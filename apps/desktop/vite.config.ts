@@ -1,0 +1,112 @@
+/// <reference types="vitest" />
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import { readFileSync } from 'fs';
+
+const pkg = JSON.parse(readFileSync(path.resolve(__dirname, '../../package.json'), 'utf-8'));
+const sharedSrc = path.resolve(__dirname, '../../shared/src');
+
+// https://vitejs.dev/config/
+export default defineConfig({
+  plugins: [react()],
+  define: {
+    __APP_VERSION__: JSON.stringify(
+      process.env.APP_VERSION ||
+      (process.env.TAURI_CONFIG ? JSON.parse(process.env.TAURI_CONFIG).version : null) ||
+      pkg.version
+    ),
+    __UPDATES_ENABLED__: JSON.stringify(process.env.UPDATES_ENABLED !== 'false'),
+  },
+  resolve: {
+    alias: [
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+      { find: '@zclaudia/shared', replacement: path.resolve(sharedSrc, 'index.ts') },
+      { find: /^@zclaudia\/shared\/(.+)$/, replacement: `${sharedSrc}/$1.ts` },
+    ],
+  },
+  // Vite options tailored for Tauri development
+  clearScreen: false,
+  build: {
+    chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('@tauri-apps')) return 'vendor-tauri';
+            if (id.includes('react-syntax-highlighter') || id.includes('/prismjs/') || id.includes('/refractor/')) {
+              return 'vendor-code';
+            }
+            if (
+              id.includes('react-markdown')
+              || id.includes('remark-gfm')
+              || id.includes('/micromark')
+              || id.includes('/mdast')
+              || id.includes('/hast')
+              || id.includes('/unist')
+            ) {
+              return 'vendor-markdown';
+            }
+            if (id.includes('@xterm')) return 'vendor-xterm';
+            if (id.includes('@xyflow')) return 'vendor-flow';
+            if (id.includes('react') || id.includes('zustand')) return 'vendor-react';
+          }
+
+          if (
+            id.includes('/src/components/chat/')
+            || id.includes('/src/components/fileviewer/')
+            || id.includes('/src/components/supervision/')
+          ) {
+            return 'feature-interactive';
+          }
+          if (id.includes('/src/components/workflows/')) return 'feature-workflows';
+          if (id.includes('/src/components/local-prs/')) return 'feature-local-prs';
+        },
+      },
+    },
+  },
+  server: {
+    host: '127.0.0.1',
+    port: Number(process.env.VITE_DEV_SERVER_PORT || process.env.PORT || '1420'),
+    strictPort: true,
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
+  },
+  // Exclude Rust build artifacts (10GB, 100K+ files) from vite's file system scan
+  exclude: ['src-tauri/target/**'],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    // Pure logic tests (.test.ts) run in node — no jsdom overhead.
+    // Component tests (.test.tsx) keep jsdom. The 15 .test.ts files that
+    // need DOM opt in via `// @vitest-environment jsdom` docblock.
+    environmentMatchGlobs: [
+      ['src/**/*.test.ts', 'node'],
+    ],
+    setupFiles: ['./src/test/setup.ts'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['src-tauri/**', 'node_modules/**', 'dist/**'],
+    server: {
+      deps: {
+        // Allow vitest to mock these Tauri-specific packages that aren't installed
+        inline: [/@tauri-apps\/.*/],
+      },
+    },
+    coverage: {
+      provider: 'istanbul',
+      reporter: ['text', 'json', 'html'],
+      all: true,
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/test/**', '**/*.d.ts', 'src/main.tsx', 'src/**/__tests__/**',
+        // Tauri-only files — use @tauri-apps/plugin-updater or @tauri-apps/plugin-process
+        // which are not installed as npm deps (only available in Tauri runtime)
+        'src/hooks/useAutoUpdate.ts',
+        'src/components/UpdateBanner.tsx',
+        'src/components/MobileSetup.tsx',
+        'src/App.tsx',
+      ],
+    },
+  },
+});

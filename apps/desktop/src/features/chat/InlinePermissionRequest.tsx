@@ -1,0 +1,344 @@
+import { useState, useEffect, useRef } from 'react';
+import { Check, X, Lock, AlertTriangle, Bot, FileText } from 'lucide-react';
+import { usePermissionStore, type PermissionRequest } from '../../stores/permissionStore';
+import { PermissionDetailView } from '../../components/permission/PermissionDetailView';
+import { isDesktopTauri } from '../../utils/platform';
+import { buildPopoutUrl, openPopoutWindow } from '../../utils/popoutWindow';
+
+interface InlinePermissionRequestProps {
+  request: PermissionRequest;
+  onDecision: (requestId: string, allow: boolean, remember?: boolean, credential?: string, feedback?: string) => void;
+}
+
+function buildAIReviewMetadataHint(result: ReturnType<typeof usePermissionStore.getState>['aiReviewResults'][string] | undefined): string | null {
+  const metadata = result?.metadata;
+  if (!metadata) return null;
+
+  if (metadata.payloadDisposition === 'do_not_send') {
+    return 'Remote AI review skipped because sensitive local material was detected.';
+  }
+
+  if (metadata.payloadDisposition === 'send_with_redaction') {
+    const files = metadata.reviewedFileCount ?? 0;
+    const redactions = metadata.redactionCount ?? 0;
+    return `Remote AI review used sanitized payload; redactions ${redactions}; reviewed ${files} file${files === 1 ? '' : 's'}.`;
+  }
+
+  return null;
+}
+
+export function InlinePermissionRequest({ request, onDecision }: InlinePermissionRequestProps) {
+  const [remainingTime, setRemainingTime] = useState(0);
+  const [remember, setRemember] = useState(false);
+  const [credential, setCredential] = useState('');
+  const [resolved, setResolved] = useState<'allow' | 'deny' | null>(null);
+  const [countdownStopped, setCountdownStopped] = useState(false);
+  const credentialInputRef = useRef<HTMLInputElement>(null);
+  const onDecisionRef = useRef(onDecision);
+  const feedback = usePermissionStore((state) => state.feedbackDrafts[request.requestId] || '');
+  const setFeedbackDraft = usePermissionStore((state) => state.setFeedbackDraft);
+  const clearFeedbackDraft = usePermissionStore((state) => state.clearFeedbackDraft);
+  const aiReviewResult = usePermissionStore((state) => state.aiReviewResults[request.requestId]);
+  const aiReviewMetadataHint = buildAIReviewMetadataHint(aiReviewResult);
+  const workflowProgress = usePermissionStore((state) => state.workflowProgress[request.requestId]);
+  // Detect plan-proposal requests by inspecting the tool input shape, not the
+  // tool name. Anything carrying a non-empty `plan` markdown string opts into
+  // the Comment textarea + "Deny + Comment" path, so the same UX applies to
+  // Claude's ExitPlanMode, the MCP-bridged exit_plan_mode, Cursor's createPlan,
+  // and any future provider's plan tool — no name list to maintain here.
+  const isPlanProposalRequest = ((): boolean => {
+    try {
+      const parsed = JSON.parse(request.detail);
+      return !!parsed && typeof parsed === 'object'
+        && typeof (parsed as Record<string, unknown>).plan === 'string'
+        && ((parsed as Record<string, unknown>).plan as string).length > 0;
+    } catch {
+      return false;
+    }
+  })();
+  const workflowRunId = request.workflowRunId || workflowProgress?.workflowRunId;
+
+  const handleOpenReviewLogs = () => {
+    if (!workflowRunId) return;
+    const params = { aiReviewLogs: workflowRunId };
+    const title = `AI Review Logs · ${request.toolName}`;
+    if (isDesktopTauri()) {
+      void openPopoutWindow({
+        type: 'ai-review-logs',
+        params,
+        title,
+        width: 900,
+        height: 700,
+      });
+      return;
+    }
+    window.open(buildPopoutUrl(params), '_blank', 'width=900,height=700');
+  };
+
+  useEffect(() => {
+    onDecisionRef.current = onDecision;
+  }, [onDecision]);
+
+  useEffect(() => {
+    setRemember(false);
+    setCredential('');
+    setCountdownStopped(false);
+    setResolved(null);
+
+    if (request.timeoutSec === 0) {
+      setRemainingTime(0);
+      if (request.requiresCredential) {
+        setTimeout(() => credentialInputRef.current?.focus(), 100);
+      }
+      return;
+    }
+
+    setRemainingTime(request.timeoutSec);
+
+    if (request.requiresCredential) {
+      setTimeout(() => credentialInputRef.current?.focus(), 100);
+    }
+  }, [request.requestId]);
+
+  useEffect(() => {
+    if (request.timeoutSec === 0) {
+      setRemainingTime(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setRemainingTime((prev) => {
+        if (countdownStopped) return prev;
+        if (prev <= 1) {
+          // Backend handles timeout resolution (AI review or auto-approve/deny).
+          // Frontend no longer auto-denies — server is authoritative.
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [request.requestId, request.timeoutSec, countdownStopped]);
+
+  const handleAllow = () => {
+    setResolved('allow');
+    clearFeedbackDraft(request.requestId);
+    if (request.requiresCredential) {
+      onDecisionRef.current(request.requestId, true, remember, credential || undefined);
+    } else {
+      onDecisionRef.current(request.requestId, true, remember);
+    }
+  };
+
+  const handleDeny = () => {
+    setResolved('deny');
+    clearFeedbackDraft(request.requestId);
+    onDecisionRef.current(request.requestId, false, remember);
+  };
+
+  const handleDenyWithFeedback = () => {
+    const note = feedback.trim();
+    if (!note) return;
+    setCountdownStopped(true);
+    setResolved('deny');
+    clearFeedbackDraft(request.requestId);
+    onDecisionRef.current(request.requestId, false, remember, undefined, note);
+  };
+
+  const hasTimeout = request.timeoutSec > 0;
+  const progressPercent = hasTimeout ? (remainingTime / request.timeoutSec) * 100 : 0;
+  const credentialLabel = request.credentialHint === 'sudo_password' ? 'sudo password' : 'credential';
+  const isCredential = request.requiresCredential;
+  const borderColor = isCredential ? 'border-l-amber-500' : 'border-l-warning';
+
+  // Resolved compact state
+  if (resolved) {
+    return (
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-border/50 bg-secondary/30 text-xs ${
+        resolved === 'allow' ? 'text-success' : 'text-muted-foreground'
+      }`}>
+        {resolved === 'allow' ? (
+          <Check size={14} strokeWidth={2} className="flex-shrink-0" />
+        ) : (
+          <X size={14} strokeWidth={2} className="flex-shrink-0" />
+        )}
+        <span className="font-mono">{request.toolName}</span>
+        <span>— {resolved === 'allow' ? 'Approved' : 'Denied'}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-xl border border-border overflow-hidden border-l-4 ${borderColor}`}>
+      {/* Timeout progress bar (legacy — hidden when workflow manages timeout) */}
+      {hasTimeout && (
+        <div className="h-0.5 bg-muted">
+          <div
+            className="h-full transition-all duration-1000 ease-linear bg-warning"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="px-3 py-2 bg-card flex items-center gap-2">
+        {isCredential ? (
+          <Lock size={16} strokeWidth={2} className="text-amber-500 flex-shrink-0" />
+        ) : (
+          <AlertTriangle size={16} strokeWidth={2} className="text-warning flex-shrink-0" />
+        )}
+        <span className="text-sm font-medium text-card-foreground">
+          {isCredential ? 'Credential Required' : 'Permission Required'}
+        </span>
+        <span className="px-1.5 py-0.5 bg-muted rounded-md text-xs font-mono text-foreground">
+          {request.toolName}
+        </span>
+        {request.matchedRule && (
+          <span className="px-1.5 py-0.5 bg-amber-500/10 rounded-md text-[11px] text-amber-700 dark:text-amber-400">
+            {request.matchedRule}
+          </span>
+        )}
+        {request.backendName && (
+          <span className="ml-auto text-xs text-muted-foreground flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+            {request.backendName}
+          </span>
+        )}
+      </div>
+
+      {/* Detail */}
+      <div className="px-3 py-2 border-t border-border/50">
+        <PermissionDetailView
+          toolName={request.toolName}
+          detail={request.detail}
+          maxHeightClass="max-h-32"
+        />
+
+        {/* Credential input */}
+        {isCredential && (
+          <div className="mt-2">
+            <input
+              ref={credentialInputRef}
+              type="password"
+              value={credential}
+              onChange={(e) => setCredential(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && credential) handleAllow();
+              }}
+              placeholder={`Enter ${credentialLabel}`}
+              autoComplete="off"
+              className="w-full px-2.5 py-1.5 bg-input border border-border rounded-md text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+            />
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              Encrypted end-to-end
+            </p>
+          </div>
+        )}
+        {isPlanProposalRequest && (
+          <div className="mt-2">
+            <label className="text-[11px] text-muted-foreground block mb-1">
+              Comment (sent with deny)
+            </label>
+            <textarea
+              value={feedback}
+              onChange={(e) => setFeedbackDraft(request.requestId, e.target.value)}
+              placeholder="Why do you reject exiting plan mode?"
+              rows={2}
+              className="w-full px-2.5 py-1.5 bg-input border border-border rounded-md text-sm text-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none"
+            />
+          </div>
+        )}
+
+        {/* Timer + remember + actions */}
+        <div className="flex items-center gap-2 mt-2 flex-wrap">
+          {/* Workflow progress */}
+          {request.workflowMode && workflowProgress && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Bot size={12} />
+              <span>
+                {workflowProgress.currentStep.status === 'running'
+                  ? `${workflowProgress.currentStep.label}...`
+                  : `${workflowProgress.completedSteps.length}/${workflowProgress.totalSteps} steps`}
+              </span>
+            </div>
+          )}
+          {request.workflowMode && !workflowProgress && !aiReviewResult && (
+            <span className="text-xs text-muted-foreground flex items-center gap-1 animate-pulse">
+              <Bot size={12} />
+              Workflow processing...
+            </span>
+          )}
+          {workflowRunId && (
+            <button
+              type="button"
+              onClick={handleOpenReviewLogs}
+              className="text-[11px] flex items-center gap-1 px-2 py-0.5 rounded-full border border-border text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+              title="Open AI review logs in a new window"
+            >
+              <FileText size={11} />
+              View logs
+            </button>
+          )}
+          {/* AI Review status (populated by workflow's ai_risk_analysis step) */}
+          {aiReviewResult && (
+            <div className="flex flex-col gap-0.5">
+              <span className={`text-xs flex items-center gap-1 ${
+                aiReviewResult.decision === 'deny' ? 'text-destructive' : 'text-muted-foreground'
+              }`}>
+                <Bot size={12} />
+                {aiReviewResult.decision === 'deny'
+                  ? `AI: unsafe (${Math.round(aiReviewResult.confidence * 100)}%) — ${aiReviewResult.reasoning?.slice(0, 60) || ''}`
+                  : aiReviewResult.decision === 'uncertain'
+                    ? `AI: uncertain — ${aiReviewResult.reasoning?.slice(0, 60) || `${Math.round(aiReviewResult.confidence * 100)}%`}`
+                    : `AI: safe (${Math.round(aiReviewResult.confidence * 100)}%) — ${aiReviewResult.reasoning?.slice(0, 60) || ''}`}
+              </span>
+              {aiReviewMetadataHint && (
+                <span className="text-[11px] text-muted-foreground">
+                  {aiReviewMetadataHint}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Remember checkbox */}
+          <label className="flex items-center gap-1.5 cursor-pointer text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="w-3.5 h-3.5 rounded-md border-input bg-background text-primary focus:ring-primary"
+            />
+            Remember
+          </label>
+
+          <div className="flex-1" />
+
+          {/* Action buttons */}
+          <button
+            onClick={handleDeny}
+            className="px-3 py-1.5 bg-secondary hover:bg-secondary/80 active:bg-secondary/70 text-secondary-foreground rounded-full text-xs font-medium transition-colors"
+          >
+            Deny
+          </button>
+          {isPlanProposalRequest && (
+            <button
+              onClick={handleDenyWithFeedback}
+              disabled={!feedback.trim()}
+              className="px-3 py-1.5 bg-secondary hover:bg-secondary/80 active:bg-secondary/70 text-secondary-foreground rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Deny + Comment
+            </button>
+          )}
+          <button
+            onClick={handleAllow}
+            disabled={isCredential && !credential}
+            className="px-3 py-1.5 bg-success hover:bg-success/80 active:bg-success/70 text-success-foreground rounded-full text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Allow
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

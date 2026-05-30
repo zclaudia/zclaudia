@@ -1,0 +1,106 @@
+import { describe, expect, it } from 'vitest';
+import { normalizeFromToolUse } from '../interaction-normalizer.js';
+
+describe('normalizeFromToolUse', () => {
+  it('returns normalized todo interaction for valid TodoWrite input', () => {
+    const result = normalizeFromToolUse({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      providerType: 'claude',
+      toolUseId: 'tool-1',
+      toolName: 'TodoWrite',
+      toolInput: {
+        todos: [
+          { content: 'Fix bug', status: 'completed' },
+          { content: 'Ship patch', status: 'in_progress' },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({
+      type: 'interaction_todo_update',
+      interactionId: 'tool-1',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      provider: 'claude',
+      todos: [
+        { content: 'Fix bug', status: 'completed' },
+        { content: 'Ship patch', status: 'in_progress' },
+      ],
+    });
+  });
+
+  it('returns normalized todo interaction for Cursor updateTodos input', () => {
+    const result = normalizeFromToolUse({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      providerType: 'cursor',
+      toolUseId: 'tool-2',
+      toolName: 'updateTodos',
+      toolInput: {
+        todos: [
+          { content: '扫描 orchestration 代码', status: 'completed' },
+          { content: '执行 review', status: 'in_progress' },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({
+      type: 'interaction_todo_update',
+      interactionId: 'tool-2',
+      sessionId: 'session-1',
+      runId: 'run-1',
+      provider: 'cursor',
+      todos: [
+        { content: '扫描 orchestration 代码', status: 'completed' },
+        { content: '执行 review', status: 'in_progress' },
+      ],
+    });
+  });
+
+  it('uses provider-normalized interaction kind without matching native tool names', () => {
+    const result = normalizeFromToolUse({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      providerType: 'claude',
+      toolUseId: 'tool-3',
+      toolName: 'provider_native_todo',
+      interactionKind: 'todo_update',
+      toolInput: {
+        todos: [
+          { content: 'Keep runtime provider-agnostic', status: 'pending' },
+        ],
+      },
+    });
+
+    expect(result).toMatchObject({
+      type: 'interaction_todo_update',
+      interactionId: 'tool-3',
+      todos: [
+        { content: 'Keep runtime provider-agnostic', status: 'pending' },
+      ],
+    });
+  });
+
+  it('returns null when TodoWrite payload cannot be normalized', () => {
+    const result = normalizeFromToolUse({
+      sessionId: 'session-1',
+      toolUseId: 'tool-1',
+      toolName: 'TodoWrite',
+      toolInput: { unexpected: 'shape' },
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('returns null when toolUseId is missing', () => {
+    const result = normalizeFromToolUse({
+      sessionId: 'session-1',
+      toolUseId: '',
+      toolName: 'TodoWrite',
+      toolInput: { todos: [{ content: 'Task', status: 'pending' }] },
+    });
+
+    expect(result).toBeNull();
+  });
+});

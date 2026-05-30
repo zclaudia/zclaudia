@@ -1,0 +1,450 @@
+/**
+ * Workflow Service (Facade)
+ *
+ * Orchestrates the workflow engine, scheduler, and event bridge.
+ * Provides CRUD operations and manages lifecycle.
+ */
+
+import type { Database } from 'better-sqlite3';
+import type {
+  Workflow,
+  WorkflowRun,
+  WorkflowStepRun,
+  WorkflowDefinition,
+  WorkflowTrigger,
+} from '@zclaudia/shared/features/workflows';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import { WorkflowRepository } from './repository.js';
+import { WorkflowRunRepository } from './workflow-run-repository.js';
+import { WorkflowStepRunRepository } from './workflow-step-run-repository.js';
+import { WorkflowScheduleRepository } from './workflow-schedule-repository.js';
+import type { WorkflowEngine } from './engine.js';
+import { computeNextCronRun } from '../../utils/cron.js';
+import { pluginEvents } from '../../infra/events/index.js';
+import {
+  BUILTIN_WORKFLOW_TEMPLATES,
+  PERMISSION_WORKFLOW_TEMPLATE_ID,
+  SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY,
+} from './templates.js';
+
+export class ImmutableSystemWorkflowError extends Error {
+  constructor(message = 'System workflow is immutable') {
+    super(message);
+    this.name = 'ImmutableSystemWorkflowError';
+  }
+}
+
+export class WorkflowService {
+  private workflowRepo: WorkflowRepository;
+  private runRepo: WorkflowRunRepository;
+  private stepRunRepo: WorkflowStepRunRepository;
+  private scheduleRepo: WorkflowScheduleRepository;
+  private eventSubscriptions: Array<() => void> = [];
+
+  constructor(
+    private db: Database,
+    private broadcastFn: (projectId: string | undefined, message: ServerMessage | { type: string; projectId?: string; [key: string]: unknown }) => void,
+    private engine: WorkflowEngine,
+  ) {
+    this.workflowRepo = new WorkflowRepository(db);
+    this.runRepo = new WorkflowRunRepository(db);
+    this.stepRunRepo = new WorkflowStepRunRepository(db);
+    this.scheduleRepo = new WorkflowScheduleRepository(db);
+  }
+
+  // ── Initialization ────────────────────────────────────────────
+
+  initialize(): void {
+    this.ensureBuiltinWorkflows();
+    this.rebuildEventSubscriptions();
+  }
+
+  private ensureBuiltinWorkflows(): void {
+    const template = BUILTIN_WORKFLOW_TEMPLATES.find(t => t.id === PERMISSION_WORKFLOW_TEMPLATE_ID);
+    if (!template) return;
+
+    const systemWorkflow = this.workflowRepo.findBySystemKey(SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY);
+    if (!systemWorkflow) {
+      const legacyGlobal = this.workflowRepo.findGlobalByTemplate(PERMISSION_WORKFLOW_TEMPLATE_ID);
+      if (legacyGlobal) {
+        this.workflowRepo.update(legacyGlobal.id, {
+          status: 'active',
+          definition: template.definition,
+          isSystem: true,
+          systemKey: SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY,
+          sourceType: 'template',
+        });
+        console.log(`[Workflow] Adopted global builtin workflow as system fallback: ${template.name}`);
+        return;
+      }
+
+      this.workflowRepo.create({
+        projectId: undefined,
+        name: template.name,
+        description: template.description,
+        status: 'active',
+        definition: template.definition,
+        templateId: template.id,
+        isSystem: true,
+        systemKey: SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY,
+        sourceType: 'template',
+      });
+      console.log(`[Workflow] Auto-created system fallback workflow: ${template.name}`);
+      return;
+    }
+
+    const needsRepair = systemWorkflow.status !== 'active'
+      || systemWorkflow.templateId !== PERMISSION_WORKFLOW_TEMPLATE_ID
+      || !systemWorkflow.isSystem
+      || JSON.stringify(systemWorkflow.definition) !== JSON.stringify(template.definition);
+
+    if (needsRepair) {
+      this.workflowRepo.update(systemWorkflow.id, {
+        name: template.name,
+        description: template.description,
+        status: 'active',
+        definition: template.definition,
+        templateId: template.id,
+        isSystem: true,
+        systemKey: SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY,
+        sourceType: 'template',
+      });
+      console.log(`[Workflow] Repaired system fallback workflow: ${template.name}`);
+    }
+  }
+
+  getSystemPermissionFallback(): Workflow {
+    const workflow = this.workflowRepo.findBySystemKey(SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY);
+    if (!workflow) {
+      throw new Error('System permission fallback workflow is missing');
+    }
+    return workflow;
+  }
+
+  // ── Workflow CRUD ─────────────────────────────────────────────
+
+  listWorkflows(projectId: string): Workflow[] {
+    return this.workflowRepo.findByProject(projectId);
+  }
+
+  listAllWorkflows(): Workflow[] {
+    return this.workflowRepo.findAll();
+  }
+
+  getWorkflow(workflowId: string): Workflow | null {
+    return this.workflowRepo.findById(workflowId);
+  }
+
+  createWorkflow(data: {
+    projectId?: string;
+    name: string;
+    description?: string;
+    definition: WorkflowDefinition;
+    templateId?: string;
+    status?: 'active' | 'disabled';
+    sourcePluginId?: string;
+    sourceType?: 'user' | 'plugin' | 'template';
+    authoringMode?: 'simple' | 'graph' | 'event-trigger';
+  }): Workflow {
+    const workflow = this.workflowRepo.create({
+      projectId: data.projectId,
+      name: data.name,
+      description: data.description,
+      status: data.status ?? 'active',
+      definition: data.definition,
+      templateId: data.templateId,
+      sourcePluginId: data.sourcePluginId,
+      sourceType: data.sourceType,
+      authoringMode: data.authoringMode,
+    });
+
+    // Set up schedule if needed
+    if (workflow.status === 'active') {
+      this.syncSchedule(workflow);
+      this.rebuildEventSubscriptions();
+    }
+
+    this.broadcastWorkflowUpdate(workflow);
+    return workflow;
+  }
+
+  updateWorkflow(workflowId: string, data: Partial<Omit<Workflow, 'id' | 'projectId' | 'createdAt'>>): Workflow {
+    const existing = this.workflowRepo.findById(workflowId);
+    if (existing?.isSystem) {
+      throw new ImmutableSystemWorkflowError();
+    }
+    const workflow = this.workflowRepo.update(workflowId, data);
+
+    // Re-sync schedule
+    this.syncSchedule(workflow);
+    this.rebuildEventSubscriptions();
+
+    this.broadcastWorkflowUpdate(workflow);
+    return workflow;
+  }
+
+  deleteWorkflow(workflowId: string, projectId?: string): boolean {
+    const existing = this.workflowRepo.findById(workflowId);
+    if (existing?.isSystem) {
+      throw new ImmutableSystemWorkflowError();
+    }
+    this.scheduleRepo.deleteByWorkflow(workflowId);
+    const deleted = this.workflowRepo.delete(workflowId);
+    if (deleted) {
+      this.rebuildEventSubscriptions();
+      this.broadcastFn(projectId, {
+        type: 'workflow_deleted',
+        projectId,
+        workflowId,
+      });
+    }
+    return deleted;
+  }
+
+  // ── Template Operations ───────────────────────────────────────
+
+  getTemplates() {
+    return BUILTIN_WORKFLOW_TEMPLATES;
+  }
+
+  createFromTemplate(projectId: string | undefined, templateId: string): Workflow {
+    if (templateId === PERMISSION_WORKFLOW_TEMPLATE_ID) {
+      throw new ImmutableSystemWorkflowError('Permission escalation template is managed by the system');
+    }
+    const template = BUILTIN_WORKFLOW_TEMPLATES.find(t => t.id === templateId);
+    if (!template) throw new Error(`Template not found: ${templateId}`);
+
+    // Check if already exists — toggle enable/disable
+    const existing = projectId
+      ? this.workflowRepo.findByProjectAndTemplate(projectId, templateId)
+      : this.workflowRepo.findGlobalByTemplate(templateId);
+    if (existing) {
+      const newStatus = existing.status === 'active' ? 'disabled' : 'active';
+      return this.updateWorkflow(existing.id, { status: newStatus });
+    }
+
+    return this.createWorkflow({
+      projectId,
+      name: template.name,
+      description: template.description,
+      definition: template.definition,
+      templateId: template.id,
+    });
+  }
+
+  // ── Trigger & Run ─────────────────────────────────────────────
+
+  async triggerWorkflow(
+    workflowId: string,
+    triggerSource: 'manual' | 'schedule' | 'event' = 'manual',
+    triggerDetail?: string,
+    triggerData?: {
+      eventPayload?: Record<string, unknown>;
+      triggerContext?: Record<string, unknown>;
+    },
+  ): Promise<WorkflowRun> {
+    const workflow = this.workflowRepo.findById(workflowId);
+    if (!workflow) throw new Error(`Workflow not found: ${workflowId}`);
+    if (workflow.status !== 'active') throw new Error(`Workflow is not active: ${workflowId}`);
+
+    return this.engine.startRun(
+      workflowId,
+      workflow.projectId,
+      workflow.definition,
+      triggerSource,
+      triggerDetail,
+      triggerData,
+    );
+  }
+
+  getRuns(workflowId: string, limit?: number): WorkflowRun[] {
+    return this.runRepo.findByWorkflow(workflowId, limit);
+  }
+
+  getRunsByProject(projectId: string, limit?: number): WorkflowRun[] {
+    return this.runRepo.findByProject(projectId, limit);
+  }
+
+  getRun(runId: string): { run: WorkflowRun; stepRuns: WorkflowStepRun[] } | null {
+    const run = this.runRepo.findById(runId);
+    if (!run) return null;
+    const stepRuns = this.stepRunRepo.findByRun(runId);
+    return { run, stepRuns };
+  }
+
+  cancelRun(runId: string): boolean {
+    return this.engine.cancelRun(runId);
+  }
+
+  // ── Approval API ──────────────────────────────────────────────
+
+  approveStep(stepRunId: string): boolean {
+    return this.engine.approveStep(stepRunId);
+  }
+
+  rejectStep(stepRunId: string): boolean {
+    return this.engine.rejectStep(stepRunId);
+  }
+
+  // ── Scheduler Tick ────────────────────────────────────────────
+
+  async tick(): Promise<void> {
+    try {
+      const now = Date.now();
+      const dueSchedules = this.scheduleRepo.findDue(now);
+
+      for (const schedule of dueSchedules) {
+        const workflow = this.workflowRepo.findById(schedule.workflowId);
+        if (!workflow || workflow.status !== 'active') continue;
+
+        // Skip if already running
+        if (this.engine.isRunning(workflow.id)) continue;
+
+        // Find the trigger config
+        const trigger = workflow.definition.triggers[schedule.triggerIndex];
+        if (!trigger) continue;
+
+        const triggerDetail = trigger.type === 'cron'
+          ? `cron: ${trigger.cron}`
+          : trigger.type === 'once'
+          ? `once: ${new Date(trigger.onceAt || 0).toISOString()}`
+          : `interval: ${trigger.intervalMinutes}min`;
+
+        // Start the run
+        try {
+          await this.triggerWorkflow(workflow.id, 'schedule', triggerDetail, {
+            triggerContext: {
+              type: trigger.type,
+              cron: trigger.cron,
+              intervalMinutes: trigger.intervalMinutes,
+              onceAt: trigger.onceAt,
+            },
+          });
+        } catch (err) {
+          console.error(`[Workflow] Schedule trigger failed for ${workflow.id}:`, err);
+        }
+
+        // Compute next run
+        const nextRun = this.computeNextRun(trigger);
+        this.scheduleRepo.updateNextRun(workflow.id, nextRun);
+      }
+    } catch (err) {
+      console.error('[Workflow] tick error:', err);
+    }
+  }
+
+  // ── Event Bridge ──────────────────────────────────────────────
+
+  private rebuildEventSubscriptions(): void {
+    // Unsubscribe old
+    for (const unsub of this.eventSubscriptions) {
+      unsub();
+    }
+    this.eventSubscriptions = [];
+
+    // Find all active workflows with event triggers
+    const workflows = this.workflowRepo.findAllActive();
+    const eventWorkflows = new Map<string, Workflow[]>();
+
+    for (const wf of workflows) {
+      for (const trigger of wf.definition.triggers) {
+        if (trigger.type === 'event' && trigger.event) {
+          const list = eventWorkflows.get(trigger.event) ?? [];
+          list.push(wf);
+          eventWorkflows.set(trigger.event, list);
+        }
+      }
+    }
+
+    // Subscribe once per event pattern (supports exact matches and globs)
+    for (const [event, wfs] of eventWorkflows) {
+      const isPattern = event.includes('*');
+      const handler = async (data: unknown, _sourcePluginId?: string) => {
+        for (const wf of wfs) {
+          if (wf.status !== 'active') continue;
+          // Allow concurrent runs for event-triggered workflows (e.g., permission escalation).
+          // Only skip for scheduled/cron workflows where duplicates are undesirable.
+
+          // Check event filter
+          const trigger = wf.definition.triggers.find(
+            t => t.type === 'event' && t.event === event
+          );
+          if (trigger?.eventFilter && !this.matchesFilter(data, trigger.eventFilter)) continue;
+
+          try {
+            await this.triggerWorkflow(wf.id, 'event', `event: ${event}`, {
+              eventPayload: data && typeof data === 'object' ? data as Record<string, unknown> : { value: data },
+              triggerContext: {
+                type: 'event',
+                event,
+              },
+            });
+          } catch (err) {
+            console.error(`[Workflow] Event trigger failed for ${wf.id}:`, err);
+          }
+        }
+      };
+
+      const unsub = isPattern
+        ? pluginEvents.onPattern(event, handler, 'workflow-engine')
+        : pluginEvents.on(event, handler, 'workflow-engine');
+
+      this.eventSubscriptions.push(unsub);
+    }
+  }
+
+  private matchesFilter(data: unknown, filter: Record<string, unknown>): boolean {
+    if (!data || typeof data !== 'object') return false;
+    const record = data as Record<string, unknown>;
+    for (const [key, value] of Object.entries(filter)) {
+      if (record[key] !== value) return false;
+    }
+    return true;
+  }
+
+  // ── Schedule Sync ─────────────────────────────────────────────
+
+  private syncSchedule(workflow: Workflow): void {
+    if (workflow.status !== 'active') {
+      this.scheduleRepo.deleteByWorkflow(workflow.id);
+      return;
+    }
+
+    // Find first schedulable trigger (cron/interval/once)
+    const triggerIndex = workflow.definition.triggers.findIndex(
+      t => t.type === 'cron' || t.type === 'interval' || t.type === 'once'
+    );
+
+    if (triggerIndex === -1) {
+      this.scheduleRepo.deleteByWorkflow(workflow.id);
+      return;
+    }
+
+    const trigger = workflow.definition.triggers[triggerIndex];
+    const nextRun = this.computeNextRun(trigger);
+    this.scheduleRepo.upsert(workflow.id, triggerIndex, nextRun, true);
+  }
+
+  private computeNextRun(trigger: WorkflowTrigger): number | null {
+    if (trigger.type === 'cron' && trigger.cron) {
+      return computeNextCronRun(trigger.cron);
+    }
+    if (trigger.type === 'interval' && trigger.intervalMinutes) {
+      return Date.now() + trigger.intervalMinutes * 60 * 1000;
+    }
+    if (trigger.type === 'once' && trigger.onceAt) {
+      return trigger.onceAt > Date.now() ? trigger.onceAt : null;
+    }
+    return null;
+  }
+
+  // ── Broadcast ─────────────────────────────────────────────────
+
+  private broadcastWorkflowUpdate(workflow: Workflow): void {
+    this.broadcastFn(workflow.projectId, {
+      type: 'workflow_update',
+      projectId: workflow.projectId,
+      workflow,
+    });
+  }
+}

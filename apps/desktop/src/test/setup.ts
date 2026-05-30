@@ -1,0 +1,223 @@
+import '@testing-library/jest-dom';
+import React from 'react';
+import { afterEach, vi } from 'vitest';
+import { cleanup } from '@testing-library/react';
+
+// Mock WebSocket
+class MockWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+
+  readonly CONNECTING = 0;
+  readonly OPEN = 1;
+  readonly CLOSING = 2;
+  readonly CLOSED = 3;
+
+  readyState = MockWebSocket.OPEN;
+  onopen: ((event: Event) => void) | null = null;
+  onclose: ((event: CloseEvent) => void) | null = null;
+  onmessage: ((event: MessageEvent) => void) | null = null;
+  onerror: ((event: Event) => void) | null = null;
+
+  constructor(public url: string) {
+    // 优化：使用 queueMicrotask 替代 setTimeout，更快执行
+    queueMicrotask(() => {
+      this.onopen?.(new Event('open'));
+    });
+  }
+
+  send = vi.fn();
+  close = vi.fn(() => {
+    this.readyState = MockWebSocket.CLOSED;
+    this.onclose?.(new CloseEvent('close'));
+  });
+}
+
+vi.stubGlobal('WebSocket', MockWebSocket);
+
+// Mock crypto.randomUUID with unique IDs
+let uuidCounter = 0;
+Object.defineProperty(globalThis, 'crypto', {
+  value: {
+    randomUUID: () => `test-uuid-${++uuidCounter}`,
+  },
+  configurable: true,
+});
+
+// DOM-specific mocks — only when running in jsdom (skipped in node environment)
+if (typeof window !== 'undefined') {
+  // Mock localStorage for zustand persist
+  const localStorageMock = (() => {
+    let store: Record<string, string> = {};
+    return {
+      getItem: (key: string) => store[key] || null,
+      setItem: (key: string, value: string) => {
+        store[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete store[key];
+      },
+      clear: () => {
+        store = {};
+      },
+      get length() {
+        return Object.keys(store).length;
+      },
+      key: (index: number) => Object.keys(store)[index] || null,
+    };
+  })();
+
+  Object.defineProperty(window, 'localStorage', {
+    value: localStorageMock,
+  });
+
+  // Mock matchMedia
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  });
+}
+
+// Mock IndexedDB for agentStorage tests
+// 优化：使用同步/微任务替代 setTimeout，减少等待时间
+class MockIDBDatabase {
+  name: string;
+  version: number;
+  objectStoreNames = { contains: vi.fn().mockReturnValue(false), length: 0 } as unknown as DOMStringList;
+
+  constructor(name: string) {
+    this.name = name;
+    this.version = 1;
+  }
+
+  createObjectStore = vi.fn(() => ({
+    createIndex: vi.fn(),
+  }));
+  transaction = vi.fn(() => {
+    const tx: Record<string, unknown> = {
+      oncomplete: null as ((ev: Event) => void) | null,
+      onerror: null as ((ev: Event) => void) | null,
+      commit: vi.fn(),
+      abort: vi.fn(),
+    };
+
+    const makeRequest = (result?: unknown) => {
+      const req: Record<string, unknown> = {
+        result: result ?? undefined,
+        error: null,
+        onsuccess: null as ((ev: Event) => void) | null,
+        onerror: null as ((ev: Event) => void) | null,
+      };
+      // 优化：使用 queueMicrotask 替代 setTimeout(..., 0)
+      queueMicrotask(() => {
+        if (req.onsuccess) (req.onsuccess as (ev: Event) => void)(new Event('success'));
+        if (tx.oncomplete) (tx.oncomplete as (ev: Event) => void)(new Event('complete'));
+      });
+      return req;
+    };
+
+    tx.objectStore = vi.fn(() => ({
+      get: vi.fn(() => makeRequest(undefined)),
+      put: vi.fn(() => makeRequest(undefined)),
+      delete: vi.fn(() => makeRequest(undefined)),
+      getAll: vi.fn(() => makeRequest([])),
+      clear: vi.fn(() => makeRequest(undefined)),
+    }));
+
+    return tx;
+  });
+  close = vi.fn();
+}
+
+class MockIDBRequest<T = unknown> {
+  result: T | null = null;
+  error: DOMException | null = null;
+  source: unknown = null;
+  transaction: IDBTransaction | null = null;
+  readyState: IDBRequestReadyState = 'pending';
+  onsuccess: ((this: IDBRequest, ev: Event) => void) | null = null;
+  onerror: ((this: IDBRequest, ev: Event) => void) | null = null;
+}
+
+class MockIDBOpenDBRequest extends MockIDBRequest<IDBDatabase> {
+  onupgradeneeded: ((this: IDBOpenDBRequest, ev: IDBVersionChangeEvent) => void) | null = null;
+  onblocked: ((this: IDBOpenDBRequest, ev: Event) => void) | null = null;
+}
+
+const mockIndexedDB = {
+  open: vi.fn((name: string, version?: number) => {
+    const request = new MockIDBOpenDBRequest();
+    // 优化：使用 queueMicrotask 替代 setTimeout(..., 0)
+    queueMicrotask(() => {
+      request.result = new MockIDBDatabase(name) as unknown as IDBDatabase;
+      request.onsuccess?.call(request as unknown as IDBOpenDBRequest, new Event('success'));
+    });
+    return request as unknown as IDBOpenDBRequest;
+  }),
+  deleteDatabase: vi.fn(),
+  cmp: vi.fn((a: unknown, b: unknown) => (a === b ? 0 : a < b ? -1 : 1)),
+};
+
+vi.stubGlobal('indexedDB', mockIndexedDB);
+
+// Mock fetch for API tests
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
+
+// Mock scrollIntoView for DOM elements (jsdom only)
+if (typeof Element !== 'undefined') {
+  Element.prototype.scrollTo = vi.fn();
+  Element.prototype.scrollIntoView = vi.fn();
+}
+
+// Mock ThemeContext — needed by components that use useTheme (e.g. BrandMark → LoadingIndicator)
+vi.mock('@/contexts/ThemeContext', () => ({
+  useTheme: vi.fn(() => ({
+    theme: 'dark',
+    resolvedTheme: 'dark',
+    setTheme: vi.fn(),
+    toggleTheme: vi.fn(),
+  })),
+  ThemeProvider: ({ children }: { children: React.ReactNode }) => children,
+  isDarkTheme: vi.fn(() => true),
+}));
+
+// Mock ConnectionContext — needed by components using useConnection (e.g. ServerSelector → Sidebar)
+vi.mock('@/contexts/ConnectionContext', () => ({
+  useConnection: vi.fn(() => ({
+    isConnected: true,
+    serverUrl: 'http://localhost:3100',
+    socket: null,
+    sendMessage: vi.fn(),
+    connect: vi.fn(),
+    disconnect: vi.fn(),
+  })),
+  ConnectionProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+// Helper to reset mocks between tests
+vi.stubGlobal('__resetDesktopMocks__', () => {
+  mockFetch.mockReset();
+  mockIndexedDB.open.mockClear();
+});
+
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  mockFetch.mockReset();
+  mockIndexedDB.open.mockClear();
+  if (typeof window !== 'undefined') {
+    window.localStorage.clear();
+  }
+});

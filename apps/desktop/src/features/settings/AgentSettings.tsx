@@ -1,0 +1,206 @@
+import { useState, useEffect, useCallback } from 'react';
+import { fetchApi, getProviders } from '../../services/api';
+import type { ProviderConfig } from '@zclaudia/shared';
+import { ShortcutSettings } from './ShortcutSettings';
+import { isDesktopTauri } from '../../utils/platform';
+import { useAgentConfigStore } from '../../stores/agentConfigStore';
+import { Select } from '../../components/ui/Select';
+
+interface AgentCapabilities {
+  tools: Array<{ id: string; name: string; description: string; scope: string[] }>;
+  skills: Array<{ id: string; name: string; description: string }>;
+  contextTemplates: string[];
+  maxConcurrentTasks: number;
+}
+
+export function AgentSettings() {
+  const [capabilities, setCapabilities] = useState<AgentCapabilities | null>(null);
+  const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const config = useAgentConfigStore((s) => s.config);
+  const loadConfig = useAgentConfigStore((s) => s.loadConfig);
+  const updateConfig = useAgentConfigStore((s) => s.updateConfig);
+  const loading = useAgentConfigStore((s) => s.isLoading);
+  const saving = useAgentConfigStore((s) => s.isSaving);
+  const error = useAgentConfigStore((s) => s.error);
+  const [metaLoading, setMetaLoading] = useState(true);
+  const [metaError, setMetaError] = useState<string | null>(null);
+
+  const loadData = useCallback(async () => {
+    setMetaLoading(true);
+    setMetaError(null);
+    try {
+      await loadConfig();
+      const [capsRes, providerList] = await Promise.all([
+        fetchApi<AgentCapabilities>('/api/agent/capabilities'),
+        getProviders().catch(() => [] as ProviderConfig[]),
+      ]);
+      if (capsRes.success && capsRes.data) setCapabilities(capsRes.data);
+      setProviders(providerList);
+    } catch (err: unknown) {
+      setMetaError(err instanceof Error ? err.message : 'Failed to load agent settings');
+    } finally {
+      setMetaLoading(false);
+    }
+  }, [loadConfig]);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const saveConfig = useCallback(async (updates: {
+    enabled?: boolean;
+    providerId?: string | null;
+  }) => {
+    await updateConfig(updates);
+  }, [updateConfig]);
+
+  if (loading || metaLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="p-3 bg-secondary/50 rounded-lg text-sm text-muted-foreground">Loading...</div>
+      </div>
+    );
+  }
+
+  if ((error || metaError) && !config) {
+    return (
+      <div className="space-y-6">
+        <div className="p-3 bg-destructive/10 rounded-lg text-sm">
+          <p className="text-destructive">Could not load agent settings from server.</p>
+          <p className="text-xs text-destructive/70 mt-1">{error || metaError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+
+      {/* General */}
+      <div>
+        <h3 className="text-sm font-medium mb-3">General</h3>
+        <div className="p-3 bg-secondary/50 rounded-lg space-y-3">
+          {/* Enable toggle */}
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm">Claudia</span>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Personal assistant with tools, skills, and task orchestration
+              </p>
+            </div>
+            <button
+              onClick={() => saveConfig({ enabled: !config?.enabled })}
+              disabled={saving}
+              className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
+                config?.enabled ? 'bg-primary' : 'bg-muted'
+              }`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                config?.enabled ? 'translate-x-5' : 'translate-x-0'
+              }`} />
+            </button>
+          </div>
+
+          {/* Provider */}
+          <div className="pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-sm">Provider</span>
+              <Select
+                value={config?.providerId || ''}
+                onChange={(next) => saveConfig({ providerId: next || null })}
+                disabled={saving}
+                size="md"
+                align="right"
+                triggerClassName="min-w-[180px]"
+                options={[
+                  { value: '', label: 'Default (same as chat)' },
+                  ...providers.map((p) => ({
+                    value: p.id,
+                    label: `${p.name}${p.isDefault ? ' (default)' : ''}`,
+                  })),
+                ]}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 mt-1">
+              Choose which provider the agent uses
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Global Shortcut - desktop only */}
+      {isDesktopTauri() && (
+        <div>
+          <h3 className="text-sm font-medium mb-3">Shortcut</h3>
+          <ShortcutSettings disabled={!config?.enabled} />
+        </div>
+      )}
+
+      {/* Capabilities */}
+      {capabilities && (
+        <div>
+          <h3 className="text-sm font-medium mb-3">Capabilities</h3>
+          <div className="space-y-2">
+
+            {/* Tools */}
+            <div className="p-3 bg-secondary/50 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm">Tools</span>
+                <span className="text-xs text-muted-foreground">{capabilities.tools.length}</span>
+              </div>
+              {capabilities.tools.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No agent tools registered.</p>
+              ) : (
+                <div className="space-y-1">
+                  {capabilities.tools.map((tool) => (
+                    <div key={tool.id} className="flex items-center justify-between text-xs">
+                      <span className="font-mono text-foreground/80">{tool.name}</span>
+                      <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">{tool.description}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Skills */}
+            {capabilities.skills.length > 0 && (
+              <div className="p-3 bg-secondary/50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm">Skills</span>
+                  <span className="text-xs text-muted-foreground">{capabilities.skills.length}</span>
+                </div>
+                <div className="space-y-1">
+                  {capabilities.skills.map((skill) => (
+                    <div key={skill.id} className="flex items-center justify-between text-xs">
+                      <span className="text-foreground/80">{skill.name}</span>
+                      {skill.description && (
+                        <span className="text-muted-foreground truncate ml-2 max-w-[50%] text-right">{skill.description}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Runtime */}
+            <div className="p-3 bg-secondary/50 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm">Runtime</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Max Concurrent Tasks</span>
+                  <span className="font-mono">{capabilities.maxConcurrentTasks}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Context Templates</span>
+                  <span className="font-mono">{capabilities.contextTemplates.join(', ')}</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

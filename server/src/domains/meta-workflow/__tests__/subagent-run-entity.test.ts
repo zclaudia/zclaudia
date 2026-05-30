@@ -1,0 +1,222 @@
+// server/src/domains/meta-workflow/__tests__/subagent-run-entity.test.ts
+import { describe, it, expect, vi } from 'vitest';
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createSubagentRunEntity, createRunVirtualClientFromAiRunPort } from '../run-entities/subagent-run-entity.js';
+import type { MetaSubagentTemplate } from '@zclaudia/shared/features/meta-workflow';
+
+const baseTemplate: MetaSubagentTemplate = {
+  id: 's1',
+  systemPrompt: 'You investigate.',
+  allowedTools: ['Read', 'Grep'],
+  maxTurns: 5,
+  terminationCondition: { kind: 'output-file', target: 'report.md' },
+  sourceType: 'auto',
+  createdAt: 0,
+  updatedAt: 0,
+};
+
+describe('subagent run-entity adapter', () => {
+  it('returns exitOk=true when output-file is produced', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-test-'));
+    const runVirtualClient = vi.fn().mockImplementation(async () => {
+      writeFileSync(join(dir, 'report.md'), '# report');
+      return { ok: true };
+    });
+    const runEntity = createSubagentRunEntity({ runVirtualClient });
+    const outcome = await runEntity(
+      { kind: 'subagent', subagent: baseTemplate },
+      { worktreePath: dir },
+    );
+    expect(outcome.exitOk).toBe(true);
+    expect(runVirtualClient).toHaveBeenCalledOnce();
+  });
+
+  it('returns exitOk=false when output-file is missing', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-test-'));
+    const runVirtualClient = vi.fn().mockResolvedValue({ ok: true });
+    const runEntity = createSubagentRunEntity({ runVirtualClient });
+    const outcome = await runEntity(
+      { kind: 'subagent', subagent: baseTemplate },
+      { worktreePath: dir },
+    );
+    expect(outcome.exitOk).toBe(false);
+  });
+
+  it('output-keyword termination matches when AI output contains keyword', async () => {
+    const tmpl: MetaSubagentTemplate = {
+      ...baseTemplate,
+      terminationCondition: { kind: 'output-keyword', target: '[INVESTIGATION_COMPLETE]' },
+    };
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-test-'));
+    const runVirtualClient = vi.fn().mockResolvedValue({
+      ok: true,
+      output: 'I have finished my investigation. [INVESTIGATION_COMPLETE]',
+    });
+    const runEntity = createSubagentRunEntity({ runVirtualClient });
+    const outcome = await runEntity(
+      { kind: 'subagent', subagent: tmpl },
+      { worktreePath: dir },
+    );
+    expect(outcome.exitOk).toBe(true);
+  });
+
+  it('output-keyword termination fails when keyword is missing', async () => {
+    const tmpl: MetaSubagentTemplate = {
+      ...baseTemplate,
+      terminationCondition: { kind: 'output-keyword', target: '[DONE]' },
+    };
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-test-'));
+    const runVirtualClient = vi.fn().mockResolvedValue({ ok: true, output: 'lorem ipsum' });
+    const runEntity = createSubagentRunEntity({ runVirtualClient });
+    const outcome = await runEntity(
+      { kind: 'subagent', subagent: tmpl },
+      { worktreePath: dir },
+    );
+    expect(outcome.exitOk).toBe(false);
+  });
+
+  it('rejects non-subagent kind', async () => {
+    const runVirtualClient = vi.fn();
+    const runEntity = createSubagentRunEntity({ runVirtualClient });
+    await expect(runEntity(
+      { kind: 'workflow', workflow: {} as never, workflowId: 'w' },
+      { worktreePath: '/tmp' },
+    )).rejects.toThrow(/subagent/i);
+  });
+
+  it('returns exitOk=false when virtual client itself fails', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-test-'));
+    const runVirtualClient = vi.fn().mockResolvedValue({ ok: false });
+    const runEntity = createSubagentRunEntity({ runVirtualClient });
+    const outcome = await runEntity(
+      { kind: 'subagent', subagent: baseTemplate },
+      { worktreePath: dir },
+    );
+    expect(outcome.exitOk).toBe(false);
+  });
+});
+
+// Additional Phase D tests for the AI-runport adapter
+
+describe('createRunVirtualClientFromAiRunPort', () => {
+  it('invokes the AI run port with system prompt as input', async () => {
+    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+      // Simulate the port emitting an assistant message and then completion.
+      input.onMessage?.({ kind: 'assistant_message', content: 'analysis result' });
+      input.onMessage?.({ kind: 'run_completed' });
+    });
+    const runVirtualClient = createRunVirtualClientFromAiRunPort({
+      aiRunPort: { startVirtualRun } as never,
+      defaultProviderId: 'provider-x',
+      timeoutMs: 1000,
+    });
+    const result = await runVirtualClient({
+      systemPrompt: 'You investigate.',
+      allowedTools: ['Read'],
+      maxTurns: 5,
+      cwd: '/tmp',
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toMatch(/analysis result/);
+    expect(startVirtualRun).toHaveBeenCalledOnce();
+  });
+
+  it('returns ok=false when the port throws', async () => {
+    const startVirtualRun = vi.fn().mockRejectedValue(new Error('boom'));
+    const runVirtualClient = createRunVirtualClientFromAiRunPort({
+      aiRunPort: { startVirtualRun } as never,
+      defaultProviderId: 'provider-x',
+      timeoutMs: 1000,
+    });
+    const result = await runVirtualClient({
+      systemPrompt: 'p', allowedTools: [], maxTurns: 5, cwd: '/tmp',
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it('times out and returns ok=false when no completion is seen', async () => {
+    const startVirtualRun = vi.fn().mockImplementation(async () => {
+      // Never sends a completion event.
+    });
+    const runVirtualClient = createRunVirtualClientFromAiRunPort({
+      aiRunPort: { startVirtualRun } as never,
+      defaultProviderId: 'provider-x',
+      timeoutMs: 5,
+    });
+    const result = await runVirtualClient({
+      systemPrompt: 'p', allowedTools: [], maxTurns: 5, cwd: '/tmp',
+    });
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe('createRunVirtualClientFromAiRunPort — incremental termination', () => {
+  it('resolves ok=true early when output-file appears mid-conversation', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-incr-'));
+    let messagesSent = 0;
+    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+      input.onMessage?.({ kind: 'assistant_message', content: 'thinking...' });
+      messagesSent += 1;
+      // create the report file mid-conversation
+      writeFileSync(join(dir, 'report.md'), 'done');
+      input.onMessage?.({ kind: 'assistant_message', content: 'wrote report' });
+      messagesSent += 1;
+      // simulate that more messages follow (which we should ignore once terminated)
+      input.onMessage?.({ kind: 'tool_use', content: 'still chatting' });
+      messagesSent += 1;
+      // The adapter should resolve before run_completed fires.
+    });
+    const runVirtualClient = createRunVirtualClientFromAiRunPort({
+      aiRunPort: { startVirtualRun } as never,
+      timeoutMs: 1000,
+    });
+    const result = await runVirtualClient({
+      systemPrompt: 'investigate',
+      allowedTools: ['Read'],
+      maxTurns: 30,
+      cwd: dir,
+      terminationCondition: { kind: 'output-file', target: 'report.md' },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.output).toContain('thinking');
+    expect(messagesSent).toBe(3);  // all 3 events fired before we resolved
+  });
+
+  it('resolves ok=true early when output-keyword appears mid-conversation', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'subagent-incr-'));
+    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+      input.onMessage?.({ kind: 'assistant_message', content: 'still thinking' });
+      input.onMessage?.({ kind: 'assistant_message', content: '[INVESTIGATION_COMPLETE]' });
+    });
+    const runVirtualClient = createRunVirtualClientFromAiRunPort({
+      aiRunPort: { startVirtualRun } as never,
+      timeoutMs: 1000,
+    });
+    const result = await runVirtualClient({
+      systemPrompt: 'investigate',
+      allowedTools: ['Read'],
+      maxTurns: 30,
+      cwd: dir,
+      terminationCondition: { kind: 'output-keyword', target: '[INVESTIGATION_COMPLETE]' },
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it('still resolves at run_completed when no terminationCondition supplied', async () => {
+    // Backward compatibility — Phase D callers that don't pass terminationCondition still work.
+    const startVirtualRun = vi.fn().mockImplementation(async (input: { onMessage?: (m: { kind: string; content?: string }) => void }) => {
+      input.onMessage?.({ kind: 'assistant_message', content: 'hi' });
+      input.onMessage?.({ kind: 'run_completed' });
+    });
+    const runVirtualClient = createRunVirtualClientFromAiRunPort({
+      aiRunPort: { startVirtualRun } as never,
+      timeoutMs: 1000,
+    });
+    const result = await runVirtualClient({
+      systemPrompt: 'p', allowedTools: [], maxTurns: 5, cwd: '/tmp',
+    });
+    expect(result.ok).toBe(true);
+  });
+});

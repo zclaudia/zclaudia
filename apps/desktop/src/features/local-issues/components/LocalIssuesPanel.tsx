@@ -1,0 +1,166 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
+import type { LocalIssueStatus } from '@zclaudia/shared';
+import { ACTIONABLE_LABEL } from '@zclaudia/shared';
+import { useLocalIssueStore } from '../store';
+import { useAttachmentCounts } from '../../attachments';
+import { LocalIssueCard } from './LocalIssueCard';
+import { CreateIssueDialog } from './CreateIssueDialog';
+import { LocalIssueDetailView } from './LocalIssueDetailView';
+
+interface LocalIssuesPanelProps {
+  projectId: string;
+  /** Controlled: the issue currently shown in detail view, or null for the list. */
+  selectedIssueId: string | null;
+  /** Called when the user picks an issue from the list, or clears selection. */
+  onSelectIssue: (issueId: string | null) => void;
+}
+
+type FilterStatus = 'all' | LocalIssueStatus;
+
+const FILTER_OPTIONS: { value: FilterStatus; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'open', label: 'Open' },
+  { value: 'tracked', label: 'Tracked' },
+  { value: 'closed', label: 'Closed' },
+  { value: 'cancelled', label: 'Cancelled' },
+];
+
+const PRIORITY_ORDER: Record<string, number> = {
+  critical: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+};
+
+export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: LocalIssuesPanelProps) {
+  const issues = useLocalIssueStore((s) => s.issues[projectId] ?? []);
+  const loadIssues = useLocalIssueStore((s) => s.loadIssues);
+  const [filter, setFilter] = useState<FilterStatus>('all');
+  const [actionableOnly, setActionableOnly] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+
+  useEffect(() => {
+    loadIssues(projectId).catch(() => {});
+  }, [projectId]);
+
+  // Batch fetch attachment counts so every card shows its badge without
+  // each card making its own request.
+  const issueIds = useMemo(() => issues.map((i) => i.id), [issues]);
+  useAttachmentCounts('local_issue', issueIds);
+
+  const selectedIssue = useMemo(
+    () => (selectedIssueId ? issues.find((i) => i.id === selectedIssueId) ?? null : null),
+    [selectedIssueId, issues],
+  );
+
+  // If the selected issue was deleted (e.g. via WS broadcast), drop selection.
+  useEffect(() => {
+    if (selectedIssueId && !selectedIssue) onSelectIssue(null);
+  }, [selectedIssueId, selectedIssue, onSelectIssue]);
+
+  if (selectedIssue) {
+    return (
+      <LocalIssueDetailView
+        issue={selectedIssue}
+        projectId={projectId}
+        onDeleted={() => onSelectIssue(null)}
+      />
+    );
+  }
+
+  const filtered = issues
+    .filter((issue) => filter === 'all' || issue.status === filter)
+    .filter((issue) => !actionableOnly || issue.labels.includes(ACTIONABLE_LABEL))
+    .sort((a, b) => {
+      // Open/in_progress first, then by priority, then by creation time
+      const statusOrder = (s: string) => (s === 'closed' ? 1 : 0);
+      const sd = statusOrder(a.status) - statusOrder(b.status);
+      if (sd !== 0) return sd;
+      const pd = (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9);
+      if (pd !== 0) return pd;
+      return b.createdAt - a.createdAt;
+    });
+
+  const counts: Record<FilterStatus, number> = {
+    all: issues.length,
+    open: issues.filter((i) => i.status === 'open').length,
+    tracked: issues.filter((i) => i.status === 'tracked').length,
+    closed: issues.filter((i) => i.status === 'closed').length,
+    cancelled: issues.filter((i) => i.status === 'cancelled').length,
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+        <div className="flex items-center gap-2">
+          {FILTER_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setFilter(opt.value)}
+              className={`px-2.5 py-1 text-xs rounded-md transition-colors ${
+                filter === opt.value
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {opt.label}
+              <span className="ml-1 opacity-60">{counts[opt.value]}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={() => setActionableOnly((v) => !v)}
+            aria-pressed={actionableOnly}
+            className={`text-xs px-2 py-1 rounded-md border transition-colors ${
+              actionableOnly
+                ? 'bg-amber-500/10 border-amber-500/40 text-amber-500'
+                : 'border-border text-muted-foreground hover:bg-muted'
+            }`}
+          >
+            可动工
+          </button>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Plus className="w-3 h-3" />
+          New Issue
+        </button>
+      </div>
+
+      {/* Issue List */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        {filtered.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <p className="text-sm">No issues found.</p>
+            <p className="text-xs mt-1">
+              {filter === 'all'
+                ? 'Create an issue to track problems you want to solve later.'
+                : `No ${filter.replace('_', ' ')} issues.`}
+            </p>
+          </div>
+        ) : (
+          filtered.map((issue) => (
+            <LocalIssueCard
+              key={issue.id}
+              issue={issue}
+              projectId={projectId}
+              onOpen={onSelectIssue}
+            />
+          ))
+        )}
+      </div>
+
+      {/* Dialogs */}
+      {showCreate && (
+        <CreateIssueDialog
+          projectId={projectId}
+          onClose={() => setShowCreate(false)}
+        />
+      )}
+    </div>
+  );
+}

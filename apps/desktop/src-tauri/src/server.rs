@@ -1,0 +1,762 @@
+use std::collections::BTreeMap;
+use std::io::{BufRead, BufReader, Write as IoWrite};
+use std::process::{Child, Command, Stdio};
+use std::sync::Mutex;
+
+static SERVER_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
+static SERVER_PORT: Mutex<Option<u16>> = Mutex::new(None);
+static SERVER_CONFIG: Mutex<Option<ServerLaunchConfig>> = Mutex::new(None);
+/// PID of a dev-mode server spawned from JS (not in SERVER_PROCESS).
+static DEV_SERVER_PID: Mutex<Option<u32>> = Mutex::new(None);
+/// Data directory path, set once at start_server for use by cleanup functions.
+static DATA_DIR: Mutex<Option<String>> = Mutex::new(None);
+const SHELL_NETWORK_ENV_KEYS: [&str; 8] = [
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+];
+
+#[derive(serde::Serialize)]
+pub struct ServerResult {
+    pub port: u16,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ServerLaunchConfig {
+    server_path: String,
+    data_dir: String,
+    local_reviewer_env: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ExistingServerAction {
+    Reuse,
+    Restart,
+}
+
+fn decide_existing_server_action(
+    existing_config: Option<&ServerLaunchConfig>,
+    requested_config: &ServerLaunchConfig,
+) -> ExistingServerAction {
+    if existing_config == Some(requested_config) {
+        ExistingServerAction::Reuse
+    } else {
+        ExistingServerAction::Restart
+    }
+}
+
+/// Write a debug log line to a file in the data directory for troubleshooting.
+fn debug_log(data_dir: &str, msg: &str) {
+    let log_path = std::path::Path::new(data_dir).join("server-debug.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+    {
+        let _ = writeln!(f, "[{}] {}", chrono_now(), msg);
+    }
+    eprintln!("[EmbeddedServer/Rust] {}", msg);
+}
+
+fn process_io_log_line(stream: &str, line: &str) -> String {
+    format!("node {}: {}", stream, line)
+}
+
+fn debug_process_io(data_dir: &str, stream: &str, line: &str) {
+    debug_log(data_dir, &process_io_log_line(stream, line));
+}
+
+fn chrono_now() -> String {
+    let dur = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    format!("{}", dur.as_secs())
+}
+
+// --- PID file management ---
+
+fn pid_file_path(data_dir: &str) -> std::path::PathBuf {
+    std::path::Path::new(data_dir).join("server.pid")
+}
+
+fn write_pid_file(data_dir: &str, pid: u32) {
+    let path = pid_file_path(data_dir);
+    if let Ok(mut f) = std::fs::File::create(&path) {
+        let _ = write!(f, "{}", pid);
+    }
+}
+
+fn remove_pid_file(data_dir: &str) {
+    let _ = std::fs::remove_file(pid_file_path(data_dir));
+}
+
+/// Kill the process recorded in the pid file (orphan from a previous run).
+fn cleanup_stale_pid_file(data_dir: &str) {
+    let path = pid_file_path(data_dir);
+    if let Ok(contents) = std::fs::read_to_string(&path) {
+        if let Ok(pid) = contents.trim().parse::<i32>() {
+            // Check if process is still alive
+            #[cfg(unix)]
+            {
+                let alive = unsafe { libc::kill(pid, 0) } == 0;
+                if alive {
+                    eprintln!(
+                        "[EmbeddedServer/Rust] Killing orphaned server (pid={})",
+                        pid
+                    );
+                    unsafe {
+                        libc::kill(pid, libc::SIGTERM);
+                    }
+                    // Brief wait for it to exit
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    // Force kill if still alive
+                    let still_alive = unsafe { libc::kill(pid, 0) } == 0;
+                    if still_alive {
+                        unsafe {
+                            libc::kill(pid, libc::SIGKILL);
+                        }
+                    }
+                }
+            }
+        }
+        // Remove stale pid file
+        let _ = std::fs::remove_file(&path);
+    }
+}
+
+// --- Shell PATH resolution ---
+
+/// Resolve the user's login shell PATH.
+/// GUI apps on macOS don't inherit the full shell environment (nvm, homebrew, etc.),
+/// so we run the user's login shell to extract the real PATH.
+fn resolve_shell_path(data_dir: &str) -> String {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let home = std::env::var("HOME").unwrap_or_else(|_| String::new());
+    let current_path = std::env::var("PATH").unwrap_or_default();
+
+    debug_log(
+        data_dir,
+        &format!(
+            "SHELL={}, HOME={}, current PATH={}",
+            shell, home, current_path
+        ),
+    );
+
+    // Use -l (login) only — NOT -i (interactive).
+    // Interactive mode sources .zshrc which can trigger macOS TCC permission
+    // dialogs (e.g. "network volume" access) from user shell plugins.
+    // Login mode sources .zprofile/.zshenv which covers Homebrew, nvm PATH setup.
+    // Anything missed is handled by build_fallback_path().
+    let output = Command::new(&shell)
+        .args(["-l", "-c", "echo $PATH"])
+        .env("HOME", &home)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output();
+
+    match &output {
+        Ok(out) if out.status.success() => {
+            let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            debug_log(data_dir, &format!("Resolved shell PATH: {}", path));
+            path
+        }
+        Ok(out) => {
+            debug_log(
+                data_dir,
+                &format!(
+                    "Shell exited with status={}, stderr={}",
+                    out.status,
+                    String::from_utf8_lossy(&out.stderr)
+                ),
+            );
+            build_fallback_path(&current_path, &home, data_dir)
+        }
+        Err(e) => {
+            debug_log(data_dir, &format!("Failed to spawn shell: {}", e));
+            build_fallback_path(&current_path, &home, data_dir)
+        }
+    }
+}
+
+fn build_fallback_path(current: &str, home: &str, data_dir: &str) -> String {
+    let mut paths: Vec<String> = vec![current.to_string()];
+    for p in &["/opt/homebrew/bin", "/usr/local/bin"] {
+        if std::path::Path::new(p).is_dir() {
+            paths.push(p.to_string());
+        }
+    }
+    let nvm_dir = format!("{}/.nvm/versions/node", home);
+    if let Ok(entries) = std::fs::read_dir(&nvm_dir) {
+        for entry in entries.flatten() {
+            let bin = entry.path().join("bin");
+            if bin.is_dir() {
+                paths.push(bin.to_string_lossy().to_string());
+            }
+        }
+    }
+    paths.push(format!("{}/.local/bin", home));
+    paths.push(format!("{}/.cargo/bin", home));
+    let fallback = paths.join(":");
+    debug_log(data_dir, &format!("Using fallback PATH: {}", fallback));
+    fallback
+}
+
+fn resolve_shell_env_value(shell: &str, home: &str, key: &str) -> Option<String> {
+    let output = Command::new(shell)
+        .args(["-l", "-c", &format!("printenv {}", key)])
+        .env("HOME", home)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let value = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+fn resolve_shell_network_env() -> BTreeMap<String, String> {
+    let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+    let home = std::env::var("HOME").unwrap_or_else(|_| String::new());
+    let mut env_map = BTreeMap::new();
+
+    for key in SHELL_NETWORK_ENV_KEYS {
+        if let Some(value) = resolve_shell_env_value(&shell, &home, key) {
+            env_map.insert(key.to_string(), value);
+        }
+    }
+
+    env_map
+}
+
+#[tauri::command]
+pub fn get_shell_network_env() -> BTreeMap<String, String> {
+    resolve_shell_network_env()
+}
+
+// --- macOS quarantine removal ---
+
+/// Remove com.apple.quarantine extended attribute from a path (recursively for directories).
+/// Self-signed apps don't pass Gatekeeper, so downloaded DMGs leave quarantine attributes
+/// on all bundled binaries. Without removal, macOS blocks execution of the node sidecar
+/// and native modules even after the user allows the main app to run.
+#[cfg(target_os = "macos")]
+fn remove_quarantine(path: &std::path::Path, data_dir: &str) {
+    let output = Command::new("xattr")
+        .args(["-r", "-d", "com.apple.quarantine"])
+        .arg(path)
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .output();
+    match output {
+        Ok(out) if out.status.success() => {
+            debug_log(data_dir, &format!("Cleared quarantine: {}", path.display()));
+        }
+        Ok(out) => {
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            // "No such xattr" is expected when quarantine is already absent — not an error
+            if !stderr.contains("No such xattr") {
+                debug_log(
+                    data_dir,
+                    &format!("xattr warning on {}: {}", path.display(), stderr.trim()),
+                );
+            }
+        }
+        Err(e) => {
+            debug_log(
+                data_dir,
+                &format!("Failed to run xattr on {}: {}", path.display(), e),
+            );
+        }
+    }
+}
+
+// --- Server lifecycle ---
+
+/// Start the embedded Node.js server as a child process.
+/// Returns the port number once SERVER_READY:<port> is detected on stdout.
+#[tauri::command]
+pub async fn start_server(
+    _app: tauri::AppHandle,
+    server_path: String,
+    data_dir: String,
+    local_reviewer_env: Option<std::collections::BTreeMap<String, String>>,
+) -> Result<ServerResult, String> {
+    let requested_config = ServerLaunchConfig {
+        server_path: server_path.clone(),
+        data_dir: data_dir.clone(),
+        local_reviewer_env: local_reviewer_env.clone(),
+    };
+    let mut should_restart_existing = false;
+
+    if let Ok(mut guard) = SERVER_PROCESS.lock() {
+        if let Some(existing_child) = guard.as_mut() {
+            match existing_child.try_wait() {
+                Ok(None) => {
+                    let existing_config = SERVER_CONFIG.lock().map_err(|e| e.to_string())?.clone();
+                    if decide_existing_server_action(existing_config.as_ref(), &requested_config)
+                        == ExistingServerAction::Reuse
+                    {
+                        let existing_port = SERVER_PORT
+                            .lock()
+                            .ok()
+                            .and_then(|guard| *guard)
+                            .ok_or_else(|| {
+                                "Server process is running but port is unknown".to_string()
+                            })?;
+                        eprintln!(
+                            "[EmbeddedServer/Rust] Reusing existing server (pid={}, port={})",
+                            existing_child.id(),
+                            existing_port
+                        );
+                        return Ok(ServerResult {
+                            port: existing_port,
+                        });
+                    }
+
+                    eprintln!(
+                        "[EmbeddedServer/Rust] Existing server config differs; restarting (pid={})",
+                        existing_child.id()
+                    );
+                    should_restart_existing = true;
+                }
+                Ok(Some(status)) => {
+                    eprintln!(
+                        "[EmbeddedServer/Rust] Removing exited server process before restart (status={})",
+                        status
+                    );
+                    *guard = None;
+                    if let Ok(mut port_guard) = SERVER_PORT.lock() {
+                        *port_guard = None;
+                    }
+                    if let Ok(mut config_guard) = SERVER_CONFIG.lock() {
+                        *config_guard = None;
+                    }
+                }
+                Err(e) => {
+                    return Err(format!("Failed to inspect existing server process: {}", e));
+                }
+            }
+        }
+    }
+
+    if should_restart_existing {
+        stop_server().await?;
+    }
+
+    // Kill any orphaned server from a previous crash via pid file
+    cleanup_stale_pid_file(&data_dir);
+
+    // Store data_dir for use by stop/exit hooks
+    if let Ok(mut guard) = DATA_DIR.lock() {
+        *guard = Some(data_dir.clone());
+    }
+
+    // The node binary is in Contents/MacOS/ (same directory as the main executable)
+    let node_bin = std::env::current_exe()
+        .map_err(|e| format!("Failed to get current exe: {}", e))?
+        .parent()
+        .ok_or("Failed to get exe parent dir")?
+        .join("node");
+
+    if !node_bin.exists() {
+        return Err(format!("Node binary not found at: {}", node_bin.display()));
+    }
+
+    // Remove macOS quarantine attributes from bundled binaries.
+    // Self-signed apps downloaded from the internet have quarantine flags on all
+    // internal files. The user may xattr -cr the .app, but if they don't (or it
+    // doesn't propagate), the node sidecar and native modules will fail to execute.
+    #[cfg(target_os = "macos")]
+    {
+        remove_quarantine(&node_bin, &data_dir);
+        let server_dir = std::path::Path::new(&server_path).parent();
+        if let Some(dir) = server_dir {
+            remove_quarantine(dir, &data_dir);
+        }
+    }
+
+    // Ensure data directory exists
+    std::fs::create_dir_all(&data_dir).ok();
+
+    // Resolve the user's full shell PATH so the server can find CLIs (claude, etc.)
+    // Prepend the sidecar directory so child processes (e.g. claude-agent-sdk)
+    // can also find our bundled node binary via PATH.
+    let sidecar_dir = node_bin.parent().unwrap().to_string_lossy().to_string();
+    let shell_path = format!("{}:{}", sidecar_dir, resolve_shell_path(&data_dir));
+    let shell_network_env = resolve_shell_network_env();
+
+    eprintln!(
+        "[EmbeddedServer/Rust] node={}, server={}, data_dir={}",
+        node_bin.display(),
+        server_path,
+        data_dir
+    );
+    debug_log(
+        &data_dir,
+        &format!(
+            "Inherited shell network env keys: {:?}",
+            shell_network_env.keys().collect::<Vec<_>>()
+        ),
+    );
+
+    // Resolve the main app's bundle identifier so child processes (node sidecar,
+    // Claude CLI) share the same macOS TCC permission entry as the main app.
+    // Without this, macOS shows duplicate permission dialogs — once for "ZClaudia"
+    // and once for "zclaudia" (the node binary).
+    let bundle_id = _app.config().identifier.clone();
+
+    // Spawn node with the server script
+    let mut child = Command::new(&node_bin);
+    child
+        .arg(&server_path)
+        .env("PORT", "0")
+        .env("SERVER_HOST", "127.0.0.1")
+        .env("ZCLAUDIA_DATA_DIR", &data_dir)
+        .env("PATH", &shell_path)
+        .env_remove("ANTHROPIC_MODEL")
+        .env_remove("ANTHROPIC_DEFAULT_OPUS_MODEL")
+        .env_remove("ANTHROPIC_DEFAULT_SONNET_MODEL")
+        .env_remove("ANTHROPIC_DEFAULT_HAIKU_MODEL")
+        .env_remove("OPENAI_MODEL")
+        .env_remove("MODEL")
+        .env_remove("CLAUDE_MODEL")
+        .env_remove("CLAUDE_CODE_MODEL")
+        .env_remove("CODEX_MODEL")
+        .env_remove("CURSOR_MODEL")
+        .env_remove("KIMI_MODEL")
+        .env_remove("MINIMAX_MODEL")
+        .env_remove("MOONSHOT_MODEL")
+        // Attribute TCC (Transparency, Consent, Control) decisions to the main app
+        // so macOS doesn't show separate permission dialogs for the node sidecar.
+        .env("__CFBundleIdentifier", &bundle_id)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    for (key, value) in &shell_network_env {
+        child.env(key, value);
+    }
+    if let Some(extra_env) = local_reviewer_env {
+        for (key, value) in extra_env {
+            child.env(key, value);
+        }
+    }
+
+    let mut child = child
+        .spawn()
+        .map_err(|e| format!("Failed to spawn node: {}", e))?;
+
+    let pid = child.id();
+    eprintln!("[EmbeddedServer/Rust] Spawned node (pid={})", pid);
+
+    // Write pid file for orphan cleanup
+    write_pid_file(&data_dir, pid);
+
+    // Drain stderr immediately so startup failures cannot block while stdout is
+    // still waiting for SERVER_READY.
+    if let Some(stderr) = child.stderr.take() {
+        let stderr_log_dir = data_dir.clone();
+        std::thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    debug_process_io(&stderr_log_dir, "stderr", &line);
+                }
+            }
+            debug_log(&stderr_log_dir, "node stderr stream closed");
+        });
+    }
+
+    // Read stdout line by line looking for SERVER_READY:<port>
+    let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
+    let reader = BufReader::new(stdout);
+    let mut port: Option<u16> = None;
+    let mut lines_iter = reader.lines();
+
+    // Read until we find SERVER_READY
+    while let Some(line) = lines_iter.next() {
+        match line {
+            Ok(line) => {
+                debug_process_io(&data_dir, "stdout", &line);
+                if let Some(rest) = line.strip_prefix("SERVER_READY:") {
+                    if let Ok(p) = rest.trim().parse::<u16>() {
+                        port = Some(p);
+                        break;
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("[EmbeddedServer/Rust] stdout read error: {}", e);
+                break;
+            }
+        }
+    }
+
+    // Keep draining stdout in a background thread so the pipe doesn't break (EPIPE).
+    // The server continues to write log lines to stdout after SERVER_READY.
+    let stdout_log_dir = data_dir.clone();
+    std::thread::spawn(move || {
+        for line in lines_iter {
+            if let Ok(line) = line {
+                debug_process_io(&stdout_log_dir, "stdout", &line);
+            }
+        }
+        debug_log(&stdout_log_dir, "node stdout stream closed");
+    });
+
+    match port {
+        Some(p) => {
+            // Store the child process for cleanup
+            let mut guard = SERVER_PROCESS.lock().map_err(|e| e.to_string())?;
+            *guard = Some(child);
+            let mut port_guard = SERVER_PORT.lock().map_err(|e| e.to_string())?;
+            *port_guard = Some(p);
+            let mut config_guard = SERVER_CONFIG.lock().map_err(|e| e.to_string())?;
+            *config_guard = Some(requested_config);
+            eprintln!("[EmbeddedServer/Rust] Server ready on port {}", p);
+            Ok(ServerResult { port: p })
+        }
+        None => {
+            // Process exited before outputting SERVER_READY
+            remove_pid_file(&data_dir);
+            if let Ok(mut port_guard) = SERVER_PORT.lock() {
+                *port_guard = None;
+            }
+            if let Ok(mut config_guard) = SERVER_CONFIG.lock() {
+                *config_guard = None;
+            }
+            let status = child.wait().map_err(|e| e.to_string())?;
+            Err(format!(
+                "Server process exited without SERVER_READY (status={})",
+                status
+            ))
+        }
+    }
+}
+
+/// Send SIGTERM and wait for graceful exit, falling back to SIGKILL.
+fn graceful_kill(child: &mut Child, timeout_secs: u64) {
+    let pid = child.id();
+
+    #[cfg(unix)]
+    {
+        unsafe {
+            libc::kill(pid as i32, libc::SIGTERM);
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        let _ = child.kill();
+        let _ = child.wait();
+        return;
+    }
+
+    let start = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                eprintln!(
+                    "[EmbeddedServer/Rust] Server exited gracefully ({})",
+                    status
+                );
+                return;
+            }
+            Ok(None) => {
+                if start.elapsed() > std::time::Duration::from_secs(timeout_secs) {
+                    eprintln!("[EmbeddedServer/Rust] Graceful timeout, sending SIGKILL");
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            Err(_) => return,
+        }
+    }
+}
+
+/// Stop the embedded server process gracefully.
+///
+/// Sends SIGTERM first so the Node.js server can run its shutdown handlers
+/// (disconnect from gateway, close database, etc.). Falls back to SIGKILL
+/// if the process doesn't exit within 3 seconds.
+#[tauri::command]
+pub async fn stop_server() -> Result<(), String> {
+    let mut guard = SERVER_PROCESS.lock().map_err(|e| e.to_string())?;
+    if let Some(mut child) = guard.take() {
+        eprintln!(
+            "[EmbeddedServer/Rust] Stopping server (pid={})...",
+            child.id()
+        );
+        graceful_kill(&mut child, 3);
+        // Remove pid file
+        if let Ok(dir_guard) = DATA_DIR.lock() {
+            if let Some(dir) = dir_guard.as_deref() {
+                remove_pid_file(dir);
+            }
+        }
+        if let Ok(mut port_guard) = SERVER_PORT.lock() {
+            *port_guard = None;
+        }
+        if let Ok(mut config_guard) = SERVER_CONFIG.lock() {
+            *config_guard = None;
+        }
+        eprintln!("[EmbeddedServer/Rust] Server stopped");
+    }
+    Ok(())
+}
+
+/// Register a dev-mode server PID so the Rust exit hook can clean it up.
+/// In dev mode the server is spawned from JS via Command.sidecar(), so Rust
+/// doesn't have a Child handle — only the PID, which we kill via libc::kill.
+#[tauri::command]
+pub fn register_dev_server_pid(pid: u32) {
+    eprintln!("[EmbeddedServer/Rust] Registered dev server pid={}", pid);
+    if let Ok(mut guard) = DEV_SERVER_PID.lock() {
+        *guard = Some(pid);
+    }
+}
+
+/// Kill the dev-mode server process by PID (SIGTERM then SIGKILL).
+fn kill_dev_server() {
+    if let Ok(mut guard) = DEV_SERVER_PID.lock() {
+        if let Some(pid) = guard.take() {
+            #[cfg(unix)]
+            {
+                let alive = unsafe { libc::kill(pid as i32, 0) } == 0;
+                if alive {
+                    eprintln!("[EmbeddedServer/Rust] Killing dev server (pid={})", pid);
+                    unsafe {
+                        libc::kill(pid as i32, libc::SIGTERM);
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    let still_alive = unsafe { libc::kill(pid as i32, 0) } == 0;
+                    if still_alive {
+                        eprintln!("[EmbeddedServer/Rust] Dev server still alive, sending SIGKILL");
+                        unsafe {
+                            libc::kill(pid as i32, libc::SIGKILL);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Kill the server process synchronously (for use in exit hooks).
+/// Blocks until the server process exits to prevent orphaned processes.
+pub fn stop_server_sync() {
+    // Kill dev-mode server (spawned from JS, tracked by PID only)
+    kill_dev_server();
+
+    // Kill production server (spawned from Rust, tracked as Child)
+    if let Ok(mut guard) = SERVER_PROCESS.lock() {
+        if let Some(mut child) = guard.take() {
+            let pid = child.id();
+            eprintln!(
+                "[EmbeddedServer/Rust] Exit hook: stopping server (pid={})...",
+                pid
+            );
+            graceful_kill(&mut child, 3);
+
+            // Clean up pid file
+            if let Some(dir) = DATA_DIR.lock().ok().and_then(|g| g.clone()) {
+                remove_pid_file(&dir);
+            }
+            if let Ok(mut port_guard) = SERVER_PORT.lock() {
+                *port_guard = None;
+            }
+            if let Ok(mut config_guard) = SERVER_CONFIG.lock() {
+                *config_guard = None;
+            }
+            eprintln!("[EmbeddedServer/Rust] Exit hook: server stopped");
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        decide_existing_server_action, process_io_log_line, ExistingServerAction,
+        ServerLaunchConfig,
+    };
+    use std::collections::BTreeMap;
+
+    fn make_config(
+        server_path: &str,
+        data_dir: &str,
+        env: Option<&[(&str, &str)]>,
+    ) -> ServerLaunchConfig {
+        let local_reviewer_env = env.map(|pairs| {
+            pairs
+                .iter()
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+                .collect::<BTreeMap<_, _>>()
+        });
+        ServerLaunchConfig {
+            server_path: server_path.to_string(),
+            data_dir: data_dir.to_string(),
+            local_reviewer_env,
+        }
+    }
+
+    #[test]
+    fn reuses_existing_server_when_launch_config_matches() {
+        let requested = make_config(
+            "/app/server.mjs",
+            "/tmp/zclaudia",
+            Some(&[("OPENAI_API_KEY", "a"), ("HTTP_PROXY", "http://proxy")]),
+        );
+        let existing = make_config(
+            "/app/server.mjs",
+            "/tmp/zclaudia",
+            Some(&[("HTTP_PROXY", "http://proxy"), ("OPENAI_API_KEY", "a")]),
+        );
+
+        assert_eq!(
+            decide_existing_server_action(Some(&existing), &requested),
+            ExistingServerAction::Reuse
+        );
+    }
+
+    #[test]
+    fn restarts_existing_server_when_data_dir_differs() {
+        let existing = make_config("/app/server.mjs", "/tmp/zclaudia-a", None);
+        let requested = make_config("/app/server.mjs", "/tmp/zclaudia-b", None);
+
+        assert_eq!(
+            decide_existing_server_action(Some(&existing), &requested),
+            ExistingServerAction::Restart
+        );
+    }
+
+    #[test]
+    fn restarts_existing_server_when_cached_config_is_missing() {
+        let requested = make_config("/app/server.mjs", "/tmp/zclaudia", None);
+
+        assert_eq!(
+            decide_existing_server_action(None, &requested),
+            ExistingServerAction::Restart
+        );
+    }
+
+    #[test]
+    fn process_io_log_line_tags_child_output_stream() {
+        assert_eq!(
+            process_io_log_line("stderr", "Error: gateway failed"),
+            "node stderr: Error: gateway failed"
+        );
+    }
+}

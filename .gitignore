@@ -1,0 +1,130 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# MCP server config (local dev, contains session-specific URLs)
+.mcp.json
+
+# Build outputs
+dist/
+/build/
+bundle/
+.output/
+target/
+
+# Tauri
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/binaries/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Android signing keys
+*.keystore
+*.jks
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Misc
+*.tgz
+.turbo/
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# OpenCode local runtime data
+.opencode/
+
+# Test results and reports
+playwright-report/
+test-results/
+apps/desktop/test-results-full/
+e2e/fixtures/security-tests/*.exe
+e2e/fixtures/security-tests/*renamed*
+
+# Development documentation (may contain local paths)
+ARCHITECTURE_REFACTORING_SUMMARY.md
+E2E_TESTS_SUMMARY.md
+
+# Playwright MCP cache
+.playwright-mcp/
+
+# Server data directory
+server/data/
+
+# macOS system files
+*.DS_Store
+.AppleDouble
+.LSOverride
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+.cache
+
+# Additional OS files
+.Spotlight-V100
+.Trashes
+
+# Editor backup files
+*.bak
+
+# Performance profiling
+*.cpuprofile
+*.heapsnapshot
+.worktrees/
+.zclaudia/
+.supervision/
+# Ignore .github except workflows
+.github/*
+!.github/workflows/
+
+.cursor/
+
+.version
+
+# Top-level runtime plugin installs (anchored to repo root so it does not
+# match source dirs like shared/src/plugins/, server/src/application/plugins/).
+/plugins/
+
+# Superpowers plugin generated docs
+docs/superpowers/
+
+.3rd-party/

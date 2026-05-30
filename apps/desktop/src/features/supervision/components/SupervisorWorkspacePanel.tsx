@@ -1,0 +1,458 @@
+import { useEffect, useMemo, useState } from 'react';
+import type { AcceptanceDecision, ExecutionGateDecision, ProjectAgent, ProjectChange } from '@zclaudia/shared';
+import type { ClientMessage } from '@zclaudia/shared';
+import * as api from '../../../services/api';
+import { useConnection } from '../../../contexts/ConnectionContext';
+import { useSupervisionStore } from '../store';
+import { TaskBoard } from './TaskBoard';
+import { ActiveChangeCard } from './ActiveChangeCard';
+import { RecentChangesPanel } from './RecentChangesPanel';
+import { AllChangesPanel } from './AllChangesPanel';
+import { WorkspaceDocsPanel } from './WorkspaceDocsPanel';
+import { NewRunDropdown } from '../../meta-workflow/components/NewRunDropdown.js';
+import { MetaWorkflowPanel } from '../../meta-workflow/components/MetaWorkflowPanel.js';
+import { listLegacyClassicChangeIds } from '../../openspec/api.js';
+import {
+  type ContextDocumentPreview,
+  type PreviewDocTarget,
+  extractWorkspaceDocs,
+} from './supervisor-utils';
+
+interface SupervisorWorkspacePanelProps {
+  projectId: string;
+  agent: ProjectAgent | null;
+}
+
+export function SupervisorWorkspacePanel({ projectId, agent }: SupervisorWorkspacePanelProps) {
+  const { sendMessage } = useConnection();
+  const socket = useMemo(
+    () => ({ send: (raw: string) => sendMessage(JSON.parse(raw) as ClientMessage) }),
+    [sendMessage],
+  );
+  const [activeTab, setActiveTab] = useState<'classic' | 'meta'>('classic');
+  const activeChange = useSupervisionStore((s) => s.activeChanges[projectId] ?? null);
+  const executionPlan = useSupervisionStore((s) => activeChange ? s.executionPlans[activeChange.id] : undefined);
+  const tasks = useSupervisionStore((s) => s.tasks[projectId] ?? []);
+  const setActiveChange = useSupervisionStore((s) => s.setActiveChange);
+  const setExecutionPlan = useSupervisionStore((s) => s.setExecutionPlan);
+  const setTasks = useSupervisionStore((s) => s.setTasks);
+  const [loading, setLoading] = useState(false);
+  const [showCreateChange, setShowCreateChange] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newSummary, setNewSummary] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [docs, setDocs] = useState<ContextDocumentPreview[]>([]);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [actionNotes, setActionNotes] = useState('');
+  const [changeHistory, setChangeHistory] = useState<ProjectChange[]>([]);
+  const [allChanges, setAllChanges] = useState<ProjectChange[]>([]);
+  const [previewChangeId, setPreviewChangeId] = useState<string | null>(null);
+  const [showAllChanges, setShowAllChanges] = useState(false);
+  const [changesFilter, setChangesFilter] = useState<'all' | 'active' | 'completed' | 'cancelled'>('all');
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [draftDocContent, setDraftDocContent] = useState('');
+  const [legacyClassicChangeIds, setLegacyClassicChangeIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    let cancelled = false;
+    listLegacyClassicChangeIds(projectId)
+      .then((ids) => { if (!cancelled) setLegacyClassicChangeIds(new Set(ids)); })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [projectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function hydrate() {
+      try {
+        const change = await api.getActiveProjectChange(projectId);
+        if (cancelled) return;
+        setActiveChange(projectId, change);
+        setPreviewChangeId(change?.id ?? null);
+        const changes = await api.getProjectChanges(projectId);
+        if (cancelled) return;
+        setAllChanges(changes);
+        setChangeHistory(changes.filter((item) => !item.active));
+        const contextDocs = await api.getSupervisionContext(projectId);
+        if (cancelled) return;
+        if (change) {
+          const [plan, filteredTasks] = await Promise.all([
+            api.getChangeExecutionPlan(change.id),
+            api.getSupervisionTasks(projectId, change.id),
+          ]);
+          if (cancelled) return;
+          setExecutionPlan(change.id, plan);
+          setTasks(projectId, filteredTasks);
+          const nextDocs = extractWorkspaceDocs(change.id, contextDocs);
+          setDocs(nextDocs);
+          setSelectedDocId((prev) => prev && nextDocs.some((doc) => doc.id === prev) ? prev : nextDocs[0]?.id ?? null);
+        } else {
+          const nextDocs = extractWorkspaceDocs(undefined, contextDocs);
+          setDocs(nextDocs);
+          setSelectedDocId(nextDocs[0]?.id ?? null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load supervisor workspace');
+        }
+      }
+    }
+    hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, setActiveChange, setExecutionPlan, setTasks]);
+
+  const changeTasks = useMemo(
+    () => activeChange ? tasks.filter((task) => task.changeId === activeChange.id) : [],
+    [activeChange, tasks],
+  );
+
+  const refreshActiveChange = async (change: ProjectChange) => {
+    setActiveChange(projectId, change);
+    setPreviewChangeId(change.id);
+    const [plan, filteredTasks, contextDocs, changes] = await Promise.all([
+      api.getChangeExecutionPlan(change.id),
+      api.getSupervisionTasks(projectId, change.id),
+      api.getSupervisionContext(projectId),
+      api.getProjectChanges(projectId),
+    ]);
+    setExecutionPlan(change.id, plan);
+    setTasks(projectId, filteredTasks);
+    setAllChanges(changes);
+    setChangeHistory(changes.filter((item) => !item.active));
+    const nextDocs = extractWorkspaceDocs(change.id, contextDocs);
+    setDocs(nextDocs);
+    setSelectedDocId((prev) => prev && nextDocs.some((doc) => doc.id === prev) ? prev : nextDocs[0]?.id ?? null);
+  };
+
+  const handleCreateChange = async () => {
+    if (!newTitle.trim() || !newSummary.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const change = await api.createProjectChange(projectId, {
+        title: newTitle.trim(),
+        summary: newSummary.trim(),
+      });
+      await refreshActiveChange(change);
+      setShowCreateChange(false);
+      setNewTitle('');
+      setNewSummary('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create change');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGateAction = async (
+    action: () => Promise<ProjectChange>,
+    errorMessage: string,
+  ) => {
+    if (!activeChange) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await action();
+      await refreshActiveChange(updated);
+      setActionNotes('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequestDesign = () =>
+    handleGateAction(
+      () => api.requestDesignGate(activeChange!.id, actionNotes.trim() || undefined),
+      'Failed to request design review',
+    );
+
+  const handleResolveDesign = (decision: 'approve_design' | 'revise_design' | 'revise_change') =>
+    handleGateAction(
+      () => api.resolveDesignGate(activeChange!.id, decision, actionNotes.trim() || undefined),
+      'Failed to resolve design gate',
+    );
+
+  const handleRequestExecution = () =>
+    handleGateAction(
+      () => api.requestExecutionGate(activeChange!.id, actionNotes.trim() || undefined),
+      'Failed to request execution review',
+    );
+
+  const handleResolveExecution = (decision: ExecutionGateDecision) =>
+    handleGateAction(
+      () => api.resolveExecutionGate(activeChange!.id, decision, actionNotes.trim() || undefined),
+      'Failed to resolve execution gate',
+    );
+
+  const handleRequestAcceptance = () =>
+    handleGateAction(
+      () => api.requestAcceptance(activeChange!.id, actionNotes.trim() || undefined),
+      'Failed to request acceptance',
+    );
+
+  const handleResolveAcceptance = (decision: AcceptanceDecision) =>
+    handleGateAction(
+      () => api.resolveAcceptance(activeChange!.id, decision, actionNotes.trim() || undefined),
+      'Failed to resolve acceptance',
+    );
+
+  const handleRequestSync = () =>
+    handleGateAction(
+      () => api.requestChangeSync(activeChange!.id, actionNotes.trim() || undefined),
+      'Failed to request sync',
+    );
+
+  const handleCompleteChange = () =>
+    handleGateAction(
+      () => api.completeProjectChange(activeChange!.id, actionNotes.trim() || undefined),
+      'Failed to complete change',
+    );
+
+  const handlePreviewChange = async (change: ProjectChange, preferredDoc?: PreviewDocTarget) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const contextDocs = await api.getSupervisionContext(projectId);
+      const nextDocs = extractWorkspaceDocs(change.id, contextDocs);
+      setPreviewChangeId(change.id);
+      setDocs(nextDocs);
+      setEditingDocId(null);
+      setDraftDocContent('');
+      const preferredDocId = preferredDoc
+        ? nextDocs.find((doc) => doc.id.endsWith(`/${preferredDoc}.md`))?.id ?? null
+        : null;
+      setSelectedDocId(
+        preferredDocId
+          ?? ((prev) => prev && nextDocs.some((doc) => doc.id === prev) ? prev : nextDocs[0]?.id ?? null),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load change documents');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedDoc = docs.find((doc) => doc.id === selectedDocId) ?? null;
+  const recentHistory = useMemo(
+    () => [...changeHistory].sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt)).slice(0, 5),
+    [changeHistory],
+  );
+  const filteredChanges = useMemo(() => {
+    const sorted = [...allChanges].sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt));
+    if (changesFilter === 'active') return sorted.filter((change) => change.active);
+    if (changesFilter === 'completed') return sorted.filter((change) => change.status === 'completed');
+    if (changesFilter === 'cancelled') return sorted.filter((change) => change.status === 'cancelled');
+    return sorted;
+  }, [allChanges, changesFilter]);
+  const previewChange = useMemo(
+    () => (activeChange?.id === previewChangeId
+      ? activeChange
+      : recentHistory.find((change) => change.id === previewChangeId) ?? null),
+    [activeChange, previewChangeId, recentHistory],
+  );
+
+  const handleStartEditing = () => {
+    if (!selectedDoc) return;
+    setEditingDocId(selectedDoc.id);
+    setDraftDocContent(selectedDoc.content);
+  };
+
+  const handleCancelEditing = () => {
+    setEditingDocId(null);
+    setDraftDocContent('');
+  };
+
+  const handleSaveDocument = async () => {
+    const docType = selectedDoc ? (selectedDoc.id.split('/').pop()?.replace('.md', '') ?? '') : '';
+    const isEditableDocType = ['design', 'execution', 'tasks'].includes(docType);
+    if (!selectedDoc || !isEditableDocType || !activeChange) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const updated = await api.updateChangeDocument(activeChange.id, docType as 'design' | 'execution' | 'tasks', draftDocContent);
+      await refreshActiveChange(updated);
+      setEditingDocId(null);
+      setDraftDocContent('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save change document');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!agent) {
+    return (
+      <div className="flex items-center justify-center h-full text-muted-foreground">
+        <div className="text-center">
+          <p className="text-sm">No supervisor agent configured.</p>
+          <p className="text-xs mt-1">Enable supervisor first in project settings.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full border-r border-border">
+      <div className="px-4 py-3 border-b border-border space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold">Supervisor Workspace</h2>
+            <p className="text-xs text-muted-foreground">Spec-driven execution for the active change.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <NewRunDropdown
+              projectId={projectId}
+              socket={socket}
+              onNewClassicChange={() => setShowCreateChange((value) => !value)}
+            />
+          </div>
+        </div>
+
+        {showCreateChange && !activeChange && (
+          <div className="grid gap-2 rounded-lg border border-border bg-secondary/30 p-3">
+            <input
+              value={newTitle}
+              onChange={(event) => setNewTitle(event.target.value)}
+              placeholder="Change title"
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+            />
+            <textarea
+              value={newSummary}
+              onChange={(event) => setNewSummary(event.target.value)}
+              placeholder="What will this change accomplish?"
+              rows={3}
+              className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none"
+            />
+            <div className="flex justify-end">
+              <button
+                onClick={handleCreateChange}
+                disabled={loading || !newTitle.trim() || !newSummary.trim()}
+                className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                Create Change
+              </button>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+            {error}
+          </div>
+        )}
+
+        {activeChange && (
+          <ActiveChangeCard
+            activeChange={activeChange}
+            executionPlan={executionPlan}
+            changeTasks={changeTasks}
+            actionNotes={actionNotes}
+            loading={loading}
+            isLegacy={legacyClassicChangeIds.has(activeChange.id)}
+            onActionNotesChange={setActionNotes}
+            onRequestDesign={handleRequestDesign}
+            onResolveDesign={handleResolveDesign}
+            onRequestExecution={handleRequestExecution}
+            onResolveExecution={handleResolveExecution}
+            onRequestAcceptance={handleRequestAcceptance}
+            onResolveAcceptance={handleResolveAcceptance}
+            onRequestSync={handleRequestSync}
+            onCompleteChange={handleCompleteChange}
+          />
+        )}
+
+        <RecentChangesPanel
+          recentHistory={recentHistory}
+          previewChangeId={previewChangeId}
+          showAllChanges={showAllChanges}
+          loading={loading}
+          onToggleShowAll={() => setShowAllChanges((value) => !value)}
+          onPreviewChange={handlePreviewChange}
+        />
+
+        {showAllChanges && allChanges.length > 0 && (
+          <AllChangesPanel
+            filteredChanges={filteredChanges}
+            changesFilter={changesFilter}
+            previewChangeId={previewChangeId}
+            loading={loading}
+            onFilterChange={setChangesFilter}
+            onPreviewChange={(change) => handlePreviewChange(change)}
+          />
+        )}
+      </div>
+
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex gap-2 px-4 py-2 border-b border-border">
+          <button
+            className={`px-3 py-1 text-sm ${activeTab === 'classic' ? 'border-b-2 border-blue-600 font-medium' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('classic')}
+          >
+            Classic Changes
+          </button>
+          <button
+            className={`px-3 py-1 text-sm ${activeTab === 'meta' ? 'border-b-2 border-blue-600 font-medium' : 'text-muted-foreground'}`}
+            onClick={() => setActiveTab('meta')}
+          >
+            Meta Workflows
+          </button>
+        </div>
+        {activeTab === 'classic' ? (
+          <div className="flex-1 overflow-hidden">
+            {activeChange || docs.length > 0 ? (
+              <div className="grid h-full grid-cols-[1.2fr_1fr]">
+                <div className="min-w-0 overflow-hidden border-r border-border">
+                  {activeChange ? (
+                    <TaskBoard
+                      projectId={projectId}
+                      changeId={activeChange.id}
+                      title={activeChange.title}
+                      tasks={changeTasks}
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center px-6 text-center text-muted-foreground">
+                      <div>
+                        <p className="text-sm">Project context is available.</p>
+                        <p className="mt-1 text-xs">Review or edit baseline docs, then start a change when you are ready.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <WorkspaceDocsPanel
+                  docs={docs}
+                  selectedDocId={selectedDocId}
+                  previewChange={previewChange}
+                  activeChange={activeChange}
+                  editingDocId={editingDocId}
+                  draftDocContent={draftDocContent}
+                  loading={loading}
+                  onSelectDoc={setSelectedDocId}
+                  onStartEditing={handleStartEditing}
+                  onCancelEditing={handleCancelEditing}
+                  onSaveDocument={handleSaveDocument}
+                  onDraftContentChange={setDraftDocContent}
+                  onBackToActive={() => void handlePreviewChange(activeChange!)}
+                />
+              </div>
+            ) : (
+              <div className="flex h-full items-center justify-center px-6 text-center text-muted-foreground">
+                <div>
+                  <p className="text-sm">No active change yet.</p>
+                  <p className="mt-1 text-xs">Set up project context, then create a change to start spec-driven execution.</p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 overflow-auto p-4">
+            <MetaWorkflowPanel projectId={projectId} socket={socket} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

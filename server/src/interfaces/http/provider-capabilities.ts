@@ -1,0 +1,55 @@
+import { Router, Request, Response } from 'express';
+import type Database from 'better-sqlite3';
+import type { ApiResponse } from '@zclaudia/shared/core/api';
+import type { ProviderCapabilities } from '@zclaudia/shared/core/provider';
+
+const ZCLAUDIA_CAPABILITIES: ProviderCapabilities = {
+  modeLabel: 'Mode',
+  modelLabel: 'Runtime',
+  defaultModeId: 'default',
+  modes: [
+    { id: 'default', label: 'Default', description: 'Stub runtime mode for normal zclaudia turns' },
+    { id: 'plan', label: 'Plan', description: 'Stub runtime mode for planning-oriented turns' },
+  ],
+  models: [
+    { id: 'zclaudia-stub', label: 'ZClaudia Stub' },
+  ],
+  supportsAIReview: false,
+};
+
+export function mountCapabilityRoutes(router: Router, db: Database.Database): void {
+  router.get('/type/:type/capabilities', (req: Request, res: Response) => {
+    if (req.params.type !== 'zclaudia') {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Runtime type not found' },
+      });
+      return;
+    }
+
+    res.json({ success: true, data: ZCLAUDIA_CAPABILITIES } as ApiResponse<ProviderCapabilities>);
+  });
+
+  router.get('/:id/capabilities', (req: Request, res: Response) => {
+    const row = db.prepare('SELECT type FROM providers WHERE id = ?')
+      .get(req.params.id) as { type: string } | undefined;
+
+    if (!row) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Runtime config not found' },
+      });
+      return;
+    }
+
+    if (row.type !== 'zclaudia') {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Runtime type not found' },
+      });
+      return;
+    }
+
+    res.json({ success: true, data: ZCLAUDIA_CAPABILITIES } as ApiResponse<ProviderCapabilities>);
+  });
+}

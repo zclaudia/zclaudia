@@ -1,0 +1,835 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import { useRecoveryStore, RECOVERY_MAX_RETRIES } from '../recoveryStore';
+
+function resetStore() {
+  useRecoveryStore.setState({
+    coordinator: 'ready',
+    transport: {
+      status: 'connected',
+      mode: 'direct',
+      generation: 0,
+      error: null,
+      peerSessionId: null,
+      retryCount: 0,
+      lastMessageAt: null,
+      statusEnteredAt: Date.now(),
+    },
+    activeBackendId: null,
+    selectedSessionId: null,
+    backends: {},
+    dataSyncs: {},
+    activeSession: {
+      sessionId: null,
+      status: 'idle',
+      backendId: null,
+      ownershipVersion: null,
+      retryCount: 0,
+      lastError: null,
+      hasGapMarker: false,
+      lastMessageAt: null,
+      statusEnteredAt: Date.now(),
+    },
+    nextOwnershipVersion: 1,
+    backgroundAt: null,
+  } as any);
+}
+
+describe('recoveryStore', () => {
+  beforeEach(resetStore);
+
+  it('maps subscribing backends to backend_subscribing', () => {
+    useRecoveryStore.setState({
+      activeBackendId: 'b1',
+      backends: {
+        b1: {
+          backendId: 'b1',
+          status: 'subscribing',
+          subscribed: false,
+          lastError: null,
+          lastCloseReason: null,
+          statusEnteredAt: Date.now(),
+        },
+      },
+    } as any);
+
+    expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('backend_subscribing');
+  });
+
+  it('only returns verified backend for active session after owner verification', () => {
+    useRecoveryStore.getState().setSelection('b1', 's1');
+    expect(useRecoveryStore.getState().getVerifiedSessionBackendId('s1')).toBeNull();
+
+    useRecoveryStore.getState().noteActiveSessionOwnerVerified('s1', 'b1', 3);
+    expect(useRecoveryStore.getState().getVerifiedSessionBackendId('s1')).toBe('b1');
+  });
+
+  it('completes recovery when transport, backend, data sync, and active session are ready', () => {
+    useRecoveryStore.setState({
+      coordinator: 'recovering',
+      transport: {
+        status: 'connected',
+        mode: 'direct',
+        generation: 2,
+        error: null,
+        peerSessionId: null,
+        statusEnteredAt: Date.now(),
+      },
+      activeBackendId: 'b1',
+      selectedSessionId: 's1',
+      backends: {
+        b1: {
+          backendId: 'b1',
+          status: 'ready',
+          subscribed: true,
+          lastError: null,
+          lastCloseReason: null,
+          statusEnteredAt: Date.now(),
+        },
+      },
+      dataSyncs: {
+        b1: {
+          backendId: 'b1',
+          status: 'ready',
+          ownershipVersion: 4,
+          lastError: null,
+          lastSyncAt: Date.now(),
+          statusEnteredAt: Date.now(),
+        },
+      },
+      activeSession: {
+        sessionId: 's1',
+        status: 'live',
+        backendId: 'b1',
+        ownershipVersion: 4,
+        lastError: null,
+        hasGapMarker: false,
+        statusEnteredAt: Date.now(),
+      },
+    } as any);
+
+    useRecoveryStore.getState().completeRecoveryIfPossible();
+    expect(useRecoveryStore.getState().coordinator).toBe('ready');
+  });
+
+  it('treats stopped transport as offline even if stale backend state remains ready', () => {
+    useRecoveryStore.setState({
+      transport: {
+        status: 'stopped',
+        mode: 'direct',
+        generation: 2,
+        error: null,
+        peerSessionId: null,
+        retryCount: 0,
+        lastMessageAt: null,
+        statusEnteredAt: Date.now(),
+      },
+      activeBackendId: 'b1',
+      backends: {
+        b1: {
+          backendId: 'b1',
+          status: 'ready',
+          subscribed: true,
+                    dataReady: true,
+          retryCount: 0,
+          lastError: null,
+          lastCloseReason: null,
+          statusEnteredAt: Date.now(),
+        },
+      },
+      dataSyncs: {
+        b1: {
+          backendId: 'b1',
+          status: 'ready',
+          ownershipVersion: 1,
+          retryCount: 0,
+          lastError: null,
+          lastSyncAt: Date.now(),
+          statusEnteredAt: Date.now(),
+        },
+      },
+    } as any);
+
+    expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('offline');
+  });
+
+  describe('subscribed / dataReady', () => {
+    it('backend stays in subscribing until both subscribed and data are ready', () => {
+      useRecoveryStore.getState().noteBackendSubscribing('b1');
+      const b1 = useRecoveryStore.getState().backends.b1;
+      expect(b1.status).toBe('subscribing');
+      expect(b1.subscribed).toBe(false);
+      expect(b1.dataReady).toBe(false);
+    });
+
+    it('noteDataSyncSucceeded sets dataReady and transitions to ready when subscribed is true', () => {
+      useRecoveryStore.setState({
+        backends: {
+          b1: {
+            backendId: 'b1', status: 'subscribing', subscribed: true,
+            dataReady: false, retryCount: 0,
+            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+          },
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteDataSyncSucceeded('b1');
+
+      const b1 = useRecoveryStore.getState().backends.b1;
+      expect(b1.dataReady).toBe(true);
+      expect(b1.status).toBe('ready');
+    });
+
+    it('noteDataSyncSucceeded does NOT mark backend ready when subscribed is false', () => {
+      useRecoveryStore.setState({
+        backends: {
+          b1: {
+            backendId: 'b1', status: 'subscribing', subscribed: false,
+            dataReady: false, retryCount: 0,
+            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+          },
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteDataSyncSucceeded('b1');
+
+      const b1 = useRecoveryStore.getState().backends.b1;
+      expect(b1.dataReady).toBe(true);
+      expect(b1.status).toBe('subscribing');
+    });
+
+    it('applySnapshot sets subscribed when runtimeState is ready', () => {
+      useRecoveryStore.getState().applySnapshot({
+        snapshotVersion: 1, capturedAt: Date.now(), mode: 'direct',
+        connectionState: 'connected', localBackendId: null,
+        currentInstanceId: null, currentDeviceId: null,
+        backends: [{ backendId: 'b1', runtimeState: 'ready', online: true } as any],
+        sessionStreams: {},
+      });
+
+      const b1 = useRecoveryStore.getState().backends.b1;
+      expect(b1.subscribed).toBe(true);
+    });
+
+    it('applySnapshot maps runtimeState ready to status ready regardless of dataReady', () => {
+      useRecoveryStore.setState({
+        backends: {
+          b1: { backendId: 'b1', status: 'visible', subscribed: false, dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+      } as any);
+      useRecoveryStore.getState().applySnapshot({
+        snapshotVersion: 1, capturedAt: Date.now(), mode: 'embedded',
+        connectionState: 'connected', localBackendId: 'b1',
+        currentInstanceId: null, currentDeviceId: null,
+        backends: [{ backendId: 'b1', runtimeState: 'ready', online: true } as any],
+        sessionStreams: {},
+      });
+      const b1 = useRecoveryStore.getState().backends.b1;
+      expect(b1.status).toBe('ready');
+      expect(b1.subscribed).toBe(true);
+    });
+  });
+
+  describe('startBackendRecovery', () => {
+    it('enters recovering when previously-synced data regresses to stale', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        activeBackendId: 'b1',
+        selectedSessionId: null,
+        backends: {
+          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+        dataSyncs: {
+          b1: { backendId: 'b1', status: 'stale', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now() - 60000, statusEnteredAt: Date.now() },
+        },
+      } as any);
+
+      useRecoveryStore.getState().startBackendRecovery('b1');
+
+      const state = useRecoveryStore.getState();
+      expect(state.coordinator).toBe('recovering');
+      expect(state.dataSyncs.b1.status).toBe('stale');
+      expect(state.dataSyncs.b1.retryCount).toBe(0);
+    });
+
+    it('no-ops on first boot when data sync does not exist yet', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        activeBackendId: 'b1',
+        selectedSessionId: null,
+        backends: {
+          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+        dataSyncs: {},
+      } as any);
+
+      useRecoveryStore.getState().startBackendRecovery('b1');
+      expect(useRecoveryStore.getState().coordinator).toBe('ready');
+    });
+
+    it('no-ops on first boot when session is idle', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        activeBackendId: 'b1',
+        selectedSessionId: 's1',
+        backends: {
+          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+        dataSyncs: {},
+        activeSession: {
+          sessionId: 's1', status: 'idle', backendId: null,
+          ownershipVersion: null, retryCount: 0, lastError: null,
+          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+        },
+      } as any);
+
+      useRecoveryStore.getState().startBackendRecovery('b1');
+      expect(useRecoveryStore.getState().coordinator).toBe('ready');
+    });
+
+    it('enters recovering when active session was disrupted (stale)', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        activeBackendId: 'b1',
+        selectedSessionId: 's1',
+        backends: {
+          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+        dataSyncs: {
+          b1: { backendId: 'b1', status: 'ready', ownershipVersion: 3, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() },
+        },
+        activeSession: {
+          sessionId: 's1', status: 'stale', backendId: 'b1',
+          ownershipVersion: null, retryCount: 0, lastError: null,
+          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+        },
+      } as any);
+
+      useRecoveryStore.getState().startBackendRecovery('b1');
+
+      const state = useRecoveryStore.getState();
+      expect(state.coordinator).toBe('recovering');
+      expect(state.activeSession.status).toBe('stale');
+      expect(state.dataSyncs.b1.status).toBe('stale');
+    });
+
+    it('no-ops when already recovering', () => {
+      useRecoveryStore.setState({ coordinator: 'recovering' } as any);
+      useRecoveryStore.getState().startBackendRecovery('b1');
+      expect(useRecoveryStore.getState().coordinator).toBe('recovering');
+    });
+
+    it('no-ops when transport is not connected', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        transport: { ...useRecoveryStore.getState().transport, status: 'reconnecting' },
+        activeBackendId: 'b1',
+      } as any);
+
+      useRecoveryStore.getState().startBackendRecovery('b1');
+      expect(useRecoveryStore.getState().coordinator).toBe('ready');
+    });
+
+    it('no-ops for non-active backend', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        activeBackendId: 'b1',
+        backends: {
+          b2: { backendId: 'b2', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+      } as any);
+
+      useRecoveryStore.getState().startBackendRecovery('b2');
+      expect(useRecoveryStore.getState().coordinator).toBe('ready');
+    });
+
+    it('no-ops when data sync and session are already healthy', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        activeBackendId: 'b1',
+        selectedSessionId: 's1',
+        backends: {
+          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+        dataSyncs: {
+          b1: { backendId: 'b1', status: 'ready', ownershipVersion: 3, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() },
+        },
+        activeSession: {
+          sessionId: 's1', status: 'live', backendId: 'b1',
+          ownershipVersion: 3, retryCount: 0, lastError: null,
+          hasGapMarker: false, lastMessageAt: Date.now(), statusEnteredAt: Date.now(),
+        },
+      } as any);
+
+      useRecoveryStore.getState().startBackendRecovery('b1');
+      expect(useRecoveryStore.getState().coordinator).toBe('ready');
+    });
+
+    it('does not touch transport or other backends', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        activeBackendId: 'b1',
+        selectedSessionId: 's1',
+        backends: {
+          b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+          b2: { backendId: 'b2', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() },
+        },
+        dataSyncs: {
+          b1: { backendId: 'b1', status: 'stale', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now() },
+          b2: { backendId: 'b2', status: 'ready', ownershipVersion: 2, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() },
+        },
+        activeSession: {
+          sessionId: 's1', status: 'stale', backendId: 'b1',
+          ownershipVersion: null, retryCount: 0, lastError: null,
+          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+        },
+      } as any);
+
+      const transportBefore = useRecoveryStore.getState().transport;
+      useRecoveryStore.getState().startBackendRecovery('b1');
+
+      const state = useRecoveryStore.getState();
+      expect(state.transport).toBe(transportBefore);
+      expect(state.backends.b2.status).toBe('ready');
+      expect(state.dataSyncs.b2.status).toBe('ready');
+      expect(state.coordinator).toBe('recovering');
+    });
+  });
+
+  describe('startRecovery', () => {
+    it('resets retry counts, preserves subscribed, clears dataReady', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        backends: {
+          b1: {
+            backendId: 'b1', status: 'ready', subscribed: true,
+            dataReady: true, retryCount: 2,
+            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+          },
+        },
+        dataSyncs: {
+          b1: {
+            backendId: 'b1', status: 'ready', ownershipVersion: 3, retryCount: 1,
+            lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now(),
+          },
+        },
+        activeBackendId: 'b1',
+      } as any);
+
+      useRecoveryStore.getState().startRecovery('direct');
+
+      const state = useRecoveryStore.getState();
+      expect(state.coordinator).toBe('recovering');
+      expect(state.transport.retryCount).toBe(0);
+      expect(state.backends.b1.retryCount).toBe(0);
+      expect(state.backends.b1.subscribed).toBe(true);
+      expect(state.backends.b1.dataReady).toBe(false);
+      expect(state.backends.b1.status).toBe('ready');
+      expect(state.dataSyncs.b1.retryCount).toBe(0);
+      expect(state.dataSyncs.b1.status).toBe('stale');
+    });
+
+    it('preserves transport.status — does not downgrade connected to reconnecting', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        transport: { ...useRecoveryStore.getState().transport, status: 'connected', generation: 5 },
+        backends: {},
+        dataSyncs: {},
+        activeBackendId: null,
+      } as any);
+
+      useRecoveryStore.getState().startRecovery('embedded');
+
+      const t = useRecoveryStore.getState().transport;
+      expect(t.status).toBe('connected');
+      expect(t.generation).toBe(6);
+    });
+
+    it('preserves transport.status when transport is reconnecting', () => {
+      useRecoveryStore.setState({
+        coordinator: 'ready',
+        transport: { ...useRecoveryStore.getState().transport, status: 'reconnecting', generation: 3 },
+        backends: {},
+        dataSyncs: {},
+        activeBackendId: null,
+      } as any);
+
+      useRecoveryStore.getState().startRecovery('direct');
+
+      expect(useRecoveryStore.getState().transport.status).toBe('reconnecting');
+    });
+  });
+
+  describe('applySnapshot transport isolation', () => {
+    it('does not override transport.status from snapshot connectionState', () => {
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'connected' },
+      } as any);
+
+      useRecoveryStore.getState().applySnapshot({
+        snapshotVersion: 1, capturedAt: Date.now(), mode: 'embedded',
+        connectionState: 'reconnecting',
+        localBackendId: null, currentInstanceId: null, currentDeviceId: null,
+        backends: [], sessionStreams: {},
+      });
+
+      expect(useRecoveryStore.getState().transport.status).toBe('connected');
+    });
+
+    it('updates transport.mode from snapshot', () => {
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, mode: 'direct' },
+      } as any);
+
+      useRecoveryStore.getState().applySnapshot({
+        snapshotVersion: 1, capturedAt: Date.now(), mode: 'embedded',
+        connectionState: 'connected',
+        localBackendId: null, currentInstanceId: null, currentDeviceId: null,
+        backends: [], sessionStreams: {},
+      });
+
+      expect(useRecoveryStore.getState().transport.mode).toBe('embedded');
+    });
+  });
+
+  describe('timeout actions', () => {
+    it('noteTransportTimeout increments retryCount and sets error status', () => {
+      useRecoveryStore.setState({ coordinator: 'recovering' } as any);
+      useRecoveryStore.getState().noteTransportTimeout();
+
+      const state = useRecoveryStore.getState();
+      expect(state.transport.status).toBe('error');
+      expect(state.transport.retryCount).toBe(1);
+      expect(state.transport.error).toContain('timeout');
+    });
+
+    it('noteTransportTimeout sets coordinator to error when retries exhausted', () => {
+      useRecoveryStore.setState({
+        coordinator: 'recovering',
+        transport: {
+          ...useRecoveryStore.getState().transport,
+          retryCount: RECOVERY_MAX_RETRIES.TRANSPORT - 1,
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteTransportTimeout();
+
+      expect(useRecoveryStore.getState().coordinator).toBe('error');
+    });
+
+    it('noteBackendTimeout marks backend as error', () => {
+      useRecoveryStore.setState({
+        backends: {
+          b1: {
+            backendId: 'b1', status: 'subscribing', subscribed: false,
+            dataReady: false, retryCount: 0,
+            lastError: null, lastCloseReason: null, statusEnteredAt: Date.now(),
+          },
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteBackendTimeout('b1');
+
+      const b1 = useRecoveryStore.getState().backends.b1;
+      expect(b1.status).toBe('error');
+      expect(b1.retryCount).toBe(1);
+      expect(b1.lastError).toContain('timeout');
+    });
+
+    it('noteDataSyncTimeout transitions delta sync to stale', () => {
+      useRecoveryStore.setState({
+        dataSyncs: {
+          b1: {
+            backendId: 'b1', status: 'syncing_delta', ownershipVersion: 1,
+            retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now(),
+          },
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteDataSyncTimeout('b1');
+
+      expect(useRecoveryStore.getState().dataSyncs.b1.status).toBe('stale');
+    });
+
+    it('noteActiveSessionTimeout gracefully degrades catch-up to live with gap marker', () => {
+      useRecoveryStore.setState({
+        activeSession: {
+          sessionId: 's1', status: 'catching_up', backendId: 'b1',
+          ownershipVersion: 1, retryCount: 0, lastError: null,
+          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteActiveSessionTimeout();
+
+      const session = useRecoveryStore.getState().activeSession;
+      expect(session.status).toBe('live');
+      expect(session.hasGapMarker).toBe(true);
+    });
+
+    it('noteActiveSessionTimeout marks error for non-catchup phases', () => {
+      useRecoveryStore.setState({
+        coordinator: 'recovering',
+        activeSession: {
+          sessionId: 's1', status: 'opening_stream', backendId: 'b1',
+          ownershipVersion: 1, retryCount: RECOVERY_MAX_RETRIES.SESSION_STREAM - 1,
+          lastError: null, hasGapMarker: false, lastMessageAt: null,
+          statusEnteredAt: Date.now(),
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteActiveSessionTimeout();
+
+      expect(useRecoveryStore.getState().activeSession.status).toBe('error');
+      expect(useRecoveryStore.getState().coordinator).toBe('error');
+    });
+  });
+
+  describe('message tracking', () => {
+    it('noteActiveSessionMessage updates activeSession.lastMessageAt', () => {
+      useRecoveryStore.setState({
+        activeSession: {
+          sessionId: 's1', status: 'live', backendId: 'b1',
+          ownershipVersion: 1, retryCount: 0, lastError: null,
+          hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now(),
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteActiveSessionMessage();
+      expect(useRecoveryStore.getState().activeSession.lastMessageAt).toBeGreaterThan(0);
+    });
+  });
+
+  describe('getBackendViewState', () => {
+    it('returns offline when transport is idle', () => {
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'idle' },
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('offline');
+    });
+
+    it('returns transport_reconnecting when transport is connecting', () => {
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'connecting' },
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('transport_reconnecting');
+    });
+
+    it('returns transport_reconnecting when transport is reconnecting', () => {
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'reconnecting' },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('transport_reconnecting');
+    });
+
+    it('returns error when transport has error', () => {
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'error' },
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
+    });
+
+    it('returns error when backend has error', () => {
+      useRecoveryStore.setState({
+        backends: { b1: { backendId: 'b1', status: 'error', subscribed: true,  dataReady: false, retryCount: 3, lastError: 'timeout', lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
+    });
+
+    it('returns error when data sync has error', () => {
+      useRecoveryStore.setState({
+        activeBackendId: 'b1',
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        dataSyncs: { b1: { backendId: 'b1', status: 'error', ownershipVersion: 1, retryCount: 3, lastError: 'sync fail', lastSyncAt: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
+    });
+
+    it('returns offline when backend is absent', () => {
+      useRecoveryStore.setState({
+        backends: { b1: { backendId: 'b1', status: 'absent', subscribed: false,  dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('offline');
+    });
+
+    it('returns offline when backend is unknown', () => {
+      expect(useRecoveryStore.getState().getBackendViewState('unknown')).toBe('offline');
+    });
+
+    it('returns backend_visible for visible backend', () => {
+      useRecoveryStore.setState({
+        backends: { b1: { backendId: 'b1', status: 'visible', subscribed: false,  dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('backend_visible');
+    });
+
+    it('returns backend_subscribing for subscribing backend', () => {
+      useRecoveryStore.setState({
+        backends: { b1: { backendId: 'b1', status: 'subscribing', subscribed: false, dataReady: false, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('backend_subscribing');
+    });
+
+    it('returns data_syncing when backend is ready but data sync is stale', () => {
+      useRecoveryStore.setState({
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        dataSyncs: { b1: { backendId: 'b1', status: 'stale', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('data_syncing');
+    });
+
+    it('returns data_syncing when data sync is syncing_full', () => {
+      useRecoveryStore.setState({
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        dataSyncs: { b1: { backendId: 'b1', status: 'syncing_full', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('data_syncing');
+    });
+
+    it('returns data_syncing when no data sync exists for backend', () => {
+      useRecoveryStore.setState({
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        dataSyncs: {},
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('data_syncing');
+    });
+
+    it('returns session_syncing when active session is in recovery phase', () => {
+      useRecoveryStore.setState({
+        activeBackendId: 'b1',
+        selectedSessionId: 's1',
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        dataSyncs: { b1: { backendId: 'b1', status: 'ready', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() } },
+        activeSession: { sessionId: 's1', status: 'catching_up', backendId: 'b1', ownershipVersion: 1, retryCount: 0, lastError: null, hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now() },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('session_syncing');
+    });
+
+    it('returns ready when everything is healthy', () => {
+      useRecoveryStore.setState({
+        activeBackendId: 'b1',
+        selectedSessionId: 's1',
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        dataSyncs: { b1: { backendId: 'b1', status: 'ready', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() } },
+        activeSession: { sessionId: 's1', status: 'live', backendId: 'b1', ownershipVersion: 1, retryCount: 0, lastError: null, hasGapMarker: false, lastMessageAt: Date.now(), statusEnteredAt: Date.now() },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('ready');
+    });
+
+    it('returns error when active session has error on same backend', () => {
+      useRecoveryStore.setState({
+        activeBackendId: 'b1',
+        selectedSessionId: 's1',
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+        dataSyncs: { b1: { backendId: 'b1', status: 'ready', ownershipVersion: 1, retryCount: 0, lastError: null, lastSyncAt: Date.now(), statusEnteredAt: Date.now() } },
+        activeSession: { sessionId: 's1', status: 'error', backendId: 'b1', ownershipVersion: 1, retryCount: 3, lastError: 'stream failed', hasGapMarker: false, lastMessageAt: null, statusEnteredAt: Date.now() },
+      } as any);
+      expect(useRecoveryStore.getState().getBackendViewState('b1')).toBe('error');
+    });
+
+    it('returns null-safe for null backendId', () => {
+      expect(useRecoveryStore.getState().getBackendViewState(null)).toBe('offline');
+    });
+  });
+
+  describe('setSelection', () => {
+    it('resets active session when selectedSessionId is cleared', () => {
+      useRecoveryStore.getState().setSelection('b1', 's1');
+      expect(useRecoveryStore.getState().activeSession.sessionId).toBe('s1');
+
+      useRecoveryStore.getState().setSelection('b1', null);
+      expect(useRecoveryStore.getState().activeSession.sessionId).toBeNull();
+      expect(useRecoveryStore.getState().activeSession.status).toBe('idle');
+    });
+
+    it('sets stale status when switching sessions during recovery', () => {
+      useRecoveryStore.setState({ coordinator: 'recovering' } as any);
+      useRecoveryStore.getState().setSelection('b1', 's2');
+      expect(useRecoveryStore.getState().activeSession.status).toBe('stale');
+    });
+
+    it('no-ops when selection is unchanged', () => {
+      useRecoveryStore.getState().setSelection('b1', 's1');
+      const before = useRecoveryStore.getState().activeSession;
+      useRecoveryStore.getState().setSelection('b1', 's1');
+      expect(useRecoveryStore.getState().activeSession).toBe(before);
+    });
+  });
+
+  describe('noteBackground', () => {
+    it('sets coordinator to background with timestamp', () => {
+      useRecoveryStore.getState().noteBackground();
+      const state = useRecoveryStore.getState();
+      expect(state.coordinator).toBe('background');
+      expect(state.backgroundAt).toBeGreaterThan(0);
+    });
+  });
+
+  describe('exported helpers', () => {
+    it('isBackendReady requires both transport and backend readiness', async () => {
+      const { isBackendReady } = await import('../recoveryStore.ts');
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'connected' },
+        backends: { b1: { backendId: 'b1', status: 'ready', subscribed: true, dataReady: true, retryCount: 0, lastError: null, lastCloseReason: null, statusEnteredAt: Date.now() } },
+      } as any);
+      expect(isBackendReady('b1')).toBe(true);
+
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'reconnecting' },
+      } as any);
+      expect(isBackendReady('b1')).toBe(false);
+      expect(isBackendReady('unknown')).toBe(false);
+      expect(isBackendReady(null)).toBe(false);
+    });
+
+    it('isTransportReady returns true when connected', async () => {
+      const { isTransportReady } = await import('../recoveryStore.ts');
+      expect(isTransportReady()).toBe(true);
+
+      useRecoveryStore.setState({
+        transport: { ...useRecoveryStore.getState().transport, status: 'idle' },
+      } as any);
+      expect(isTransportReady()).toBe(false);
+    });
+  });
+
+  describe('retry logic', () => {
+    it('noteDataSyncFailed increments retryCount and resets to stale on first failure', () => {
+      useRecoveryStore.setState({
+        dataSyncs: {
+          b1: {
+            backendId: 'b1', status: 'syncing_full', ownershipVersion: 1,
+            retryCount: 0, lastError: null, lastSyncAt: null, statusEnteredAt: Date.now(),
+          },
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteDataSyncFailed('b1', 'network error');
+
+      const dataSync = useRecoveryStore.getState().dataSyncs.b1;
+      expect(dataSync.retryCount).toBe(1);
+      expect(dataSync.status).toBe('stale');
+      expect(dataSync.lastError).toBe('network error');
+    });
+
+    it('noteDataSyncFailed transitions to error when retries exhausted', () => {
+      useRecoveryStore.setState({
+        coordinator: 'recovering',
+        dataSyncs: {
+          b1: {
+            backendId: 'b1', status: 'syncing_full', ownershipVersion: 1,
+            retryCount: RECOVERY_MAX_RETRIES.DATA_SYNC_FULL - 1,
+            lastError: null, lastSyncAt: null, statusEnteredAt: Date.now(),
+          },
+        },
+      } as any);
+
+      useRecoveryStore.getState().noteDataSyncFailed('b1', 'final failure');
+
+      expect(useRecoveryStore.getState().dataSyncs.b1.status).toBe('error');
+      expect(useRecoveryStore.getState().coordinator).toBe('error');
+    });
+  });
+});

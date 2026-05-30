@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Capability for the main window (desktop platforms)",
+  "windows": ["main", "file-viewer-*", "session-chat-*", "terminal-*", "plugin-*", "automation", "automation-*", "workflow-editor-*", "claudia-ball", "claudia-chat", "notch"],
+  "platforms": ["macOS", "linux", "windows"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:webview:allow-create-webview-window",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-is-visible",
+    "core:window:allow-hide",
+    "core:window:allow-outer-position",
+    "core:event:default",
+    "global-shortcut:default",
+    "shell:allow-open",
+    "fs:default",
+    "fs:allow-download-read-recursive",
+    "fs:allow-download-write-recursive",
+    "shell:allow-kill",
+    "updater:default",
+    "process:allow-restart",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "run-node",
+          "cmd": "node",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "binaries/node",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "run-node",
+          "cmd": "node",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "binaries/node",
+          "sidecar": true,
+          "args": true
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "wsl-check",
+          "cmd": "wsl",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "open-windows-terminal",
+          "cmd": "wt.exe",
+          "args": true,
+          "sidecar": false
+        },
+        {
+          "name": "open-cmd-wsl",
+          "cmd": "cmd.exe",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "wsl-check",
+          "cmd": "wsl",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    }
+  ]
+}

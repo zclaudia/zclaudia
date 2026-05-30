@@ -1,0 +1,436 @@
+import type { WorkflowTemplate } from '@zclaudia/shared/features/workflows';
+
+export const PERMISSION_WORKFLOW_TEMPLATE_ID = 'permission-escalation-default';
+export const SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY = 'permission_escalation_fallback';
+
+export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
+  {
+    id: PERMISSION_WORKFLOW_TEMPLATE_ID,
+    name: 'Permission Escalation (Default)',
+    description: 'Handles escalated permission requests: classifies the request, runs AI risk analysis, and auto-approves or keeps waiting for user.',
+    category: 'permission',
+    definition: {
+      entryNodeId: 'classify',
+      triggers: [
+        { type: 'event', event: 'permission.escalated' },
+      ],
+      nodes: [
+        {
+          id: 'classify',
+          name: 'Classify Request',
+          type: 'permission_classify',
+          config: {},
+          position: { x: 300, y: 0 },
+          onError: 'abort',
+        },
+        {
+          id: 'check_escalate',
+          name: 'Escalate Always?',
+          type: 'condition',
+          config: {},
+          position: { x: 300, y: 150 },
+          condition: {
+            expression: '${classify.output.isEscalateAlways} == true',
+          },
+        },
+        {
+          id: 'ai_review',
+          name: 'AI Risk Analysis',
+          type: 'ai_risk_analysis',
+          config: {
+            confidenceThreshold: 0.7,
+            maxAutoApprovalsPerMinute: 10,
+          },
+          position: { x: 150, y: 300 },
+          timeoutMs: 120000,
+          onError: 'route',
+        },
+        {
+          id: 'check_confidence',
+          name: 'High Confidence Approve?',
+          type: 'condition',
+          config: {},
+          position: { x: 150, y: 450 },
+          condition: {
+            expression: '${ai_review.output.approved} == true',
+          },
+        },
+        {
+          id: 'decide_approve',
+          name: 'Auto-Approve',
+          type: 'permission_decide',
+          config: {
+            decision: 'approve',
+            reason: 'AI review: ${ai_review.output.reasoning} (${ai_review.output.confidence})',
+          },
+          position: { x: 0, y: 600 },
+        },
+        {
+          id: 'notify_review_done',
+          name: 'Notify Review Result',
+          type: 'notify',
+          config: {
+            type: 'system',
+            title: 'AI Review',
+            message: 'AI review result: ${ai_review.output.decision} — ${ai_review.output.reasoning}',
+            priority: 'normal',
+          },
+          position: { x: 300, y: 600 },
+        },
+        {
+          id: 'notify_review_failed',
+          name: 'Notify Review Failed',
+          type: 'notify',
+          config: {
+            type: 'system',
+            title: 'AI Review Error',
+            message: 'AI risk analysis failed: ${ai_review.output.error}. Waiting for manual decision.',
+            priority: 'high',
+          },
+          position: { x: 450, y: 450 },
+        },
+      ],
+      edges: [
+        { id: 'e1', source: 'classify', target: 'check_escalate', type: 'success' },
+        // escalateAlways = true → workflow completes without deciding;
+        // the request remains pending until the user explicitly approves/rejects.
+        // escalateAlways = false → run AI review
+        { id: 'e3', source: 'check_escalate', target: 'ai_review', type: 'condition_false' },
+        // AI review path
+        { id: 'e6', source: 'ai_review', target: 'check_confidence', type: 'success' },
+        { id: 'e7', source: 'check_confidence', target: 'decide_approve', type: 'condition_true' },
+        { id: 'e8', source: 'check_confidence', target: 'notify_review_done', type: 'condition_false' },
+        { id: 'e9', source: 'ai_review', target: 'notify_review_failed', type: 'error' },
+      ],
+    },
+  },
+  {
+    id: 'local-pr-review-merge',
+    name: 'Local PR: Review & Merge',
+    description: 'Auto-commit changes, AI-review, and merge if approved. On merge conflict, start AI resolution session.',
+    category: 'git',
+    definition: {
+      entryNodeId: 'commit',
+      triggers: [
+        { type: 'event', event: 'run.completed' },
+      ],
+      nodes: [
+        {
+          id: 'commit',
+          name: 'Auto Commit',
+          type: 'git_commit',
+          config: {},
+          position: { x: 300, y: 0 },
+          onError: 'abort',
+        },
+        {
+          id: 'review',
+          name: 'AI Code Review',
+          type: 'ai_review',
+          config: {},
+          position: { x: 300, y: 150 },
+          timeoutMs: 1800000,
+          onError: 'abort',
+        },
+        {
+          id: 'check_review',
+          name: 'Check Review Result',
+          type: 'condition',
+          config: {},
+          position: { x: 300, y: 300 },
+          condition: {
+            expression: '${review.output.reviewPassed} == true',
+          },
+        },
+        {
+          id: 'merge',
+          name: 'Merge to Base Branch',
+          type: 'git_merge',
+          config: { baseBranch: 'main' },
+          position: { x: 150, y: 450 },
+          onError: 'route',
+        },
+        {
+          id: 'notify_failed',
+          name: 'Notify Review Failed',
+          type: 'notify',
+          config: {
+            type: 'system',
+            message: 'Review failed. Notes: ${review.output.reviewNotes}',
+          },
+          position: { x: 450, y: 450 },
+        },
+        {
+          id: 'resolve_conflict',
+          name: 'AI Conflict Resolution',
+          type: 'ai_prompt',
+          config: {
+            prompt: 'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
+            sessionName: 'Conflict Resolution',
+          },
+          position: { x: 0, y: 600 },
+        },
+      ],
+      edges: [
+        { id: 'e1', source: 'commit', target: 'review', type: 'success' },
+        { id: 'e2', source: 'review', target: 'check_review', type: 'success' },
+        { id: 'e3', source: 'check_review', target: 'merge', type: 'condition_true' },
+        { id: 'e4', source: 'check_review', target: 'notify_failed', type: 'condition_false' },
+        { id: 'e5', source: 'merge', target: 'resolve_conflict', type: 'error' },
+      ],
+    },
+  },
+  {
+    id: 'daily-ai-review',
+    name: 'Daily AI Code Review',
+    description: 'AI reviews recent git changes every morning',
+    category: 'ai',
+    definition: {
+      entryNodeId: 'review',
+      triggers: [{ type: 'cron', cron: '0 9 * * *' }],
+      nodes: [
+        {
+          id: 'review',
+          name: 'AI Review',
+          type: 'ai_prompt',
+          config: {
+            prompt: 'Review the recent git changes. Run "git log --oneline --since=\'24 hours ago\'" and "git diff HEAD~5" (or fewer if less than 5 commits exist). Provide a summary and any potential issues.',
+            sessionName: 'Daily AI Review',
+          },
+          position: { x: 300, y: 0 },
+        },
+      ],
+      edges: [],
+    },
+  },
+  {
+    id: 'auto-git-commit',
+    name: 'Auto Git Commit',
+    description: 'Periodically commits uncommitted changes with AI-generated messages',
+    category: 'git',
+    definition: {
+      entryNodeId: 'commit',
+      triggers: [{ type: 'interval', intervalMinutes: 30 }],
+      nodes: [
+        {
+          id: 'commit',
+          name: 'Auto Commit',
+          type: 'ai_prompt',
+          config: {
+            prompt: 'Check if there are uncommitted changes using "git status". If there are changes, review with "git diff", stage all, write a conventional commit message, and commit. If no changes, respond "No uncommitted changes found."',
+            sessionName: 'Auto Commit',
+          },
+          position: { x: 300, y: 0 },
+        },
+      ],
+      edges: [],
+    },
+  },
+  {
+    id: 'code-quality-check',
+    name: 'Code Quality Check',
+    description: 'Run linting and type checking with AI analysis',
+    category: 'ci',
+    definition: {
+      entryNodeId: 'lint',
+      triggers: [{ type: 'cron', cron: '0 12 * * 1-5' }],
+      nodes: [
+        {
+          id: 'lint',
+          name: 'Run Lint & Typecheck',
+          type: 'shell',
+          config: { command: 'npm run lint 2>&1 || true; npx tsc --noEmit 2>&1 || true', timeoutMs: 120000 },
+          position: { x: 300, y: 0 },
+          onError: 'skip',
+        },
+        {
+          id: 'analyze',
+          name: 'AI Analysis',
+          type: 'ai_prompt',
+          config: {
+            prompt: 'Here are the lint/typecheck results:\n${lint.output.stdout}\n\nAnalyze the errors and suggest fixes for the most critical issues.',
+            sessionName: 'Code Quality Check',
+          },
+          position: { x: 300, y: 150 },
+        },
+      ],
+      edges: [
+        { id: 'e1', source: 'lint', target: 'analyze', type: 'success' },
+      ],
+    },
+  },
+  {
+    id: 'nightly-test-and-fix',
+    name: 'Nightly Test & Fix',
+    description: 'Run tests nightly, auto-fix failures with AI, create PR for review and merge',
+    category: 'ci',
+    definition: {
+      entryNodeId: 'create_wt',
+      triggers: [{ type: 'cron', cron: '0 2 * * *' }],
+      nodes: [
+        {
+          id: 'create_wt',
+          name: 'Create Test Worktree',
+          type: 'create_worktree',
+          config: {
+            branchName: 'nightly/${date}',
+            baseBranch: 'master',
+          },
+          position: { x: 300, y: 0 },
+          onError: 'abort',
+        },
+        {
+          id: 'run_tests',
+          name: 'Run Tests',
+          type: 'shell',
+          config: {
+            command: 'pnpm test',
+            cwd: '${create_wt.output.worktreePath}',
+            timeoutMs: 300000,
+          },
+          position: { x: 300, y: 150 },
+          onError: 'route',
+        },
+        {
+          id: 'ai_fix',
+          name: 'AI Fix Test Failures',
+          type: 'ai_prompt',
+          config: {
+            prompt: 'The following tests failed. Fix the source code to make tests pass. Do NOT modify test files.\n\nTest command: pnpm test\nTest output:\n${run_tests.output.stderr}\n${run_tests.output.stdout}',
+            sessionName: 'Nightly: Fix Test Failures',
+            workingDirectory: '${create_wt.output.worktreePath}',
+          },
+          position: { x: 500, y: 300 },
+          timeoutMs: 600000,
+        },
+        {
+          id: 'commit_fix',
+          name: 'Commit Fixes',
+          type: 'git_commit',
+          config: {
+            cwd: '${create_wt.output.worktreePath}',
+          },
+          position: { x: 500, y: 450 },
+          onError: 'skip',
+        },
+        {
+          id: 'notify_fix_failed',
+          name: 'Notify Fix Failed',
+          type: 'notify',
+          config: {
+            type: 'system',
+            title: 'Nightly Test & Fix',
+            message: 'Tests still failing after max fix attempts. Manual intervention needed.',
+            priority: 'high',
+            tags: ['warning', 'test_tube'],
+          },
+          position: { x: 700, y: 450 },
+        },
+        {
+          id: 'create_pr',
+          name: 'Create Local PR',
+          type: 'create_pr',
+          config: {
+            worktreePath: '${create_wt.output.worktreePath}',
+            title: 'Nightly: Test fixes ${date}',
+            baseBranch: 'master',
+          },
+          position: { x: 100, y: 300 },
+        },
+        {
+          id: 'review',
+          name: 'AI Code Review',
+          type: 'ai_review',
+          config: {
+            worktreePath: '${create_wt.output.worktreePath}',
+          },
+          position: { x: 100, y: 450 },
+          timeoutMs: 1800000,
+          onError: 'abort',
+        },
+        {
+          id: 'check_review',
+          name: 'Review Passed?',
+          type: 'condition',
+          config: {},
+          position: { x: 100, y: 600 },
+          condition: {
+            expression: '${review.output.reviewPassed} == true',
+          },
+        },
+        {
+          id: 'notify_review_failed',
+          name: 'Notify Review Issues',
+          type: 'notify',
+          config: {
+            type: 'system',
+            title: 'Nightly Test & Fix',
+            message: 'AI review found issues: ${review.output.reviewNotes}',
+            priority: 'high',
+            tags: ['x', 'mag'],
+          },
+          position: { x: 300, y: 700 },
+        },
+        {
+          id: 'notify_ready',
+          name: 'Notify Ready for Merge',
+          type: 'notify',
+          config: {
+            type: 'system',
+            title: 'Nightly Test & Fix',
+            message: 'Nightly PR is ready for merge. Tests fixed and review passed.',
+            priority: 'high',
+            tags: ['white_check_mark', 'rocket'],
+          },
+          position: { x: -50, y: 700 },
+        },
+        {
+          id: 'await_merge',
+          name: 'Await Merge Approval',
+          type: 'wait',
+          config: { type: 'approval' },
+          position: { x: -50, y: 850 },
+          timeoutMs: 86400000,
+        },
+        {
+          id: 'merge',
+          name: 'Merge to Master',
+          type: 'git_merge',
+          config: {
+            branch: '${create_pr.output.branchName}',
+            baseBranch: 'master',
+            worktreePath: '${create_wt.output.worktreePath}',
+          },
+          position: { x: -50, y: 1000 },
+          onError: 'route',
+        },
+        {
+          id: 'resolve_conflict',
+          name: 'AI Conflict Resolution',
+          type: 'ai_prompt',
+          config: {
+            prompt: 'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
+            sessionName: 'Nightly: Conflict Resolution',
+            workingDirectory: '${create_wt.output.worktreePath}',
+          },
+          position: { x: -200, y: 1150 },
+        },
+      ],
+      edges: [
+        { id: 'e1', source: 'create_wt', target: 'run_tests', type: 'success' },
+        { id: 'e2', source: 'run_tests', target: 'create_pr', type: 'success' },
+        { id: 'e3', source: 'run_tests', target: 'ai_fix', type: 'error' },
+        { id: 'e4', source: 'ai_fix', target: 'commit_fix', type: 'success' },
+        { id: 'e5', source: 'commit_fix', target: 'run_tests', type: 'loop', maxIterations: 3 },
+        { id: 'e6', source: 'commit_fix', target: 'notify_fix_failed', type: 'loop_exhausted' },
+        { id: 'e7', source: 'create_pr', target: 'review', type: 'success' },
+        { id: 'e8', source: 'review', target: 'check_review', type: 'success' },
+        { id: 'e9', source: 'check_review', target: 'notify_ready', type: 'condition_true' },
+        { id: 'e10', source: 'check_review', target: 'notify_review_failed', type: 'condition_false' },
+        { id: 'e11', source: 'notify_ready', target: 'await_merge', type: 'success' },
+        { id: 'e12', source: 'await_merge', target: 'merge', type: 'success' },
+        { id: 'e13', source: 'merge', target: 'resolve_conflict', type: 'error' },
+      ],
+    },
+  },
+];

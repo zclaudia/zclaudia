@@ -1,0 +1,556 @@
+import type { Database } from 'better-sqlite3';
+import type { Session } from '@zclaudia/shared/core/session';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import type {
+  SupervisionTask,
+  ReviewVerdict,
+  TaskResult,
+  SupervisionLogEvent,
+  TrustLevel,
+} from '@zclaudia/shared/features/supervision';
+import { SupervisionTaskRepository } from './repositories/supervision-task.js';
+import type { SupervisionProjectPort, SupervisionSessionPort } from './ports.js';
+import type { ContextManager } from './context-manager.js';
+import type { WorktreePool } from './worktree-pool.js';
+import type { SupervisionAiRunPort } from './ports.js';
+import { getReviewRejectionOutcome } from './model.js';
+import {
+  assertTaskStatus,
+  assertTaskTransition,
+} from './status-machine.js';
+
+const REVIEW_VERDICT_REGEX = /\[REVIEW_VERDICT\]([\s\S]*?)\[\/REVIEW_VERDICT\]/;
+const REVIEW_EVIDENCE_TIMEOUT_MS = 15_000;
+const REVIEW_RUN_TIMEOUT_MS = 5 * 60 * 1000;
+
+export class ReviewEngine {
+  private reviewClients = new Map<string, unknown>(); // taskId → virtualClient
+  private reviewTimeouts = new Map<string, NodeJS.Timeout>();
+
+  constructor(
+    private db: Database,
+    private taskRepo: SupervisionTaskRepository,
+    private projectRepo: SupervisionProjectPort,
+    private sessionRepo: SupervisionSessionPort,
+    private getContextManager: (projectId: string) => ContextManager,
+    private broadcastTaskUpdate: (taskId: string, projectId: string) => void,
+    private logFn: (
+      projectId: string,
+      event: SupervisionLogEvent,
+      detail?: Record<string, unknown>,
+      taskId?: string,
+    ) => void,
+    private collectGitEvidence: (cwd: string, baseCommit: string) => Promise<string>,
+    private aiRunPort: SupervisionAiRunPort,
+    private getWorktreePool?: (projectId: string) => WorktreePool,
+  ) {}
+
+  /**
+   * Create a review session, inject objective evidence, trigger Provider run.
+   */
+  async createReview(task: SupervisionTask): Promise<void> {
+    const project = this.projectRepo.findById(task.projectId);
+    if (!project?.rootPath) {
+      console.error(`[ReviewEngine] Cannot create review for task ${task.id}: project has no rootPath`);
+      return;
+    }
+
+    // 1. Create review session
+    const session = this.sessionRepo.create({
+      projectId: task.projectId,
+      name: `Review: ${task.title}`,
+      type: 'background',
+      projectRole: 'review',
+      taskId: task.id,
+      workingDirectory: project.rootPath,
+    } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+
+    // 2. Collect objective evidence (from worktree if parallel, else project root)
+    let evidenceCwd = project.rootPath;
+    if (task.sessionId) {
+      const taskSession = this.sessionRepo.findById(task.sessionId);
+      if (taskSession?.workingDirectory) {
+        evidenceCwd = taskSession.workingDirectory;
+      }
+    }
+
+    let evidence = '(no git evidence available)';
+    if (task.baseCommit) {
+      try {
+        evidence = await this.withTimeout(
+          this.collectGitEvidence(evidenceCwd, task.baseCommit),
+          REVIEW_EVIDENCE_TIMEOUT_MS,
+          'collectGitEvidence timed out',
+        );
+      } catch (err) {
+        console.error(`[ReviewEngine] Failed to collect evidence for task ${task.id}:`, err);
+        evidence = '(git evidence unavailable: collection failed or timed out)';
+      }
+    }
+
+    // 3. Build review prompt
+    const reviewPrompt = this.buildReviewPrompt(task, project.name, evidence);
+
+    // 4. Create virtual client and trigger run
+    this.reviewClients.set(task.id, { clientId: `supervisor_review_${task.id}` });
+    this.aiRunPort.startVirtualRun({
+      clientId: `supervisor_review_${task.id}`,
+      sessionId: session.id,
+      input: reviewPrompt,
+      workingDirectory: project.rootPath,
+      onMessage: (msg) => {
+        this.handleReviewRunMessage(task.id, task.projectId, session.id, msg);
+      },
+    });
+
+    this.armReviewTimeout(task.id, task.projectId, session.id);
+
+    this.logFn(
+      task.projectId,
+      'review_started',
+      { taskId: task.id, reviewSessionId: session.id },
+      task.id,
+    );
+  }
+
+  /**
+   * Handle messages from the review session's virtual client.
+   */
+  private handleReviewRunMessage(
+    taskId: string,
+    projectId: string,
+    reviewSessionId: string,
+    msg: ServerMessage,
+  ): void {
+    if (msg.type === 'run_completed') {
+      this.clearReviewTimeout(taskId);
+      (async () => {
+        try {
+          const task = this.taskRepo.findById(taskId);
+          if (!task) return;
+          assertTaskStatus(task.status, 'reviewing', `complete review for ${taskId}`);
+
+          const verdict = this.parseVerdict(reviewSessionId);
+          await this.handleReviewComplete(task, verdict, reviewSessionId);
+        } catch (err) {
+          console.error(`[ReviewEngine] Error handling review run_completed for task ${taskId}:`, err);
+        } finally {
+          this.reviewClients.delete(taskId);
+        }
+      })();
+      return;
+    }
+
+    if (msg.type === 'run_failed') {
+      this.clearReviewTimeout(taskId);
+      try {
+        const errorMsg = 'error' in msg ? (msg as import('@zclaudia/shared/wire/messages').RunFailedMessage).error : 'Review run failed';
+        this.logFn(
+          projectId,
+          'review_failed',
+          { taskId, error: errorMsg, reviewSessionId },
+          taskId,
+        );
+
+        // Don't fail the task — the code changes may be fine.
+        // Keep in reviewing for manual intervention.
+        const task = this.taskRepo.findById(taskId);
+        if (task) {
+          assertTaskStatus(task.status, 'reviewing', `record review failure for ${taskId}`);
+          const updatedResult: TaskResult = {
+            ...(task.result ?? { summary: '', filesChanged: [] }),
+            reviewSessionId,
+          };
+          this.taskRepo.updateStatus(taskId, 'reviewing', { result: updatedResult });
+          this.broadcastTaskUpdate(taskId, projectId);
+        }
+
+        this.archiveReviewSession(reviewSessionId);
+      } catch (err) {
+        console.error(`[ReviewEngine] Error handling review run_failed for task ${taskId}:`, err);
+      } finally {
+        this.reviewClients.delete(taskId);
+      }
+    }
+  }
+
+  /**
+   * Parse [REVIEW_VERDICT] from the review session's assistant messages.
+   */
+  parseVerdict(sessionId: string): ReviewVerdict | null {
+    try {
+      const messages = this.db
+        .prepare(
+          `SELECT content FROM messages
+           WHERE session_id = ? AND role = 'assistant'
+           ORDER BY created_at DESC LIMIT 5`,
+        )
+        .all(sessionId) as { content: string }[];
+
+      const combined = messages.map((m) => m.content).join('\n');
+      const match = REVIEW_VERDICT_REGEX.exec(combined);
+      if (!match) return null;
+
+      const block = match[1].trim();
+      const approvedMatch = block.match(/^\s*approved\s*:\s*(true|false)\s*$/im);
+      const approved = approvedMatch ? approvedMatch[1].toLowerCase() === 'true' : false;
+
+      const notes = this.extractMultilineField(block, 'notes') ?? '';
+      const suggestedChangesBlock = this.extractMultilineField(block, 'suggested_changes');
+      const suggestedChanges = suggestedChangesBlock
+        ? suggestedChangesBlock
+            .split('\n')
+            .map((line) => line.trim().replace(/^-\s*/, ''))
+            .filter(Boolean)
+        : undefined;
+
+      return { approved, notes, suggestedChanges };
+    } catch {
+      return null;
+    }
+  }
+
+  private extractMultilineField(block: string, fieldName: 'notes' | 'suggested_changes'): string | undefined {
+    const fieldHeader = new RegExp(`^\\s*${fieldName}\\s*:\\s*(\\|)?\\s*$`, 'i');
+    const anyHeader = /^\s*(approved|notes|suggested_changes)\s*:/i;
+    const lines = block.split('\n');
+    const startIndex = lines.findIndex((line) => fieldHeader.test(line));
+    if (startIndex === -1) {
+      return undefined;
+    }
+
+    const collected: string[] = [];
+    for (let index = startIndex + 1; index < lines.length; index += 1) {
+      const line = lines[index];
+      if (anyHeader.test(line)) {
+        break;
+      }
+      collected.push(line.replace(/^\s{2}/, ''));
+    }
+
+    const value = collected.join('\n').trim();
+    return value || undefined;
+  }
+
+  /**
+   * Apply review verdict based on trust level.
+   */
+  async handleReviewComplete(
+    task: SupervisionTask,
+    verdict: ReviewVerdict | null,
+    reviewSessionId: string,
+  ): Promise<void> {
+    const project = this.projectRepo.findById(task.projectId);
+    const trustLevel: TrustLevel = project?.agent?.config?.trustLevel ?? 'low';
+
+    // Write review result file
+    if (project?.rootPath) {
+      const cm = this.getContextManager(task.projectId);
+      const reviewContent = verdict
+        ? `# Review: ${task.title}\n\n## Verdict: ${verdict.approved ? 'APPROVED' : 'REJECTED'}\n\n${verdict.notes}\n${
+            verdict.suggestedChanges?.length
+              ? '\n## Suggested Changes\n' + verdict.suggestedChanges.map((s) => `- ${s}`).join('\n') + '\n'
+              : ''
+          }`
+        : `# Review: ${task.title}\n\nNo structured verdict found.\n`;
+      cm.writeReviewResult(task.id, reviewContent);
+    }
+
+    // Attach verdict + reviewSessionId to result
+    const updatedResult: TaskResult = {
+      ...(task.result ?? { summary: '', filesChanged: [] }),
+      reviewVerdict: verdict ?? undefined,
+      reviewSessionId,
+    };
+
+    // Check if this is a worktree task
+    const taskSession = task.sessionId ? this.sessionRepo.findById(task.sessionId) : undefined;
+    const isWorktreeTask =
+      taskSession?.workingDirectory &&
+      project?.rootPath &&
+      taskSession.workingDirectory !== project.rootPath;
+
+    if (trustLevel === 'low') {
+      // Low trust: keep in reviewing, let user manually confirm
+      this.taskRepo.updateStatus(task.id, 'reviewing', { result: updatedResult });
+      this.broadcastTaskUpdate(task.id, task.projectId);
+      this.logFn(
+        task.projectId,
+        'review_completed',
+        {
+          taskId: task.id,
+          approved: verdict?.approved,
+          trustLevel,
+          autoApplied: false,
+        },
+        task.id,
+      );
+      this.archiveReviewSession(reviewSessionId);
+      return;
+    }
+
+    // Medium/high trust: auto-apply verdict
+    if (!verdict) {
+      // Parse failure: keep in reviewing for manual intervention
+      this.taskRepo.updateStatus(task.id, 'reviewing', { result: updatedResult });
+      this.broadcastTaskUpdate(task.id, task.projectId);
+      this.logFn(
+        task.projectId,
+        'review_completed',
+        { taskId: task.id, verdictParsed: false, trustLevel },
+        task.id,
+      );
+      this.archiveReviewSession(reviewSessionId);
+      return;
+    }
+
+    if (verdict.approved) {
+      // Approved → attempt merge if worktree, otherwise integrated directly
+      if (isWorktreeTask && this.getWorktreePool) {
+        const pool = this.getWorktreePool(task.projectId);
+        this.logFn(task.projectId, 'merge_started', { taskId: task.id }, task.id);
+
+        const mergeResult = await pool.mergeBack(
+          task.id,
+          task.attempt,
+          taskSession!.workingDirectory!,
+        );
+
+        if (mergeResult.success) {
+          pool.release(taskSession!.workingDirectory!);
+          assertTaskTransition(task.status, 'integrated');
+          this.taskRepo.updateStatus(task.id, 'integrated', { result: updatedResult });
+          this.broadcastTaskUpdate(task.id, task.projectId);
+          this.logFn(task.projectId, 'merge_completed', { taskId: task.id }, task.id);
+          this.logFn(task.projectId, 'worktree_released', {
+            taskId: task.id, worktreePath: taskSession!.workingDirectory,
+          }, task.id);
+        } else {
+          assertTaskTransition(task.status, 'merge_conflict');
+          this.taskRepo.updateStatus(task.id, 'merge_conflict', {
+            result: {
+              ...updatedResult,
+              reviewNotes: `Merge conflicts: ${mergeResult.conflicts?.join(', ')}`,
+            },
+          });
+          this.broadcastTaskUpdate(task.id, task.projectId);
+          this.logFn(task.projectId, 'merge_conflict', {
+            taskId: task.id, conflicts: mergeResult.conflicts,
+          }, task.id);
+          // Don't release worktree — keep for manual resolution
+        }
+      } else {
+        // Serial mode: approved = integrated
+        assertTaskTransition(task.status, 'integrated');
+        this.taskRepo.updateStatus(task.id, 'integrated', { result: updatedResult });
+        this.broadcastTaskUpdate(task.id, task.projectId);
+      }
+
+      this.logFn(
+        task.projectId,
+        'review_completed',
+        {
+          taskId: task.id,
+          approved: true,
+          trustLevel,
+          autoApplied: true,
+        },
+        task.id,
+      );
+    } else {
+      // Rejected → release worktree, then retry or fail
+      if (isWorktreeTask && this.getWorktreePool) {
+        const pool = this.getWorktreePool(task.projectId);
+        pool.release(taskSession!.workingDirectory!);
+        this.logFn(task.projectId, 'worktree_released', {
+          taskId: task.id, worktreePath: taskSession!.workingDirectory,
+        }, task.id);
+      }
+
+      const { nextStatus, nextAttempt } = getReviewRejectionOutcome(task.attempt, task.maxRetries);
+      if (nextStatus === 'queued') {
+        // Retry: increment attempt, inject reviewNotes, re-queue
+        const retryResult: TaskResult = {
+          ...updatedResult,
+          reviewNotes: verdict.notes,
+        };
+        assertTaskTransition(task.status, 'queued');
+        this.taskRepo.updateStatus(task.id, 'queued', {
+          result: retryResult,
+          attempt: nextAttempt,
+        });
+        this.broadcastTaskUpdate(task.id, task.projectId);
+        this.logFn(
+          task.projectId,
+          'review_completed',
+          {
+            taskId: task.id,
+            approved: false,
+            trustLevel,
+            autoApplied: true,
+            retrying: true,
+            newAttempt: nextAttempt,
+          },
+          task.id,
+        );
+      } else {
+        // Max retries exceeded → failed
+        assertTaskTransition(task.status, 'failed');
+        this.taskRepo.updateStatus(task.id, 'failed', { result: updatedResult });
+        this.broadcastTaskUpdate(task.id, task.projectId);
+        this.logFn(
+          task.projectId,
+          'review_completed',
+          {
+            taskId: task.id,
+            approved: false,
+            trustLevel,
+            autoApplied: true,
+            retrying: false,
+            maxRetriesExceeded: true,
+          },
+          task.id,
+        );
+      }
+    }
+
+    this.archiveReviewSession(reviewSessionId);
+  }
+
+  /**
+   * Build the review system prompt.
+   */
+  buildReviewPrompt(
+    task: SupervisionTask,
+    projectName: string,
+    evidence: string,
+  ): string {
+    let prompt = `[INDEPENDENT CODE REVIEW]
+
+You are reviewing the output of an automated coding task. You must evaluate whether the task was completed correctly based on the acceptance criteria and the actual code changes.
+
+CRITICAL: Do NOT trust the task's self-reported summary blindly. Base your review primarily on the OBJECTIVE EVIDENCE (diff) below.
+
+== Task ==
+Project: ${projectName}
+Title: ${task.title}
+Description: ${task.description}
+Attempt: ${task.attempt}
+`;
+
+    if (task.acceptanceCriteria && task.acceptanceCriteria.length > 0) {
+      prompt += `\n== Acceptance Criteria ==\n`;
+      for (const ac of task.acceptanceCriteria) {
+        prompt += `- ${ac}\n`;
+      }
+    }
+
+    if (task.result?.summary) {
+      prompt += `\n== Task Self-Reported Summary ==\n${task.result.summary}\n`;
+    }
+
+    if (task.result?.workflowOutputs && task.result.workflowOutputs.length > 0) {
+      prompt += `\n== Workflow Action Results ==\n`;
+      for (const wo of task.result.workflowOutputs) {
+        prompt += `Action: ${wo.action}\nSuccess: ${wo.success}\nOutput:\n${wo.output}\n\n`;
+      }
+    }
+
+    prompt += `\n== Objective Evidence (Code Diff) ==
+\`\`\`diff
+${evidence}
+\`\`\`
+
+== Instructions ==
+Evaluate the changes against the acceptance criteria. Consider:
+1. Do the code changes actually implement what the task requires?
+2. Did all workflow actions (tests, lint) pass?
+3. Are there any obvious bugs, regressions, or missing pieces?
+4. Is the code quality acceptable?
+
+Output your verdict in this exact format:
+
+[REVIEW_VERDICT]
+approved: true/false
+notes: |
+  <your detailed review notes>
+suggested_changes:
+  - <suggestion 1 if rejected>
+  - <suggestion 2 if rejected>
+[/REVIEW_VERDICT]
+`;
+
+    return prompt;
+  }
+
+  /**
+   * Archive a review session after completion.
+   */
+  archiveReviewSession(sessionId: string): void {
+    try {
+      if (!this.sessionRepo.findById(sessionId)) {
+        return;
+      }
+      this.sessionRepo.update(sessionId, { archivedAt: Date.now() });
+    } catch (err) {
+      console.error(`[ReviewEngine] Failed to archive review session ${sessionId}:`, err);
+    }
+  }
+
+  private armReviewTimeout(taskId: string, projectId: string, reviewSessionId: string): void {
+    this.clearReviewTimeout(taskId);
+    const timer = setTimeout(() => {
+      try {
+        const task = this.taskRepo.findById(taskId);
+        if (!task) {
+          return;
+        }
+        assertTaskStatus(task.status, 'reviewing', `handle review timeout for ${taskId}`);
+
+        const updatedResult: TaskResult = {
+          ...(task.result ?? { summary: '', filesChanged: [] }),
+          reviewSessionId,
+          reviewNotes: 'Review timed out; manual intervention required.',
+        };
+
+        this.taskRepo.updateStatus(taskId, 'reviewing', { result: updatedResult });
+        this.broadcastTaskUpdate(taskId, projectId);
+        this.logFn(projectId, 'review_completed', {
+          taskId,
+          verdictParsed: false,
+          timedOut: true,
+        }, taskId);
+      } finally {
+        this.reviewClients.delete(taskId);
+        this.archiveReviewSession(reviewSessionId);
+        this.clearReviewTimeout(taskId);
+      }
+    }, REVIEW_RUN_TIMEOUT_MS);
+
+    this.reviewTimeouts.set(taskId, timer);
+  }
+
+  private clearReviewTimeout(taskId: string): void {
+    const timer = this.reviewTimeouts.get(taskId);
+    if (timer) {
+      clearTimeout(timer);
+      this.reviewTimeouts.delete(taskId);
+    }
+  }
+
+  private withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+      promise.then(
+        (value) => {
+          clearTimeout(timer);
+          resolve(value);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        },
+      );
+    });
+  }
+}

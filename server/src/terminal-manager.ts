@@ -1,0 +1,271 @@
+import * as pty from 'node-pty';
+import { execSync } from 'child_process';
+import type { TerminalOutputMessage, TerminalExitedMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
+
+const IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
+const SCROLLBACK_MAX_BYTES = 64 * 1024; // 64KB scrollback buffer
+const SCROLLBACK_MAX_CHUNKS = 2000;
+
+/**
+ * Detect available shell for the current platform.
+ *
+ * - Linux / macOS: use $SHELL or fallback to 'bash'
+ * - Windows: prefer WSL ('wsl.exe') if installed, otherwise 'powershell.exe'
+ */
+function detectShell(): string {
+  if (process.platform !== 'win32') {
+    return process.env.SHELL || 'bash';
+  }
+
+  // Windows: check if WSL is available
+  try {
+    execSync('wsl.exe --status', {
+      timeout: 3000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    return 'wsl.exe';
+  } catch {
+    // WSL not available, fall back to PowerShell
+    return process.env.COMSPEC || 'powershell.exe';
+  }
+}
+
+interface ManagedTerminal {
+  pty: pty.IPty;
+  clientId: string | null;
+  projectId: string;
+  lastActivity: number;
+  idleTimer: ReturnType<typeof setTimeout>;
+  scrollback: string[];
+  scrollbackBytes: number;
+  /**
+   * Set when the PTY exited while no client was attached. The next attach() consumes this
+   * (returning the exitCode along with the scrollback) and the entry is then deleted.
+   */
+  exited?: { exitCode: number };
+}
+
+export class TerminalManager {
+  private terminals = new Map<string, ManagedTerminal>();
+  private sendToClient: (clientId: string, msg: ServerMessage) => void;
+
+  constructor(sendToClient: (clientId: string, msg: ServerMessage) => void) {
+    this.sendToClient = sendToClient;
+  }
+
+  create(terminalId: string, clientId: string, cwd: string, cols: number, rows: number): void {
+    // Clamp cols/rows to sane ranges to prevent PTY crashes
+    cols = Math.max(1, Math.min(500, cols || 80));
+    rows = Math.max(1, Math.min(200, rows || 24));
+
+    // Destroy existing terminal with same ID if any
+    if (this.terminals.has(terminalId)) {
+      this.destroy(terminalId);
+    }
+
+    const shell = detectShell();
+    // Always spawn at $HOME to avoid macOS TCC permission dialogs
+    // (accessing Desktop/Documents/Downloads triggers a system prompt that blocks pty.spawn).
+    // Then cd to the target directory — if that fails, the user sees a normal shell error.
+    const safeCwd = process.env.HOME || '/';
+    console.log(`[Terminal] Spawning: shell=${shell}, safeCwd=${safeCwd}, targetCwd=${cwd}, cols=${cols}, rows=${rows}`);
+    let ptyProcess: pty.IPty;
+    try {
+      ptyProcess = pty.spawn(shell, [], {
+        name: 'xterm-256color',
+        cols,
+        rows,
+        cwd: safeCwd,
+        env: process.env as Record<string, string>,
+      });
+    } catch (err) {
+      console.error(`[Terminal] pty.spawn failed: shell=${shell}, cwd=${safeCwd}, PATH=${process.env.PATH?.substring(0, 200)}`);
+      throw err;
+    }
+
+    // cd to the target directory after shell starts (non-blocking, graceful failure)
+    if (cwd && cwd !== safeCwd) {
+      // Use printf to avoid echoing the cd command in the terminal,
+      // and clear the line so the user only sees the prompt at the target dir.
+      ptyProcess.write(`cd ${this.shellEscape(cwd)} && clear\n`);
+    }
+
+    const managed: ManagedTerminal = {
+      pty: ptyProcess,
+      clientId,
+      projectId: '',
+      lastActivity: Date.now(),
+      idleTimer: this.startIdleTimer(terminalId),
+      scrollback: [],
+      scrollbackBytes: 0,
+    };
+
+    this.terminals.set(terminalId, managed);
+
+    ptyProcess.onData((data) => {
+      this.appendScrollback(managed, data);
+      if (managed.clientId) {
+        this.sendToClient(managed.clientId, {
+          type: 'terminal_output',
+          terminalId,
+          data,
+        } as TerminalOutputMessage);
+      }
+    });
+
+    ptyProcess.onExit(({ exitCode }) => {
+      // Guard against the destroy() + new create() race for the same terminalId — the old PTY's
+      // onExit may fire async and we don't want it to mutate the new entry.
+      const current = this.terminals.get(terminalId);
+      if (!current || current.pty !== ptyProcess) return;
+
+      if (current.clientId) {
+        // Owned exit — deliver the message immediately and tear the entry down.
+        this.sendToClient(current.clientId, {
+          type: 'terminal_exited',
+          terminalId,
+          exitCode,
+        } as TerminalExitedMessage);
+        this.terminals.delete(terminalId);
+        clearTimeout(current.idleTimer);
+      } else {
+        // Detached exit — keep the entry around so the next attach() can hand the exit code
+        // to the client along with the scrollback. The idle timer continues to run; if no one
+        // reattaches before it fires, the entry is cleaned up like any other stale terminal.
+        current.exited = { exitCode };
+      }
+    });
+  }
+
+  /** Attach a new client to an existing terminal session (for pop-out windows). */
+  attach(
+    terminalId: string,
+    clientId: string,
+    cols: number,
+    rows: number,
+  ): { success: boolean; scrollback: string[]; error?: string; pendingExit?: { exitCode: number } } {
+    const managed = this.terminals.get(terminalId);
+    if (!managed) {
+      return { success: false, scrollback: [], error: 'Terminal not found' };
+    }
+
+    // PTY already exited while detached — hand the exit code over together with scrollback,
+    // then clean up the entry. This is a one-shot consumption.
+    if (managed.exited) {
+      const scrollback = [...managed.scrollback];
+      const pendingExit = managed.exited;
+      clearTimeout(managed.idleTimer);
+      this.terminals.delete(terminalId);
+      return { success: true, scrollback, pendingExit };
+    }
+
+    // Switch ownership to new client
+    managed.clientId = clientId;
+    managed.lastActivity = Date.now();
+    this.resetIdleTimer(terminalId, managed);
+
+    // Resize to new window dimensions
+    cols = Math.max(1, Math.min(500, cols || 80));
+    rows = Math.max(1, Math.min(200, rows || 24));
+    managed.pty.resize(cols, rows);
+
+    return { success: true, scrollback: [...managed.scrollback] };
+  }
+
+  detachTerminal(terminalId: string, clientId?: string): void {
+    const managed = this.terminals.get(terminalId);
+    if (!managed) return;
+    if (clientId && managed.clientId !== clientId) return;
+    managed.clientId = null;
+  }
+
+  write(terminalId: string, data: string): void {
+    const managed = this.terminals.get(terminalId);
+    if (!managed) return;
+    managed.lastActivity = Date.now();
+    this.resetIdleTimer(terminalId, managed);
+    managed.pty.write(data);
+  }
+
+  resize(terminalId: string, cols: number, rows: number): void {
+    const managed = this.terminals.get(terminalId);
+    if (!managed) return;
+    // Clamp cols/rows to sane ranges to prevent PTY crashes
+    cols = Math.max(1, Math.min(500, cols || 80));
+    rows = Math.max(1, Math.min(200, rows || 24));
+    managed.pty.resize(cols, rows);
+  }
+
+  destroy(terminalId: string): void {
+    const managed = this.terminals.get(terminalId);
+    if (!managed) return;
+    clearTimeout(managed.idleTimer);
+    managed.pty.kill();
+    this.terminals.delete(terminalId);
+  }
+
+  /** Returns true iff `clientId` is the current owner of the given terminal. */
+  isOwnedBy(terminalId: string, clientId: string): boolean {
+    return this.terminals.get(terminalId)?.clientId === clientId;
+  }
+
+  /** Detach a client without killing its terminals. PTYs stay alive for re-attach. */
+  detachClient(clientId: string): void {
+    for (const [, managed] of this.terminals) {
+      if (managed.clientId === clientId) {
+        managed.clientId = null;
+        // Idle timer continues — PTY will be destroyed if no one reattaches
+      }
+    }
+  }
+
+  destroyForClient(clientId: string): void {
+    for (const [terminalId, managed] of this.terminals) {
+      if (managed.clientId === clientId) {
+        clearTimeout(managed.idleTimer);
+        managed.pty.kill();
+        this.terminals.delete(terminalId);
+      }
+    }
+  }
+
+  destroyAll(): void {
+    for (const [, managed] of this.terminals) {
+      clearTimeout(managed.idleTimer);
+      managed.pty.kill();
+    }
+    this.terminals.clear();
+  }
+
+  private appendScrollback(managed: ManagedTerminal, data: string): void {
+    managed.scrollback.push(data);
+    managed.scrollbackBytes += data.length;
+
+    // Trim oldest chunks when exceeding limits
+    while (
+      managed.scrollback.length > SCROLLBACK_MAX_CHUNKS ||
+      managed.scrollbackBytes > SCROLLBACK_MAX_BYTES
+    ) {
+      const removed = managed.scrollback.shift();
+      if (removed) managed.scrollbackBytes -= removed.length;
+      else break;
+    }
+  }
+
+  private startIdleTimer(terminalId: string): ReturnType<typeof setTimeout> {
+    return setTimeout(() => {
+      console.log(`[Terminal] Idle timeout for terminal ${terminalId}`);
+      this.destroy(terminalId);
+    }, IDLE_TIMEOUT_MS);
+  }
+
+  private resetIdleTimer(terminalId: string, managed: ManagedTerminal): void {
+    clearTimeout(managed.idleTimer);
+    managed.idleTimer = this.startIdleTimer(terminalId);
+  }
+
+  /** Escape a path for use in a shell command (wrap in single quotes, escape existing quotes). */
+  private shellEscape(s: string): string {
+    return "'" + s.replace(/'/g, "'\\''") + "'";
+  }
+}

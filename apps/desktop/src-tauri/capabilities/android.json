@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "android",
+  "description": "Capability for Android platform",
+  "windows": ["main", "file-viewer-*", "session-chat-*"],
+  "platforms": ["android"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-close",
+    "core:window:allow-destroy",
+    "core:window:allow-show",
+    "core:window:allow-set-focus",
+    "core:window:allow-unminimize",
+    "core:webview:allow-create-webview-window",
+    "shell:allow-open",
+    "fs:default",
+    "fs:allow-download-read-recursive",
+    "fs:allow-download-write-recursive",
+    "shell:allow-kill",
+    {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "run-node",
+          "cmd": "node",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    },
+    {
+      "identifier": "shell:allow-spawn",
+      "allow": [
+        {
+          "name": "run-node",
+          "cmd": "node",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { PermissionSettings } from '../PermissionSettings';
+import { useProviderMetaStore } from '../../../stores/providerMetaStore';
+import { useServerStore } from '../../../stores/serverStore';
+
+const mockGetAgentConfig = vi.fn();
+const mockUpdateAgentConfig = vi.fn();
+const mockListAllWorkflows = vi.fn();
+const mockGetProviders = vi.fn();
+const mockGetProviderCapabilities = vi.fn();
+
+vi.mock('../../../services/api/servers', () => ({
+  getAgentConfig: (...args: unknown[]) => mockGetAgentConfig(...args),
+  updateAgentConfig: (...args: unknown[]) => mockUpdateAgentConfig(...args),
+}));
+
+vi.mock('../../../features/workflows/api', () => ({
+  listAllWorkflows: (...args: unknown[]) => mockListAllWorkflows(...args),
+}));
+
+vi.mock('../../../services/api/providers', () => ({
+  getProviders: (...args: unknown[]) => mockGetProviders(...args),
+  getProviderCapabilities: (...args: unknown[]) => mockGetProviderCapabilities(...args),
+}));
+
+describe('PermissionSettings', () => {
+  beforeEach(() => {
+    mockGetAgentConfig.mockReset();
+    mockUpdateAgentConfig.mockReset();
+    mockListAllWorkflows.mockReset();
+    mockGetProviders.mockReset();
+    mockGetProviderCapabilities.mockReset();
+
+    useServerStore.setState({ activeServerId: 'local' } as any);
+    useProviderMetaStore.setState({
+      providersByBackend: {
+        local: [
+          {
+            id: 'prov-supported',
+            name: 'Primary',
+            type: 'zclaudia',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+          {
+            id: 'prov-unsupported',
+            name: 'Legacy',
+            type: 'zclaudia',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+          },
+        ],
+      },
+    } as any);
+
+    mockGetAgentConfig.mockResolvedValue({
+      id: 1,
+      enabled: true,
+      projectId: null,
+      sessionId: null,
+      providerId: null,
+      permissionWorkflowOverrideId: null,
+      permissionPolicy: JSON.stringify({
+        enabled: true,
+        aiReview: {
+          enabled: true,
+        },
+      }),
+    });
+    mockUpdateAgentConfig.mockResolvedValue({
+      id: 1,
+      enabled: true,
+      projectId: null,
+      sessionId: null,
+      providerId: null,
+      permissionWorkflowOverrideId: null,
+      permissionPolicy: null,
+    });
+    mockListAllWorkflows.mockResolvedValue([]);
+
+    mockGetProviderCapabilities.mockImplementation(async (providerId: string) => ({
+      modes: [],
+      models: [],
+      supportsAIReview: providerId === 'prov-supported',
+    }));
+    mockGetProviders.mockResolvedValue([]);
+  });
+
+  function findTriggerByText(textFragment: string): HTMLElement {
+    const triggers = screen.getAllByRole('button').filter(b =>
+      b.getAttribute('aria-haspopup') === 'listbox'
+    );
+    const match = triggers.find(b => b.textContent?.includes(textFragment));
+    if (!match) throw new Error(`No Select trigger found containing "${textFragment}"`);
+    return match;
+  }
+
+  it('only lists providers that support AI review', async () => {
+    render(<PermissionSettings />);
+
+    await screen.findByText('Review provider');
+
+    await waitFor(() => {
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported');
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-unsupported');
+    });
+
+    fireEvent.click(findTriggerByText('Session default'));
+    expect(screen.getByRole('option', { name: 'Session default' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Primary (zclaudia)' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'Legacy (zclaudia)' })).toBeNull();
+  });
+
+  it('loads providers when provider store is empty', async () => {
+    useProviderMetaStore.setState({
+      providersByBackend: { local: [] },
+    } as any);
+
+    mockGetProviders.mockResolvedValue([
+      {
+        id: 'prov-supported',
+        name: 'Primary',
+        type: 'zclaudia',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ]);
+
+    render(<PermissionSettings />);
+
+    await waitFor(() => {
+      expect(mockGetProviders).toHaveBeenCalled();
+      expect(mockGetProviderCapabilities).toHaveBeenCalledWith('prov-supported');
+    });
+
+    fireEvent.click(findTriggerByText('Session default'));
+    expect(screen.getByRole('option', { name: 'Primary (zclaudia)' })).toBeInTheDocument();
+  });
+
+  it('lists non-system workflows as global override options', async () => {
+    mockListAllWorkflows.mockResolvedValue([
+      { id: 'wf-global', name: 'Global Review', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },
+      { id: 'wf-system', name: 'System Fallback', status: 'active', isSystem: true, definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },
+      { id: 'wf-disabled', name: 'Disabled Review', status: 'disabled', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },
+    ]);
+
+    render(<PermissionSettings />);
+
+    expect(await screen.findByText('Global override')).toBeInTheDocument();
+    fireEvent.click(findTriggerByText('System fallback only'));
+    expect(screen.getByRole('option', { name: '[Global] Global Review' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: '[Global] System Fallback' })).toBeNull();
+    expect(screen.queryByRole('option', { name: '[Global] Disabled Review' })).toBeNull();
+  });
+});

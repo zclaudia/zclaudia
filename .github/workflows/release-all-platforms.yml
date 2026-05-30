@@ -1,0 +1,424 @@
+name: Release All Platforms
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.1.42). Leave empty to auto-bump or reuse existing draft.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-all-platforms
+  cancel-in-progress: false
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      build: ${{ steps.version.outputs.build }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Compute release version
+        id: version
+        shell: bash
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            # Manual input: use exact version provided
+            VERSION="$INPUT_VERSION"
+          else
+            # Auto: check for existing draft release first
+            EXISTING_DRAFT=$(gh release list --json tagName,isDraft \
+              --jq '[.[] | select(.isDraft) | .tagName] | sort | reverse | first // empty' 2>/dev/null || true)
+            if [ -n "$EXISTING_DRAFT" ]; then
+              VERSION="${EXISTING_DRAFT#v}"
+              echo "Reusing existing draft release: $EXISTING_DRAFT"
+            else
+              eval "$(./scripts/release/version-bump.sh --platform macos --bump)"
+            fi
+          fi
+
+          BUILD="$(echo "$VERSION" | cut -d. -f3)"
+          MAJOR="$(echo "$VERSION" | cut -d. -f1)"
+          MINOR="$(echo "$VERSION" | cut -d. -f2)"
+          VERSION_CODE=$((MAJOR * 1000000 + MINOR * 10000 + BUILD))
+          TAG="v${VERSION}"
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "build=$BUILD" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Prepared release: $TAG"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$TAG" >/dev/null 2>&1 || \
+            gh release create "$TAG" --title "ZClaudia $VERSION" --notes "ZClaudia $VERSION" --draft
+
+  build-macos:
+    needs: prepare-release
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    # Intel Mac (macos-13) runner deprecated by GitHub — only build ARM for now
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-14
+            arch: aarch64
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_REMOTE: origin
+      RELEASE: 1
+      RELEASE_CREATE_IF_MISSING: 0
+      # SKIP_LATEST_JSON_UPLOAD: only needed for dual-arch builds with merge job
+      RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+      RELEASE_BUILD: ${{ needs.prepare-release.outputs.build }}
+      RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+      SKIP_SIGNING: ${{ secrets.MACOS_CERT_P12_BASE64 == '' && '1' || '0' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/desktop/src-tauri -> target
+
+      - name: Install updater signing key
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.tauri"
+          printf '%s' '${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}' > "$HOME/.tauri/zclaudia.key"
+          chmod 600 "$HOME/.tauri/zclaudia.key"
+          if [ -n "${{ secrets.TAURI_SIGNING_PUBLIC_KEY || '' }}" ]; then
+            printf '%s' '${{ secrets.TAURI_SIGNING_PUBLIC_KEY }}' > "$HOME/.tauri/zclaudia.key.pub"
+            chmod 644 "$HOME/.tauri/zclaudia.key.pub"
+          fi
+          echo "TAURI_SIGNING_PRIVATE_KEY_PATH=$HOME/.tauri/zclaudia.key" >> "$GITHUB_ENV"
+
+      - name: Import macOS signing certificate
+        if: env.MACOS_CERT_P12_BASE64 != ''
+        shell: bash
+        env:
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          CERT_PATH="$RUNNER_TEMP/macos-signing.p12"
+          KEYCHAIN_PATH="$RUNNER_TEMP/build.keychain-db"
+          printf '%s' "$MACOS_CERT_P12_BASE64" | base64 --decode > "$CERT_PATH"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERT_PATH" -P "$MACOS_CERT_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" login.keychain-db
+          security default-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Build and upload macOS release assets
+        shell: bash
+        run: ./scripts/build/macos.sh
+
+  build-linux:
+    needs: prepare-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_REMOTE: origin
+      RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+      RELEASE_BUILD: ${{ needs.prepare-release.outputs.build }}
+      TAG: ${{ needs.prepare-release.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux system dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+
+      - name: Install dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/desktop/src-tauri -> target
+
+      - name: Build Linux packages
+        shell: bash
+        run: ./scripts/build/linux.sh
+
+      - name: Upload Linux artifacts to release
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release upload "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            apps/desktop/src-tauri/target/release/bundle/deb/*.deb \
+            apps/desktop/src-tauri/target/release/bundle/rpm/*.rpm \
+            --clobber
+
+  # Build Linux x64 server bundle for WSL embedded in the Windows installer.
+  # Runs on Ubuntu so native modules (better-sqlite3, node-pty, ripgrep) are
+  # compiled for Linux — required because the server runs inside WSL.
+  build-wsl-server:
+    needs: prepare-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      CI: true
+      RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+
+      - name: Install dependencies
+        shell: bash
+        run: pnpm install --frozen-lockfile
+
+      - name: Build server bundle (Linux x64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          export APP_VERSION="$RELEASE_VERSION"
+          pnpm -r run build
+          pnpm --filter @zclaudia/server run bundle
+
+          # Copy the Linux node sidecar binary into the bundle
+          NODE_BIN=$(ls apps/desktop/src-tauri/binaries/node-*-unknown-linux-gnu 2>/dev/null | head -n1)
+          if [ -n "$NODE_BIN" ]; then
+            cp "$NODE_BIN" server/bundle/node
+            chmod +x server/bundle/node
+            echo "Bundled node binary: $(du -h server/bundle/node | cut -f1)"
+          else
+            echo "ERROR: Linux node sidecar binary not found"
+            exit 1
+          fi
+
+          # Write version file for runtime version checking
+          echo "$RELEASE_VERSION" > server/bundle/.version
+          echo "WSL server bundle ready: $(du -sh server/bundle/ | cut -f1)"
+
+      - name: Upload WSL server bundle
+        uses: actions/upload-artifact@v6
+        with:
+          name: wsl-server-bundle
+          path: server/bundle/
+          retention-days: 1
+
+  build-windows:
+    needs: [prepare-release, build-wsl-server]
+    runs-on: windows-2022
+    timeout-minutes: 60
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+      RELEASE_BUILD: ${{ needs.prepare-release.outputs.build }}
+      TAG: ${{ needs.prepare-release.outputs.tag }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+
+      - name: Install dependencies
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            apps/desktop/src-tauri -> target
+
+      - name: Download WSL server bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: wsl-server-bundle
+          path: apps/desktop/src-tauri/wsl-server
+
+      - name: Build Windows installers
+        shell: pwsh
+        run: .\scripts\build\windows.ps1
+
+      - name: Upload Windows artifacts to release
+        shell: pwsh
+        run: |
+          gh release upload $env:TAG `
+            --repo $env:GITHUB_REPOSITORY `
+            apps/desktop/src-tauri/target/release/bundle/msi/*.msi `
+            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe `
+            --clobber
+
+  build-android:
+    needs: prepare-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CI: true
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_REMOTE: origin
+      RELEASE: 1
+      RELEASE_CREATE_IF_MISSING: 0
+      RELEASE_VERSION: ${{ needs.prepare-release.outputs.version }}
+      RELEASE_BUILD: ${{ needs.prepare-release.outputs.build }}
+      RELEASE_VERSION_CODE: ${{ needs.prepare-release.outputs.version_code }}
+      RELEASE_TAG: ${{ needs.prepare-release.outputs.tag }}
+      KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: '.node-version'
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK components
+        shell: bash
+        run: |
+          set -euo pipefail
+          yes 2>/dev/null | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-36" \
+            "build-tools;35.0.0" \
+            "ndk;27.0.12077973"
+
+      - name: Install Android signing keystore
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$HOME/.android/zclaudia-release.keystore"
+          chmod 600 "$HOME/.android/zclaudia-release.keystore"
+
+      - name: Build and upload Android release assets
+        shell: bash
+        run: ./scripts/build/android.sh

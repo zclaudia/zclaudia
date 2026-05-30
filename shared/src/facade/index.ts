@@ -1,0 +1,49 @@
+// BackendFacade module — unified backend capability surface
+
+// Types
+export type {
+  BackendFacadeMode,
+  BackendConnectionState,
+  BackendRuntimeState,
+  BackendOpenState,
+  SessionStreamState,
+  BackendHandle,
+  BackendSnapshot,
+  SessionStreamSnapshot,
+  BackendFacadeSnapshot,
+  BackendStateDiff,
+  StreamCommand,
+  StreamEvent,
+  StreamManagerResult,
+  BackendFacadeEvent,
+  BackendFacade,
+} from './types.js';
+
+// Adapter contract
+export type {
+  FacadeAdapterConnectionState,
+  FacadeAdapterEvent,
+  FacadeAdapterBootstrapState,
+  FacadeAdapterCommands,
+  FacadeAdapterQueries,
+  FacadeAdapterEventBus,
+  FacadeRuntimeGatewayAdapter,
+  BackendFacadeRuntimeCoreOptions,
+} from './adapter.js';
+
+// Constants
+export {
+  EPHEMERAL_STREAM_TTL,
+  CLOSED_TOMBSTONE_TTL,
+  ERROR_TOMBSTONE_TTL,
+  OPENING_STREAM_TTL,
+  DEFAULT_GC_INTERVAL,
+} from './constants.js';
+
+// Runtime classes
+export { FacadeRegistryStore } from './registry-store.js';
+export { FacadeStreamManager } from './stream-manager.js';
+export { BackendFacadeRuntimeCore } from './runtime-core.js';
+
+// Pure functions
+export { assembleSnapshot } from './snapshot.js';

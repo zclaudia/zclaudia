@@ -1,0 +1,337 @@
+import React from 'react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { PlanReviewInteractionMessage } from '@zclaudia/shared';
+import { ChatActionsProvider } from '../ChatActionsContext';
+import { useInteractionStore } from '../../../stores/interactionStore';
+import { useChatStore } from '../../../stores/chatStore';
+
+const sendMessage = vi.fn();
+const createIssue = vi.fn();
+const mockProjectId = 'proj-1';
+
+vi.mock('../../../contexts/ConnectionContext', () => ({
+  useConnection: () => ({ sendMessage }),
+}));
+
+vi.mock('../../local-issues/store', () => ({
+  useLocalIssueStore: (selector?: (s: { createIssue: typeof createIssue }) => unknown) =>
+    selector ? selector({ createIssue }) : { createIssue },
+}));
+
+vi.mock('../../../stores/projectStore', () => ({
+  useProjectStore: {
+    getState: () => ({
+      sessions: [{ id: 'session-1', projectId: mockProjectId }],
+    }),
+  },
+}));
+
+import { InteractionItem } from '../InteractionItem';
+
+const interaction: PlanReviewInteractionMessage = {
+  type: 'interaction_plan_review',
+  interactionId: 'i-1',
+  sessionId: 'session-1',
+  source: 'tool_call',
+  createdAt: 0,
+  plan: '# Refactor auth\n\nDo the thing.',
+};
+
+beforeEach(() => {
+  sendMessage.mockReset();
+  createIssue.mockReset();
+});
+
+describe('PlanReviewRenderer — save as issue', () => {
+  it('renders a Save as Issue button alongside Approve and Deny', () => {
+    render(<InteractionItem interaction={interaction} />);
+    expect(screen.getByRole('button', { name: /save as issue/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /deny/i })).toBeInTheDocument();
+  });
+
+  it('opens dialog with extracted default title when Save as Issue is clicked', () => {
+    render(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /save as issue/i }));
+    const input = screen.getByLabelText(/title/i) as HTMLInputElement;
+    expect(input.value).toBe('Refactor auth');
+  });
+
+  it('on save: creates an actionable issue, then sends deny with the issue id in feedback', async () => {
+    createIssue.mockResolvedValue({
+      id: 'iss-42',
+      projectId: mockProjectId,
+      title: 'Refactor auth',
+      description: interaction.plan,
+      status: 'open',
+      priority: 'medium',
+      labels: ['actionable'],
+      createdAt: 0,
+      updatedAt: 0,
+    });
+
+    render(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /save as issue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(createIssue).toHaveBeenCalledWith(mockProjectId, {
+        title: 'Refactor auth',
+        description: interaction.plan,
+        labels: ['actionable'],
+      });
+    });
+
+    await waitFor(() => {
+      expect(sendMessage).toHaveBeenCalledWith({
+        type: 'interaction_response',
+        interactionId: 'i-1',
+        sessionId: 'session-1',
+        response: {
+          approved: false,
+          feedback: 'Saved as issue #iss-42 for later.',
+        },
+      });
+    });
+  });
+
+  it('on save: renders a "saved as issue" terminal state', async () => {
+    createIssue.mockResolvedValue({
+      id: 'iss-42',
+      projectId: mockProjectId,
+      title: 'Refactor auth',
+      description: interaction.plan,
+      status: 'open',
+      priority: 'medium',
+      labels: ['actionable'],
+      createdAt: 0,
+      updatedAt: 0,
+    });
+    render(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /save as issue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    expect(await screen.findByText(/saved as issue #iss-42/i)).toBeInTheDocument();
+  });
+
+  it('on save failure: stays pending, does not call sendMessage', async () => {
+    createIssue.mockRejectedValue(new Error('boom'));
+    render(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /save as issue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => expect(createIssue).toHaveBeenCalled());
+    expect(sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument();
+  });
+
+  it('disables Approve/Deny/Save while a save is in-flight (prevents duplicate responses)', async () => {
+    let resolveCreate: (issue: unknown) => void;
+    createIssue.mockReturnValue(
+      new Promise((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+
+    render(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /save as issue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    // Mid-flight: dialog dismissed (simulate cancel), outer buttons should now be disabled.
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /approve/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /deny/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /save as issue/i })).toBeDisabled();
+    });
+
+    // Clicking a disabled button must not trigger sendMessage.
+    fireEvent.click(screen.getByRole('button', { name: /deny/i }));
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+    expect(sendMessage).not.toHaveBeenCalled();
+
+    // Resolving the save eventually fires the deny+savedAsIssue response exactly once.
+    resolveCreate!({
+      id: 'iss-99',
+      projectId: mockProjectId,
+      title: 'Refactor auth',
+      description: interaction.plan,
+      status: 'open',
+      priority: 'medium',
+      labels: ['actionable'],
+      createdAt: 0,
+      updatedAt: 0,
+    });
+
+    await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        response: { approved: false, feedback: 'Saved as issue #iss-99 for later.' },
+      }),
+    );
+  });
+});
+
+describe('PlanReviewRenderer — todos rendering', () => {
+  it('does not render the Steps section when todos is absent', () => {
+    render(<InteractionItem interaction={interaction} />);
+    expect(screen.queryByText(/Steps/i)).not.toBeInTheDocument();
+  });
+
+  it('renders a Steps section with one row per todo when present', () => {
+    const withTodos = {
+      ...interaction,
+      todos: [
+        { content: 'first step', status: 'pending' as const },
+        { content: 'second step', status: 'in_progress' as const },
+        { content: 'third step', status: 'completed' as const },
+      ],
+    };
+    render(<InteractionItem interaction={withTodos} />);
+    expect(screen.getByText(/Steps/)).toBeInTheDocument();
+    expect(screen.getByText('first step')).toBeInTheDocument();
+    expect(screen.getByText('second step')).toBeInTheDocument();
+    expect(screen.getByText('third step')).toBeInTheDocument();
+  });
+
+  it('shows a "Show all N steps" toggle when more than 8 todos are present', () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      content: `step ${i + 1}`,
+      status: 'pending' as const,
+    }));
+    render(<InteractionItem interaction={{ ...interaction, todos: many }} />);
+
+    // First 8 visible, 9-12 hidden
+    expect(screen.getByText('step 1')).toBeInTheDocument();
+    expect(screen.getByText('step 8')).toBeInTheDocument();
+    expect(screen.queryByText('step 9')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText(/Show all 12 steps/i));
+
+    expect(screen.getByText('step 12')).toBeInTheDocument();
+  });
+});
+
+const handleSendMessage = vi.fn();
+const setMode = vi.fn();
+
+function renderWithActions(ui: React.ReactNode) {
+  return render(
+    <ChatActionsProvider value={{ handleSendMessage, setMode }}>
+      {ui}
+    </ChatActionsProvider>,
+  );
+}
+
+const synthInteraction: PlanReviewInteractionMessage = {
+  ...interaction,
+  source: 'client_synth',
+};
+
+beforeEach(() => {
+  handleSendMessage.mockReset();
+  handleSendMessage.mockResolvedValue(undefined);
+  setMode.mockReset();
+});
+
+describe('PlanReviewRenderer — client_synth', () => {
+  it('on Approve: sets mode to default and sends "Proceed with the plan above."', async () => {
+    renderWithActions(<InteractionItem interaction={synthInteraction} />);
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+    await waitFor(() => {
+      expect(setMode).toHaveBeenCalledWith('session-1', 'default');
+      expect(handleSendMessage).toHaveBeenCalledWith(
+        'Proceed with the plan above.',
+        undefined,
+        'default',
+      );
+    });
+    // does NOT send interaction_response
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('on Deny with empty feedback: sends the default deny message and keeps mode', async () => {
+    renderWithActions(<InteractionItem interaction={synthInteraction} />);
+    fireEvent.click(screen.getByRole('button', { name: /^deny$/i }));
+    await waitFor(() => {
+      expect(handleSendMessage).toHaveBeenCalledWith('Please revise the plan.');
+    });
+    expect(setMode).not.toHaveBeenCalled();
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('on Deny with feedback: sends the feedback text', async () => {
+    renderWithActions(<InteractionItem interaction={synthInteraction} />);
+    const textarea = screen.getByPlaceholderText(/comment/i);
+    fireEvent.change(textarea, { target: { value: 'add the test step please' } });
+    fireEvent.click(screen.getByRole('button', { name: /^deny$/i }));
+    await waitFor(() => {
+      expect(handleSendMessage).toHaveBeenCalledWith('add the test step please');
+    });
+  });
+
+  it('on Save as Issue: saves locally and sends "Saved as issue #N for later."', async () => {
+    createIssue.mockResolvedValue({
+      id: 'iss-7',
+      projectId: mockProjectId,
+      title: 'Refactor auth',
+      description: synthInteraction.plan,
+      status: 'open',
+      priority: 'medium',
+      labels: ['actionable'],
+      createdAt: 0,
+      updatedAt: 0,
+    });
+    renderWithActions(<InteractionItem interaction={synthInteraction} />);
+    fireEvent.click(screen.getByRole('button', { name: /save as issue/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    await waitFor(() => {
+      expect(handleSendMessage).toHaveBeenCalledWith('Saved as issue #iss-7 for later.');
+    });
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('on Approve success: resolves the interaction from the store', async () => {
+    // Seed the interaction store with the synth interaction
+    useInteractionStore.setState({
+      interactions: { [synthInteraction.interactionId]: synthInteraction },
+    } as any);
+    renderWithActions(<InteractionItem interaction={synthInteraction} />);
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+    await waitFor(() => {
+      expect(handleSendMessage).toHaveBeenCalled();
+    });
+    // After successful send, the interaction must be removed from the store
+    expect(useInteractionStore.getState().has(synthInteraction.interactionId)).toBe(false);
+    // Clean up store after test
+    useInteractionStore.setState({ interactions: {} } as any);
+  });
+
+  it('on Approve when handleSendMessage rejects: reverts to captured prior mode and decision state', async () => {
+    // Seed the chat store with the prior mode so the rollback uses the captured value
+    useChatStore.setState({ modeOverrides: { 'session-1': 'plan' } } as any);
+    handleSendMessage.mockRejectedValueOnce(new Error('network down'));
+    renderWithActions(<InteractionItem interaction={synthInteraction} />);
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+    await waitFor(() => {
+      // mode was switched to 'default' then back to the captured prior mode ('plan')
+      expect(setMode).toHaveBeenNthCalledWith(1, 'session-1', 'default');
+      expect(setMode).toHaveBeenNthCalledWith(2, 'session-1', 'plan');
+    });
+    // decision card reverts — Approve button visible again
+    expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument();
+  });
+});
+
+describe('PlanReviewRenderer — tool_call regression', () => {
+  it('on Approve: still sends interaction_response (not handleSendMessage)', () => {
+    renderWithActions(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+    expect(sendMessage).toHaveBeenCalledWith({
+      type: 'interaction_response',
+      interactionId: 'i-1',
+      sessionId: 'session-1',
+      response: { approved: true, feedback: undefined },
+    });
+    expect(handleSendMessage).not.toHaveBeenCalled();
+  });
+});

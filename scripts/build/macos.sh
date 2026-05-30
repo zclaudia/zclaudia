@@ -1,0 +1,557 @@
+#!/usr/bin/env bash
+# Build macOS desktop app (DMG + app bundle)
+# Requires: Rust, Node.js, pnpm
+# Run on macOS only
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+
+# --- Preflight checks ---
+if [[ "$(uname)" != "Darwin" ]]; then
+  echo "ERROR: This script must be run on macOS"
+  exit 1
+fi
+
+# Prefer rustup-managed toolchain over Homebrew Rust
+export PATH="$HOME/.cargo/bin:$PATH"
+
+# Ensure Node.js is available (fnm / nvm) and matches .node-version
+if command -v fnm >/dev/null 2>&1; then eval "$(fnm env --use-on-cd)"; fnm use --silent-if-unchanged 2>/dev/null || true; fi
+if command -v nvm >/dev/null 2>&1; then nvm use 2>/dev/null || true; fi
+
+# Load .env if present (for TAURI_SIGNING_PRIVATE_KEY_PATH, etc.)
+if [ -f .env ]; then
+  set -a; source .env; set +a
+fi
+
+# Local macOS signing certificate support.
+# CI imports a .p12 into a temporary keychain before building; do the same locally
+# when a developer has exported the certificate into ~/.tauri/.
+TEMP_KEYCHAIN_PATH=""
+cleanup_temp_keychain() {
+  if [ -n "$TEMP_KEYCHAIN_PATH" ] && [ -f "$TEMP_KEYCHAIN_PATH" ]; then
+    security delete-keychain "$TEMP_KEYCHAIN_PATH" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_temp_keychain EXIT
+
+DEFAULT_MACOS_CERT_PATH="$HOME/.tauri/ZClaudia-signing.p12"
+DEFAULT_MACOS_CERT_PASSWORD_FILE="$HOME/.tauri/ZClaudia-signing.pwd"
+if [ -z "${MACOS_CERT_P12_PATH:-}" ] && [ -f "$DEFAULT_MACOS_CERT_PATH" ]; then
+  MACOS_CERT_P12_PATH="$DEFAULT_MACOS_CERT_PATH"
+  export MACOS_CERT_P12_PATH
+fi
+if [ -z "${MACOS_CERT_PASSWORD:-}" ] && [ -f "$DEFAULT_MACOS_CERT_PASSWORD_FILE" ]; then
+  MACOS_CERT_PASSWORD="$(tr -d '\r\n' < "$DEFAULT_MACOS_CERT_PASSWORD_FILE")"
+  export MACOS_CERT_PASSWORD
+fi
+
+if [ "${SKIP_SIGNING:-}" != "1" ] && [ -n "${MACOS_CERT_P12_PATH:-}" ] && [ -f "${MACOS_CERT_P12_PATH}" ]; then
+  echo "=== Importing macOS signing certificate into temporary keychain ==="
+  TEMP_KEYCHAIN_PATH="$(python3 - <<'PY'
+import tempfile
+from pathlib import Path
+
+fd, path = tempfile.mkstemp(prefix='zclaudia-build-keychain.', suffix='-db')
+Path(path).unlink(missing_ok=True)
+print(f"{path}.keychain-db")
+PY
+)"
+  if [ -z "${KEYCHAIN_PASSWORD:-}" ]; then
+    KEYCHAIN_PASSWORD="$(python3 - <<'PY'
+import secrets
+import string
+
+alphabet = string.ascii_letters + string.digits
+print(''.join(secrets.choice(alphabet) for _ in range(32)))
+PY
+)"
+  fi
+  security create-keychain -p "$KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN_PATH"
+  security set-keychain-settings -lut 21600 "$TEMP_KEYCHAIN_PATH"
+  security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN_PATH"
+  security import "$MACOS_CERT_P12_PATH" -P "${MACOS_CERT_PASSWORD:-}" -A -t cert -f pkcs12 -k "$TEMP_KEYCHAIN_PATH"
+  security list-keychains -d user -s "$TEMP_KEYCHAIN_PATH" login.keychain-db
+  security default-keychain -d user -s "$TEMP_KEYCHAIN_PATH"
+  security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$TEMP_KEYCHAIN_PATH"
+  echo "Using temporary keychain: $TEMP_KEYCHAIN_PATH"
+  echo ""
+fi
+
+# Prefer the existing local Tauri updater keypair when no explicit path is set.
+DEFAULT_TAURI_KEY_PATH="$HOME/.tauri/zclaudia.key"
+DEFAULT_TAURI_PUBKEY_PATH="$HOME/.tauri/zclaudia.key.pub"
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ] && [ -f "$DEFAULT_TAURI_KEY_PATH" ]; then
+  TAURI_SIGNING_PRIVATE_KEY_PATH="$DEFAULT_TAURI_KEY_PATH"
+  export TAURI_SIGNING_PRIVATE_KEY_PATH
+fi
+
+# Read signing key from file path if provided. `tauri build` uses the env var
+# contents, while `tauri signer sign` is more reliable with an explicit key file.
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ] && [ -f "${TAURI_SIGNING_PRIVATE_KEY_PATH}" ]; then
+  TAURI_SIGNING_PRIVATE_KEY="$(cat "$TAURI_SIGNING_PRIVATE_KEY_PATH")"
+  export TAURI_SIGNING_PRIVATE_KEY
+fi
+
+for cmd in rustup pnpm; do
+  command -v "$cmd" >/dev/null || { echo "ERROR: $cmd not found"; exit 1; }
+done
+
+sign_updater_artifact() {
+  local artifact_path="$1"
+  local artifact_abs_path="$artifact_path"
+  local key_path="${TAURI_SIGNING_PRIVATE_KEY_PATH:-}"
+  local temp_key_path=""
+
+  if [ ! -f "$artifact_abs_path" ] && [ -f "$PWD/$artifact_path" ]; then
+    artifact_abs_path="$PWD/$artifact_path"
+  fi
+
+  if [ -f "$artifact_abs_path" ]; then
+    artifact_abs_path="$(cd "$(dirname "$artifact_abs_path")" && pwd)/$(basename "$artifact_abs_path")"
+  fi
+
+  if [ -z "$key_path" ] && [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+    temp_key_path="$(mktemp /tmp/zclaudia-tauri-key.XXXXXX)"
+    chmod 600 "$temp_key_path"
+    printf '%s' "$TAURI_SIGNING_PRIVATE_KEY" > "$temp_key_path"
+    key_path="$temp_key_path"
+  fi
+
+  if [ -z "$key_path" ] || [ ! -f "$key_path" ]; then
+    [ -n "$temp_key_path" ] && rm -f "$temp_key_path"
+    return 1
+  fi
+
+  if [ ! -f "$artifact_abs_path" ]; then
+    echo "  WARNING: Updater artifact not found for signing: $artifact_path"
+    [ -n "$temp_key_path" ] && rm -f "$temp_key_path"
+    return 1
+  fi
+
+  local signer_cmd=(
+    env
+    -u TAURI_SIGNING_PRIVATE_KEY
+    -u TAURI_SIGNING_PRIVATE_KEY_PATH
+    pnpm
+    --filter @zclaudia/desktop
+    exec
+    tauri
+    signer
+    sign
+    --private-key-path "$key_path"
+  )
+  if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then
+    signer_cmd+=(--password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD")
+  fi
+  signer_cmd+=("$artifact_abs_path")
+
+  rm -f "${artifact_abs_path}.sig"
+  if "${signer_cmd[@]}"; then
+    [ -n "$temp_key_path" ] && rm -f "$temp_key_path"
+    return 0
+  fi
+
+  [ -n "$temp_key_path" ] && rm -f "$temp_key_path"
+  return 1
+}
+
+cleanup_macos_dmg_artifacts() {
+  local bundle_dir="$1"
+  local dmg_dir="$bundle_dir/dmg"
+
+  # Remove any previously produced DMG files and Tauri temp images.
+  find "$dmg_dir" -name '*.dmg' -delete 2>/dev/null || true
+  find "$bundle_dir/macos" -name 'rw.*.dmg' -delete 2>/dev/null || true
+
+  # Detach any lingering volumes created from this bundle dir.
+  for disk in $(hdiutil info 2>/dev/null | grep -A20 "image-path.*$bundle_dir" | grep '/dev/disk' | awk '{print $1}' | grep -o '/dev/disk[0-9]*' | sort -u); do
+    echo "  Detaching stale mount: $disk"
+    hdiutil detach "$disk" -force 2>/dev/null || true
+  done
+
+  # Force-unmount any volumes named after the app. These are the usual cause of
+  # sporadic `hdiutil create ... Resource busy` failures on CI runners.
+  for vol in /Volumes/ZClaudia*; do
+    if [ -d "$vol" ]; then
+      echo "  Force unmounting volume: $vol"
+      hdiutil detach "$vol" -force 2>/dev/null || diskutil unmount force "$vol" 2>/dev/null || true
+    fi
+  done
+}
+
+create_macos_dmg_with_retry() {
+  local app_bundle="$1"
+  local dmg_path="$2"
+  local attempts=3
+  local temp_root=""
+  local temp_dmg=""
+
+  temp_root="$(mktemp -d "${TMPDIR:-/tmp}/zclaudia-dmg.XXXXXX")"
+  trap 'rm -rf "$temp_root"' RETURN
+
+  # Build from a staging copy to avoid hdiutil racing with the just re-signed bundle.
+  ditto "$app_bundle" "$temp_root/ZClaudia.app"
+
+  for attempt in $(seq 1 "$attempts"); do
+    temp_dmg="$temp_root/ZClaudia.dmg"
+    rm -f "$temp_dmg" "$dmg_path"
+
+    if hdiutil create -volname "ZClaudia" -srcfolder "$temp_root/ZClaudia.app" -ov -format UDZO "$temp_dmg"; then
+      mv "$temp_dmg" "$dmg_path"
+      rm -rf "$temp_root"
+      trap - RETURN
+      return 0
+    fi
+
+    if [ "$attempt" -lt "$attempts" ]; then
+      echo "  hdiutil create failed (attempt $attempt/$attempts), retrying after cleanup"
+      cleanup_macos_dmg_artifacts "$BUNDLE_DIR"
+      sleep $((attempt * 2))
+    fi
+  done
+
+  rm -rf "$temp_root"
+  trap - RETURN
+  return 1
+}
+
+verify_release_bundle() {
+  local app_bundle="$1"
+  local resources_dir="$app_bundle/Contents/Resources"
+  local bundled_server="$resources_dir/server/server.mjs"
+
+  echo "=== Verifying release bundle ==="
+
+  if [ ! -d "$app_bundle" ]; then
+    echo "ERROR: App bundle not found: $app_bundle"
+    exit 1
+  fi
+
+  if [ ! -f "$bundled_server" ]; then
+    echo "ERROR: Bundled server entry missing: $bundled_server"
+    exit 1
+  fi
+
+  if rg -n --hidden --no-ignore "server/dist/index.js" "$resources_dir" >/dev/null 2>&1; then
+    echo "ERROR: Release bundle still references dev server path: server/dist/index.js"
+    rg -n --hidden --no-ignore "server/dist/index.js" "$resources_dir" || true
+    exit 1
+  fi
+
+  echo "Release bundle verified"
+  echo ""
+}
+
+# Release target: prefer the repository that triggered the GitHub Actions run.
+# Fallback to a git remote only for local/manual releases.
+RELEASE_REMOTE="${RELEASE_REMOTE:-origin}"
+if [ -n "${GITHUB_REPOSITORY:-}" ]; then
+  RELEASE_REPO="$GITHUB_REPOSITORY"
+else
+  RELEASE_REPO=$(git remote get-url "$RELEASE_REMOTE" 2>/dev/null | sed 's/.*github\.com[:/]\(.*\)\.git/\1/') || RELEASE_REPO=""
+fi
+echo "Release target: ${GITHUB_REPOSITORY:-$RELEASE_REMOTE} → $RELEASE_REPO"
+
+# --- Version selection ---
+# In CI (RELEASE_VERSION + RELEASE_BUILD set by workflow), use those directly.
+# Locally, always build a dev version from the latest release tag without
+# advancing the next release number.
+echo "=== Version check ==="
+
+if [ -n "${RELEASE_VERSION:-}" ] && [ -n "${RELEASE_BUILD:-}" ]; then
+  # CI mode: use workflow-provided version
+  VERSION="$RELEASE_VERSION"
+  BUILD="$RELEASE_BUILD"
+  VERSION_CODE="${RELEASE_VERSION_CODE:-0}"
+  echo "Using CI-provided version: $VERSION (build $BUILD)"
+else
+  echo "Local build → deriving dev version from latest release tag"
+  eval "$(./scripts/release/version-bump.sh --platform macos --dev-suffix)"
+fi
+
+# Derive major/minor from VERSION for both CI and local dev builds.
+VERSION_CORE="$(echo "$VERSION" | sed 's/^v//; s/-.*//')"
+MAJOR="$(echo "$VERSION_CORE" | cut -d. -f1)"
+MINOR="$(echo "$VERSION_CORE" | cut -d. -f2)"
+
+export UPDATES_ENABLED="${UPDATES_ENABLED:-${RELEASE_VERSION:+true}}"
+if [ -z "${RELEASE_VERSION:-}" ] || [ -z "${RELEASE_BUILD:-}" ]; then
+  export UPDATES_ENABLED="${UPDATES_ENABLED:-false}"
+fi
+
+ARCH=$(uname -m)
+# Map uname -m to Tauri platform identifier
+if [ "$ARCH" = "arm64" ] || [ "$ARCH" = "aarch64" ]; then
+  TAURI_ARCH="aarch64"
+else
+  TAURI_ARCH="x86_64"
+fi
+echo "Version: $VERSION  Arch: $ARCH ($TAURI_ARCH)"
+echo ""
+
+# --- Install / update dependencies ---
+echo "=== Installing dependencies ==="
+pnpm install
+echo ""
+
+# --- Server bundle ---
+echo "=== Building server bundle ==="
+export APP_VERSION="$VERSION"
+
+# Clean release outputs first so Tauri cannot package stale frontend or app artifacts.
+echo "=== Cleaning release outputs ==="
+rm -rf apps/desktop/dist
+rm -rf apps/desktop/src-tauri/target/release
+
+pnpm -r run build
+pnpm --filter @zclaudia/server run bundle
+echo ""
+
+# --- Clean stale bundle artifacts ---
+# Tauri's bundle_dmg.sh (create-dmg) fails when:
+#   1. Old DMG files exist (hdiutil convert -o won't overwrite)
+#   2. Stale DMG images are still mounted from failed previous runs
+#      (causes volume name conflicts and AppleScript "Can't get disk" errors)
+BUNDLE_DIR="apps/desktop/src-tauri/target/release/bundle"
+if [ -d "$BUNDLE_DIR" ]; then
+  echo "=== Cleaning stale bundle artifacts ==="
+  # Detach any mounted DMG images from previous builds
+  # In hdiutil info, /dev/disk lines appear AFTER the image-path line
+  STALE_DISKS=$(hdiutil info 2>/dev/null | grep -A20 "image-path.*$BUNDLE_DIR" | grep '/dev/disk' | awk '{print $1}' | grep -o '/dev/disk[0-9]*' | sort -u || true)
+  for disk in $STALE_DISKS; do
+    echo "  Detaching stale mount: $disk"
+    hdiutil detach "$disk" -force 2>/dev/null || true
+  done
+  # Remove old DMG files
+  find "$BUNDLE_DIR/dmg" -name '*.dmg' -delete 2>/dev/null || true
+  # Remove temp read-write DMG images from failed runs
+  find "$BUNDLE_DIR/macos" -name 'rw.*.dmg' -delete 2>/dev/null || true
+  echo ""
+fi
+
+# --- Build ---
+# Code signing is ON by default (uses signingIdentity from tauri.conf.json).
+# To skip signing (community/local builds): SKIP_SIGNING=1 bash scripts/build/macos.sh
+TAURI_CONFIG_FILE="apps/desktop/src-tauri/tauri.macos.release.generated.json"
+
+# Tauri requires strict semver (MAJOR.MINOR.PATCH) — strip v prefix and prerelease suffixes
+TAURI_VERSION="$(echo "$VERSION" | sed 's/^v//; s/-.*//')"
+
+cat > "$TAURI_CONFIG_FILE" <<EOF
+{
+  "version": "$TAURI_VERSION",
+  "build": {
+    "beforeBuildCommand": ""
+  },
+  "bundle": {
+    "resources": {
+      "../../../server/bundle/": "server/"
+    }
+  }
+}
+EOF
+if [ "${SKIP_SIGNING:-}" = "1" ]; then
+  echo "Code signing disabled (SKIP_SIGNING=1)"
+  python3 - <<'PY'
+import json
+from pathlib import Path
+
+path = Path("apps/desktop/src-tauri/tauri.macos.release.generated.json")
+data = json.loads(path.read_text())
+data.setdefault("bundle", {}).setdefault("macOS", {})["signingIdentity"] = None
+path.write_text(json.dumps(data))
+PY
+else
+  echo "Code signing enabled"
+fi
+echo "Building macOS desktop app..."
+# Build only .app and updater (skip Tauri's DMG — we rebuild it after re-signing anyway)
+pnpm --filter @zclaudia/desktop exec tauri build --bundles app,updater --config src-tauri/tauri.macos.release.generated.json || {
+  rm -f "$TAURI_CONFIG_FILE"
+  echo "ERROR: Tauri build failed"
+  exit 1
+}
+rm -f "$TAURI_CONFIG_FILE"
+echo ""
+
+verify_release_bundle "$BUNDLE_DIR/macos/ZClaudia.app"
+
+# --- Re-sign native modules and node sidecar ---
+# Tauri signs the node sidecar with hardened runtime, but self-signed certificates
+# can't use disable-library-validation entitlements. Native .node modules
+# (better-sqlite3, node-pty, ripgrep) are adhoc-signed and fail library validation
+# under hardened runtime → SIGTRAP. Fix: sign .node files with same identity, and
+# re-sign node WITHOUT hardened runtime so it can load third-party native modules.
+if [ "${SKIP_SIGNING:-}" != "1" ]; then
+  APP_BUNDLE="$BUNDLE_DIR/macos/ZClaudia.app"
+  SIGNING_IDENTITY="${MACOS_SIGNING_IDENTITY:-ZClaudia Signing}"
+
+  if [ -d "$APP_BUNDLE" ]; then
+    echo "=== Re-signing native modules and node sidecar ==="
+
+    # Sign all native .node modules with the app's signing identity
+    find "$APP_BUNDLE/Contents/Resources/server" -name "*.node" -print0 | while IFS= read -r -d '' native; do
+      echo "  Signing: $(basename "$native")"
+      codesign --force --sign "$SIGNING_IDENTITY" "$native"
+    done
+
+    # Re-sign node binary WITHOUT hardened runtime (--options runtime omitted)
+    # Self-signed certs can't use disable-library-validation entitlement,
+    # so we must disable hardened runtime for the node sidecar entirely.
+    echo "  Re-signing node without hardened runtime"
+    codesign --force --sign "$SIGNING_IDENTITY" "$APP_BUNDLE/Contents/MacOS/node"
+
+    # Re-sign the app bundle (inner signatures changed, outer must be refreshed)
+    echo "  Re-signing app bundle"
+    codesign --force --sign "$SIGNING_IDENTITY" --options runtime "$APP_BUNDLE"
+
+    echo "  Verifying signature..."
+    codesign --verify --deep --strict "$APP_BUNDLE" && echo "  Signature OK" || echo "  WARNING: Signature verification failed"
+
+    # --- Rebuild DMG and updater artifacts ---
+    # Tauri creates the DMG and .tar.gz BEFORE our re-signing, so they contain
+    # the original (incorrect) signatures. We must rebuild them.
+
+    # Rebuild .app.tar.gz (updater artifact)
+    TAR_GZ_PATH="$BUNDLE_DIR/macos/ZClaudia.app.tar.gz"
+    if [ -f "$TAR_GZ_PATH" ]; then
+      echo "  Rebuilding updater tar.gz with corrected signatures"
+      tar -czf "$TAR_GZ_PATH" -C "$BUNDLE_DIR/macos" "ZClaudia.app"
+      # Re-sign the tar.gz if signing key is available
+      if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ] || [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ]; then
+        echo "  Re-signing updater artifact"
+        if sign_updater_artifact "$TAR_GZ_PATH"; then
+          echo "  Updater signature refreshed"
+        else
+          echo "  WARNING: Could not re-sign updater artifact (non-fatal)"
+        fi
+      fi
+    fi
+
+    # Rebuild DMG with corrected app bundle
+    echo "  Rebuilding DMG with corrected signatures"
+    DMG_DIR="$BUNDLE_DIR/dmg"
+    cleanup_macos_dmg_artifacts "$BUNDLE_DIR"
+    sleep 1
+    # Create new DMG
+    DMG_NAME="ZClaudia_${VERSION}_$(uname -m).dmg"
+    DMG_PATH="$DMG_DIR/$DMG_NAME"
+    mkdir -p "$DMG_DIR"
+    create_macos_dmg_with_retry "$APP_BUNDLE" "$DMG_PATH"
+    # Sign the DMG
+    codesign --force --sign "$SIGNING_IDENTITY" "$DMG_PATH"
+    echo "  DMG rebuilt: $DMG_PATH"
+    echo ""
+  fi
+fi
+
+# --- Rename outputs with version ---
+echo "=== Renaming outputs with version ==="
+
+# .app stays as ZClaudia.app (it's a folder, no version needed)
+if [ -d "$BUNDLE_DIR/macos/ZClaudia.app" ]; then
+  echo "  APP: $BUNDLE_DIR/macos/ZClaudia.app"
+fi
+
+# Rename .dmg → ZClaudia-{version}_{arch}.dmg
+if [ -d "$BUNDLE_DIR/dmg" ]; then
+  for dmg in "$BUNDLE_DIR"/dmg/ZClaudia_*.dmg; do
+    [ -f "$dmg" ] || continue
+    VERSIONED_DMG="$BUNDLE_DIR/dmg/ZClaudia-${VERSION}_${ARCH}.dmg"
+    mv "$dmg" "$VERSIONED_DMG"
+    echo "  DMG: $VERSIONED_DMG"
+    ls -lh "$VERSIONED_DMG"
+  done
+fi
+
+# --- Rename updater artifacts with architecture ---
+# Tauri produces ZClaudia.app.tar.gz; rename to include arch so dual-arch
+# builds (aarch64 + x86_64) don't collide on the same release.
+TAR_GZ_ORIG="$BUNDLE_DIR/macos/ZClaudia.app.tar.gz"
+TAR_SIG_ORIG="$BUNDLE_DIR/macos/ZClaudia.app.tar.gz.sig"
+TAR_GZ_NAME="ZClaudia_${TAURI_ARCH}.app.tar.gz"
+TAR_GZ="$BUNDLE_DIR/macos/$TAR_GZ_NAME"
+TAR_SIG="$BUNDLE_DIR/macos/${TAR_GZ_NAME}.sig"
+
+if [ -f "$TAR_GZ_ORIG" ]; then
+  mv "$TAR_GZ_ORIG" "$TAR_GZ"
+  echo "  Renamed updater artifact: $TAR_GZ_NAME"
+fi
+if [ -f "$TAR_SIG_ORIG" ]; then
+  mv "$TAR_SIG_ORIG" "$TAR_SIG"
+  echo "  Renamed updater signature: ${TAR_GZ_NAME}.sig"
+fi
+
+# --- Generate update manifest (latest.json) ---
+if [ -f "$TAR_GZ" ] && [ -f "$TAR_SIG" ]; then
+  echo "=== Generating update manifest ==="
+  SIGNATURE=$(cat "$TAR_SIG")
+  PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  RELEASE_TAG="${RELEASE_TAG:-v${MAJOR}.${MINOR}.${BUILD}}"
+  DOWNLOAD_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_TAG}/${TAR_GZ_NAME}"
+
+  cat > "$BUNDLE_DIR/latest.json" << MANIFEST_EOF
+{
+  "version": "${VERSION}",
+  "notes": "ZClaudia ${VERSION}",
+  "pub_date": "${PUB_DATE}",
+  "platforms": {
+    "darwin-${TAURI_ARCH}": {
+      "signature": "${SIGNATURE}",
+      "url": "${DOWNLOAD_URL}"
+    }
+  }
+}
+MANIFEST_EOF
+
+  echo "  Generated: $BUNDLE_DIR/latest.json"
+  echo "  TAR.GZ:    $TAR_GZ"
+  echo "  Signature: $TAR_SIG"
+
+  # --- Optional: Upload to GitHub Release ---
+  if command -v gh >/dev/null 2>&1 && [ "${RELEASE:-}" = "1" ]; then
+    echo ""
+    echo "=== Uploading to GitHub Release ==="
+    RELEASE_TAG="${RELEASE_TAG:-v${MAJOR}.${MINOR}.${BUILD}}"
+    TAG="$RELEASE_TAG"
+
+    if [ "${RELEASE_CREATE_IF_MISSING:-1}" = "1" ]; then
+      gh release create "$TAG" --repo "$RELEASE_REPO" --title "ZClaudia $VERSION" --notes "ZClaudia $VERSION" --draft 2>/dev/null || true
+    fi
+
+    # Upload artifacts (overwrite if exist). By default this script remains a
+    # self-contained release entrypoint and uploads latest.json itself.
+    # Dual-arch GitHub Actions builds set SKIP_LATEST_JSON_UPLOAD=1 and merge
+    # the per-arch manifests in a follow-up job.
+    UPLOAD_FILES=("$TAR_GZ")
+    [ -f "$TAR_SIG" ] && UPLOAD_FILES+=("$TAR_SIG")
+    if [ "${SKIP_LATEST_JSON_UPLOAD:-0}" != "1" ]; then
+      UPLOAD_FILES+=("$BUNDLE_DIR/latest.json")
+    fi
+    [ -f "${VERSIONED_DMG:-}" ] && UPLOAD_FILES+=("$VERSIONED_DMG")
+
+    gh release upload "$TAG" --repo "$RELEASE_REPO" "${UPLOAD_FILES[@]}" --clobber
+    echo "  Uploaded to: https://github.com/${RELEASE_REPO}/releases/tag/$TAG"
+    echo "  NOTE: Release is in DRAFT state. Publish it to make the update live."
+
+    # Clean old draft releases, keep latest 5
+    OLD_DRAFTS=$(gh release list --repo "$RELEASE_REPO" --json tagName,isDraft --jq '[.[] | select(.isDraft)] | sort_by(.tagName) | reverse | .[5:] | .[].tagName' 2>/dev/null || true)
+    if [ -n "$OLD_DRAFTS" ]; then
+      echo ""
+      echo "=== Cleaning old draft releases ==="
+      echo "$OLD_DRAFTS" | while read -r old_tag; do
+        gh release delete "$old_tag" --repo "$RELEASE_REPO" --cleanup-tag --yes 2>/dev/null || true
+        echo "  Deleted: $old_tag"
+      done
+    fi
+  fi
+else
+  echo ""
+  echo "  NOTE: No update artifacts generated."
+  echo "  To enable auto-update signing, configure one of:"
+  echo "    export TAURI_SIGNING_PRIVATE_KEY_PATH=\"$HOME/.tauri/zclaudia.key\""
+  echo "    export TAURI_SIGNING_PRIVATE_KEY=\$(cat \"$HOME/.tauri/zclaudia.key\")"
+fi
+
+echo ""
+echo "=== Build complete: ZClaudia $VERSION ==="

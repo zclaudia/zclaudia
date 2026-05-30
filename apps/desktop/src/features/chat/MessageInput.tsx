@@ -1,0 +1,1079 @@
+import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, ChangeEvent, useCallback, useMemo } from 'react';
+import { Paperclip, X, Send, File as FileIcon, ChevronRight } from 'lucide-react';
+import { Icon } from '../../components/ui/Icon';
+import { getFileIcon } from '../../config/icons';
+import type { SlashCommand, FileEntry } from '@zclaudia/shared';
+import * as api from '../../services/api';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useChatStore, type SessionDraft } from '../../stores/chatStore';
+
+export interface Attachment {
+  id: string;
+  type: 'image' | 'file';
+  name: string;
+  data: string; // base64 data URL
+  mimeType: string;
+}
+
+interface MessageInputProps {
+  sessionId: string;           // Session ID for draft persistence
+  onSend: (message: string, attachments?: Attachment[]) => void;
+  onCancel?: () => void;
+  onCommand?: (command: string, args: string) => void;
+  commands?: SlashCommand[];  // Commands from provider
+  projectRoot?: string;       // Project root for @ file mentions
+  backendId?: string | null;  // Backend ID for routing file listing API calls
+  disabled?: boolean;
+  isLoading?: boolean;
+  placeholder?: string;
+  initialValue?: string;      // Initial value to set (e.g., for restoring after cancel)
+  initialAttachments?: Attachment[]; // Initial attachments to restore
+  advancedMode?: boolean;     // Advanced input: larger textarea, Enter=newline on desktop
+  mobileToolbarSlot?: React.ReactNode; // Extra buttons rendered in mobile action row
+  onRequestAdvancedMode?: () => void;
+}
+
+// State for @ mention feature
+interface MentionState {
+  isActive: boolean;
+  triggerIndex: number;
+  query: string;
+  currentPath: string;
+  entries: FileEntry[];
+  selectedIndex: number;
+  isLoading: boolean;
+  hasError: boolean;
+}
+
+const initialMentionState: MentionState = {
+  isActive: false,
+  triggerIndex: -1,
+  query: '',
+  currentPath: '',
+  entries: [],
+  selectedIndex: 0,
+  isLoading: false,
+  hasError: false,
+};
+
+const DRAFT_PERSIST_DEBOUNCE_MS = 300;
+const COLLAPSED_CONTROL_SIZE_PX = 48;
+const EXPANDED_INPUT_DEFAULT_HEIGHT_PX = 160;
+const EXPANDED_INPUT_MIN_HEIGHT_PX = 120;
+const DUPLICATE_SEND_GUARD_MS = 400;
+
+// Format file size
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes}B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}MB`;
+};
+
+// Simple debounce function
+function debounce<T extends (...args: Parameters<T>) => void>(
+  fn: T,
+  delay: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), delay);
+  };
+}
+
+export function MessageInput({
+  sessionId,
+  onSend,
+  onCancel,
+  onCommand,
+  commands = [],
+  projectRoot,
+  backendId,
+  disabled = false,
+  isLoading = false,
+  placeholder = 'Type a message...',
+  initialValue,
+  initialAttachments,
+  advancedMode = false,
+  mobileToolbarSlot,
+  onRequestAdvancedMode,
+}: MessageInputProps) {
+  const getAvailableViewportHeight = useCallback(() => {
+    if (typeof window === 'undefined') return 800;
+    return window.visualViewport?.height ?? window.innerHeight;
+  }, []);
+  const isMobile = useIsMobile();
+  const setDraft = useChatStore((s) => s.setDraft);
+  const clearDraft = useChatStore((s) => s.clearDraft);
+  const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+  const [value, setValue] = useState('');
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [showCommands, setShowCommands] = useState(false);
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [mentionState, setMentionState] = useState<MentionState>(initialMentionState);
+  const [isComposing, setIsComposing] = useState(false); // Track IME composition state
+  const [availableViewportHeight, setAvailableViewportHeight] = useState(getAvailableViewportHeight);
+  const controlIconSize = isMobile ? 18 : 20;
+  const expandedInputMaxHeight = Math.max(
+    EXPANDED_INPUT_MIN_HEIGHT_PX,
+    Math.min(Math.floor(availableViewportHeight * 0.4), 320)
+  );
+  const expandedInputHeight = Math.min(EXPANDED_INPUT_DEFAULT_HEIGHT_PX, expandedInputMaxHeight);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const commandListRef = useRef<HTMLDivElement>(null);
+  const mentionListRef = useRef<HTMLDivElement>(null);
+  const compositionTimeoutRef = useRef<number | null>(null); // Timer for composition end delay
+  const draftPersistTimeoutRef = useRef<number | null>(null);
+  const pendingDraftValueRef = useRef('');
+  const pendingDraftAttachmentsRef = useRef<Attachment[]>([]);
+  const lastSubmissionRef = useRef<{ key: string; at: number } | null>(null);
+
+  const getPendingDraft = useCallback((): SessionDraft => ({
+    content: pendingDraftValueRef.current,
+    attachments: pendingDraftAttachmentsRef.current,
+  }), []);
+
+  const flushDraftPersistence = useCallback(() => {
+    if (draftPersistTimeoutRef.current) {
+      clearTimeout(draftPersistTimeoutRef.current);
+      draftPersistTimeoutRef.current = null;
+    }
+
+    setDraft(sessionId, getPendingDraft());
+  }, [getPendingDraft, sessionId, setDraft]);
+
+  const clearDraftPersistence = useCallback(() => {
+    if (draftPersistTimeoutRef.current) {
+      clearTimeout(draftPersistTimeoutRef.current);
+      draftPersistTimeoutRef.current = null;
+    }
+    pendingDraftValueRef.current = '';
+    pendingDraftAttachmentsRef.current = [];
+  }, []);
+
+  const scheduleDraftPersistence = useCallback(() => {
+    if (draftPersistTimeoutRef.current) {
+      clearTimeout(draftPersistTimeoutRef.current);
+    }
+
+    draftPersistTimeoutRef.current = window.setTimeout(() => {
+      draftPersistTimeoutRef.current = null;
+      setDraft(sessionId, getPendingDraft());
+    }, DRAFT_PERSIST_DEBOUNCE_MS);
+  }, [getPendingDraft, sessionId, setDraft]);
+
+  // Update value and persist draft to store
+  const updateValue = useCallback((newValue: string) => {
+    setValue(newValue);
+    pendingDraftValueRef.current = newValue;
+    scheduleDraftPersistence();
+  }, [scheduleDraftPersistence]);
+
+  // Update value when initialValue changes (e.g., after cancel to restore previous message)
+  useEffect(() => {
+    if (initialValue !== undefined) {
+      setValue(initialValue);
+      pendingDraftValueRef.current = initialValue;
+      // Focus textarea after setting value
+      setTimeout(() => textareaRef.current?.focus(), 0);
+    }
+  }, [initialValue]);
+
+  // Update attachments when initialAttachments changes
+  useEffect(() => {
+    if (initialAttachments !== undefined) {
+      setAttachments(initialAttachments);
+      pendingDraftAttachmentsRef.current = initialAttachments;
+    }
+  }, [initialAttachments]);
+
+  // Cleanup composition timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (compositionTimeoutRef.current) {
+        clearTimeout(compositionTimeoutRef.current);
+      }
+      if (draftPersistTimeoutRef.current) {
+        flushDraftPersistence();
+      }
+    };
+  }, [flushDraftPersistence]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateViewportHeight = () => {
+      setAvailableViewportHeight(getAvailableViewportHeight());
+    };
+
+    const viewport = window.visualViewport;
+    updateViewportHeight();
+
+    window.addEventListener('resize', updateViewportHeight);
+    viewport?.addEventListener('resize', updateViewportHeight);
+    viewport?.addEventListener('scroll', updateViewportHeight);
+
+    return () => {
+      window.removeEventListener('resize', updateViewportHeight);
+      viewport?.removeEventListener('resize', updateViewportHeight);
+      viewport?.removeEventListener('scroll', updateViewportHeight);
+    };
+  }, [getAvailableViewportHeight]);
+
+  // Filter commands based on input (memoized to avoid O(n) filter on every render)
+  const filteredCommands = useMemo(
+    () => value.startsWith('/')
+      ? commands.filter((cmd) =>
+          cmd.command.toLowerCase().startsWith(value.toLowerCase())
+        )
+      : [],
+    [value, commands]
+  );
+
+  // Detect @ mention in text
+  const detectMention = useCallback((text: string, cursorPos: number): { triggerIndex: number; query: string } | null => {
+    // Find the last @ before cursor that's not preceded by a non-space character
+    for (let i = cursorPos - 1; i >= 0; i--) {
+      const char = text[i];
+      if (char === '@') {
+        // Check if @ is at start or preceded by whitespace
+        if (i === 0 || /\s/.test(text[i - 1])) {
+          return {
+            triggerIndex: i,
+            query: text.substring(i + 1, cursorPos)
+          };
+        }
+        break;
+      }
+      // Stop if we hit whitespace (except within the path)
+      if (char === ' ' || char === '\n' || char === '\t') {
+        break;
+      }
+    }
+    return null;
+  }, []);
+
+  // Parse query into path components
+  const parseQuery = useCallback((query: string) => {
+    const pathParts = query.split('/');
+    const currentPath = pathParts.slice(0, -1).join('/');
+    const searchQuery = pathParts[pathParts.length - 1];
+    return { currentPath, searchQuery };
+  }, []);
+
+  // Fetch directory entries with debouncing
+  const fetchEntries = useCallback(async (projectRootPath: string, relativePath: string, query: string, resolvedBackendId?: string | null) => {
+    if (!projectRootPath) return;
+
+    setMentionState(prev => ({ ...prev, isLoading: true, hasError: false }));
+
+    try {
+      const result = await api.listDirectory({
+        projectRoot: projectRootPath,
+        relativePath,
+        query,
+        maxResults: 20,
+        backendId: resolvedBackendId,
+      });
+
+      setMentionState(prev => ({
+        ...prev,
+        entries: result.entries,
+        isLoading: false,
+        selectedIndex: 0
+      }));
+    } catch (error) {
+      console.error('Failed to fetch directory listing:', error);
+      setMentionState(prev => ({ ...prev, entries: [], isLoading: false, hasError: true }));
+    }
+  }, []);
+
+  // Debounced fetch
+  const debouncedFetchEntries = useMemo(
+    () => debounce(fetchEntries, 150),
+    [fetchEntries]
+  );
+
+  // Auto-resize textarea height based on content and fall back to internal scrolling past a max height.
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    if (!advancedMode) {
+      if (!isMobile) {
+        // Desktop collapsed mode is intentionally fixed-height. As soon as content
+        // needs more than a single line, switch to advanced mode instead of
+        // stretching the baseline row and risking visual misalignment.
+        textarea.style.height = '24px';
+        textarea.style.maxHeight = '24px';
+        textarea.style.overflowY = 'hidden';
+        if (textarea.scrollHeight > textarea.clientHeight + 1) {
+          onRequestAdvancedMode?.();
+        }
+        return;
+      }
+
+      // Mobile collapsed composer can grow within the available viewport.
+      const maxHeight = expandedInputHeight;
+      textarea.style.height = 'auto';
+      textarea.style.height = `${Math.max(
+        COLLAPSED_CONTROL_SIZE_PX,
+        Math.min(textarea.scrollHeight, maxHeight)
+      )}px`;
+      textarea.style.maxHeight = `${maxHeight}px`;
+      textarea.style.overflowY = textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+
+      if (isMobile) {
+        textarea.scrollTop = textarea.scrollHeight;
+      }
+    } else {
+      // Advanced mode: clear inline styles so CSS min/max + overflow takes effect
+      textarea.style.height = '';
+      textarea.style.overflowY = 'auto';
+    }
+  }, [value, advancedMode, expandedInputHeight, isMobile, availableViewportHeight, onRequestAdvancedMode]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const keepLatestLineVisible = () => {
+      textarea.scrollTop = textarea.scrollHeight;
+    };
+
+    textarea.addEventListener('focus', keepLatestLineVisible);
+    return () => textarea.removeEventListener('focus', keepLatestLineVisible);
+  }, [isMobile]);
+
+  // Show/hide command suggestions
+  useEffect(() => {
+    if (value.startsWith('/') && filteredCommands.length > 0 && !value.includes(' ')) {
+      setShowCommands(true);
+      setSelectedCommandIndex(0);
+    } else {
+      setShowCommands(false);
+    }
+  }, [value, filteredCommands.length]);
+
+  // Scroll selected command into view
+  useEffect(() => {
+    if (showCommands && commandListRef.current) {
+      const selectedElement = commandListRef.current.children[selectedCommandIndex] as HTMLElement;
+      if (selectedElement?.scrollIntoView) {
+        selectedElement.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [selectedCommandIndex, showCommands]);
+
+  // Scroll selected mention into view
+  useEffect(() => {
+    if (mentionState.isActive && mentionListRef.current) {
+      const selectedElement = mentionListRef.current.querySelector(`[data-index="${mentionState.selectedIndex}"]`) as HTMLElement;
+      if (selectedElement?.scrollIntoView) {
+        selectedElement.scrollIntoView({ block: 'nearest' });
+      }
+    }
+  }, [mentionState.selectedIndex, mentionState.isActive]);
+
+  // Handle input change with @ detection
+  const handleChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    const newValue = e.target.value;
+    const cursorPos = e.target.selectionStart || 0;
+
+    updateValue(newValue);
+
+    // Check for @ mention
+    if (projectRoot) {
+      const mention = detectMention(newValue, cursorPos);
+
+      if (mention) {
+        const { currentPath, searchQuery } = parseQuery(mention.query);
+
+        setMentionState(prev => ({
+          ...prev,
+          isActive: true,
+          isLoading: true,
+          hasError: false,
+          triggerIndex: mention.triggerIndex,
+          query: mention.query,
+          currentPath
+        }));
+
+        debouncedFetchEntries(projectRoot, currentPath, searchQuery, backendId);
+      } else if (mentionState.isActive) {
+        setMentionState(initialMentionState);
+      }
+    }
+  };
+
+  // Select a file/directory entry
+  const selectMentionEntry = useCallback((entry: FileEntry) => {
+    if (entry.type === 'directory') {
+      // Navigate into directory
+      const newPath = entry.path;
+      const before = value.substring(0, mentionState.triggerIndex);
+      const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
+      const newValue = `${before}@${newPath}/${after}`;
+
+      updateValue(newValue);
+
+      const newCursorPos = before.length + newPath.length + 2; // +2 for @ and /
+
+      setMentionState(prev => ({
+        ...prev,
+        query: newPath + '/',
+        currentPath: newPath,
+        selectedIndex: 0
+      }));
+
+      // Fetch new directory contents
+      if (projectRoot) {
+        fetchEntries(projectRoot, newPath, '', backendId);
+      }
+
+      // Set cursor position
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = newCursorPos;
+          textareaRef.current.selectionEnd = newCursorPos;
+          textareaRef.current.focus();
+        }
+      }, 0);
+    } else {
+      // Insert file reference
+      const before = value.substring(0, mentionState.triggerIndex);
+      const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
+      const newValue = `${before}@${entry.path} ${after}`;
+
+      updateValue(newValue);
+      setMentionState(initialMentionState);
+
+      // Move cursor after the inserted path
+      const newCursorPos = before.length + entry.path.length + 2; // +2 for @ and space
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = newCursorPos;
+          textareaRef.current.selectionEnd = newCursorPos;
+          textareaRef.current.focus();
+        }
+      }, 0);
+    }
+  }, [value, mentionState, projectRoot, backendId, fetchEntries]);
+
+  // Navigate to a specific path (for breadcrumb navigation)
+  const navigateToPath = useCallback((path: string) => {
+    const before = value.substring(0, mentionState.triggerIndex);
+    const after = value.substring(mentionState.triggerIndex + mentionState.query.length + 1);
+    const newQuery = path ? `${path}/` : '';
+    const newValue = `${before}@${newQuery}${after}`;
+
+    updateValue(newValue);
+
+    setMentionState(prev => ({
+      ...prev,
+      query: newQuery,
+      currentPath: path,
+      selectedIndex: 0
+    }));
+
+    if (projectRoot) {
+      fetchEntries(projectRoot, path, '', backendId);
+    }
+
+    const newCursorPos = before.length + newQuery.length + 1;
+    setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.selectionStart = newCursorPos;
+        textareaRef.current.selectionEnd = newCursorPos;
+        textareaRef.current.focus();
+      }
+    }, 0);
+  }, [value, mentionState, projectRoot, backendId, fetchEntries]);
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    // Handle @ mention selection
+    if (mentionState.isActive && mentionState.entries.length > 0) {
+      if (e.key === 'ArrowDown' || ((e.ctrlKey || e.metaKey) && e.key === 'n')) {
+        e.preventDefault();
+        setMentionState(prev => ({
+          ...prev,
+          selectedIndex: prev.selectedIndex < prev.entries.length - 1
+            ? prev.selectedIndex + 1
+            : 0
+        }));
+        return;
+      }
+      if (e.key === 'ArrowUp' || ((e.ctrlKey || e.metaKey) && e.key === 'p')) {
+        e.preventDefault();
+        setMentionState(prev => ({
+          ...prev,
+          selectedIndex: prev.selectedIndex > 0
+            ? prev.selectedIndex - 1
+            : prev.entries.length - 1
+        }));
+        return;
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        const selectedEntry = mentionState.entries[mentionState.selectedIndex];
+        if (selectedEntry) {
+          selectMentionEntry(selectedEntry);
+        }
+        return;
+      }
+      if (e.key === 'ArrowRight') {
+        const selectedEntry = mentionState.entries[mentionState.selectedIndex];
+        if (selectedEntry?.type === 'directory') {
+          e.preventDefault();
+          selectMentionEntry(selectedEntry);
+          return;
+        }
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMentionState(initialMentionState);
+        return;
+      }
+    }
+
+    // Handle command selection
+    if (showCommands) {
+      // ArrowDown or Ctrl+N/Cmd+N to move down
+      if (e.key === 'ArrowDown' || ((e.ctrlKey || e.metaKey) && e.key === 'n')) {
+        e.preventDefault();
+        setSelectedCommandIndex((prev) =>
+          prev < filteredCommands.length - 1 ? prev + 1 : 0
+        );
+        return;
+      }
+      // ArrowUp or Ctrl+P/Cmd+P to move up
+      if (e.key === 'ArrowUp' || ((e.ctrlKey || e.metaKey) && e.key === 'p')) {
+        e.preventDefault();
+        setSelectedCommandIndex((prev) =>
+          prev > 0 ? prev - 1 : filteredCommands.length - 1
+        );
+        return;
+      }
+      if (e.key === 'Tab' || e.key === 'Enter') {
+        e.preventDefault();
+        const selectedCommand = filteredCommands[selectedCommandIndex];
+        if (selectedCommand) {
+          updateValue(selectedCommand.command + ' ');
+          setShowCommands(false);
+        }
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setShowCommands(false);
+        return;
+      }
+    }
+
+    // Enter key behavior (guarded by IME composition state)
+    if (e.key === 'Enter' && !isComposing && !e.nativeEvent.isComposing) {
+      if (isMobile) {
+        // Mobile composer should always treat Enter as a newline. Sending is
+        // intentionally limited to the explicit send button.
+        return;
+      }
+
+      if (advancedMode) {
+        // Advanced + desktop: Cmd/Ctrl+Enter sends, plain Enter is newline
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault();
+          handleSend();
+          return;
+        }
+        // Plain Enter: don't preventDefault — let textarea insert newline
+      } else {
+        // Normal mode: Enter sends, Shift+Enter is newline
+        if (!e.shiftKey) {
+          e.preventDefault();
+          handleSend();
+          return;
+        }
+      }
+    }
+
+    // Tab to insert spaces (advanced mode only, when no dropdown is open)
+    if (e.key === 'Tab' && advancedMode && !showCommands && !mentionState.isActive) {
+      e.preventDefault();
+      const target = e.currentTarget;
+      const start = target.selectionStart;
+      const end = target.selectionEnd;
+      const newValue = value.substring(0, start) + '  ' + value.substring(end);
+      updateValue(newValue);
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.selectionStart = start + 2;
+          textareaRef.current.selectionEnd = start + 2;
+        }
+      }, 0);
+      return;
+    }
+
+    // Escape to cancel loading
+    if (e.key === 'Escape' && isLoading && onCancel) {
+      e.preventDefault();
+      onCancel();
+      return;
+    }
+
+    // Cmd+V is handled by onPaste
+  };
+
+  const handlePaste = async (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          await addFileAsAttachment(file);
+        }
+        return;
+      }
+    }
+  };
+
+  const addFileAsAttachment = async (file: File): Promise<void> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const attachment: Attachment = {
+          id: crypto.randomUUID(),
+          type: file.type.startsWith('image/') ? 'image' : 'file',
+          name: file.name,
+          data: reader.result as string,
+          mimeType: file.type,
+        };
+        setAttachments((prev) => {
+          const nextAttachments = [...prev, attachment];
+          pendingDraftAttachmentsRef.current = nextAttachments;
+          scheduleDraftPersistence();
+          return nextAttachments;
+        });
+        resolve();
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileSelect = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    for (const file of Array.from(files)) {
+      await addFileAsAttachment(file);
+    }
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => {
+      const nextAttachments = prev.filter((a) => a.id !== id);
+      pendingDraftAttachmentsRef.current = nextAttachments;
+      scheduleDraftPersistence();
+      return nextAttachments;
+    });
+  };
+
+  const handleSend = () => {
+    if (disabled) return;
+
+    const trimmedValue = value.trim();
+    const submissionKey = JSON.stringify({
+      text: trimmedValue,
+      attachments: attachments.map((attachment) => attachment.id),
+    });
+    const lastSubmission = lastSubmissionRef.current;
+
+    // Guard against duplicate mobile taps / synthetic click re-entry before
+    // React clears the local input state.
+    if (
+      lastSubmission &&
+      lastSubmission.key === submissionKey &&
+      Date.now() - lastSubmission.at < DUPLICATE_SEND_GUARD_MS
+    ) {
+      return;
+    }
+
+    // Handle slash commands
+    if (trimmedValue.startsWith('/')) {
+      const spaceIndex = trimmedValue.indexOf(' ');
+      const command = spaceIndex > 0 ? trimmedValue.substring(0, spaceIndex) : trimmedValue;
+      const args = spaceIndex > 0 ? trimmedValue.substring(spaceIndex + 1).trim() : '';
+
+      // Only treat as command if it's a known command or a plugin command (contains ':')
+      const isKnownCommand = commands.some(c => c.command === command);
+      const isPluginCommand = command.includes(':');
+
+      if (onCommand && (isKnownCommand || isPluginCommand)) {
+        lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
+        clearDraftPersistence();
+        onCommand(command, args);
+        setValue('');
+        clearDraft(sessionId);
+        return;
+      }
+    }
+
+    // Send message with attachments
+    if (trimmedValue || attachments.length > 0) {
+      lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
+      clearDraftPersistence();
+      onSend(trimmedValue, attachments.length > 0 ? attachments : undefined);
+      setValue('');
+      clearDraft(sessionId);
+      setAttachments([]);
+      pendingDraftAttachmentsRef.current = [];
+    }
+  };
+
+  const selectCommand = (command: string) => {
+    updateValue(command + ' ');
+    setShowCommands(false);
+    textareaRef.current?.focus();
+  };
+
+  return (
+    <div className="relative">
+      {/* Command suggestions dropdown */}
+      {showCommands && (
+        <div
+          ref={commandListRef}
+          className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-lg shadow-lg overflow-y-auto max-h-64 z-10"
+        >
+          {filteredCommands.map((cmd, index) => (
+            <button
+              key={cmd.command}
+              onClick={() => selectCommand(cmd.command)}
+              className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-muted ${
+                index === selectedCommandIndex ? 'bg-muted' : ''
+              }`}
+            >
+              <span className="font-mono text-primary">{cmd.command}</span>
+              <span className="text-muted-foreground text-sm">{cmd.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* @ Mention suggestions dropdown */}
+      {mentionState.isActive && (
+        <div
+          ref={mentionListRef}
+          className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-lg shadow-lg overflow-y-auto max-h-64 z-10"
+        >
+          {/* Breadcrumb navigation */}
+          {mentionState.currentPath && (
+            <div className="px-4 py-2 border-b border-border text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
+              <button
+                onClick={() => navigateToPath('')}
+                className="hover:text-foreground"
+              >
+                root
+              </button>
+              {mentionState.currentPath.split('/').map((part, idx, arr) => (
+                <span key={idx} className="flex items-center gap-1">
+                  <span className="text-muted-foreground/50">/</span>
+                  <button
+                    onClick={() => navigateToPath(arr.slice(0, idx + 1).join('/'))}
+                    className="hover:text-foreground"
+                  >
+                    {part}
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {mentionState.isLoading ? (
+            <div className="px-4 py-3 text-muted-foreground text-sm">Loading...</div>
+          ) : mentionState.hasError ? (
+            <div className="px-4 py-3 text-destructive text-sm">Failed to list files — check server connection</div>
+          ) : mentionState.entries.length === 0 ? (
+            <div className="px-4 py-3 text-muted-foreground text-sm">No files found</div>
+          ) : (
+            mentionState.entries.map((entry, index) => (
+              <button
+                key={entry.path}
+                data-index={index}
+                onClick={() => selectMentionEntry(entry)}
+                className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-muted ${
+                  index === mentionState.selectedIndex ? 'bg-muted' : ''
+                }`}
+              >
+                <Icon icon={getFileIcon(entry.name, entry.type === 'directory')} size={16} className="text-muted-foreground" />
+                <span className="flex-1 truncate">{entry.name}</span>
+                {entry.type === 'directory' && (
+                  <ChevronRight size={14} className="text-muted-foreground" />
+                )}
+                {entry.size !== undefined && (
+                  <span className="text-xs text-muted-foreground">
+                    {formatFileSize(entry.size)}
+                  </span>
+                )}
+              </button>
+            ))
+          )}
+        </div>
+      )}
+
+      {/* Attachments preview */}
+      {attachments.length > 0 && (
+        <div className="flex flex-wrap gap-2 mb-2 p-2 bg-muted rounded-lg">
+          {attachments.map((attachment) => (
+            <div
+              key={attachment.id}
+              className="relative group bg-secondary rounded-lg overflow-hidden"
+            >
+              {attachment.type === 'image' ? (
+                <img
+                  src={attachment.data}
+                  alt={attachment.name}
+                  className="h-20 w-auto max-w-32 object-cover"
+                />
+              ) : (
+                <div className="h-20 w-32 flex items-center justify-center p-2">
+                  <div className="text-center">
+                    <FileIcon size={32} strokeWidth={1.5} className="mx-auto text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground truncate block mt-1">
+                      {attachment.name}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={() => removeAttachment(attachment.id)}
+                className="absolute top-1 right-1 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+                aria-label={`Remove attachment ${attachment.name}`}
+              >
+                <X size={12} strokeWidth={2} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Input area */}
+      {isMobile ? (
+        /* Mobile: card-style two-row layout — textarea on top, buttons below */
+        <div className="bg-input border border-border rounded-2xl px-3 pt-3 pb-2 mb-1">
+          <textarea
+            data-testid="message-input"
+            ref={textareaRef}
+            value={value}
+            onChange={handleChange}
+            onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
+            onCompositionStart={() => {
+              if (compositionTimeoutRef.current) {
+                clearTimeout(compositionTimeoutRef.current);
+                compositionTimeoutRef.current = null;
+              }
+              setIsComposing(true);
+            }}
+            onCompositionEnd={() => {
+              compositionTimeoutRef.current = setTimeout(() => {
+                setIsComposing(false);
+                compositionTimeoutRef.current = null;
+              }, 50);
+            }}
+            disabled={disabled}
+            placeholder={placeholder}
+            spellCheck={false}
+            autoCorrect="off"
+            autoCapitalize="off"
+            autoComplete="off"
+            rows={1}
+            className="w-full bg-transparent text-foreground placeholder-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed resize-none min-h-[1.5rem] overflow-y-auto"
+            style={{ fontSize: 'var(--chat-font-input, 0.875rem)', maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px` }}
+          />
+          <div className="flex items-center gap-2 mt-2">
+            {/* Attachment button */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              className="h-10 w-10 flex-shrink-0 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full transition-colors disabled:opacity-50"
+              title="Add attachment"
+            >
+              <Paperclip size={20} strokeWidth={1.75} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.txt,.md,.json,.csv"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            {mobileToolbarSlot}
+            <div className="flex-1" />
+            {/* Send/Cancel button */}
+            {isLoading && onCancel ? (
+              <button
+                onClick={onCancel}
+                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full transition-colors"
+                title="Cancel (Esc)"
+              >
+                <X size={20} strokeWidth={2} />
+              </button>
+            ) : (
+              <button
+                onClick={handleSend}
+                disabled={disabled || (!value.trim() && attachments.length === 0)}
+                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
+                title="Send message"
+                data-testid="send-button"
+              >
+                <Send size={20} strokeWidth={1.75} />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        /* Desktop: single-row layout */
+        <div className={`flex gap-2 ${advancedMode ? 'items-end' : 'items-center min-h-12'}`}>
+          {/* Attachment button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={disabled}
+            className={`h-12 w-12 flex-shrink-0 flex items-center justify-center ${advancedMode ? 'self-end' : ''} text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+            title="Add attachment (images, files)"
+          >
+            <Paperclip size={controlIconSize} strokeWidth={1.75} />
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*,.pdf,.txt,.md,.json,.csv"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          {/* Text input */}
+          <div className={`flex-1 relative ${advancedMode ? 'self-end' : ''}`}>
+            {advancedMode ? (
+              <textarea
+                data-testid="message-input"
+                ref={textareaRef}
+                value={value}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                onCompositionStart={() => {
+                  if (compositionTimeoutRef.current) {
+                    clearTimeout(compositionTimeoutRef.current);
+                    compositionTimeoutRef.current = null;
+                  }
+                  setIsComposing(true);
+                }}
+                onCompositionEnd={() => {
+                  compositionTimeoutRef.current = setTimeout(() => {
+                    setIsComposing(false);
+                    compositionTimeoutRef.current = null;
+                  }, 50);
+                }}
+                disabled={disabled}
+                placeholder={placeholder}
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+                autoComplete="off"
+                rows={1}
+                className="w-full resize-none overflow-auto rounded-xl border border-border bg-input px-4 py-3 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none focus:border-primary/60 focus:shadow-apple-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                style={{
+                  fontSize: 'var(--chat-font-input, 0.875rem)',
+                  minHeight: `${expandedInputHeight}px`,
+                  maxHeight: `${expandedInputMaxHeight}px`,
+                }}
+              />
+            ) : (
+              <div className="flex h-12 items-center rounded-xl border border-border bg-input px-4 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md">
+                <textarea
+                  data-testid="message-input"
+                  ref={textareaRef}
+                  value={value}
+                  onChange={handleChange}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  onCompositionStart={() => {
+                    if (compositionTimeoutRef.current) {
+                      clearTimeout(compositionTimeoutRef.current);
+                      compositionTimeoutRef.current = null;
+                    }
+                    setIsComposing(true);
+                  }}
+                  onCompositionEnd={() => {
+                    compositionTimeoutRef.current = setTimeout(() => {
+                      setIsComposing(false);
+                      compositionTimeoutRef.current = null;
+                    }, 50);
+                  }}
+                  disabled={disabled}
+                  placeholder={placeholder}
+                  spellCheck={false}
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  autoComplete="off"
+                  rows={1}
+                  className="block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Send/Cancel button */}
+          {isLoading && onCancel ? (
+            <button
+              onClick={onCancel}
+              className={`h-12 w-12 flex-shrink-0 flex items-center justify-center ${advancedMode ? 'self-end' : ''} bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full transition-colors`}
+              title="Cancel (Esc)"
+            >
+              <X size={controlIconSize} strokeWidth={2} />
+            </button>
+          ) : (
+            <button
+              onClick={handleSend}
+              disabled={disabled || (!value.trim() && attachments.length === 0)}
+              className={`h-12 w-12 flex-shrink-0 flex items-center justify-center ${advancedMode ? 'self-end' : ''} bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors`}
+              title={advancedMode
+                ? `Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`
+                : 'Send message (Enter)'}
+              data-testid="send-button"
+            >
+              <Send size={controlIconSize} strokeWidth={1.75} />
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Hint text — hidden on mobile to save space */}
+      {!isMobile && (
+        <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
+          <span>Type / for commands{projectRoot ? ', @ to reference files' : ''}</span>
+          <span>
+            {advancedMode
+              ? `${isMac ? 'Cmd' : 'Ctrl'}+Enter to send, Tab to indent`
+              : `Paste images with ${isMac ? 'Cmd' : 'Ctrl'}+V`
+            }
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}

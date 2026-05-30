@@ -1,0 +1,59 @@
+import type {
+  GetNotificationsMessage,
+  MarkAllNotificationsReadMessage,
+  MarkNotificationsReadMessage,
+  DismissNotificationsMessage,
+  NotificationListMessage,
+} from '@zclaudia/shared/wire/messages';
+import type { NotificationService } from '../../../domains/notification-feed/index.js';
+import type { ConnectedClient } from '../transport/types.js';
+import { sendMessage } from '../transport/broadcast.js';
+
+export function handleGetNotifications(
+  client: ConnectedClient,
+  message: GetNotificationsMessage,
+  notificationService: NotificationService,
+): void {
+  const result = notificationService.listItems({
+    limit: message.limit,
+    before: message.before,
+    unreadOnly: message.unreadOnly,
+  });
+  sendMessage(client.ws, {
+    type: 'notification_list',
+    items: result.items,
+    hasMore: result.hasMore,
+    unreadCount: result.unreadCount,
+    unreadCountsByTab: result.unreadCountsByTab,
+    append: typeof message.before === 'number',
+  } as NotificationListMessage);
+}
+
+export function handleMarkNotificationsRead(
+  message: MarkNotificationsReadMessage,
+  notificationService: NotificationService,
+): void {
+  if (Array.isArray(message.itemIds)) {
+    notificationService.markRead(message.itemIds);
+  }
+}
+
+export function handleMarkAllNotificationsRead(
+  _message: MarkAllNotificationsReadMessage,
+  notificationService: NotificationService,
+): void {
+  notificationService.markAllRead();
+}
+
+export function handleDismissNotifications(
+  message: DismissNotificationsMessage,
+  notificationService: NotificationService,
+): void {
+  if (Array.isArray(message.itemIds)) {
+    notificationService.dismissItems(message.itemIds);
+  }
+}
+
+export function handleClearReadNotifications(notificationService: NotificationService): void {
+  notificationService.clearRead();
+}
