@@ -26,6 +26,8 @@
 // Core types
 export * from './core/server.js';
 export * from './core/llm-profile.js';
+export * from './core/agent-profile.js';
+export * from './core/tools.js';
 export * from './core/runtime-capabilities.js';
 export * from './core/session.js';
 export * from './core/message.js';
