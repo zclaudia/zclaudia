@@ -572,7 +572,8 @@ export function useCommandHandler({
       projectPath: currentProject?.rootPath,
       projectName: currentProject?.name,
       sessionId,
-      provider: currentSession?.llmProfileId || currentProject?.llmProfileId || 'claude',
+      // TODO(agent-profiles): resolve via session.agentProfileId → agent_profile.llm_profile_id once exposed.
+      provider: currentProject?.llmProfileId || 'claude',
       model: modelOverride || 'default'
     };
 

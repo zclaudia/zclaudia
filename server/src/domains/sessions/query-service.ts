@@ -4,7 +4,7 @@ import { hasForegroundActiveRunForSession } from '../../utils/run-state.js';
 
 type ActiveRunsMap = Map<string, unknown>;
 
-const SESSION_SELECT = `id, project_id as projectId, name, llm_profile_id as llmProfileId,
+const SESSION_SELECT = `id, project_id as projectId, name, agent_profile_id as agentProfileId,
                sdk_session_id as sdkSessionId, type, parent_session_id as parentSessionId,
                working_directory as workingDirectory,
                archived_at as archivedAt,
@@ -19,7 +19,7 @@ export interface SyncedSessionSummary {
   id: string;
   projectId: string;
   name?: string;
-  llmProfileId?: string;
+  agentProfileId: string | null;
   workingDirectory?: string;
   createdAt: number;
   updatedAt: number;
@@ -101,7 +101,7 @@ export class SessionQueryService {
     }
 
     const sessions = this.db.prepare(`
-      SELECT s.id, s.project_id as projectId, s.name, s.llm_profile_id as llmProfileId,
+      SELECT s.id, s.project_id as projectId, s.name, s.agent_profile_id as agentProfileId,
              s.sdk_session_id as sdkSessionId, s.type, s.parent_session_id as parentSessionId,
              s.working_directory as workingDirectory,
              s.archived_at as archivedAt,
@@ -119,7 +119,7 @@ export class SessionQueryService {
       id: session.id,
       projectId: session.projectId,
       name: session.name,
-      llmProfileId: session.llmProfileId ?? undefined,
+      agentProfileId: session.agentProfileId ?? null,
       workingDirectory: session.workingDirectory ?? undefined,
       createdAt: session.createdAt,
       updatedAt: session.updatedAt,

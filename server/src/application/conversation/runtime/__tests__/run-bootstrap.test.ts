@@ -34,6 +34,15 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       system_prompt TEXT
     );
 
+    CREATE TABLE agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      llm_profile_id TEXT,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER,
+      updated_at INTEGER
+    );
+
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -44,7 +53,7 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       project_role TEXT,
       plan_status TEXT,
       task_id TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       last_run_status TEXT,
       created_at INTEGER,
       updated_at INTEGER
@@ -97,16 +106,27 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
     INSERT INTO projects (id, llm_profile_id, root_path, system_prompt)
     VALUES ('project-1', NULL, '/tmp/project', NULL)
   `).run();
+
+  // Seed an agent_profile that points at sessionProfileId (the llm_profile under test)
+  // so the session → agent_profile → llm_profile lookup chain works in run-bootstrap.
+  if (sessionProfileId) {
+    db.prepare(`
+      INSERT INTO agent_profiles (id, name, llm_profile_id, is_default, created_at, updated_at)
+      VALUES ('agent-1', 'Test Agent', ?, 1, ?, ?)
+    `).run(sessionProfileId, now, now);
+  }
+  const sessionAgentId = sessionProfileId ? 'agent-1' : null;
+
   db.prepare(`
     INSERT INTO sessions (
       id, project_id, name, sdk_session_id, type, working_directory,
-      project_role, plan_status, task_id, llm_profile_id, created_at, updated_at
+      project_role, plan_status, task_id, agent_profile_id, created_at, updated_at
     )
     VALUES (
       'session-1', 'project-1', 'Test Session', 'sdk-existing', 'regular', '/tmp/project',
       NULL, NULL, NULL, ?, ?, ?
     )
-  `).run(sessionProfileId, now, now);
+  `).run(sessionAgentId, now, now);
 
   return db;
 }

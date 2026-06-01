@@ -39,7 +39,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -60,6 +60,18 @@ function createTestDb(): Database.Database {
       type TEXT NOT NULL DEFAULT 'claude',
       cli_path TEXT,
       env TEXT,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      llm_profile_id TEXT,
+      model TEXT NOT NULL DEFAULT 'm',
+      system_prompt TEXT NOT NULL DEFAULT '',
+      enabled_tools TEXT NOT NULL DEFAULT '[]',
       is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -106,8 +118,15 @@ describe('agent routes', () => {
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
     db.exec('DELETE FROM llm_profiles');
+    db.exec('DELETE FROM agent_profiles');
     db.exec('DELETE FROM workflows');
     db.exec('DELETE FROM agent_config');
+    // Seed a default agent profile so /api/agent/ensure can insert sessions.
+    const now = Date.now();
+    db.prepare(`
+      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
+      VALUES ('default-agent', 'Default', 1, ?, ?)
+    `).run(now, now);
   });
 
   describe('GET /api/agent/config', () => {

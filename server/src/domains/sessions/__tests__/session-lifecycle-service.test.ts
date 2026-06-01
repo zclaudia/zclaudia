@@ -17,7 +17,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -29,6 +29,17 @@ function createTestDb(): Database.Database {
       is_read_only INTEGER DEFAULT 0,
       last_run_status TEXT,
       sort_order INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      model TEXT NOT NULL DEFAULT 'm',
+      system_prompt TEXT NOT NULL DEFAULT '',
+      enabled_tools TEXT NOT NULL DEFAULT '[]',
+      is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -46,6 +57,10 @@ describe('SessionLifecycleService', () => {
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `).run('project-1', 'Test Project', 'code', now, now);
+    db.prepare(`
+      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
+      VALUES ('default-agent', 'Default', 1, ?, ?)
+    `).run(now, now);
   });
 
   afterEach(() => {
@@ -116,9 +131,9 @@ describe('SessionLifecycleService', () => {
     });
     const now = Date.now();
     db.prepare(`
-      INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
+      INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `).run('s1', 'project-1', 'Session 1', 'provider-1', 'sdk-1', now, now);
+    `).run('s1', 'project-1', 'Session 1', 'default-agent', 'sdk-1', now, now);
 
     const updated = service.updateSessionMetadata('s1', {
       name: 'Updated',

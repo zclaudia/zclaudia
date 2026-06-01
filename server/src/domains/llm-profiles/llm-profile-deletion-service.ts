@@ -43,7 +43,9 @@ export class LlmProfileDeletionService {
 
   private clearLlmProfileReferences(llmProfileId: string): void {
     this.db.prepare('UPDATE projects SET llm_profile_id = NULL WHERE llm_profile_id = ?').run(llmProfileId);
-    this.db.prepare('UPDATE sessions SET llm_profile_id = NULL WHERE llm_profile_id = ?').run(llmProfileId);
+    // Sessions no longer carry a direct llm_profile_id (link goes via agent_profile_id);
+    // agent_profiles.llm_profile_id is FK RESTRICT, so AgentProfileRepository / route handler
+    // is responsible for cascade behavior when an LlmProfile is referenced by an agent.
 
     if (this.hasColumn('projects', 'review_llm_profile_id')) {
       this.db.prepare('UPDATE projects SET review_llm_profile_id = NULL WHERE review_llm_profile_id = ?').run(llmProfileId);

@@ -3,6 +3,7 @@ import path from 'path';
 import os from 'os';
 import fs from 'fs';
 import { migrations } from './migrations/index.js';
+import { ensureDefaultAgentProfile } from '../../domains/agent-profiles/ensure-default-agent-profile.js';
 
 const DB_DIR = process.env.ZCLAUDIA_DATA_DIR
   ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
@@ -30,19 +31,26 @@ export function initDatabase(): Database.Database {
   // around without `llm_profiles` being created.
   ensureSchemaIsCurrent(db);
 
+  // Seed the default agent profile (no-op if one already exists, or if no
+  // LlmProfile exists yet — in which case the user will need to create one
+  // before they can spawn sessions).
+  ensureDefaultAgentProfile(db);
+
   return db;
 }
 
 /**
  * Detect stale dev DBs where the legacy `providers` table still exists but
  * `llm_profiles` is missing (i.e. the DB predates the providers→llm_profiles
- * rename and the migration record blocks the schema rewrite). Throws with a
- * clear remediation message instead of letting downstream queries fail.
+ * rename and the migration record blocks the schema rewrite). Also detects
+ * pre-agent-profiles DBs that lack `agent_profiles` or still have the legacy
+ * `sessions.llm_profile_id` column. Throws with a clear remediation message
+ * instead of letting downstream queries fail.
  */
 export function ensureSchemaIsCurrent(db: Database.Database): void {
   const tables = db
     .prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('providers', 'llm_profiles')"
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('providers', 'llm_profiles', 'agent_profiles')"
     )
     .all() as Array<{ name: string }>;
 
@@ -55,6 +63,31 @@ export function ensureSchemaIsCurrent(db: Database.Database): void {
         `  rm -rf $ZCLAUDIA_DATA_DIR  (or ~/.zclaudia*)\n` +
         `  bash scripts/dev/start-app.sh`
     );
+  }
+
+  if (names.has('llm_profiles') && !names.has('agent_profiles')) {
+    throw new Error(
+      `[ZClaudia] Schema mismatch: 'llm_profiles' exists but 'agent_profiles' is missing. ` +
+        `This happens when an existing dev DB predates the agent_profiles introduction. ` +
+        `Wipe the data dir and restart:\n` +
+        `  rm -rf $ZCLAUDIA_DATA_DIR  (or ~/.zclaudia*)\n` +
+        `  bash scripts/dev/start-app.sh`
+    );
+  }
+
+  const sessionsTableExists = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'sessions'")
+    .get() as { name: string } | undefined;
+  if (sessionsTableExists) {
+    const sessionCols = db.prepare("PRAGMA table_info(sessions)").all() as Array<{ name: string }>;
+    const sessionColNames = new Set(sessionCols.map((c) => c.name));
+    if (sessionColNames.has('llm_profile_id') && !sessionColNames.has('agent_profile_id')) {
+      throw new Error(
+        `[ZClaudia] Schema mismatch: sessions.llm_profile_id exists but sessions.agent_profile_id is missing. ` +
+          `Pre-agent-profiles schema. Wipe the data dir and restart:\n` +
+          `  rm -rf $ZCLAUDIA_DATA_DIR  (or ~/.zclaudia*)`
+      );
+    }
   }
 }
 

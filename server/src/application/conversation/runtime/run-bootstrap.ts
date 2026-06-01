@@ -41,6 +41,7 @@ export interface RunSessionRecord {
   project_role: string | null;
   plan_status: string | null;
   task_id: string | null;
+  agent_profile_id: string | null;
   root_path: string | null;
   llm_profile_id: string | null;
   system_prompt: string | null;
@@ -83,12 +84,17 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   const { activeRuns, client, clients, db, message, runId, sessionSync, trace } = input;
   const connectedClients = clients ?? new Map<string, ConnectedClient>();
 
+  // Resolve llm_profile_id via session → agent_profile → llm_profile, falling back to project.llm_profile_id.
   const session = db.prepare(`
     SELECT s.id, s.project_id, s.name, s.sdk_session_id, s.type as session_type,
            s.working_directory, s.project_role, s.plan_status, s.task_id,
-           p.root_path, COALESCE(s.llm_profile_id, p.llm_profile_id) as llm_profile_id, p.system_prompt
+           s.agent_profile_id,
+           p.root_path,
+           COALESCE(ap.llm_profile_id, p.llm_profile_id) as llm_profile_id,
+           p.system_prompt
     FROM sessions s
     LEFT JOIN projects p ON s.project_id = p.id
+    LEFT JOIN agent_profiles ap ON ap.id = s.agent_profile_id
     WHERE s.id = ?
   `).get(message.sessionId) as RunSessionRecord | undefined;
 

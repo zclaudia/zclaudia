@@ -27,7 +27,8 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     ? projects.find(p => p.id === currentSession.projectId)
     : null;
 
-  const llmProfileId = currentSession?.llmProfileId || currentProject?.llmProfileId;
+  // TODO(agent-profiles): resolve via session.agentProfileId → agent_profile.llm_profile_id once exposed.
+  const llmProfileId = currentProject?.llmProfileId;
   const isBackendDataReady = dataServerId != null && dataServerId === activeServerId;
   const providerScopeKey =
     resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID)
@@ -65,7 +66,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     }
 
     return () => controller.abort();
-  }, [currentSession?.llmProfileId, currentProject?.llmProfileId, currentProject?.rootPath, isConnected, isBackendDataReady, commandsCacheKey, llmProfileId, setProviderCommands]);
+  }, [currentProject?.llmProfileId, currentProject?.rootPath, isConnected, isBackendDataReady, commandsCacheKey, llmProfileId, setProviderCommands]);
 
   useEffect(() => {
     const controller = new AbortController();

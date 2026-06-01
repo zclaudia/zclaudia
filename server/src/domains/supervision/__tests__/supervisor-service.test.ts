@@ -162,7 +162,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -177,6 +177,14 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
     );
 
     CREATE TABLE messages (
@@ -362,6 +370,12 @@ describe('SupervisorService', () => {
     db.exec('DELETE FROM messages');
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
+    db.exec('DELETE FROM agent_profiles');
+    const _agentSeedNow = Date.now();
+    db.prepare(`
+      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
+      VALUES ('default-agent', 'Default', 1, ?, ?)
+    `).run(_agentSeedNow, _agentSeedNow);
     broadcastFn.mockClear();
     mockSupervisionAiRunPort.startVirtualRun.mockReset();
     mockExecSync.mockReset();
@@ -3803,14 +3817,16 @@ describe('SupervisorService', () => {
   // ========================================
 
   describe('initAgent() with llmProfileId', () => {
-    it('passes llmProfileId to session creation', () => {
+    it('creates main session with default agent profile (llmProfileId arg is now informational only)', () => {
       const projectId = seedProject(db);
 
+      // The llmProfileId parameter is deprecated post agent_profiles introduction —
+      // sessions now FK to agent_profiles, and SessionRepository auto-resolves to default.
       const agent = service.initAgent(projectId, {}, 'custom-provider');
 
       expect(agent.mainSessionId).toBeDefined();
       const session = sessionRepo.findById(agent.mainSessionId!);
-      expect(session!.llmProfileId).toBe('custom-provider');
+      expect(session!.agentProfileId).toBe('default-agent');
     });
   });
 });

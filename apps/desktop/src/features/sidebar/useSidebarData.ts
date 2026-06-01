@@ -140,8 +140,8 @@ export function useSidebarData() {
   }, [sessionsByProject]);
 
   const getProviderName = useCallback((session: typeof sessions[0]) => {
-    const pid = session.llmProfileId
-      || projects.find(p => p.id === session.projectId)?.llmProfileId;
+    // TODO(agent-profiles): use session.agentProfileId → agent_profile.llm_profile_id once exposed.
+    const pid = projects.find(p => p.id === session.projectId)?.llmProfileId;
     if (pid) {
       const provider = providers.find(p => p.id === pid);
       return provider?.name || provider?.providerType || pid;

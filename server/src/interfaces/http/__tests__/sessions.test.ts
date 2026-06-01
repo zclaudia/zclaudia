@@ -44,7 +44,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -79,6 +79,20 @@ function createTestDb(): Database.Database {
       query TEXT NOT NULL,
       result_count INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT,
+      llm_profile_id TEXT,
+      model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
+      system_prompt TEXT NOT NULL DEFAULT '',
+      enabled_tools TEXT NOT NULL DEFAULT '[]',
+      thinking_level TEXT,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
     );
   `);
 
@@ -117,6 +131,7 @@ describe('sessions routes', () => {
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
     db.exec('DELETE FROM search_history');
+    db.exec('DELETE FROM agent_profiles');
     activeRuns.clear();
     // Recreate FTS table and trigger
     db.exec(`
@@ -129,12 +144,16 @@ describe('sessions routes', () => {
       END;
     `);
 
-    // Create a test project
+    // Create a test project + default agent profile (required by SessionRepository.create auto-resolve)
     const now = Date.now();
     db.prepare(`
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `).run('project-1', 'Test Project', 'code', now, now);
+    db.prepare(`
+      INSERT INTO agent_profiles (id, name, model, system_prompt, enabled_tools, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+    `).run('default-agent', 'Default', 'claude-sonnet-4-6', '', '[]', now, now);
   });
 
   describe('GET /api/sessions', () => {
@@ -385,9 +404,9 @@ describe('sessions routes', () => {
     it('preserves omitted nullable fields when updating another field', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', 'provider-1', 'sdk-123', now, now);
+      `).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
 
       const res = await request(app)
         .put('/api/sessions/s1')
@@ -395,36 +414,35 @@ describe('sessions routes', () => {
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT name, llm_profile_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
+      const row = db.prepare('SELECT name, agent_profile_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
       expect(row.name).toBe('Updated Name');
-      expect(row.llm_profile_id).toBe('provider-1');
+      expect(row.agent_profile_id).toBe('default-agent');
       expect(row.sdk_session_id).toBe('sdk-123');
     });
 
     it('clears nullable fields only when explicitly set to null', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', 'provider-1', 'sdk-123', now, now);
+      `).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
 
       const res = await request(app)
         .put('/api/sessions/s1')
-        .send({ llmProfileId: null, sdkSessionId: null });
+        .send({ sdkSessionId: null });
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT llm_profile_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
-      expect(row.llm_profile_id).toBeNull();
+      const row = db.prepare('SELECT sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
       expect(row.sdk_session_id).toBeNull();
     });
 
     it('trims updated string fields', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
+        INSERT INTO sessions (id, project_id, name, agent_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `).run('s1', 'project-1', 'Original', 'provider-1', 'sdk-123', now, now);
+      `).run('s1', 'project-1', 'Original', 'default-agent', 'sdk-123', now, now);
 
       const res = await request(app)
         .put('/api/sessions/s1')

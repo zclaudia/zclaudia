@@ -26,7 +26,7 @@ describe('SessionRepository', () => {
         id: 'sess-123',
         project_id: 'proj-456',
         name: 'Test Session',
-        llm_profile_id: 'prov-789',
+        agent_profile_id: 'agent-789',
         sdk_session_id: 'sdk-sess-123',
         type: 'regular',
         parent_session_id: 'parent-sess-123',
@@ -42,7 +42,7 @@ describe('SessionRepository', () => {
         id: 'sess-123',
         projectId: 'proj-456',
         name: 'Test Session',
-        llmProfileId: 'prov-789',
+        agentProfileId: 'agent-789',
         sdkSessionId: 'sdk-sess-123',
         type: 'regular',
         parentSessionId: 'parent-sess-123',
@@ -62,7 +62,7 @@ describe('SessionRepository', () => {
         id: 'sess-123',
         project_id: 'proj-456',
         name: null,
-        llm_profile_id: null,
+        agent_profile_id: 'agent-fallback',
         sdk_session_id: null,
         type: 'regular',
         parent_session_id: null,
@@ -75,7 +75,7 @@ describe('SessionRepository', () => {
       const result = repository.mapRow(row);
 
       expect(result.name).toBeUndefined();
-      expect(result.llmProfileId).toBeUndefined();
+      expect(result.agentProfileId).toBe('agent-fallback');
       expect(result.sdkSessionId).toBeUndefined();
       expect(result.parentSessionId).toBeUndefined();
       expect(result.workingDirectory).toBeUndefined();
@@ -102,7 +102,7 @@ describe('SessionRepository', () => {
       const data = {
         projectId: 'proj-123',
         name: 'New Session',
-        llmProfileId: 'prov-456',
+        agentProfileId: 'agent-456',
         sdkSessionId: 'sdk-789',
         type: 'agent',
         parentSessionId: 'parent-123',
@@ -112,9 +112,10 @@ describe('SessionRepository', () => {
       const { sql, params } = repository.createQuery(data);
 
       expect(sql).toContain('INSERT INTO sessions');
+      expect(sql).toContain('agent_profile_id');
       expect(params[1]).toBe('proj-123');
       expect(params[2]).toBe('New Session');
-      expect(params[3]).toBe('prov-456');
+      expect(params[3]).toBe('agent-456');
       expect(params[4]).toBe('sdk-789');
       expect(params[5]).toBe('agent');
       expect(params[6]).toBe('parent-123');
@@ -123,7 +124,8 @@ describe('SessionRepository', () => {
 
     it('uses default type when not specified', () => {
       const data = {
-        projectId: 'proj-123'
+        projectId: 'proj-123',
+        agentProfileId: 'agent-1',
       } as any;
 
       const { params } = repository.createQuery(data);
@@ -133,7 +135,8 @@ describe('SessionRepository', () => {
 
     it('generates UUID for id', () => {
       const data = {
-        projectId: 'proj-123'
+        projectId: 'proj-123',
+        agentProfileId: 'agent-1',
       } as any;
 
       const { params } = repository.createQuery(data);
@@ -143,11 +146,11 @@ describe('SessionRepository', () => {
 
     it('sets timestamps correctly', () => {
       const before = Date.now();
-      const data = { projectId: 'proj-123' } as any;
+      const data = { projectId: 'proj-123', agentProfileId: 'agent-1' } as any;
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      // params: [id, projectId, name, llmProfileId, sdkSessionId, type, parentSessionId,
+      // params: [id, projectId, name, agentProfileId, sdkSessionId, type, parentSessionId,
       // workingDirectory, sortOrder, projectRole, taskId, planStatus, isReadOnly,
       // lastRunStatus, createdAt, updatedAt]
       expect(params[14]).toBeGreaterThanOrEqual(before);
@@ -170,15 +173,15 @@ describe('SessionRepository', () => {
     it('generates UPDATE query for multiple fields', () => {
       const { sql, params } = repository.updateQuery('sess-123', {
         name: 'New Name',
-        llmProfileId: 'new-prov',
+        agentProfileId: 'new-agent',
         sdkSessionId: 'new-sdk'
       });
 
       expect(sql).toContain('name = ?');
-      expect(sql).toContain('llm_profile_id = ?');
+      expect(sql).toContain('agent_profile_id = ?');
       expect(sql).toContain('sdk_session_id = ?');
       expect(params).toContain('New Name');
-      expect(params).toContain('new-prov');
+      expect(params).toContain('new-agent');
       expect(params).toContain('new-sdk');
     });
 

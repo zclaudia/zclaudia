@@ -106,11 +106,12 @@ export async function handleStopBackgroundTask(
   }
 
   if (!resolvedProviderType) {
+    // Resolve provider type via session → agent_profile → llm_profile chain.
     const providerRow = db.prepare(`
-      SELECT pr.type FROM sessions s
-      LEFT JOIN projects p ON s.project_id = p.id
-      LEFT JOIN providers pr ON pr.id = COALESCE(s.llm_profile_id, p.llm_profile_id)
-      WHERE s.id = ? AND pr.type IS NOT NULL
+      SELECT lp.provider_type as type FROM sessions s
+      LEFT JOIN agent_profiles ap ON ap.id = s.agent_profile_id
+      LEFT JOIN llm_profiles lp ON lp.id = COALESCE(ap.llm_profile_id, (SELECT llm_profile_id FROM projects WHERE id = s.project_id))
+      WHERE s.id = ? AND lp.provider_type IS NOT NULL
     `).get(targetSessionId) as { type: string } | undefined;
     resolvedProviderType = providerRow?.type;
   }

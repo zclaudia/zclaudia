@@ -17,7 +17,7 @@ export class SessionRepository extends BaseRepository<
       id: row.id,
       projectId: row.project_id,
       name: row.name || undefined,
-      llmProfileId: row.llm_profile_id || undefined,
+      agentProfileId: row.agent_profile_id,
       sdkSessionId: row.sdk_session_id || undefined,
       type: row.type || 'regular',
       parentSessionId: row.parent_session_id || undefined,
@@ -38,10 +38,17 @@ export class SessionRepository extends BaseRepository<
     const id = uuidv4();
     const now = Date.now();
 
+    const agentProfileId = data.agentProfileId || this.resolveDefaultAgentProfileId();
+    if (!agentProfileId) {
+      throw new Error(
+        'SessionRepository.create: agentProfileId is required and no default agent profile exists. Create one via /api/agent-profiles first.',
+      );
+    }
+
     return {
       sql: `
         INSERT INTO sessions (
-          id, project_id, name, llm_profile_id, sdk_session_id, type,
+          id, project_id, name, agent_profile_id, sdk_session_id, type,
           parent_session_id, working_directory, sort_order,
           project_role, task_id, plan_status, is_read_only, last_run_status,
           created_at, updated_at
@@ -52,7 +59,7 @@ export class SessionRepository extends BaseRepository<
         id,
         data.projectId,
         data.name || null,
-        data.llmProfileId || null,
+        agentProfileId,
         data.sdkSessionId || null,
         data.type || 'regular',
         data.parentSessionId || null,
@@ -81,9 +88,9 @@ export class SessionRepository extends BaseRepository<
       updates.push('name = ?');
       params.push(data.name);
     }
-    if (data.llmProfileId !== undefined) {
-      updates.push('llm_profile_id = ?');
-      params.push(data.llmProfileId);
+    if (data.agentProfileId !== undefined) {
+      updates.push('agent_profile_id = ?');
+      params.push(data.agentProfileId);
     }
     if (data.sdkSessionId !== undefined) {
       updates.push('sdk_session_id = ?');
@@ -171,5 +178,21 @@ export class SessionRepository extends BaseRepository<
       'SELECT COALESCE(MAX(sort_order), -1) + 1 as sortOrder FROM sessions WHERE project_id = ?'
     ).get(projectId) as { sortOrder: number };
     return row.sortOrder;
+  }
+
+  /**
+   * Look up an agent_profile_id to use when a session is created without one.
+   * Prefers is_default=1, falls back to the oldest agent_profile by created_at.
+   * Returns null if no agent_profile exists (caller should fail loud).
+   */
+  private resolveDefaultAgentProfileId(): string | null {
+    const def = this.db
+      .prepare('SELECT id FROM agent_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1')
+      .get() as { id: string } | undefined;
+    if (def?.id) return def.id;
+    const oldest = this.db
+      .prepare('SELECT id FROM agent_profiles ORDER BY created_at ASC LIMIT 1')
+      .get() as { id: string } | undefined;
+    return oldest?.id ?? null;
   }
 }

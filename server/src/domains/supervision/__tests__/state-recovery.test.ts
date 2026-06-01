@@ -26,11 +26,19 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
+    CREATE TABLE agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -135,6 +143,12 @@ describe('StateRecovery', () => {
     db.exec('DELETE FROM supervision_tasks');
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
+    db.exec('DELETE FROM agent_profiles');
+    const _now = Date.now();
+    db.prepare(`
+      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
+      VALUES ('default-agent', 'Default', 1, ?, ?)
+    `).run(_now, _now);
     activeRuns = new Map();
     mockSupervisorService = {
       hasWorktreePool: vi.fn().mockReturnValue(false),

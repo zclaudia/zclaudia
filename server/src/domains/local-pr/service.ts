@@ -391,14 +391,17 @@ export class LocalPRService {
       return;
     }
 
-    // Create background review session (read-only, hidden from sidebar)
+    // Create background review session (read-only, hidden from sidebar).
+    // agentProfileId auto-resolved by SessionRepository when empty;
+    // llmProfileId is retained for downstream AI run dispatch (not stored on session).
+    void llmProfileId;
     const session = this.sessionRepo.create({
       projectId: pr.projectId,
       name: `Review: ${pr.title}`,
       type: 'background',
       projectRole: 'review',
       workingDirectory: pr.worktreePath,
-      llmProfileId,
+      agentProfileId: '',
       isReadOnly: true,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 
@@ -818,13 +821,14 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       return;
     }
 
+    // llmProfileId used downstream for AI run; agentProfileId auto-resolved by SessionRepository.
     const session = this.sessionRepo.create({
       projectId: pr.projectId,
       name: `Conflict resolution: ${pr.title}`,
       type: 'background',
       projectRole: 'review',
       workingDirectory: pr.worktreePath,
-      llmProfileId,
+      agentProfileId: '',
       isReadOnly: true,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 

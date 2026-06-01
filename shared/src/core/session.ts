@@ -6,7 +6,10 @@ export interface Session {
   id: string;
   projectId: string;
   name?: string;
-  llmProfileId?: string;
+  /** FK to agent_profiles.id (NOT NULL on the server schema). Optional in the
+   *  shared type to accommodate sync payloads that omit it; populated by the
+   *  server before any session can be persisted. */
+  agentProfileId?: string;
   sdkSessionId?: string | null;
   type: SessionType;                // 'regular' = user-facing, 'background' = autonomous task
   parentSessionId?: string;          // Which session spawned this one (for background sessions)

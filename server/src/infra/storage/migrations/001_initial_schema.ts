@@ -582,6 +582,20 @@ CREATE TABLE IF NOT EXISTS llm_profiles (
           updated_at INTEGER NOT NULL
         );
 
+CREATE TABLE IF NOT EXISTS agent_profiles (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          llm_profile_id TEXT NOT NULL REFERENCES llm_profiles(id) ON DELETE RESTRICT,
+          model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
+          system_prompt TEXT NOT NULL DEFAULT '',
+          enabled_tools TEXT NOT NULL DEFAULT '["read","write","edit","bash","grep","find","ls"]',
+          thinking_level TEXT,
+          is_default INTEGER DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+
 CREATE TABLE IF NOT EXISTS scheduled_tasks (
           id TEXT PRIMARY KEY,
           project_id TEXT,
@@ -650,7 +664,7 @@ CREATE TABLE IF NOT EXISTS sessions (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
           name TEXT,
-          llm_profile_id TEXT,
+          agent_profile_id TEXT NOT NULL REFERENCES agent_profiles(id) ON DELETE RESTRICT,
           sdk_session_id TEXT,
           type TEXT CHECK(type IN ('regular', 'background', 'agent')) DEFAULT 'regular',
           parent_session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,
@@ -881,6 +895,10 @@ CREATE INDEX IF NOT EXISTS idx_file_references_session ON file_references(sessio
 
 CREATE INDEX IF NOT EXISTS idx_llm_profiles_default ON llm_profiles(is_default);
 
+CREATE INDEX IF NOT EXISTS idx_agent_profiles_default ON agent_profiles(is_default);
+
+CREATE INDEX IF NOT EXISTS idx_agent_profiles_llm_profile ON agent_profiles(llm_profile_id);
+
 CREATE INDEX IF NOT EXISTS idx_local_issue_comments_issue
       ON local_issue_comments(issue_id, created_at);
 
@@ -987,6 +1005,8 @@ CREATE INDEX IF NOT EXISTS idx_session_drafts_session ON session_drafts(session_
 CREATE INDEX IF NOT EXISTS idx_sessions_archived ON sessions(archived_at);
 
 CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
+
+CREATE INDEX IF NOT EXISTS idx_sessions_agent_profile ON sessions(agent_profile_id);
 
 CREATE INDEX IF NOT EXISTS idx_spec_changes_project ON spec_changes(project_id, status);
 

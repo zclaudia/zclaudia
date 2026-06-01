@@ -15,13 +15,13 @@ describe('sessions model', () => {
     expect(normalizeSessionCreateInput({
       projectId: '  project-1  ',
       name: '  Demo  ',
-      llmProfileId: null,
+      agentProfileId: null,
       parentSessionId: '  parent-1  ',
       workingDirectory: '  /tmp/work  ',
     })).toEqual({
       projectId: 'project-1',
       name: 'Demo',
-      llmProfileId: undefined,
+      agentProfileId: undefined,
       type: undefined,
       parentSessionId: 'parent-1',
       workingDirectory: '/tmp/work',
@@ -31,11 +31,11 @@ describe('sessions model', () => {
   it('builds update patch with trim and explicit null clearing', () => {
     expect(buildSessionUpdatePatch({
       name: '  Updated  ',
-      llmProfileId: null,
+      agentProfileId: null,
       sdkSessionId: '  sdk-1  ',
     })).toEqual({
       name: 'Updated',
-      llmProfileId: null,
+      agentProfileId: null,
       sdkSessionId: 'sdk-1',
     });
   });
@@ -64,8 +64,8 @@ describe('sessions model', () => {
       projectId: 'project-1',
       title: 'Implement feature',
       taskId: 'task-1',
+      agentProfileId: 'agent-1',
       parentSessionId: 'main-1',
-      llmProfileId: 'provider-1',
       workingDirectory: '/repo',
     })).toEqual({
       projectId: 'project-1',
@@ -74,7 +74,7 @@ describe('sessions model', () => {
       projectRole: 'task',
       taskId: 'task-1',
       parentSessionId: 'main-1',
-      llmProfileId: 'provider-1',
+      agentProfileId: 'agent-1',
       workingDirectory: '/repo',
       planStatus: 'planning',
     });

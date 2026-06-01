@@ -31,7 +31,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -46,6 +46,13 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    );
+    CREATE TABLE agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
     );
     CREATE TABLE messages (
       id TEXT PRIMARY KEY,
@@ -151,6 +158,12 @@ describe('CheckpointEngine', () => {
     db.exec('DELETE FROM messages');
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
+    db.exec('DELETE FROM agent_profiles');
+    const _now = Date.now();
+    db.prepare(`
+      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
+      VALUES ('default-agent', 'Default', 1, ?, ?)
+    `).run(_now, _now);
 
     broadcastFn = vi.fn();
     logFn = vi.fn();

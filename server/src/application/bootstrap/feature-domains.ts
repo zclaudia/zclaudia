@@ -13,6 +13,7 @@ import {
   type SessionEventPublisherPort,
 } from '../../domains/sessions/index.js';
 import { registerLlmProfilesDomain } from '../../domains/llm-profiles/index.js';
+import { registerAgentProfilesDomain } from '../../domains/agent-profiles/index.js';
 import { registerRuntimeRoutes } from '../../infra/providers/runtime-routes.js';
 import { registerNotificationDomain } from '../../domains/notification-feed/index.js';
 import { registerSupervisionDomain, type SupervisionAiRunPort, type SupervisionProjectPort, type SupervisionSessionPort, type SupervisionSessionModelPort } from '../../domains/supervision/index.js';
@@ -128,6 +129,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   registerProjectsDomain({ db, app, authMiddleware, onProjectChanged: handleProjectChanged });
   registerSessionsDomain({ app, authMiddleware, db, activeRuns, sessionEvents });
   registerLlmProfilesDomain({ app, authMiddleware, db });
+  registerAgentProfilesDomain({ app, authMiddleware, db });
   registerRuntimeRoutes({ app, authMiddleware, db, toolRegistry });
 
   const {

@@ -286,13 +286,15 @@ Generate a workflow definition based on the user's natural language description.
     systemPrompt: string,
     userPrompt: string,
   ): Promise<string> {
+    // llmProfileId used downstream for AI dispatch; agentProfileId auto-resolved by SessionRepository.
+    void llmProfileId;
     const session = this.sessionRepo.create({
       projectId,
       name: 'Workflow Generator',
       type: 'background',
       projectRole: 'workflow',
       workingDirectory: undefined,
-      llmProfileId,
+      agentProfileId: '',
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 
     return new Promise<string>((resolve, reject) => {

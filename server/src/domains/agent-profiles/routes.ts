@@ -1,0 +1,258 @@
+import { Router, Request, Response } from 'express';
+import type Database from 'better-sqlite3';
+import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
+import type { ApiResponse } from '@zclaudia/shared/core/api';
+import { AgentProfileRepository } from './repository.js';
+import {
+  AgentProfileDeletionService,
+  AgentProfileInUseError,
+  AgentProfileNotFoundError,
+} from './agent-profile-deletion-service.js';
+
+const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+
+export function createAgentProfileRoutes(db: Database.Database): Router {
+  const router = Router();
+  const repo = new AgentProfileRepository(db);
+  const deletionService = new AgentProfileDeletionService(db);
+
+  router.get('/', (_req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: repo.findAllOrdered() } as ApiResponse<AgentProfileConfig[]>);
+    } catch (error) {
+      console.error('Error fetching agent profiles:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to fetch agent profiles' },
+      });
+    }
+  });
+
+  router.get('/:id', (req: Request, res: Response) => {
+    try {
+      const profile = repo.findById(req.params.id);
+      if (!profile) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'AgentProfile not found' },
+        });
+        return;
+      }
+      res.json({ success: true, data: profile } as ApiResponse<AgentProfileConfig>);
+    } catch (error) {
+      console.error('Error fetching agent profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to fetch agent profile' },
+      });
+    }
+  });
+
+  router.post('/', (req: Request, res: Response) => {
+    try {
+      const {
+        name,
+        description,
+        llmProfileId,
+        model,
+        systemPrompt,
+        enabledTools,
+        thinkingLevel,
+        isDefault,
+      } = req.body ?? {};
+
+      if (!name || typeof name !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'name is required' },
+        });
+        return;
+      }
+      if (!llmProfileId || typeof llmProfileId !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'llmProfileId is required' },
+        });
+        return;
+      }
+      if (!model || typeof model !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'model is required' },
+        });
+        return;
+      }
+      if (!Array.isArray(enabledTools)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'enabledTools must be an array' },
+        });
+        return;
+      }
+      if (thinkingLevel !== undefined && thinkingLevel !== null && !VALID_THINKING_LEVELS.includes(thinkingLevel)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid thinkingLevel. Must be one of: ${VALID_THINKING_LEVELS.join(', ')}`,
+          },
+        });
+        return;
+      }
+
+      const llmExists = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(llmProfileId) as
+        | { id: string }
+        | undefined;
+      if (!llmExists) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: `llmProfileId not found: ${llmProfileId}` },
+        });
+        return;
+      }
+
+      if (isDefault) {
+        repo.clearAllDefaults();
+      }
+
+      const profile = repo.create({
+        name,
+        description,
+        llmProfileId,
+        model,
+        systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : '',
+        enabledTools,
+        thinkingLevel: thinkingLevel ?? undefined,
+        isDefault: Boolean(isDefault),
+      });
+
+      res.status(201).json({ success: true, data: profile } as ApiResponse<AgentProfileConfig>);
+    } catch (error) {
+      console.error('Error creating agent profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to create agent profile' },
+      });
+    }
+  });
+
+  router.patch('/:id', (req: Request, res: Response) => {
+    try {
+      const body = req.body ?? {};
+
+      if (
+        body.thinkingLevel !== undefined &&
+        body.thinkingLevel !== null &&
+        !VALID_THINKING_LEVELS.includes(body.thinkingLevel)
+      ) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: `Invalid thinkingLevel. Must be one of: ${VALID_THINKING_LEVELS.join(', ')}`,
+          },
+        });
+        return;
+      }
+
+      if (body.llmProfileId !== undefined) {
+        const llmExists = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(body.llmProfileId) as
+          | { id: string }
+          | undefined;
+        if (!llmExists) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: `llmProfileId not found: ${body.llmProfileId}`,
+            },
+          });
+          return;
+        }
+      }
+
+      if (!repo.findById(req.params.id)) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'AgentProfile not found' },
+        });
+        return;
+      }
+
+      if (body.isDefault === true) {
+        repo.clearAllDefaults();
+      }
+
+      const patch: Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> = {};
+      if (Object.prototype.hasOwnProperty.call(body, 'name')) patch.name = body.name;
+      if (Object.prototype.hasOwnProperty.call(body, 'description')) patch.description = body.description ?? undefined;
+      if (Object.prototype.hasOwnProperty.call(body, 'llmProfileId')) patch.llmProfileId = body.llmProfileId;
+      if (Object.prototype.hasOwnProperty.call(body, 'model')) patch.model = body.model;
+      if (Object.prototype.hasOwnProperty.call(body, 'systemPrompt')) patch.systemPrompt = body.systemPrompt;
+      if (Object.prototype.hasOwnProperty.call(body, 'enabledTools')) patch.enabledTools = body.enabledTools;
+      if (Object.prototype.hasOwnProperty.call(body, 'thinkingLevel')) patch.thinkingLevel = body.thinkingLevel ?? undefined;
+      if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
+
+      const updated = repo.update(req.params.id, patch);
+      res.json({ success: true, data: updated } as ApiResponse<AgentProfileConfig>);
+    } catch (error) {
+      console.error('Error updating agent profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to update agent profile' },
+      });
+    }
+  });
+
+  router.delete('/:id', (req: Request, res: Response) => {
+    try {
+      deletionService.deleteAgentProfile(req.params.id);
+      res.json({ success: true } as ApiResponse<void>);
+    } catch (error) {
+      if (error instanceof AgentProfileNotFoundError) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: error.message },
+        });
+        return;
+      }
+      if (error instanceof AgentProfileInUseError) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'IN_USE',
+            message: error.message,
+            sessionCount: error.sessionCount,
+          },
+        });
+        return;
+      }
+      console.error('Error deleting agent profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to delete agent profile' },
+      });
+    }
+  });
+
+  router.post('/:id/set-default', (req: Request, res: Response) => {
+    try {
+      if (!repo.findById(req.params.id)) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'AgentProfile not found' },
+        });
+        return;
+      }
+      res.json({ success: true, data: repo.setDefault(req.params.id) } as ApiResponse<AgentProfileConfig>);
+    } catch (error) {
+      console.error('Error setting default agent profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to set default agent profile' },
+      });
+    }
+  });
+
+  return router;
+}

@@ -132,10 +132,25 @@ export async function handleClaudiaMessage(
 
   // Create new session only if not reusing
   if (!isSessionReuse) {
+    const defaultAgent = db
+      .prepare('SELECT id FROM agent_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1')
+      .get() as { id?: string } | undefined;
+    const fallbackAgent = defaultAgent?.id
+      ? undefined
+      : (db.prepare('SELECT id FROM agent_profiles ORDER BY created_at ASC LIMIT 1').get() as { id?: string } | undefined);
+    const agentProfileId = defaultAgent?.id ?? fallbackAgent?.id;
+    if (!agentProfileId) {
+      sendMessage(client.ws, {
+        type: 'claudia_message_failed',
+        clientRequestId: clientReqId,
+        error: 'No default agent profile available — create one in Settings first',
+      } as ClaudiaMessageFailedMessage);
+      return;
+    }
     db.prepare(`
-      INSERT INTO sessions (id, project_id, name, type, parent_session_id, working_directory, created_at, updated_at)
-      VALUES (?, ?, ?, 'agent', NULL, ?, ?, ?)
-    `).run(sessionId, inlineProjectId, `Claudia: ${inlineInput.slice(0, 50)}`, sessionWorkingDirectory, now, now);
+      INSERT INTO sessions (id, project_id, name, agent_profile_id, type, parent_session_id, working_directory, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'agent', NULL, ?, ?, ?)
+    `).run(sessionId, inlineProjectId, `Claudia: ${inlineInput.slice(0, 50)}`, agentProfileId, sessionWorkingDirectory, now, now);
     branchService.attachSession(branchId, sessionId);
   }
 

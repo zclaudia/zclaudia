@@ -43,14 +43,14 @@ export function isPlanningTaskSession(session: Pick<Session, 'projectRole' | 'pl
 export interface SessionCreateInput {
   projectId?: string;
   name?: string;
-  llmProfileId?: string | null;
+  agentProfileId?: string | null;
   type?: SessionType | null;
   parentSessionId?: string | null;
   workingDirectory?: string | null;
 }
 
 export type SessionUpdatePatch = {
-  [K in keyof Pick<Session, 'name' | 'llmProfileId' | 'sdkSessionId'>]?: Session[K] | null;
+  [K in keyof Pick<Session, 'name' | 'agentProfileId' | 'sdkSessionId'>]?: Session[K] | null;
 };
 
 function normalizeOptionalString(value: unknown): string | undefined {
@@ -74,7 +74,7 @@ export function normalizeSessionCreateInput(input: SessionCreateInput): SessionC
   return {
     projectId: normalizeOptionalString(input.projectId),
     name: normalizeOptionalString(input.name),
-    llmProfileId: input.llmProfileId == null ? undefined : normalizeOptionalString(input.llmProfileId),
+    agentProfileId: input.agentProfileId == null ? undefined : normalizeOptionalString(input.agentProfileId),
     type: input.type ?? undefined,
     parentSessionId: input.parentSessionId == null ? undefined : normalizeOptionalString(input.parentSessionId),
     workingDirectory: input.workingDirectory == null ? undefined : normalizeOptionalString(input.workingDirectory),
@@ -87,8 +87,8 @@ export function buildSessionUpdatePatch(body: Record<string, unknown>): SessionU
   if (Object.prototype.hasOwnProperty.call(body, 'name')) {
     patch.name = body.name == null ? null : normalizeOptionalString(body.name);
   }
-  if (Object.prototype.hasOwnProperty.call(body, 'llmProfileId')) {
-    patch.llmProfileId = body.llmProfileId == null ? null : normalizeOptionalString(body.llmProfileId);
+  if (Object.prototype.hasOwnProperty.call(body, 'agentProfileId')) {
+    patch.agentProfileId = body.agentProfileId == null ? null : normalizeOptionalString(body.agentProfileId);
   }
   if (Object.prototype.hasOwnProperty.call(body, 'sdkSessionId')) {
     patch.sdkSessionId = body.sdkSessionId == null ? null : normalizeOptionalString(body.sdkSessionId);
@@ -112,8 +112,8 @@ export interface TaskSessionSeed {
   projectId: string;
   title: string;
   taskId: string;
+  agentProfileId: string;
   parentSessionId?: string;
-  llmProfileId?: string;
   workingDirectory?: string;
 }
 
@@ -125,7 +125,7 @@ export function buildTaskPlanningSession(seed: TaskSessionSeed): Omit<Session, '
     projectRole: 'task',
     taskId: seed.taskId,
     parentSessionId: seed.parentSessionId,
-    llmProfileId: seed.llmProfileId,
+    agentProfileId: seed.agentProfileId,
     workingDirectory: seed.workingDirectory,
     planStatus: 'planning',
   };

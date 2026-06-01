@@ -18,6 +18,7 @@ describe('ensureSchemaIsCurrent', () => {
     const db = new Database(':memory:');
     db.exec(`CREATE TABLE providers (id TEXT)`);
     db.exec(`CREATE TABLE llm_profiles (id TEXT)`);
+    db.exec(`CREATE TABLE agent_profiles (id TEXT)`);
 
     expect(() => ensureSchemaIsCurrent(db)).not.toThrow();
 
@@ -29,6 +30,26 @@ describe('ensureSchemaIsCurrent', () => {
     applyMigrations(db); // creates llm_profiles, no legacy providers table
 
     expect(() => ensureSchemaIsCurrent(db)).not.toThrow();
+
+    db.close();
+  });
+
+  it('throws clear error when llm_profiles exists but agent_profiles missing', () => {
+    const db = new Database(':memory:');
+    db.exec(`CREATE TABLE llm_profiles (id TEXT)`);
+
+    expect(() => ensureSchemaIsCurrent(db)).toThrow(/Schema mismatch.*agent_profiles/s);
+
+    db.close();
+  });
+
+  it('throws clear error when sessions has llm_profile_id but missing agent_profile_id', () => {
+    const db = new Database(':memory:');
+    db.exec(`CREATE TABLE llm_profiles (id TEXT)`);
+    db.exec(`CREATE TABLE agent_profiles (id TEXT)`);
+    db.exec(`CREATE TABLE sessions (id TEXT, llm_profile_id TEXT)`);
+
+    expect(() => ensureSchemaIsCurrent(db)).toThrow(/sessions\.llm_profile_id.*agent_profile_id/s);
 
     db.close();
   });

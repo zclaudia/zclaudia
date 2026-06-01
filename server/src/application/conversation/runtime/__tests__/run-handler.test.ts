@@ -128,6 +128,15 @@ function createDb(): Database.Database {
       system_prompt TEXT
     );
 
+    CREATE TABLE agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      llm_profile_id TEXT,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER,
+      updated_at INTEGER
+    );
+
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -140,7 +149,7 @@ function createDb(): Database.Database {
       project_role TEXT,
       plan_status TEXT,
       task_id TEXT,
-      llm_profile_id TEXT,
+      agent_profile_id TEXT,
       system_prompt TEXT,
       is_read_only INTEGER,
       last_run_status TEXT,
@@ -184,6 +193,11 @@ function createDb(): Database.Database {
     VALUES ('project-1', 'provider-1', '/tmp', 'project system prompt')
   `).run();
 
+  db.prepare(`
+    INSERT INTO agent_profiles (id, name, llm_profile_id, is_default, created_at, updated_at)
+    VALUES ('agent-1', 'Test Agent', 'provider-1', 1, ?, ?)
+  `).run(now, now);
+
   return db;
 }
 
@@ -195,9 +209,9 @@ function insertSession(db: Database.Database, values: {
   db.prepare(`
     INSERT INTO sessions (
       id, project_id, name, sdk_session_id, type, parent_session_id, working_directory, project_role,
-      plan_status, task_id, llm_profile_id, system_prompt, is_read_only, last_run_status, created_at, updated_at, archived_at
+      plan_status, task_id, agent_profile_id, system_prompt, is_read_only, last_run_status, created_at, updated_at, archived_at
     )
-    VALUES (?, 'project-1', 'Test Session', NULL, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL)
+    VALUES (?, 'project-1', 'Test Session', NULL, ?, NULL, NULL, NULL, NULL, NULL, 'agent-1', NULL, NULL, NULL, ?, ?, NULL)
   `).run(values.id, values.type, Date.now(), Date.now());
 
   if (values.sdkSessionId !== undefined) {

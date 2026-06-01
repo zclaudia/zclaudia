@@ -38,7 +38,8 @@ export class SupervisorAgentManager {
   initAgent(
     projectId: string,
     config?: Partial<SupervisorConfig>,
-    llmProfileId?: string,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _llmProfileId?: string,
     mode?: AgentMode,
   ): ProjectAgent {
     const project = this.deps.projectRepo.findById(projectId);
@@ -56,7 +57,8 @@ export class SupervisorAgentManager {
       name: sessionName,
       type: 'regular',
       projectRole: 'main',
-      llmProfileId: llmProfileId ?? project.llmProfileId,
+      // agentProfileId auto-resolved to default by SessionRepository when empty.
+      agentProfileId: '',
       workingDirectory: project.rootPath,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
     this.deps.broadcastSessionCreated(mainSession);

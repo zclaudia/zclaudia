@@ -33,13 +33,14 @@ export class VirtualClientAIRunner implements AIRunnerPort {
     timeoutMs?: number;
     onSessionCreated?: (sessionId: string) => void;
   }): Promise<{ sessionId: string; content: string }> {
+    // opts.llmProfileId used downstream for AI dispatch; agentProfileId auto-resolved by SessionRepository.
     const session = this.sessionRepo.create({
       projectId: opts.projectId,
       name: opts.sessionName ?? 'Workflow AI',
       type: 'background',
       projectRole: 'workflow',
       workingDirectory: opts.workingDirectory,
-      llmProfileId: opts.llmProfileId,
+      agentProfileId: '',
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 
     opts.onSessionCreated?.(session.id);

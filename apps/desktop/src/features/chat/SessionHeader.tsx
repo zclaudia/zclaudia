@@ -115,7 +115,9 @@ export function SessionHeader({
       <div className="hidden sm:flex min-w-0 shrink-0 items-center gap-1.5 text-[9px] leading-none text-muted-foreground">
         <span className="uppercase leading-none tracking-[0.16em] text-muted-foreground/70">Session</span>
         {(() => {
-          const pid = currentSession.llmProfileId || currentProject?.llmProfileId;
+          // TODO(agent-profiles): resolve provider via session.agentProfileId → agent_profile.llm_profile_id.
+          // For now, fall back to the project's llm_profile_id since session-level llm_profile_id is gone.
+          const pid = currentProject?.llmProfileId;
           const prov = pid ? providers.find(p => p.id === pid) : undefined;
           const name = prov?.name || prov?.providerType || 'Claude';
           return (

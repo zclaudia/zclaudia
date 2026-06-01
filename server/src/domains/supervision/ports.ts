@@ -54,8 +54,8 @@ export interface SupervisionSessionModelPort {
     projectId: string;
     title: string;
     taskId: string;
+    agentProfileId: string;
     parentSessionId?: string;
-    llmProfileId?: string;
     workingDirectory?: string;
   }): Omit<Session, 'id' | 'createdAt' | 'updatedAt'>;
   buildTaskExecutingSessionPatch(workingDirectory: string): Partial<Session>;

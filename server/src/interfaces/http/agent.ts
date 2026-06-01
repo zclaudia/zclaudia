@@ -123,10 +123,24 @@ export function createAgentRoutes(db: Database.Database): Router {
           WHERE id = ?
         `).run(CLAUDIA_HOST_SESSION_NAME, now, sessionId);
       } else {
+        const defaultAgent = db
+          .prepare('SELECT id FROM agent_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1')
+          .get() as { id?: string } | undefined;
+        const fallbackAgent = defaultAgent?.id
+          ? undefined
+          : (db.prepare('SELECT id FROM agent_profiles ORDER BY created_at ASC LIMIT 1').get() as { id?: string } | undefined);
+        const agentProfileId = defaultAgent?.id ?? fallbackAgent?.id;
+        if (!agentProfileId) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'NO_AGENT_PROFILE', message: 'No default agent profile available — create one in Settings first' },
+          });
+          return;
+        }
         db.prepare(`
-          INSERT INTO sessions (id, project_id, name, type, created_at, updated_at)
-          VALUES (?, ?, ?, 'regular', ?, ?)
-        `).run(sessionId, projectId, CLAUDIA_HOST_SESSION_NAME, now, now);
+          INSERT INTO sessions (id, project_id, name, agent_profile_id, type, created_at, updated_at)
+          VALUES (?, ?, ?, ?, 'regular', ?, ?)
+        `).run(sessionId, projectId, CLAUDIA_HOST_SESSION_NAME, agentProfileId, now, now);
       }
 
       db.prepare(`

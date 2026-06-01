@@ -239,6 +239,7 @@ export class TaskExecution {
         projectId: task.projectId,
         title: task.title,
         taskId: task.id,
+        agentProfileId: '',
         workingDirectory,
       }),
       ...this.deps.sessionModel.buildTaskExecutingSessionPatch(workingDirectory),
@@ -258,8 +259,8 @@ export class TaskExecution {
         projectId: task.projectId,
         title: task.title,
         taskId: task.id,
+        agentProfileId: '',
         parentSessionId: project.agent?.mainSessionId,
-        llmProfileId: project.llmProfileId,
         workingDirectory: project.rootPath,
       }),
     );
