@@ -1,6 +1,10 @@
+import { getModel, type Model } from '@earendil-works/pi-ai';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, ProviderAdapter, RunOptions } from './types.js';
+
+const DEFAULT_PROVIDER = 'anthropic';
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 const manifest: PCPProviderManifest = {
   id: 'zclaudia',
@@ -36,6 +40,12 @@ const policy: ProviderPolicy = {
   sessionCwdPolicy: 'requested',
   emptyResultFallback: 'ZClaudia agent completed without additional output.',
 };
+
+function buildModel(): Model<unknown> {
+  const provider = process.env.PI_PROVIDER || DEFAULT_PROVIDER;
+  const model = process.env.PI_MODEL || DEFAULT_MODEL;
+  return getModel(provider, model) as Model<unknown>;
+}
 
 class AsyncQueue<T> implements AsyncIterable<T> {
   private buffer: T[] = [];
@@ -75,7 +85,7 @@ class AsyncQueue<T> implements AsyncIterable<T> {
   }
 }
 
-export const __testables = { AsyncQueue };
+export const __testables = { AsyncQueue, buildModel };
 
 function buildStubResponse(input: string, options: RunOptions): string {
   const mode = options.mode || 'default';
