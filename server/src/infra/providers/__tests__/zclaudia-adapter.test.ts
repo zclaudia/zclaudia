@@ -38,4 +38,17 @@ describe('AsyncQueue', () => {
     for await (const v of q) out.push(v);
     expect(out).toEqual([1]);
   });
+
+  it('terminates pending consumer when close() is called', async () => {
+    const q = new AsyncQueue<number>();
+    const collected: number[] = [];
+    const consumer = (async () => {
+      for await (const v of q) collected.push(v);
+    })();
+    // Let consumer reach awaiting state on first next()
+    await Promise.resolve();
+    q.close();
+    await consumer;
+    expect(collected).toEqual([]);
+  });
 });
