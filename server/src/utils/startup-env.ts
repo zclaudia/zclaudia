@@ -1,9 +1,10 @@
 const INHERITED_PROVIDER_ENV_KEYS = [
-  'ANTHROPIC_MODEL',
+  // Legacy third-party-agent model env vars that historically leaked into ZClaudia
+  // server runs from the user's shell. The pi-agent integration uses `PI_MODEL`
+  // and `OPENAI_MODEL` explicitly, so those are intentionally preserved.
   'ANTHROPIC_DEFAULT_OPUS_MODEL',
   'ANTHROPIC_DEFAULT_SONNET_MODEL',
   'ANTHROPIC_DEFAULT_HAIKU_MODEL',
-  'OPENAI_MODEL',
   'MODEL',
   'CLAUDE_MODEL',
   'CLAUDE_CODE_MODEL',
