@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import Database from 'better-sqlite3';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/index.js';
+import { applyMigrations } from '../../storage/migrations/index.js';
 
 describe('LlmProfileRepository', () => {
   let mockDb: any;
@@ -288,5 +290,83 @@ describe('LlmProfileRepository', () => {
         repository.setDefault('prov-123');
       }).toThrow('Failed to set default llm profile: prov-123');
     });
+  });
+});
+
+describe('LlmProfileRepository — new fields (baseUrl / apiKey / compat)', () => {
+  let db: Database.Database;
+  let repo: LlmProfileRepository;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+    repo = new LlmProfileRepository(db);
+  });
+
+  it('persists baseUrl + apiKey + compat fields', () => {
+    const created = repo.create({
+      name: 'deepseek-local',
+      providerType: 'openai-custom',
+      baseUrl: 'http://127.0.0.1:3000/v1',
+      apiKey: 'sk-test',
+      compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+    });
+    const fetched = repo.findById(created.id);
+    expect(fetched).toBeDefined();
+    expect(fetched!.baseUrl).toBe('http://127.0.0.1:3000/v1');
+    expect(fetched!.apiKey).toBe('sk-test');
+    expect(fetched!.compat).toEqual({
+      supportsDeveloperRole: false,
+      supportsReasoningEffort: false,
+    });
+  });
+
+  it('handles compat as undefined when not provided', () => {
+    const created = repo.create({
+      name: 'anthropic',
+      providerType: 'anthropic',
+      apiKey: 'sk-ant-test',
+    });
+    const fetched = repo.findById(created.id);
+    expect(fetched!.compat).toBeUndefined();
+  });
+
+  it('updates baseUrl / apiKey / compat partially', () => {
+    const created = repo.create({
+      name: 'p1',
+      providerType: 'openai',
+      apiKey: 'sk-old',
+    });
+    const updated = repo.update(created.id, {
+      apiKey: 'sk-new',
+      compat: { supportsStrictMode: true },
+    });
+    expect(updated!.apiKey).toBe('sk-new');
+    expect(updated!.compat).toEqual({ supportsStrictMode: true });
+  });
+
+  it('returns undefined compat when DB JSON is malformed (graceful degradation)', () => {
+    const created = repo.create({ name: 'p2', providerType: 'anthropic' });
+    // Manually corrupt the compat column
+    db.prepare('UPDATE llm_profiles SET compat = ? WHERE id = ?').run('{broken', created.id);
+    const fetched = repo.findById(created.id);
+    expect(fetched).toBeDefined();
+    expect(fetched!.compat).toBeUndefined();
+  });
+
+  it('findDefault returns is_default=1 record', () => {
+    repo.create({ name: 'a', providerType: 'anthropic' });
+    const b = repo.create({ name: 'b', providerType: 'openai', isDefault: true });
+    const def = repo.findDefault();
+    expect(def?.id).toBe(b.id);
+  });
+
+  it('setDefault clears previous default', () => {
+    const a = repo.create({ name: 'a', providerType: 'anthropic', isDefault: true });
+    const b = repo.create({ name: 'b', providerType: 'openai' });
+    repo.setDefault(b.id);
+    expect(repo.findById(a.id)!.isDefault).toBe(false);
+    expect(repo.findById(b.id)!.isDefault).toBe(true);
   });
 });
