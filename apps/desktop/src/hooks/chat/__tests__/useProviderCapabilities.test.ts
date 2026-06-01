@@ -90,9 +90,14 @@ describe('useProviderCapabilities', () => {
     expect(useChatStore.getState().setMode).toHaveBeenCalledWith('sess-1', 'plan');
   });
 
-  it('loads provider-specific metadata when session has llmProfileId', async () => {
+  it('loads provider-specific metadata when project has llmProfileId', async () => {
+    // Sub-project B removed `session.llmProfileId`; the hook now resolves the
+    // profile via `project.llmProfileId` (see `useProviderCapabilities.ts`
+    // TODO(agent-profiles) — will be re-routed through agent_profile.llm_profile_id
+    // when sub-project C wires agent.llm_profile_id through the session payload).
     useProjectStore.setState({
-      sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Session', llmProfileId: 'prov-1' }],
+      projects: [{ id: 'proj-1', name: 'Project', rootPath: '/test', llmProfileId: 'prov-1' }],
+      sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Session' }],
       providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
     } as any);
 

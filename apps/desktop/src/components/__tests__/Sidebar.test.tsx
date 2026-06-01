@@ -449,10 +449,15 @@ describe('Sidebar', () => {
 
   // ---- Provider name resolution ----
 
-  it('shows provider name from session llmProfileId', () => {
+  it('shows provider name from project llmProfileId', () => {
+    // Sub-project B removed `session.llmProfileId`; `getProviderName` now
+    // resolves via `project.llmProfileId` (see
+    // `apps/desktop/src/features/sidebar/useSidebarData.ts` TODO(agent-profiles) —
+    // will move to `agent_profile.llm_profile_id` in sub-project C).
     setupStores({
       projectStore: {
-        sessions: [{ ...baseSession, llmProfileId: 'prov-1' }],
+        projects: [{ ...baseProject, llmProfileId: 'prov-1' }],
+        sessions: [baseSession as any],
         providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
       },
     });

@@ -93,10 +93,11 @@ describe('AgentStatusBar', () => {
     fireEvent.click(screen.getByText('Start Agent'));
 
     await waitFor(() => {
+      // Sub-project B (T2 polish ea67a83) dropped the `llmProfileId` arg from
+      // `initSupervisionAgent`; signature is now `(projectId, config?, mode?)`.
       expect(mockInitSupervisionAgent).toHaveBeenCalledWith(
         'proj-1',
         expect.objectContaining({ maxConcurrentTasks: 2, trustLevel: 'medium' }),
-        'provider-1',
         'lite',
       );
       expect(mockSetAgent).toHaveBeenCalledWith('proj-1', agent);
