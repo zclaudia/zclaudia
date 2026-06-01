@@ -50,6 +50,9 @@ vi.mock('@earendil-works/pi-agent-core', () => {
       }
       if (script.rejectWith) throw script.rejectWith;
     }
+    abort(): void {
+      // No-op for tests: pi documents abort() as safe to call on an idle agent.
+    }
   }
   return { Agent: MockAgent };
 });
@@ -220,13 +223,9 @@ describe('loadHistory', () => {
 describe('translateEvent', () => {
   const ctx = { sessionId: 'test-session', model: 'claude-sonnet-4-6', cwd: '/tmp' };
 
-  it('translates agent_start to init', () => {
+  it('does not translate agent_start (run() emits init manually)', () => {
     const out = translateEvent({ type: 'agent_start' }, ctx);
-    expect(out).toMatchObject({
-      type: 'init',
-      sessionId: 'test-session',
-      systemInfo: { model: 'claude-sonnet-4-6', cwd: '/tmp' },
-    });
+    expect(out).toBeUndefined();
   });
 
   it('translates message_update text_delta to assistant chunk', () => {
@@ -320,6 +319,24 @@ describe('ZClaudiaAdapter.run', () => {
     expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'assistant', 'assistant', 'result']);
     expect(out.filter(m => m.type === 'assistant').map(m => m.content)).toEqual(['Hel', 'lo', '!']);
     expect(out[out.length - 1].isComplete).toBe(true);
+  });
+
+  it('extracts usage from agent_end.messages last assistant', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'reply' } },
+      { type: 'agent_end', messages: [
+        { role: 'user', content: 'hi', timestamp: 0 },
+        { role: 'assistant', content: [{ type: 'text', text: 'reply' }], stopReason: 'stop', usage: { input: 100, output: 50 }, timestamp: 0 } as any,
+      ] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+
+    const last = out[out.length - 1];
+    expect(last.type).toBe('result');
+    expect(last.usage).toEqual({ inputTokens: 100, outputTokens: 50 });
   });
 
   it('loads history from DB and passes it to Agent initialState', async () => {

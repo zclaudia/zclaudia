@@ -152,6 +152,23 @@ interface UsageHint {
   outputTokens: number;
 }
 
+/**
+ * Extract usage from the last assistant message in an `agent_end` payload.
+ *
+ * pi exports `getLastAssistantUsage`, but it operates on `SessionTreeEntry[]` (session-repo entries),
+ * not on `AgentMessage[]` (which is what `agent_end.messages` carries). So we scan inline and
+ * extract `usage.input` / `usage.output` from the last assistant message that has a usage block.
+ */
+function extractUsage(messages: AgentMessage[]): UsageHint | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as { role?: string; usage?: { input?: number; output?: number } };
+    if (m.role === 'assistant' && m.usage) {
+      return { inputTokens: m.usage.input ?? 0, outputTokens: m.usage.output ?? 0 };
+    }
+  }
+  return undefined;
+}
+
 export function translateEvent(
   event: AgentEvent,
   ctx: TranslateContext,
@@ -159,18 +176,8 @@ export function translateEvent(
 ): ClaudeMessage | undefined {
   try {
     switch (event.type) {
-      case 'agent_start':
-        return {
-          type: 'init',
-          sessionId: ctx.sessionId,
-          systemInfo: {
-            model: ctx.model,
-            cwd: ctx.cwd,
-            permissionMode: ctx.permissionMode || 'default',
-            tools: [],
-            agents: ['zclaudia'],
-          },
-        };
+      // agent_start is intentionally not translated; run() emits `init` directly
+      // as a run-bootstrap concern (see ZClaudiaAdapter.run).
       case 'message_update': {
         const sub = event.assistantMessageEvent;
         if (sub && sub.type === 'text_delta' && typeof sub.delta === 'string') {
@@ -270,12 +277,18 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     });
 
     // 5. Subscribe → translate → queue
-    // Skip translated `init` because we already emitted one manually above;
-    // pi's `agent_start` event translates to `init`, which would duplicate.
+    // `agent_start` is intentionally not translated by translateEvent; init is
+    // emitted manually above as a run-bootstrap concern.
     const queue = new AsyncQueue<ClaudeMessage>();
     const unsubscribe = agent.subscribe(event => {
+      if (event.type === 'agent_end') {
+        const usage = extractUsage(event.messages);
+        const result = translateEvent(event as AgentEvent, ctx, usage);
+        if (result) queue.push(result);
+        return;
+      }
       const translated = translateEvent(event as AgentEvent, ctx);
-      if (translated && translated.type !== 'init') queue.push(translated);
+      if (translated) queue.push(translated);
     });
 
     // 6. Run prompt; close queue on completion or push error on rejection
@@ -295,6 +308,9 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       for await (const m of queue) yield m;
     } finally {
       unsubscribe();
+      // Cancel any in-flight pi work (token leak prevention on early break /
+      // consumer error). Safe to call on an already-idle agent.
+      agent.abort();
     }
   }
 }
