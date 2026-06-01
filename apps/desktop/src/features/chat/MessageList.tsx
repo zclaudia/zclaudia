@@ -8,7 +8,7 @@ import { ToolCallList } from './tool-call/ToolCallList';
 import { FilePushCard } from './FilePushNotification';
 import { FilePreviewModal } from './FilePreviewModal';
 import type { MessageWithToolCalls, ToolCallState } from '../../stores/chatStore';
-import type { ContentBlock } from '@zclaudia/shared';
+import type { ContentBlock, ThinkingBlock as ThinkingBlockMeta } from '@zclaudia/shared';
 import { useFilePushStore, type FilePushItem } from '../../stores/filePushStore';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
 import { downloadFile } from '../../services/fileUpload';
@@ -78,6 +78,49 @@ function ThinkingBlock({ content }: { content: string }) {
         <div className="px-3 pb-2 border-t border-thinking/10">
           <div className="pt-2 text-muted-foreground whitespace-pre-wrap leading-relaxed italic">
             {content}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Folded card rendering structured thinking blocks from `message.metadata.thinkingBlocks`
+ * (populated by the pi-runtime). Distinct from the in-text `<ThinkingBlock>` above, which
+ * parses legacy `<thinking>` tags out of the message content.
+ */
+function ThinkingBlocksCard({ blocks }: { blocks: ThinkingBlockMeta[] }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!blocks || blocks.length === 0) return null;
+
+  const count = blocks.length;
+
+  return (
+    <div className="mb-2 rounded-lg border border-thinking/30 bg-thinking/5 text-xs">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 w-full px-3 py-1.5 text-thinking hover:text-foreground transition-colors"
+      >
+        <Brain size={14} strokeWidth={1.5} className="flex-shrink-0" />
+        <ChevronRight size={12} strokeWidth={2} className={`transition-transform flex-shrink-0 ${expanded ? 'rotate-90' : ''}`} />
+        <span className="font-medium">Thinking</span>
+        <span className="text-thinking/50 ml-auto text-[10px]">
+          {count} block{count !== 1 ? 's' : ''}
+        </span>
+      </button>
+
+      {expanded && (
+        <div className="px-3 pb-2 border-t border-thinking/10">
+          <div className="pt-2 space-y-2 text-muted-foreground italic leading-relaxed whitespace-pre-wrap">
+            {blocks.map((b, i) => (
+              <div key={i}>
+                {b.redacted && (
+                  <span className="text-warning not-italic mr-1">[Redacted by safety filter]</span>
+                )}
+                {b.text}
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -727,6 +770,11 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
     [message.content, isUser, isSystem]
   );
 
+  // Structured thinking blocks from message metadata (populated by pi-runtime).
+  // Distinct from the inline `<thinking>` tag content extracted above.
+  const metadataThinkingBlocks = !isUser && !isSystem ? message.metadata?.thinkingBlocks : undefined;
+  const hasMetadataThinking = Boolean(metadataThinkingBlocks && metadataThinkingBlocks.length > 0);
+
   if (useSegmented) {
     // Segmented rendering: streaming blocks take priority over finalized blocks
     const blocks = streamingContentBlocks || message.contentBlocks!;
@@ -741,6 +789,11 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         data-role={message.role}
         className="flex flex-col items-start min-w-0 max-w-full"
       >
+        {hasMetadataThinking && (
+          <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
+            <ThinkingBlocksCard blocks={metadataThinkingBlocks!} />
+          </div>
+        )}
         {shouldRenderFallbackContent && (
           <div className="rounded-2xl px-3 md:px-4 py-2 mb-2 w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0">
             <AssistantContent content={mainContent} />
@@ -765,6 +818,13 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         isSystem ? 'opacity-60' : ''
       }`}
     >
+      {/* Structured thinking blocks from metadata (pi-runtime) */}
+      {hasMetadataThinking && (
+        <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
+          <ThinkingBlocksCard blocks={metadataThinkingBlocks!} />
+        </div>
+      )}
+
       {/* Tool calls section (shown before the message content for assistant) — legacy rendering */}
       {!isUser && hasToolCalls && (
         <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl mb-2 min-w-0">
