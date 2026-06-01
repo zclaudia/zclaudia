@@ -28,7 +28,14 @@ export interface Message {
 
 export type ContentBlock =
   | { type: 'text'; content: string }
-  | { type: 'tool_use'; toolUseId: string };
+  | { type: 'tool_use'; toolUseId: string }
+  | { type: 'thinking'; content: string; signature?: string };
+
+export interface ThinkingBlock {
+  text: string;
+  signature?: string;
+  redacted?: boolean;
+}
 
 export interface FileChangeEffectFile {
   path: string;
@@ -51,6 +58,7 @@ export interface MessageMetadata {
   contentBlocks?: ContentBlock[];
   usage?: UsageInfo;
   filePush?: FilePushMetadata;
+  thinkingBlocks?: ThinkingBlock[];
 }
 
 export interface FilePushMetadata {
