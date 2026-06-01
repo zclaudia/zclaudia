@@ -17,7 +17,7 @@ import { getPhaseTemplate } from './phase-templates/index.js';
 export function synthesizeWorkflow(phase: PhaseDef): WorkflowDefinition {
   const template = getPhaseTemplate(phase.phaseType);
   const planRequired = phase.executeConfig?.planRequired ?? template.defaultPlanRequired;
-  const providerId = phase.runtimeProviderId;
+  const llmProfileId = phase.runtimeLlmProfileId;
   const prompt = template.buildSynthesizerPrompt(phase);
 
   const nodes: WorkflowNodeDef[] = [
@@ -27,7 +27,7 @@ export function synthesizeWorkflow(phase: PhaseDef): WorkflowDefinition {
       type: 'ai_prompt',
       config: {
         prompt: `Load context for phase "${phase.id}". Inputs: ${JSON.stringify(phase.inputs)}. Outputs expected: ${JSON.stringify(phase.outputs)}.`,
-        providerId,
+        llmProfileId,
       },
       position: { x: 100, y: 100 },
     },
@@ -40,7 +40,7 @@ export function synthesizeWorkflow(phase: PhaseDef): WorkflowDefinition {
           ? `Produce a plan.md for phase "${phase.id}". Description: ${phase.description}.`
           : `(planRequired=false) skip planning; pass through.`,
         planRequired,
-        providerId,
+        llmProfileId,
       },
       position: { x: 100, y: 200 },
     },
@@ -48,7 +48,7 @@ export function synthesizeWorkflow(phase: PhaseDef): WorkflowDefinition {
       id: 'execute',
       name: 'Execute',
       type: 'ai_prompt',
-      config: { prompt, providerId },
+      config: { prompt, llmProfileId },
       position: { x: 100, y: 300 },
     },
     {

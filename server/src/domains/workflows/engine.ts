@@ -32,7 +32,7 @@ export interface ExecutionContext {
   agg: WorkflowRunAggregate;
   projectId?: string;
   projectRootPath?: string;
-  providerId?: string;
+  llmProfileId?: string;
   eventPayload?: Record<string, unknown>;
   triggerContext?: Record<string, unknown>;
 }
@@ -267,7 +267,7 @@ export class WorkflowEngine implements ApprovalPort {
       this.runEventPayloads.set(run.id, triggerData.eventPayload);
     }
 
-    this.executeGraph(agg, definition, project?.rootPath, project?.providerId, triggerData)
+    this.executeGraph(agg, definition, project?.rootPath, project?.llmProfileId, triggerData)
       .catch((err) => {
         console.error(`[Workflow] Run ${run.id} failed:`, err);
         const currentRun = this.runRepo.findById(run.id);
@@ -294,7 +294,7 @@ export class WorkflowEngine implements ApprovalPort {
     agg: WorkflowRunAggregate,
     definition: WorkflowDefinition,
     projectRootPath?: string,
-    providerId?: string,
+    llmProfileId?: string,
     triggerData?: RunTriggerContext,
   ): Promise<void> {
     const run = agg.snapshot;
@@ -304,7 +304,7 @@ export class WorkflowEngine implements ApprovalPort {
       agg,
       projectId: run.projectId,
       projectRootPath,
-      providerId,
+      llmProfileId,
       eventPayload: triggerData?.eventPayload,
       triggerContext: triggerData?.triggerContext,
     };
@@ -409,7 +409,7 @@ export class WorkflowEngine implements ApprovalPort {
           stepRunId: stepRun.id,
           projectId: ctx.projectId,
           projectRootPath: ctx.projectRootPath,
-          providerId: ctx.providerId,
+          llmProfileId: ctx.llmProfileId,
           results: ctx.results,
           eventPayload: ctx.eventPayload,
           triggerContext: ctx.triggerContext,

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Project, ProviderConfig, UnifiedPermissionPolicy, PermissionCategory, CategoryAction, CategoryProfile, Workflow } from '@zclaudia/shared';
+import type { Project, LlmProfileConfig, UnifiedPermissionPolicy, PermissionCategory, CategoryAction, CategoryProfile, Workflow } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -59,7 +59,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
   const scopedProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
   const storeProviders = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
-  const [providers, setProviders] = useState<ProviderConfig[]>(storeProviders);
+  const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
   const [saving, setSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
@@ -67,8 +67,8 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
   // Form state
   const [name, setName] = useState('');
   const [rootPath, setRootPath] = useState('');
-  const [providerId, setProviderId] = useState<string>('');
-  const [reviewProviderId, setReviewProviderId] = useState<string>('');
+  const [llmProfileId, setProviderId] = useState<string>('');
+  const [reviewLlmProfileId, setReviewProviderId] = useState<string>('');
   const [permissionWorkflowOverrideId, setPermissionWorkflowOverrideId] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState('');
   const [workflowOptions, setWorkflowOptions] = useState<Workflow[]>([]);
@@ -116,8 +116,8 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
     setName(project.name);
     setRootPath(project.rootPath || '');
-    setProviderId(project.providerId || '');
-    setReviewProviderId(project.reviewProviderId || '');
+    setProviderId(project.llmProfileId || '');
+    setReviewProviderId(project.reviewLlmProfileId || '');
     setPermissionWorkflowOverrideId(project.permissionWorkflowOverrideId || '');
     setSystemPrompt(project.systemPrompt || '');
     if (project.agentPermissionOverride) {
@@ -131,8 +131,8 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
     project?.id,
     project?.name,
     project?.rootPath,
-    project?.providerId,
-    project?.reviewProviderId,
+    project?.llmProfileId,
+    project?.reviewLlmProfileId,
     project?.permissionWorkflowOverrideId,
     project?.systemPrompt,
     project?.agentPermissionOverride,
@@ -211,8 +211,8 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
       const updates: Partial<Project> = {
         name: name.trim(),
         rootPath: rootPath.trim() || undefined,
-        providerId: providerId || undefined,
-        reviewProviderId: reviewProviderId || undefined,
+        llmProfileId: llmProfileId || undefined,
+        reviewLlmProfileId: reviewLlmProfileId || undefined,
         permissionWorkflowOverrideId: permissionWorkflowOverrideId || undefined,
         systemPrompt: systemPrompt.trim() || undefined,
         agentPermissionOverride: hasOverride ? permOverride : undefined,
@@ -323,7 +323,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               Provider
             </label>
             <Select
-              value={providerId}
+              value={llmProfileId}
               onChange={setProviderId}
               block
               size="lg"
@@ -331,7 +331,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                 { value: '', label: 'Default Provider' },
                 ...providers.map((provider) => ({
                   value: provider.id,
-                  label: `${provider.name} (${provider.type})${provider.isDefault ? ' - Default' : ''}`,
+                  label: `${provider.name} (${provider.providerType})${provider.isDefault ? ' - Default' : ''}`,
                 })),
               ]}
             />
@@ -346,7 +346,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               Review Provider
             </label>
             <Select
-              value={reviewProviderId}
+              value={reviewLlmProfileId}
               onChange={setReviewProviderId}
               block
               size="lg"
@@ -354,7 +354,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                 { value: '', label: 'Same as Project Provider' },
                 ...providers.map((provider) => ({
                   value: provider.id,
-                  label: `${provider.name} (${provider.type})${provider.isDefault ? ' - Default' : ''}`,
+                  label: `${provider.name} (${provider.providerType})${provider.isDefault ? ' - Default' : ''}`,
                 })),
               ]}
             />

@@ -14,7 +14,7 @@ export interface DelegationConfig {
   /** Tool names that should never be auto-approved */
   neverDelegate: string[];
   /** Provider for LLM risk analysis (optional, uses default if not set) */
-  analysisProviderId?: string;
+  analysisLlmProfileId?: string;
 }
 
 export const DEFAULT_DELEGATION_CONFIG: DelegationConfig = {
@@ -23,7 +23,7 @@ export const DEFAULT_DELEGATION_CONFIG: DelegationConfig = {
   maxAutoApprovalsPerMinute: 10,
   allowedCategories: ['fileRead', 'fileWrite', 'shellSafe'],
   neverDelegate: ['AskUserQuestion', 'ExitPlanMode'],
-  analysisProviderId: undefined,
+  analysisLlmProfileId: undefined,
 };
 
 // Rate limiter: circular buffer tracking approvals per minute

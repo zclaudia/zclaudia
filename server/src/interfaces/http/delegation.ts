@@ -34,7 +34,7 @@ export function createDelegationRoutes(db: Database.Database): Router {
         ...(body.maxAutoApprovalsPerMinute !== undefined && { maxAutoApprovalsPerMinute: body.maxAutoApprovalsPerMinute }),
         ...(body.allowedCategories !== undefined && { allowedCategories: body.allowedCategories }),
         ...(body.neverDelegate !== undefined && { neverDelegate: body.neverDelegate }),
-        ...(body.analysisProviderId !== undefined && { analysisProviderId: body.analysisProviderId }),
+        ...(body.analysisLlmProfileId !== undefined && { analysisLlmProfileId: body.analysisLlmProfileId }),
       };
       // Validate
       if (typeof updated.enabled !== 'boolean') updated.enabled = DEFAULT_DELEGATION_CONFIG.enabled;
@@ -46,13 +46,13 @@ export function createDelegationRoutes(db: Database.Database): Router {
       }
       if (!Array.isArray(updated.allowedCategories)) updated.allowedCategories = DEFAULT_DELEGATION_CONFIG.allowedCategories;
       if (!Array.isArray(updated.neverDelegate)) updated.neverDelegate = DEFAULT_DELEGATION_CONFIG.neverDelegate;
-      if (updated.analysisProviderId !== undefined && typeof updated.analysisProviderId !== 'string') {
-        updated.analysisProviderId = DEFAULT_DELEGATION_CONFIG.analysisProviderId;
+      if (updated.analysisLlmProfileId !== undefined && typeof updated.analysisLlmProfileId !== 'string') {
+        updated.analysisLlmProfileId = DEFAULT_DELEGATION_CONFIG.analysisLlmProfileId;
       }
-      if (typeof updated.analysisProviderId === 'string' && updated.analysisProviderId.trim() === '') {
-        updated.analysisProviderId = undefined;
+      if (typeof updated.analysisLlmProfileId === 'string' && updated.analysisLlmProfileId.trim() === '') {
+        updated.analysisLlmProfileId = undefined;
       }
-      const providerValidationError = validateAIReviewProviderId(db, updated.analysisProviderId);
+      const providerValidationError = validateAIReviewProviderId(db, updated.analysisLlmProfileId);
       if (providerValidationError) {
         res.status(400).json({
           success: false,

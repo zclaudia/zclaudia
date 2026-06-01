@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ErrorMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { ProviderConfig } from '@zclaudia/shared/core/provider';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import { getNextOffset } from './run-lifecycle.js';
@@ -20,7 +20,7 @@ export interface RunStartMessage extends Record<string, unknown> {
   clientRequestId: string;
   sessionId: string;
   input: string;
-  providerId?: string;
+  llmProfileId?: string;
   permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
   mode?: string;
   model?: string;
@@ -41,7 +41,7 @@ export interface RunSessionRecord {
   plan_status: string | null;
   task_id: string | null;
   root_path: string | null;
-  provider_id: string | null;
+  llm_profile_id: string | null;
   system_prompt: string | null;
 }
 
@@ -68,9 +68,9 @@ export interface RunBootstrapResult {
   markPendingResolutionResumed: () => void;
   persistSessionWorkingDirectory: (nextWorkingDirectory: string | null | undefined) => void;
   projectId: string;
-  providerConfig?: ProviderConfig;
+  providerConfig?: LlmProfileConfig;
   providerEventState: RunProviderEventState;
-  providerId: string | null;
+  llmProfileId: string | null;
   requestedCwd: string;
   sendRunEvent: (event: ServerMessage) => void;
   session: RunSessionRecord;
@@ -85,7 +85,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   const session = db.prepare(`
     SELECT s.id, s.project_id, s.name, s.sdk_session_id, s.type as session_type,
            s.working_directory, s.project_role, s.plan_status, s.task_id,
-           p.root_path, COALESCE(s.provider_id, p.provider_id) as provider_id, p.system_prompt
+           p.root_path, COALESCE(s.llm_profile_id, p.llm_profile_id) as llm_profile_id, p.system_prompt
     FROM sessions s
     LEFT JOIN projects p ON s.project_id = p.id
     WHERE s.id = ?
@@ -117,19 +117,19 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     return null;
   }
 
-  const explicitProviderId = message.providerId || session.provider_id;
-  const providerId = explicitProviderId || (() => {
-    const defaultRow = db.prepare(`SELECT id FROM providers WHERE is_default = 1 LIMIT 1`).get() as { id: string } | undefined;
+  const explicitProviderId = message.llmProfileId || session.llm_profile_id;
+  const llmProfileId = explicitProviderId || (() => {
+    const defaultRow = db.prepare(`SELECT id FROM llm_profiles WHERE is_default = 1 LIMIT 1`).get() as { id: string } | undefined;
     return defaultRow?.id || null;
   })();
 
-  let providerConfig: ProviderConfig | undefined;
-  if (providerId) {
+  let providerConfig: LlmProfileConfig | undefined;
+  if (llmProfileId) {
     const providerRow = db.prepare(`
-      SELECT id, name, type, cli_path as cliPath, env, is_default as isDefault,
+      SELECT id, name, provider_type as type, base_url as cliPath, env, is_default as isDefault,
              created_at as createdAt, updated_at as updatedAt
-      FROM providers WHERE id = ?
-    `).get(providerId) as {
+      FROM llm_profiles WHERE id = ?
+    `).get(llmProfileId) as {
       id: string;
       name: string;
       type: string;
@@ -144,20 +144,20 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
       providerConfig = {
         id: providerRow.id,
         name: providerRow.name,
-        type: providerRow.type as ProviderConfig['type'],
-        cliPath: providerRow.cliPath || undefined,
+        providerType: providerRow.type,
+        baseUrl: providerRow.cliPath || undefined,
         env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
         isDefault: providerRow.isDefault === 1,
         createdAt: providerRow.createdAt,
         updatedAt: providerRow.updatedAt,
       };
-      trace.setMeta({ provider: providerConfig.type });
+      trace.setMeta({ provider: providerConfig.providerType });
     }
   }
 
   const sessionType = (session.session_type || 'regular') as 'regular' | 'background' | 'agent';
   const projectId = session.project_id || message.sessionId;
-  const providerTypeForSession = providerConfig?.type || 'zclaudia';
+  const providerTypeForSession = providerConfig?.providerType || 'zclaudia';
   const providerPolicy = providerRegistry.getPolicy(providerTypeForSession);
 
   // Some providers ignore a new non-default mode when resuming an existing
@@ -254,7 +254,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
 
   let persistedWorkingDirectory = normalizeSessionWorkingDirectory(session.working_directory, session.root_path);
   trace.setMeta({
-    provider: providerConfig?.type,
+    provider: providerConfig?.providerType,
     cwd: message.workingDirectory || persistedWorkingDirectory || session.root_path || undefined,
   });
 
@@ -301,7 +301,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     projectId,
     providerConfig,
     providerEventState,
-    providerId,
+    llmProfileId,
     requestedCwd,
     sendRunEvent,
     session,

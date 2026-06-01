@@ -16,15 +16,15 @@ export class AIPromptStepExecutor implements StepExecutorPort {
     const prompt = config.prompt as string;
     if (!prompt) return { status: 'failed', output: {}, error: 'No prompt specified' };
 
-    const providerId = (config.providerId as string) ?? ctx.providerId;
-    if (!providerId) return { status: 'failed', output: {}, error: 'No provider configured' };
+    const llmProfileId = (config.llmProfileId as string) ?? ctx.llmProfileId;
+    if (!llmProfileId) return { status: 'failed', output: {}, error: 'No provider configured' };
 
     const workingDirectory = (config.workingDirectory as string) ?? ctx.projectRootPath;
 
     try {
       const result = await this.aiRunner.runPrompt({
         projectId: ctx.projectId,
-        providerId,
+        llmProfileId,
         prompt,
         workingDirectory,
         sessionName: (config.sessionName as string) ?? `Workflow: ${node.name}`,

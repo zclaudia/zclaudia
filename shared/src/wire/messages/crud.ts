@@ -1,11 +1,11 @@
 /**
- * CRUD messages for projects, sessions, servers, and providers.
+ * CRUD messages for projects, sessions, servers, and llm profiles.
  * Includes Get/Add/Update/Delete requests, List/OperationResult responses,
- * Created/Updated/Deleted broadcast messages, and session messages / provider commands.
+ * Created/Updated/Deleted broadcast messages, and session messages / runtime commands.
  */
 
 import type { BackendServer } from '../../core/server.js';
-import type { ProviderConfig } from '../../core/provider.js';
+import type { LlmProfileConfig } from '../../core/llm-profile.js';
 import type { Session } from '../../core/session.js';
 import type { Message } from '../../core/message.js';
 import type { Project } from '../../core/project.js';
@@ -178,67 +178,67 @@ export interface ServersDeletedMessage {
   id: string;
 }
 
-// ---- Providers ----
+// ---- Llm Profiles ----
 
-export interface GetProvidersMessage {
-  type: 'get_providers';
+export interface GetLlmProfilesMessage {
+  type: 'get_llm_profiles';
 }
 
-export interface AddProviderMessage {
-  type: 'add_provider';
-  provider: Omit<ProviderConfig, 'id' | 'createdAt' | 'updatedAt'>;
+export interface AddLlmProfileMessage {
+  type: 'add_llm_profile';
+  llmProfile: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>;
 }
 
-export interface UpdateProviderMessage {
-  type: 'update_provider';
+export interface UpdateLlmProfileMessage {
+  type: 'update_llm_profile';
   id: string;
-  provider: Partial<Omit<ProviderConfig, 'id' | 'createdAt' | 'updatedAt'>>;
+  llmProfile: Partial<Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>;
 }
 
-export interface DeleteProviderMessage {
-  type: 'delete_provider';
+export interface DeleteLlmProfileMessage {
+  type: 'delete_llm_profile';
   id: string;
 }
 
-export interface ProvidersListMessage {
-  type: 'providers_list';
-  providers: ProviderConfig[];
+export interface LlmProfilesListMessage {
+  type: 'llm_profiles_list';
+  llmProfiles: LlmProfileConfig[];
 }
 
-export interface ProviderOperationResultMessage {
-  type: 'provider_operation_result';
+export interface LlmProfileOperationResultMessage {
+  type: 'llm_profile_operation_result';
   success: boolean;
   operation: 'add' | 'update' | 'delete';
-  provider?: ProviderConfig;
+  llmProfile?: LlmProfileConfig;
   error?: string;
 }
 
-export interface ProvidersCreatedMessage {
-  type: 'providers_created';
-  provider: ProviderConfig;
+export interface LlmProfilesCreatedMessage {
+  type: 'llm_profiles_created';
+  llmProfile: LlmProfileConfig;
 }
 
-export interface ProvidersUpdatedMessage {
-  type: 'providers_updated';
-  provider: ProviderConfig;
+export interface LlmProfilesUpdatedMessage {
+  type: 'llm_profiles_updated';
+  llmProfile: LlmProfileConfig;
 }
 
-export interface ProvidersDeletedMessage {
-  type: 'providers_deleted';
+export interface LlmProfilesDeletedMessage {
+  type: 'llm_profiles_deleted';
   success: boolean;
   id: string;
 }
 
-// ---- Provider Commands ----
+// ---- Runtime Commands ----
 
 export interface GetProviderCommandsMessage {
   type: 'get_provider_commands';
-  providerId: string;
+  llmProfileId: string;
   projectRoot?: string;
 }
 
 export interface ProviderCommandsMessage {
   type: 'provider_commands';
-  providerId: string;
+  llmProfileId: string;
   commands: SlashCommand[];
 }

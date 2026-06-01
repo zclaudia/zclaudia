@@ -337,7 +337,7 @@ export function ProjectListItem({
                     { value: '', label: 'Default (from project)' },
                     ...providers.map((p) => ({
                       value: p.id,
-                      label: `${p.name} (${p.type})${p.isDefault ? ' *' : ''}`,
+                      label: `${p.name} (${p.providerType})${p.isDefault ? ' *' : ''}`,
                     })),
                   ]}
                 />

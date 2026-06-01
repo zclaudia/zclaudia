@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchApi, getProviders } from '../../services/api';
-import type { ProviderConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared';
 import { ShortcutSettings } from './ShortcutSettings';
 import { isDesktopTauri } from '../../utils/platform';
 import { useAgentConfigStore } from '../../stores/agentConfigStore';
@@ -15,7 +15,7 @@ interface AgentCapabilities {
 
 export function AgentSettings() {
   const [capabilities, setCapabilities] = useState<AgentCapabilities | null>(null);
-  const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const [providers, setProviders] = useState<LlmProfileConfig[]>([]);
   const config = useAgentConfigStore((s) => s.config);
   const loadConfig = useAgentConfigStore((s) => s.loadConfig);
   const updateConfig = useAgentConfigStore((s) => s.updateConfig);
@@ -32,7 +32,7 @@ export function AgentSettings() {
       await loadConfig();
       const [capsRes, providerList] = await Promise.all([
         fetchApi<AgentCapabilities>('/api/agent/capabilities'),
-        getProviders().catch(() => [] as ProviderConfig[]),
+        getProviders().catch(() => [] as LlmProfileConfig[]),
       ]);
       if (capsRes.success && capsRes.data) setCapabilities(capsRes.data);
       setProviders(providerList);
@@ -47,7 +47,7 @@ export function AgentSettings() {
 
   const saveConfig = useCallback(async (updates: {
     enabled?: boolean;
-    providerId?: string | null;
+    llmProfileId?: string | null;
   }) => {
     await updateConfig(updates);
   }, [updateConfig]);
@@ -104,8 +104,8 @@ export function AgentSettings() {
             <div className="flex items-center justify-between">
               <span className="text-sm">Provider</span>
               <Select
-                value={config?.providerId || ''}
-                onChange={(next) => saveConfig({ providerId: next || null })}
+                value={config?.llmProfileId || ''}
+                onChange={(next) => saveConfig({ llmProfileId: next || null })}
                 disabled={saving}
                 size="md"
                 align="right"

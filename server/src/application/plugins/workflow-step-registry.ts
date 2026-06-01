@@ -81,7 +81,7 @@ class WorkflowStepRegistry {
     context: {
       projectId?: string;
       projectRootPath?: string;
-      providerId?: string;
+      llmProfileId?: string;
       stepRunId: string;
       runId: string;
     },

@@ -25,8 +25,8 @@ export class PluginProviderAPI implements ProviderAPI {
   async list(): Promise<ProviderInfo[]> {
     const providers = this.db
       .prepare(`
-        SELECT id, name, type, is_default
-        FROM providers
+        SELECT id, name, provider_type AS type, is_default
+        FROM llm_profiles
         ORDER BY is_default DESC, name ASC
       `)
       .all() as Array<{
@@ -48,8 +48,8 @@ export class PluginProviderAPI implements ProviderAPI {
   async get(providerId: string): Promise<ProviderInfo | undefined> {
     const provider = this.db
       .prepare(`
-        SELECT id, name, type, is_default
-        FROM providers
+        SELECT id, name, provider_type AS type, is_default
+        FROM llm_profiles
         WHERE id = ?
       `)
       .get(providerId) as {
@@ -77,8 +77,8 @@ export class PluginProviderAPI implements ProviderAPI {
 
     const providerRow = this.db
       .prepare(`
-        SELECT id, name, type, cli_path, env
-        FROM providers
+        SELECT id, name, provider_type AS type, base_url AS cli_path, env
+        FROM llm_profiles
         WHERE id = ?
       `)
       .get(providerId) as {
@@ -164,8 +164,8 @@ export class PluginProviderAPI implements ProviderAPI {
 
     const providerRow = this.db
       .prepare(`
-        SELECT id, name, type, cli_path, env
-        FROM providers
+        SELECT id, name, provider_type AS type, base_url AS cli_path, env
+        FROM llm_profiles
         WHERE id = ?
       `)
       .get(providerId) as {

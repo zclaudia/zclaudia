@@ -5,13 +5,13 @@ import { systemTaskRegistry } from '../../application/services/system-task-regis
 let tempFileCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 export function autoDetectProviders(db: Database.Database): void {
-  const existing = db.prepare('SELECT id FROM providers LIMIT 1').get() as { id: string } | undefined;
+  const existing = db.prepare('SELECT id FROM llm_profiles LIMIT 1').get() as { id: string } | undefined;
   if (existing) return;
 
   const now = Date.now();
   db.prepare(`
-    INSERT INTO providers (id, name, type, cli_path, env, is_default, created_at, updated_at)
-    VALUES (?, ?, 'zclaudia', NULL, NULL, 1, ?, ?)
+    INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, env, is_default, created_at, updated_at)
+    VALUES (?, ?, 'anthropic', NULL, NULL, NULL, NULL, 1, ?, ?)
   `).run(randomUUID(), 'ZClaudia Agent', now, now);
 
   console.log('   Registered default ZClaudia agent runtime');

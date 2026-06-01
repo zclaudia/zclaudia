@@ -26,7 +26,7 @@ describe('SessionRepository', () => {
         id: 'sess-123',
         project_id: 'proj-456',
         name: 'Test Session',
-        provider_id: 'prov-789',
+        llm_profile_id: 'prov-789',
         sdk_session_id: 'sdk-sess-123',
         type: 'regular',
         parent_session_id: 'parent-sess-123',
@@ -42,7 +42,7 @@ describe('SessionRepository', () => {
         id: 'sess-123',
         projectId: 'proj-456',
         name: 'Test Session',
-        providerId: 'prov-789',
+        llmProfileId: 'prov-789',
         sdkSessionId: 'sdk-sess-123',
         type: 'regular',
         parentSessionId: 'parent-sess-123',
@@ -62,7 +62,7 @@ describe('SessionRepository', () => {
         id: 'sess-123',
         project_id: 'proj-456',
         name: null,
-        provider_id: null,
+        llm_profile_id: null,
         sdk_session_id: null,
         type: 'regular',
         parent_session_id: null,
@@ -75,7 +75,7 @@ describe('SessionRepository', () => {
       const result = repository.mapRow(row);
 
       expect(result.name).toBeUndefined();
-      expect(result.providerId).toBeUndefined();
+      expect(result.llmProfileId).toBeUndefined();
       expect(result.sdkSessionId).toBeUndefined();
       expect(result.parentSessionId).toBeUndefined();
       expect(result.workingDirectory).toBeUndefined();
@@ -102,7 +102,7 @@ describe('SessionRepository', () => {
       const data = {
         projectId: 'proj-123',
         name: 'New Session',
-        providerId: 'prov-456',
+        llmProfileId: 'prov-456',
         sdkSessionId: 'sdk-789',
         type: 'agent',
         parentSessionId: 'parent-123',
@@ -147,7 +147,7 @@ describe('SessionRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      // params: [id, projectId, name, providerId, sdkSessionId, type, parentSessionId,
+      // params: [id, projectId, name, llmProfileId, sdkSessionId, type, parentSessionId,
       // workingDirectory, sortOrder, projectRole, taskId, planStatus, isReadOnly,
       // lastRunStatus, createdAt, updatedAt]
       expect(params[14]).toBeGreaterThanOrEqual(before);
@@ -170,12 +170,12 @@ describe('SessionRepository', () => {
     it('generates UPDATE query for multiple fields', () => {
       const { sql, params } = repository.updateQuery('sess-123', {
         name: 'New Name',
-        providerId: 'new-prov',
+        llmProfileId: 'new-prov',
         sdkSessionId: 'new-sdk'
       });
 
       expect(sql).toContain('name = ?');
-      expect(sql).toContain('provider_id = ?');
+      expect(sql).toContain('llm_profile_id = ?');
       expect(sql).toContain('sdk_session_id = ?');
       expect(params).toContain('New Name');
       expect(params).toContain('new-prov');

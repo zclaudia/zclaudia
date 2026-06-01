@@ -454,7 +454,7 @@ describe('api', () => {
       await updateProvider('prov1', { name: 'Updated' });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/providers/prov1',
+        'http://localhost:3100/api/llm-profiles/prov1',
         expect.objectContaining({ method: 'PUT' })
       );
     });
@@ -465,7 +465,7 @@ describe('api', () => {
       await deleteProvider('prov1');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/providers/prov1',
+        'http://localhost:3100/api/llm-profiles/prov1',
         expect.objectContaining({ method: 'DELETE' })
       );
     });
@@ -476,7 +476,7 @@ describe('api', () => {
       await setDefaultProvider('prov1');
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:3100/api/providers/prov1/set-default',
+        'http://localhost:3100/api/llm-profiles/prov1/set-default',
         expect.objectContaining({ method: 'POST' })
       );
     });
@@ -753,7 +753,7 @@ describe('api', () => {
         enabled: true,
         projectId: 'p1',
         sessionId: 's1',
-        providerId: null,
+        llmProfileId: null,
         permissionWorkflowOverrideId: 'wf-1',
         permissionPolicy: null,
       });
@@ -762,7 +762,7 @@ describe('api', () => {
     });
 
     it('updateAgentConfig', async () => {
-      mockResponse({ enabled: true, projectId: 'p1', sessionId: 's1', providerId: null, permissionWorkflowOverrideId: null, permissionPolicy: null });
+      mockResponse({ enabled: true, projectId: 'p1', sessionId: 's1', llmProfileId: null, permissionWorkflowOverrideId: null, permissionPolicy: null });
       await updateAgentConfig({ permissionWorkflowOverrideId: 'wf-1' });
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining('/api/agent/config'),

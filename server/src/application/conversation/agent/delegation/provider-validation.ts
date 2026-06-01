@@ -5,7 +5,7 @@ interface ProviderRow {
 }
 
 /**
- * Validate the `analysisProviderId` referenced by AI Review / delegation config.
+ * Validate the `analysisLlmProfileId` referenced by AI Review / delegation config.
  *
  * Current behavior: accept any existing provider; reject only when the ID
  * doesn't match a row. AI Review capability filtering is deferred until the
@@ -13,11 +13,11 @@ interface ProviderRow {
  */
 export function validateAIReviewProviderId(
   db: Database.Database,
-  providerId: string | undefined,
+  llmProfileId: string | undefined,
 ): string | null {
-  if (!providerId) return null;
+  if (!llmProfileId) return null;
 
-  const row = db.prepare('SELECT id FROM providers WHERE id = ?').get(providerId) as ProviderRow | undefined;
+  const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?').get(llmProfileId) as ProviderRow | undefined;
   if (!row) {
     return 'Selected AI review provider was not found.';
   }

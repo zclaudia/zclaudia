@@ -33,13 +33,13 @@ describe('projects model', () => {
     const patch = buildProjectPatch({
       name: '  Updated  ',
       rootPath: null,
-      reviewProviderId: null,
+      reviewLlmProfileId: null,
     });
 
     expect(patch).toEqual({
       name: 'Updated',
       rootPath: null,
-      reviewProviderId: null,
+      reviewLlmProfileId: null,
     });
   });
 
@@ -49,21 +49,21 @@ describe('projects model', () => {
       name: 'Original',
       type: 'code',
       rootPath: '/repo',
-      reviewProviderId: 'reviewer',
+      reviewLlmProfileId: 'reviewer',
       createdAt: 1,
       updatedAt: 1,
     } as Project;
 
     const nextState = applyProjectPatch(existing, buildProjectPatch({
       type: 'chat_only',
-      reviewProviderId: null,
+      reviewLlmProfileId: null,
     }));
 
     expect(nextState).toMatchObject({
       name: 'Original',
       type: 'chat_only',
       rootPath: '/repo',
-      reviewProviderId: undefined,
+      reviewLlmProfileId: undefined,
     });
   });
 

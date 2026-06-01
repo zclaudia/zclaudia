@@ -1,4 +1,4 @@
-import type { LocalPR, LocalPRStatus, ExecutionState, ProviderConfig } from '@zclaudia/shared';
+import type { LocalPR, LocalPRStatus, ExecutionState, LlmProfileConfig } from '@zclaudia/shared';
 import {
   GitMerge,
   XCircle,
@@ -75,7 +75,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
   const showExecutionState = pr.executionState !== 'idle';
 
   const project = projects.find((p) => p.id === projectId);
-  const defaultProviderId = project?.reviewProviderId || project?.providerId || '';
+  const defaultLlmProfileId = project?.reviewLlmProfileId || project?.llmProfileId || '';
 
   const branchShort = pr.branchName.replace(/^(feat|fix|chore|refactor)\//, '');
   const commitCount = pr.commits?.length ?? 0;
@@ -105,12 +105,12 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
     }
   };
 
-  const handleReview = async (providerId?: string) => {
+  const handleReview = async (llmProfileId?: string) => {
     setReviewPickerOpen(false);
     setActionError(null);
     setLoading(true);
     try {
-      await reviewPR(pr.id, projectId, providerId || undefined);
+      await reviewPR(pr.id, projectId, llmProfileId || undefined);
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to start review');
     } finally {
@@ -287,18 +287,18 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
                     <div className="absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-xl shadow-lg p-2 min-w-[200px]">
                       <p className="text-xs font-medium text-muted-foreground mb-1.5 px-1">Review with:</p>
                       <button
-                        onClick={() => handleReview(defaultProviderId)}
+                        onClick={() => handleReview(defaultLlmProfileId)}
                         className="w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted"
                       >
-                        Default{defaultProviderId ? ` (${getProviderLabel(providers, defaultProviderId)})` : ''}
+                        Default{defaultLlmProfileId ? ` (${getProviderLabel(providers, defaultLlmProfileId)})` : ''}
                       </button>
-                      {providers.filter((p) => p.id !== defaultProviderId).map((p) => (
+                      {providers.filter((p) => p.id !== defaultLlmProfileId).map((p) => (
                         <button
                           key={p.id}
                           onClick={() => handleReview(p.id)}
                           className="w-full text-left text-xs px-2 py-1.5 rounded-md hover:bg-muted"
                         >
-                          {p.name} ({p.type})
+                          {p.name} ({p.providerType})
                         </button>
                       ))}
                     </div>
@@ -536,7 +536,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
   );
 }
 
-function getProviderLabel(providers: ProviderConfig[], id: string): string {
+function getProviderLabel(providers: LlmProfileConfig[], id: string): string {
   const p = providers.find((p) => p.id === id);
   return p ? `${p.name}` : id.slice(0, 8);
 }

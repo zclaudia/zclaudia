@@ -26,7 +26,7 @@ describe('ProjectRepository', () => {
         id: 'proj-123',
         name: 'Test Project',
         type: 'code',
-        provider_id: 'prov-456',
+        llm_profile_id: 'prov-456',
         root_path: '/path/to/project',
         system_prompt: 'Test prompt',
         permission_policy: '{"mode":"autoApprove"}',
@@ -41,7 +41,7 @@ describe('ProjectRepository', () => {
         id: 'proj-123',
         name: 'Test Project',
         type: 'code',
-        providerId: 'prov-456',
+        llmProfileId: 'prov-456',
         rootPath: '/path/to/project',
         systemPrompt: 'Test prompt',
         permissionPolicy: { mode: 'autoApprove' },
@@ -58,7 +58,7 @@ describe('ProjectRepository', () => {
         id: 'proj-123',
         name: 'Test',
         type: 'code',
-        provider_id: null,
+        llm_profile_id: null,
         root_path: null,
         system_prompt: null,
         permission_policy: null,
@@ -69,7 +69,7 @@ describe('ProjectRepository', () => {
 
       const result = repository.mapRow(row);
 
-      expect(result.providerId).toBeUndefined();
+      expect(result.llmProfileId).toBeUndefined();
       expect(result.rootPath).toBeUndefined();
       expect(result.systemPrompt).toBeUndefined();
       expect(result.permissionPolicy).toBeUndefined();
@@ -94,13 +94,13 @@ describe('ProjectRepository', () => {
       expect(repository.mapRow(row).contextSyncStatus).toBe('error');
     });
 
-    it('maps reviewProviderId', () => {
+    it('maps reviewLlmProfileId', () => {
       const row = {
         id: 'proj-1', name: 'Test', type: 'code',
         created_at: 1000, updated_at: 2000,
-        review_provider_id: 'rev-1',
+        review_llm_profile_id: 'rev-1',
       };
-      expect(repository.mapRow(row).reviewProviderId).toBe('rev-1');
+      expect(repository.mapRow(row).reviewLlmProfileId).toBe('rev-1');
     });
 
     it('maps agentPermissionOverride JSON', () => {
@@ -121,7 +121,7 @@ describe('ProjectRepository', () => {
       const data = {
         name: 'New Project',
         type: 'code',
-        providerId: 'prov-789',
+        llmProfileId: 'prov-789',
         rootPath: '/new/path',
         systemPrompt: 'New prompt',
         permissionPolicy: { mode: 'askUser' }
@@ -164,8 +164,8 @@ describe('ProjectRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      // params: [id, name, type, providerId, rootPath, systemPrompt, permissionPolicy,
-      // agentPermissionOverride, agent, contextSyncStatus, reviewProviderId, permissionWorkflowOverrideId, sortOrder, createdAt, updatedAt]
+      // params: [id, name, type, llmProfileId, rootPath, systemPrompt, permissionPolicy,
+      // agentPermissionOverride, agent, contextSyncStatus, reviewLlmProfileId, permissionWorkflowOverrideId, sortOrder, createdAt, updatedAt]
       expect(params[13]).toBeGreaterThanOrEqual(before);
       expect(params[13]).toBeLessThanOrEqual(after);
       expect(params[14]).toBe(params[13]); // createdAt === updatedAt
@@ -187,12 +187,12 @@ describe('ProjectRepository', () => {
       const { sql, params } = repository.updateQuery('proj-123', {
         name: 'New Name',
         type: 'sdk',
-        providerId: 'new-prov'
+        llmProfileId: 'new-prov'
       });
 
       expect(sql).toContain('name = ?');
       expect(sql).toContain('type = ?');
-      expect(sql).toContain('provider_id = ?');
+      expect(sql).toContain('llm_profile_id = ?');
       expect(params).toContain('New Name');
       expect(params).toContain('sdk');
       expect(params).toContain('new-prov');
@@ -251,9 +251,9 @@ describe('ProjectRepository', () => {
       expect(sql).toContain('context_sync_status = ?');
     });
 
-    it('handles reviewProviderId update', () => {
-      const { sql } = repository.updateQuery('proj-1', { reviewProviderId: 'rev-1' as any });
-      expect(sql).toContain('review_provider_id = ?');
+    it('handles reviewLlmProfileId update', () => {
+      const { sql } = repository.updateQuery('proj-1', { reviewLlmProfileId: 'rev-1' as any });
+      expect(sql).toContain('review_llm_profile_id = ?');
     });
   });
 });

@@ -3,21 +3,21 @@
  * Extracted from projectStore to separate provider concerns from project/session state.
  */
 import { create } from 'zustand';
-import type { ProviderConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
+import type { LlmProfileConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { useServerStore } from './serverStore';
 
 interface ProviderMetaState {
-  providersByBackend: Record<string, ProviderConfig[]>;
+  providersByBackend: Record<string, LlmProfileConfig[]>;
   providerCommands: Record<string, SlashCommand[]>;
   providerCapabilities: Record<string, ProviderCapabilities>;
 
-  setProviders: (providers: ProviderConfig[], backendId?: string | null) => void;
-  getProviders: (backendId?: string | null) => ProviderConfig[];
-  setProviderCommands: (providerId: string, commands: SlashCommand[]) => void;
-  setProviderCapabilities: (providerId: string, capabilities: ProviderCapabilities) => void;
+  setProviders: (providers: LlmProfileConfig[], backendId?: string | null) => void;
+  getProviders: (backendId?: string | null) => LlmProfileConfig[];
+  setProviderCommands: (llmProfileId: string, commands: SlashCommand[]) => void;
+  setProviderCapabilities: (llmProfileId: string, capabilities: ProviderCapabilities) => void;
 }
 
-const EMPTY_PROVIDERS: ProviderConfig[] = [];
+const EMPTY_PROVIDERS: LlmProfileConfig[] = [];
 
 function resolveBackendId(backendId?: string | null): string | null {
   if (backendId) return backendId;
@@ -47,19 +47,19 @@ export const useProviderMetaStore = create<ProviderMetaState>((set, get) => ({
     return get().providersByBackend[resolvedBackendId] ?? EMPTY_PROVIDERS;
   },
 
-  setProviderCommands: (providerId, commands) =>
+  setProviderCommands: (llmProfileId, commands) =>
     set((state) => ({
       providerCommands: {
         ...state.providerCommands,
-        [providerId]: commands,
+        [llmProfileId]: commands,
       },
     })),
 
-  setProviderCapabilities: (providerId, capabilities) =>
+  setProviderCapabilities: (llmProfileId, capabilities) =>
     set((state) => ({
       providerCapabilities: {
         ...state.providerCapabilities,
-        [providerId]: capabilities,
+        [llmProfileId]: capabilities,
       },
     })),
 }));

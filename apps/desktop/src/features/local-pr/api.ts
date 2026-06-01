@@ -34,10 +34,10 @@ export async function retryLocalPRReview(prId: string): Promise<LocalPR> {
   return apiCall<LocalPR>(`/api/local-prs/${prId}/retry-review`, { method: 'POST' });
 }
 
-export async function reviewLocalPR(prId: string, providerId?: string): Promise<LocalPR> {
+export async function reviewLocalPR(prId: string, llmProfileId?: string): Promise<LocalPR> {
   return apiCall<LocalPR>(`/api/local-prs/${prId}/review`, {
     method: 'POST',
-    body: JSON.stringify({ providerId }),
+    body: JSON.stringify({ llmProfileId }),
   });
 }
 

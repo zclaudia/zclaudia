@@ -11,8 +11,8 @@ export class AIReviewStepExecutor implements StepExecutorPort {
     config: Record<string, unknown>,
     ctx: StepContext,
   ): Promise<StepResult> {
-    const providerId = (config.providerId as string) ?? ctx.providerId;
-    if (!providerId) return { status: 'failed', output: {}, error: 'No provider configured' };
+    const llmProfileId = (config.llmProfileId as string) ?? ctx.llmProfileId;
+    if (!llmProfileId) return { status: 'failed', output: {}, error: 'No provider configured' };
 
     const worktreePath = (config.worktreePath as string) ?? ctx.projectRootPath;
     const passMarker = (config.passMarker as string) ?? '[REVIEW_PASSED]';
@@ -31,7 +31,7 @@ If there are critical issues, include ${failMarker} in your response and list th
     try {
       const result = await this.aiRunner.runPrompt({
         projectId: ctx.projectId,
-        providerId,
+        llmProfileId,
         prompt: reviewPrompt,
         workingDirectory: worktreePath,
         sessionName: `Workflow Review: ${node.name}`,

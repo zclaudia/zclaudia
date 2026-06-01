@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, Session, SlashCommand, ProviderConfig, ProviderCapabilities } from '@zclaudia/shared';
+import type { Project, Session, SlashCommand, LlmProfileConfig, ProviderCapabilities } from '@zclaudia/shared';
 import { useChatStore } from './chatStore';
 import { useProviderMetaStore } from './providerMetaStore';
 import { useServerStore } from './serverStore';
@@ -30,7 +30,7 @@ interface ProjectState {
    * New code should use useProviderMetaStore directly.
    * Writes are synced to providerMetaStore automatically.
    */
-  providers: ProviderConfig[];
+  providers: LlmProfileConfig[];
   providerCommands: Record<string, SlashCommand[]>;
   providerCapabilities: Record<string, ProviderCapabilities>;
 
@@ -54,7 +54,7 @@ interface ProjectState {
   reorderSessions: (projectId: string, orderedIds: string[]) => void;
 
   // Actions — providers (synced to providerMetaStore)
-  setProviders: (providers: ProviderConfig[]) => void;
+  setProviders: (providers: LlmProfileConfig[]) => void;
   setDataServerId: (serverId: string | null) => void;
 
   // Actions — selection & UI
@@ -63,8 +63,8 @@ interface ProjectState {
   setDashboardView: (projectId: string, view: ProjectDashboardView) => void;
 
   // Actions — provider metadata (synced to providerMetaStore)
-  setProviderCommands: (providerId: string, commands: SlashCommand[]) => void;
-  setProviderCapabilities: (providerId: string, capabilities: ProviderCapabilities) => void;
+  setProviderCommands: (llmProfileId: string, commands: SlashCommand[]) => void;
+  setProviderCapabilities: (llmProfileId: string, capabilities: ProviderCapabilities) => void;
 }
 
 export const useProjectStore = create<ProjectState>((set) => ({
@@ -401,12 +401,12 @@ export const useProjectStore = create<ProjectState>((set) => ({
 
   // ── Provider metadata (synced to providerMetaStore) ──
 
-  setProviderCommands: (providerId, commands) => {
-    useProviderMetaStore.getState().setProviderCommands(providerId, commands);
+  setProviderCommands: (llmProfileId, commands) => {
+    useProviderMetaStore.getState().setProviderCommands(llmProfileId, commands);
   },
 
-  setProviderCapabilities: (providerId, capabilities) => {
-    useProviderMetaStore.getState().setProviderCapabilities(providerId, capabilities);
+  setProviderCapabilities: (llmProfileId, capabilities) => {
+    useProviderMetaStore.getState().setProviderCapabilities(llmProfileId, capabilities);
   },
 }));
 
@@ -533,7 +533,7 @@ function mergeProjectPreservingFields(existing: Project | undefined, incoming: P
     ...existing,
     ...incoming,
     rootPath: incoming.rootPath ?? existing.rootPath,
-    providerId: incoming.providerId ?? existing.providerId,
+    llmProfileId: incoming.llmProfileId ?? existing.llmProfileId,
     systemPrompt: incoming.systemPrompt ?? existing.systemPrompt,
     permissionPolicy: incoming.permissionPolicy ?? existing.permissionPolicy,
     agent: incoming.agent ?? existing.agent,

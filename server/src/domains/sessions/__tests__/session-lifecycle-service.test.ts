@@ -17,7 +17,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -116,7 +116,7 @@ describe('SessionLifecycleService', () => {
     });
     const now = Date.now();
     db.prepare(`
-      INSERT INTO sessions (id, project_id, name, provider_id, sdk_session_id, created_at, updated_at)
+      INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run('s1', 'project-1', 'Session 1', 'provider-1', 'sdk-1', now, now);
 

@@ -30,7 +30,7 @@ vi.mock('../../stores/providerMetaStore', () => ({
 }));
 
 // Mock child components
-vi.mock('../../features/settings/ProviderManager', () => ({ ProviderManager: ({ isOpen, inline }: any) => isOpen ? <div data-testid="provider-manager" data-inline={inline}>ProviderManager</div> : null }));
+vi.mock('../../features/settings/LlmProfileManager', () => ({ LlmProfileManager: ({ isOpen, inline }: any) => isOpen ? <div data-testid="provider-manager" data-inline={inline}>ProviderManager</div> : null }));
 vi.mock('../../features/settings/GeneralSettings', async () => {
   const React = await import('react');
   const uiStoreModule = await import('../../stores/uiStore');

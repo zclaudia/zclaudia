@@ -7,8 +7,8 @@ export interface AiExploreServiceDeps {
   aiRunPort: AiRunPort;
   /** Maximum tokens/time to wait for the AI response. Default 120s. */
   timeoutMs?: number;
-  /** Optional providerId override (passed straight to aiRunPort). */
-  providerId?: string;
+  /** Optional llmProfileId override (passed straight to aiRunPort). */
+  llmProfileId?: string;
 }
 
 export interface ExploreInput {
@@ -83,7 +83,7 @@ export class AiExploreService {
         .startVirtualRun({
           input: prompt,
           workingDirectory: input.workingDirectory,
-          providerId: this.deps.providerId,
+          llmProfileId: this.deps.llmProfileId,
           onMessage: (m) => {
             if (m.content) collected += m.content;
             if (m.kind === 'run_failed') {
@@ -196,7 +196,7 @@ export class AiExploreService {
         .startVirtualRun({
           input: prompt,
           workingDirectory,
-          providerId: this.deps.providerId,
+          llmProfileId: this.deps.llmProfileId,
           onMessage: (m: { kind: string; content?: string }) => {
             if (m.content) {
               collected += m.content;
@@ -227,7 +227,7 @@ export class AiExploreService {
         .startVirtualRun({
           input: prompt,
           workingDirectory,
-          providerId: this.deps.providerId,
+          llmProfileId: this.deps.llmProfileId,
           onMessage: (m: { kind: string; content?: string }) => {
             if (m.content) collected += m.content;
             if (['run_completed', 'completed', 'final', 'run_failed'].includes(m.kind)) {

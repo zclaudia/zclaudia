@@ -29,11 +29,11 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-      provider_id TEXT,
+      llm_profile_id TEXT,
       root_path TEXT,
       agent TEXT,
       context_sync_status TEXT NOT NULL DEFAULT 'synced',
-      review_provider_id TEXT,
+      review_llm_profile_id TEXT,
       is_internal INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -44,7 +44,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -385,7 +385,7 @@ describe('sessions routes', () => {
     it('preserves omitted nullable fields when updating another field', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO sessions (id, project_id, name, provider_id, sdk_session_id, created_at, updated_at)
+        INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run('s1', 'project-1', 'Original', 'provider-1', 'sdk-123', now, now);
 
@@ -395,34 +395,34 @@ describe('sessions routes', () => {
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT name, provider_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
+      const row = db.prepare('SELECT name, llm_profile_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
       expect(row.name).toBe('Updated Name');
-      expect(row.provider_id).toBe('provider-1');
+      expect(row.llm_profile_id).toBe('provider-1');
       expect(row.sdk_session_id).toBe('sdk-123');
     });
 
     it('clears nullable fields only when explicitly set to null', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO sessions (id, project_id, name, provider_id, sdk_session_id, created_at, updated_at)
+        INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run('s1', 'project-1', 'Original', 'provider-1', 'sdk-123', now, now);
 
       const res = await request(app)
         .put('/api/sessions/s1')
-        .send({ providerId: null, sdkSessionId: null });
+        .send({ llmProfileId: null, sdkSessionId: null });
 
       expect(res.status).toBe(200);
 
-      const row = db.prepare('SELECT provider_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
-      expect(row.provider_id).toBeNull();
+      const row = db.prepare('SELECT llm_profile_id, sdk_session_id FROM sessions WHERE id = ?').get('s1') as any;
+      expect(row.llm_profile_id).toBeNull();
       expect(row.sdk_session_id).toBeNull();
     });
 
     it('trims updated string fields', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO sessions (id, project_id, name, provider_id, sdk_session_id, created_at, updated_at)
+        INSERT INTO sessions (id, project_id, name, llm_profile_id, sdk_session_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `).run('s1', 'project-1', 'Original', 'provider-1', 'sdk-123', now, now);
 

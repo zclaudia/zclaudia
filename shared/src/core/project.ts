@@ -9,13 +9,13 @@ export interface Project {
   id: string;
   name: string;
   type: ProjectType;
-  providerId?: string;
+  llmProfileId?: string;
   rootPath?: string;
   systemPrompt?: string;
   permissionPolicy?: PermissionPolicy;
   agentPermissionOverride?: Partial<UnifiedPermissionPolicy>;  // Project-level override of global agent policy
   isInternal?: boolean;  // Internal projects (e.g. Agent Assistant) are hidden from user-facing lists
-  reviewProviderId?: string;  // Provider used for Local PR reviews
+  reviewLlmProfileId?: string;  // LlmProfile used for Local PR reviews
   permissionWorkflowOverrideId?: string;  // Project-level permission escalation workflow override
   sortOrder?: number;
   createdAt: number;

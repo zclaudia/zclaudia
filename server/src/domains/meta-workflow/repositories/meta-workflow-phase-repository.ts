@@ -31,8 +31,8 @@ type Update = {
   outputsSnapshot?: MetaWorkflowPhase['outputsSnapshot'] | null;
   gatesSnapshot?: MetaWorkflowPhase['gatesSnapshot'] | null;
   executeConfigSnapshot?: MetaWorkflowPhase['executeConfigSnapshot'] | null;
-  synthesizerProviderId?: string | null;
-  runtimeProviderId?: string | null;
+  synthesizerLlmProfileId?: string | null;
+  runtimeLlmProfileId?: string | null;
   startedAt?: number;
   completedAt?: number;
 };
@@ -68,8 +68,8 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
       outputsSnapshot: parseJsonOrUndefined<PhaseOutput[]>(row.outputs_snapshot),
       gatesSnapshot: parseJsonOrUndefined<AcceptanceGate[]>(row.gates_snapshot),
       executeConfigSnapshot: parseJsonOrUndefined<PhaseExecuteConfig>(row.execute_config_snapshot),
-      synthesizerProviderId: (row.synthesizer_provider_id as string) || undefined,
-      runtimeProviderId: (row.runtime_provider_id as string) || undefined,
+      synthesizerLlmProfileId: (row.synthesizer_llm_profile_id as string) || undefined,
+      runtimeLlmProfileId: (row.runtime_llm_profile_id as string) || undefined,
       createdAt: row.created_at as number,
       startedAt: (row.started_at as number) || undefined,
       completedAt: (row.completed_at as number) || undefined,
@@ -85,7 +85,7 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
         current_run_id, worktree_path, stale_since, stale_source_phase_id,
         attempt, max_retries,
         inputs_snapshot, outputs_snapshot, gates_snapshot, execute_config_snapshot,
-        synthesizer_provider_id, runtime_provider_id,
+        synthesizer_llm_profile_id, runtime_llm_profile_id,
         created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
@@ -102,8 +102,8 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
         data.outputsSnapshot ? JSON.stringify(data.outputsSnapshot) : null,
         data.gatesSnapshot ? JSON.stringify(data.gatesSnapshot) : null,
         data.executeConfigSnapshot ? JSON.stringify(data.executeConfigSnapshot) : null,
-        data.synthesizerProviderId ?? null,
-        data.runtimeProviderId ?? null,
+        data.synthesizerLlmProfileId ?? null,
+        data.runtimeLlmProfileId ?? null,
         data.createdAt,
       ],
     };
@@ -134,8 +134,8 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
       ['outputsSnapshot', 'outputs_snapshot'],
       ['gatesSnapshot', 'gates_snapshot'],
       ['executeConfigSnapshot', 'execute_config_snapshot'],
-      ['synthesizerProviderId', 'synthesizer_provider_id'],
-      ['runtimeProviderId', 'runtime_provider_id'],
+      ['synthesizerLlmProfileId', 'synthesizer_llm_profile_id'],
+      ['runtimeLlmProfileId', 'runtime_llm_profile_id'],
       ['startedAt', 'started_at'],
       ['completedAt', 'completed_at'],
     ];

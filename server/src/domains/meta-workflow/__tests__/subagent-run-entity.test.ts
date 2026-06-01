@@ -109,7 +109,7 @@ describe('createRunVirtualClientFromAiRunPort', () => {
     });
     const runVirtualClient = createRunVirtualClientFromAiRunPort({
       aiRunPort: { startVirtualRun } as never,
-      defaultProviderId: 'provider-x',
+      defaultLlmProfileId: 'provider-x',
       timeoutMs: 1000,
     });
     const result = await runVirtualClient({
@@ -127,7 +127,7 @@ describe('createRunVirtualClientFromAiRunPort', () => {
     const startVirtualRun = vi.fn().mockRejectedValue(new Error('boom'));
     const runVirtualClient = createRunVirtualClientFromAiRunPort({
       aiRunPort: { startVirtualRun } as never,
-      defaultProviderId: 'provider-x',
+      defaultLlmProfileId: 'provider-x',
       timeoutMs: 1000,
     });
     const result = await runVirtualClient({
@@ -142,7 +142,7 @@ describe('createRunVirtualClientFromAiRunPort', () => {
     });
     const runVirtualClient = createRunVirtualClientFromAiRunPort({
       aiRunPort: { startVirtualRun } as never,
-      defaultProviderId: 'provider-x',
+      defaultLlmProfileId: 'provider-x',
       timeoutMs: 5,
     });
     const result = await runVirtualClient({

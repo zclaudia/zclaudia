@@ -39,14 +39,14 @@ describe('PermissionSettings', () => {
           {
             id: 'prov-supported',
             name: 'Primary',
-            type: 'zclaudia',
+            providerType: 'zclaudia',
             createdAt: Date.now(),
             updatedAt: Date.now(),
           },
           {
             id: 'prov-unsupported',
             name: 'Legacy',
-            type: 'zclaudia',
+            providerType: 'zclaudia',
             createdAt: Date.now(),
             updatedAt: Date.now(),
           },
@@ -59,7 +59,7 @@ describe('PermissionSettings', () => {
       enabled: true,
       projectId: null,
       sessionId: null,
-      providerId: null,
+      llmProfileId: null,
       permissionWorkflowOverrideId: null,
       permissionPolicy: JSON.stringify({
         enabled: true,
@@ -73,16 +73,16 @@ describe('PermissionSettings', () => {
       enabled: true,
       projectId: null,
       sessionId: null,
-      providerId: null,
+      llmProfileId: null,
       permissionWorkflowOverrideId: null,
       permissionPolicy: null,
     });
     mockListAllWorkflows.mockResolvedValue([]);
 
-    mockGetProviderCapabilities.mockImplementation(async (providerId: string) => ({
+    mockGetProviderCapabilities.mockImplementation(async (llmProfileId: string) => ({
       modes: [],
       models: [],
-      supportsAIReview: providerId === 'prov-supported',
+      supportsAIReview: llmProfileId === 'prov-supported',
     }));
     mockGetProviders.mockResolvedValue([]);
   });
@@ -121,7 +121,7 @@ describe('PermissionSettings', () => {
       {
         id: 'prov-supported',
         name: 'Primary',
-        type: 'zclaudia',
+        providerType: 'zclaudia',
         createdAt: Date.now(),
         updatedAt: Date.now(),
       },

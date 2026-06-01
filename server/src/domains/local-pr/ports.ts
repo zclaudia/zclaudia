@@ -6,7 +6,7 @@ export interface LocalPRAiSessionPort {
     sessionId: string;
     input: string;
     workingDirectory?: string;
-    providerId?: string;
+    llmProfileId?: string;
     onMessage: (msg: ServerMessage) => void;
   }): Promise<void> | void;
 }

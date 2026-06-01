@@ -19,8 +19,8 @@ export function createSupervisionRoutes(service: SupervisorService): Router {
   router.post('/projects/:projectId/agent/init', (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;
-      const { config, providerId, mode } = req.body;
-      const agent = service.initAgent(projectId, config, providerId, mode);
+      const { config, llmProfileId, mode } = req.body;
+      const agent = service.initAgent(projectId, config, llmProfileId, mode);
       res.json({ success: true, data: agent } as ApiResponse<ProjectAgent>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to initialize agent';

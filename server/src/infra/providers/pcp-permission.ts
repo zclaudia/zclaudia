@@ -1,5 +1,5 @@
 import type { PCPProviderManifest, PCPPermissionMode } from '@zclaudia/shared/core/pcp';
-import type { PermissionMode } from '@zclaudia/shared/core/provider';
+import type { PermissionMode } from '@zclaudia/shared/core/runtime-capabilities';
 
 const LEGACY_TO_PCP_MODE: Record<PermissionMode, PCPPermissionMode> = {
   default: 'supervised',

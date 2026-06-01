@@ -31,7 +31,7 @@ export class AIRiskAnalysisAdapter implements AIRiskAnalysisPort {
     config: {
       confidenceThreshold: number;
       maxAutoApprovalsPerMinute: number;
-      analysisProviderId?: string;
+      analysisLlmProfileId?: string;
     };
   }): Promise<{
     decision: 'approve' | 'deny' | 'uncertain';
@@ -44,7 +44,7 @@ export class AIRiskAnalysisAdapter implements AIRiskAnalysisPort {
       timeoutBeforeReview: 0,
       confidenceThreshold: ctx.config.confidenceThreshold,
       maxAutoApprovalsPerMinute: ctx.config.maxAutoApprovalsPerMinute,
-      analysisProviderId: ctx.config.analysisProviderId,
+      analysisLlmProfileId: ctx.config.analysisLlmProfileId,
     };
 
     const result = await evaluateAIReview(config, {

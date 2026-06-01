@@ -449,10 +449,10 @@ describe('Sidebar', () => {
 
   // ---- Provider name resolution ----
 
-  it('shows provider name from session providerId', () => {
+  it('shows provider name from session llmProfileId', () => {
     setupStores({
       projectStore: {
-        sessions: [{ ...baseSession, providerId: 'prov-1' }],
+        sessions: [{ ...baseSession, llmProfileId: 'prov-1' }],
         providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
       },
     });
@@ -465,7 +465,7 @@ describe('Sidebar', () => {
     expect(container.querySelector('[data-testid="provider-name"]')?.textContent).toBe('Claude');
   });
 
-  it('falls back to default provider when session has no providerId', () => {
+  it('falls back to default provider when session has no llmProfileId', () => {
     setupStores({
       projectStore: {
         sessions: [baseSession as any],
@@ -796,7 +796,7 @@ describe('Sidebar', () => {
         expect(api.createSession).toHaveBeenCalledWith({
           projectId: 'proj-1',
           name: 'My Session',
-          providerId: undefined,
+          llmProfileId: undefined,
         });
       }
     }

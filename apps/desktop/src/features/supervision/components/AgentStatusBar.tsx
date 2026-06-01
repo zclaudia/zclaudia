@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Play, Pause, Archive } from 'lucide-react';
-import type { ProjectAgent, AgentMode, SupervisorConfig, TrustLevel, ProviderConfig } from '@zclaudia/shared';
+import type { ProjectAgent, AgentMode, SupervisorConfig, TrustLevel, LlmProfileConfig } from '@zclaudia/shared';
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
 import { useProjectStore } from '../../../stores/projectStore';
@@ -39,7 +39,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
     trustLevel: 'medium',
   });
   const [selectedProviderId, setSelectedProviderId] = useState<string>('');
-  const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const [providers, setProviders] = useState<LlmProfileConfig[]>([]);
 
   const setAgent = useSupervisionStore((s) => s.setAgent);
   const selectSession = useProjectStore((s) => s.selectSession);

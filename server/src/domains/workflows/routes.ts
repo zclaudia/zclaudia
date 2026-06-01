@@ -413,20 +413,20 @@ export function createWorkflowRoutes(
       });
     }
     try {
-      const { description, providerId } = req.body;
+      const { description, llmProfileId } = req.body;
       if (!description) {
         return res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: 'description is required' },
         });
       }
-      if (!providerId) {
+      if (!llmProfileId) {
         return res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'providerId is required' },
+          error: { code: 'VALIDATION_ERROR', message: 'llmProfileId is required' },
         });
       }
-      const result = await generatorService.generate(req.params.projectId, description, providerId);
+      const result = await generatorService.generate(req.params.projectId, description, llmProfileId);
       res.json({ success: true, data: result });
     } catch (error) {
       res.status(500).json({

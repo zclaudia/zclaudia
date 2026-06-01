@@ -8,11 +8,13 @@ function createTestDb(): Database.Database {
 
   // Create schema
   db.exec(`
-    CREATE TABLE IF NOT EXISTS providers (
+    CREATE TABLE IF NOT EXISTS llm_profiles (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'claude',
-      cli_path TEXT,
+      provider_type TEXT NOT NULL DEFAULT 'anthropic',
+      base_url TEXT,
+      api_key TEXT,
+      compat TEXT,
       env TEXT,
       is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -23,25 +25,25 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-      provider_id TEXT,
+      llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT,
       permission_policy TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
-      FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE SET NULL
+      FOREIGN KEY (llm_profile_id) REFERENCES llm_profiles(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       sdk_session_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-      FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE SET NULL
+      FOREIGN KEY (llm_profile_id) REFERENCES llm_profiles(id) ON DELETE SET NULL
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -77,7 +79,7 @@ describe('Database Operations', () => {
     db.exec('DELETE FROM messages');
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
-    db.exec('DELETE FROM providers');
+    db.exec('DELETE FROM llm_profiles');
   });
 
   describe('Providers', () => {
@@ -86,20 +88,20 @@ describe('Database Operations', () => {
       const now = Date.now();
 
       db.prepare(`
-        INSERT INTO providers (id, name, type, is_default, created_at, updated_at)
+        INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(id, 'Test Provider', 'claude', 1, now, now);
+      `).run(id, 'Test Provider', 'anthropic', 1, now, now);
 
-      const provider = db.prepare('SELECT * FROM providers WHERE id = ?').get(id) as {
+      const provider = db.prepare('SELECT * FROM llm_profiles WHERE id = ?').get(id) as {
         id: string;
         name: string;
-        type: string;
+        provider_type: string;
         is_default: number;
       };
 
       expect(provider).toBeDefined();
       expect(provider.name).toBe('Test Provider');
-      expect(provider.type).toBe('claude');
+      expect(provider.provider_type).toBe('anthropic');
       expect(provider.is_default).toBe(1);
     });
 
@@ -109,11 +111,11 @@ describe('Database Operations', () => {
       const env = { ANTHROPIC_API_KEY: 'test-key', HOME: '/custom/home' };
 
       db.prepare(`
-        INSERT INTO providers (id, name, type, env, created_at, updated_at)
+        INSERT INTO llm_profiles (id, name, provider_type, env, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(id, 'Custom Provider', 'claude', JSON.stringify(env), now, now);
+      `).run(id, 'Custom Provider', 'anthropic', JSON.stringify(env), now, now);
 
-      const provider = db.prepare('SELECT * FROM providers WHERE id = ?').get(id) as {
+      const provider = db.prepare('SELECT * FROM llm_profiles WHERE id = ?').get(id) as {
         env: string;
       };
 
@@ -183,25 +185,25 @@ describe('Database Operations', () => {
     });
 
     it('links project to provider', () => {
-      const providerId = uuidv4();
+      const llmProfileId = uuidv4();
       const projectId = uuidv4();
       const now = Date.now();
 
       db.prepare(`
-        INSERT INTO providers (id, name, type, created_at, updated_at)
+        INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
-      `).run(providerId, 'Provider', 'claude', now, now);
+      `).run(llmProfileId, 'Provider', 'anthropic', now, now);
 
       db.prepare(`
-        INSERT INTO projects (id, name, type, provider_id, created_at, updated_at)
+        INSERT INTO projects (id, name, type, llm_profile_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', providerId, now, now);
+      `).run(projectId, 'Project', 'code', llmProfileId, now, now);
 
       const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as {
-        provider_id: string;
+        llm_profile_id: string;
       };
 
-      expect(project.provider_id).toBe(providerId);
+      expect(project.llm_profile_id).toBe(llmProfileId);
     });
   });
 

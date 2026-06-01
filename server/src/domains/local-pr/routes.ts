@@ -142,8 +142,8 @@ export function createLocalPRRoutes(
       if (pr.status === 'review_failed') {
         localPRService.getRepo().update(pr.id, { status: 'open' });
       }
-      const { providerId } = req.body;
-      await localPRService.startReview(pr.id, providerId || undefined);
+      const { llmProfileId } = req.body;
+      await localPRService.startReview(pr.id, llmProfileId || undefined);
       res.json({ success: true, data: localPRService.getRepo().findById(pr.id) } as ApiResponse<LocalPR>);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to start review';
@@ -303,17 +303,17 @@ export function createLocalPRRoutes(
   router.patch('/projects/:projectId/review-provider', (req: Request, res: Response) => {
     try {
       const { projectId } = req.params;
-      const { providerId } = req.body;
+      const { llmProfileId } = req.body;
 
-      if (!providerId) {
+      if (!llmProfileId) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'providerId is required' },
+          error: { code: 'VALIDATION_ERROR', message: 'llmProfileId is required' },
         });
         return;
       }
 
-      const updated = projectRepo.update(projectId, { reviewProviderId: providerId });
+      const updated = projectRepo.update(projectId, { reviewLlmProfileId: llmProfileId });
       onProjectChanged?.();
       res.json({ success: true, data: updated });
     } catch (error) {

@@ -17,7 +17,7 @@ export class SessionRepository extends BaseRepository<
       id: row.id,
       projectId: row.project_id,
       name: row.name || undefined,
-      providerId: row.provider_id || undefined,
+      llmProfileId: row.llm_profile_id || undefined,
       sdkSessionId: row.sdk_session_id || undefined,
       type: row.type || 'regular',
       parentSessionId: row.parent_session_id || undefined,
@@ -41,7 +41,7 @@ export class SessionRepository extends BaseRepository<
     return {
       sql: `
         INSERT INTO sessions (
-          id, project_id, name, provider_id, sdk_session_id, type,
+          id, project_id, name, llm_profile_id, sdk_session_id, type,
           parent_session_id, working_directory, sort_order,
           project_role, task_id, plan_status, is_read_only, last_run_status,
           created_at, updated_at
@@ -52,7 +52,7 @@ export class SessionRepository extends BaseRepository<
         id,
         data.projectId,
         data.name || null,
-        data.providerId || null,
+        data.llmProfileId || null,
         data.sdkSessionId || null,
         data.type || 'regular',
         data.parentSessionId || null,
@@ -81,9 +81,9 @@ export class SessionRepository extends BaseRepository<
       updates.push('name = ?');
       params.push(data.name);
     }
-    if (data.providerId !== undefined) {
-      updates.push('provider_id = ?');
-      params.push(data.providerId);
+    if (data.llmProfileId !== undefined) {
+      updates.push('llm_profile_id = ?');
+      params.push(data.llmProfileId);
     }
     if (data.sdkSessionId !== undefined) {
       updates.push('sdk_session_id = ?');

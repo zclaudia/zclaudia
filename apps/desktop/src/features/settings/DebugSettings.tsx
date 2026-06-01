@@ -4,7 +4,7 @@ import * as api from '../../services/api';
 import { exportLogs, getLogCount, clearLogs } from '../../services/logger';
 import { isTauri } from '../../utils/platform';
 import type { CrashReportEntry, ManagedProcessRecord, PermissionLogEntry, SimulateAIReviewResponse } from '../../services/api/debug';
-import type { ClientMessage, ProviderConfig } from '@zclaudia/shared';
+import type { ClientMessage, LlmProfileConfig } from '@zclaudia/shared';
 import { Select } from '../../components/ui/Select';
 
 interface DebugSettingsProps {
@@ -42,7 +42,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
   const [simRunning, setSimRunning] = useState(false);
   const [simResult, setSimResult] = useState<SimulateAIReviewResponse | null>(null);
   const [simError, setSimError] = useState<string | null>(null);
-  const [simProviders, setSimProviders] = useState<ProviderConfig[]>([]);
+  const [simProviders, setSimProviders] = useState<LlmProfileConfig[]>([]);
 
   const cleanupResult = useProcessMonitorStore((state) => state.lastCleanupResult);
   const clearCleanupResult = useProcessMonitorStore((state) => state.clearCleanupResult);
@@ -165,7 +165,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
         toolInput: simToolName === 'Bash' ? { command: simDetail } : { content: simDetail },
         detail: simDetail,
         cwd: simCwd,
-        providerId: simProviderId || undefined,
+        llmProfileId: simProviderId || undefined,
         confidenceThreshold: simThreshold,
         mode: simMode,
       });
@@ -586,7 +586,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
                 options={
                   simProviders.length === 0
                     ? [{ value: '', label: 'No providers' }]
-                    : simProviders.map((p) => ({ value: p.id, label: `${p.name} (${p.type})` }))
+                    : simProviders.map((p) => ({ value: p.id, label: `${p.name} (${p.providerType})` }))
                 }
               />
 

@@ -108,11 +108,13 @@ vi.mock('../../../../utils/provider-cwd.js', () => ({
 function createDb(): Database.Database {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE providers (
+    CREATE TABLE llm_profiles (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      cli_path TEXT,
+      provider_type TEXT NOT NULL DEFAULT 'anthropic',
+      base_url TEXT,
+      api_key TEXT,
+      compat TEXT,
       env TEXT,
       is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -121,7 +123,7 @@ function createDb(): Database.Database {
 
     CREATE TABLE projects (
       id TEXT PRIMARY KEY,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT
     );
@@ -138,7 +140,7 @@ function createDb(): Database.Database {
       project_role TEXT,
       plan_status TEXT,
       task_id TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       system_prompt TEXT,
       is_read_only INTEGER,
       last_run_status TEXT,
@@ -173,12 +175,12 @@ function createDb(): Database.Database {
 
   const now = Date.now();
   db.prepare(`
-    INSERT INTO providers (id, name, type, created_at, updated_at)
-    VALUES ('provider-1', 'Claude', 'claude', ?, ?)
+    INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at)
+    VALUES ('provider-1', 'Anthropic', 'anthropic', ?, ?)
   `).run(now, now);
 
   db.prepare(`
-    INSERT INTO projects (id, provider_id, root_path, system_prompt)
+    INSERT INTO projects (id, llm_profile_id, root_path, system_prompt)
     VALUES ('project-1', 'provider-1', '/tmp', 'project system prompt')
   `).run();
 
@@ -193,7 +195,7 @@ function insertSession(db: Database.Database, values: {
   db.prepare(`
     INSERT INTO sessions (
       id, project_id, name, sdk_session_id, type, parent_session_id, working_directory, project_role,
-      plan_status, task_id, provider_id, system_prompt, is_read_only, last_run_status, created_at, updated_at, archived_at
+      plan_status, task_id, llm_profile_id, system_prompt, is_read_only, last_run_status, created_at, updated_at, archived_at
     )
     VALUES (?, 'project-1', 'Test Session', NULL, ?, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, ?, ?, NULL)
   `).run(values.id, values.type, Date.now(), Date.now());

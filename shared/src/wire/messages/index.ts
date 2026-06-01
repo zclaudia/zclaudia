@@ -34,7 +34,7 @@ import type {
   AddServerMessage, UpdateServerMessage, DeleteServerMessage,
   AddSessionMessage, UpdateSessionMessage, DeleteSessionMessage,
   AddProjectMessage, UpdateProjectMessage, DeleteProjectMessage,
-  GetProvidersMessage, AddProviderMessage, UpdateProviderMessage, DeleteProviderMessage,
+  GetLlmProfilesMessage, AddLlmProfileMessage, UpdateLlmProfileMessage, DeleteLlmProfileMessage,
   GetSessionMessagesMessage, GetProviderCommandsMessage,
 } from './crud.js';
 import type {
@@ -89,10 +89,10 @@ export type ClientMessage =
   | AddProjectMessage
   | UpdateProjectMessage
   | DeleteProjectMessage
-  | GetProvidersMessage
-  | AddProviderMessage
-  | UpdateProviderMessage
-  | DeleteProviderMessage
+  | GetLlmProfilesMessage
+  | AddLlmProfileMessage
+  | UpdateLlmProfileMessage
+  | DeleteLlmProfileMessage
   | GetSessionMessagesMessage
   | GetProviderCommandsMessage
   | TerminalOpenMessage
@@ -154,12 +154,12 @@ import type {
 import type {
   ProjectsListMessage, SessionsListMessage, ServersListMessage,
   ServerOperationResultMessage, SessionOperationResultMessage, ProjectOperationResultMessage,
-  ProvidersListMessage, ProviderOperationResultMessage,
+  LlmProfilesListMessage, LlmProfileOperationResultMessage,
   SessionMessagesMessage, ProviderCommandsMessage,
   ServersCreatedMessage, ServersUpdatedMessage, ServersDeletedMessage,
   SessionsCreatedMessage, SessionsUpdatedMessage, SessionsDeletedMessage,
   ProjectsCreatedMessage, ProjectsUpdatedMessage, ProjectsDeletedMessage,
-  ProvidersCreatedMessage, ProvidersUpdatedMessage, ProvidersDeletedMessage,
+  LlmProfilesCreatedMessage, LlmProfilesUpdatedMessage, LlmProfilesDeletedMessage,
 } from './crud.js';
 import type {
   TerminalOpenedMessage, TerminalOutputMessage, TerminalExitedMessage, TerminalAttachedMessage,
@@ -233,8 +233,8 @@ export type ServerMessage =
   | ServerOperationResultMessage
   | SessionOperationResultMessage
   | ProjectOperationResultMessage
-  | ProvidersListMessage
-  | ProviderOperationResultMessage
+  | LlmProfilesListMessage
+  | LlmProfileOperationResultMessage
   | SessionMessagesMessage
   | ProviderCommandsMessage
   | ServersCreatedMessage
@@ -246,9 +246,9 @@ export type ServerMessage =
   | ProjectsCreatedMessage
   | ProjectsUpdatedMessage
   | ProjectsDeletedMessage
-  | ProvidersCreatedMessage
-  | ProvidersUpdatedMessage
-  | ProvidersDeletedMessage
+  | LlmProfilesCreatedMessage
+  | LlmProfilesUpdatedMessage
+  | LlmProfilesDeletedMessage
   // Supervision v2
   | SupervisionTaskUpdateMessage
   | SupervisionAgentUpdateMessage

@@ -68,7 +68,7 @@ export interface CreateRunInput {
   projectId: string;
   title: string;
   description?: string;
-  defaultProviderId?: string;
+  defaultLlmProfileId?: string;
 }
 
 export class MetaWorkflowService {

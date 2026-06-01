@@ -38,7 +38,7 @@ export class SupervisorAgentManager {
   initAgent(
     projectId: string,
     config?: Partial<SupervisorConfig>,
-    providerId?: string,
+    llmProfileId?: string,
     mode?: AgentMode,
   ): ProjectAgent {
     const project = this.deps.projectRepo.findById(projectId);
@@ -56,7 +56,7 @@ export class SupervisorAgentManager {
       name: sessionName,
       type: 'regular',
       projectRole: 'main',
-      providerId: providerId ?? project.providerId,
+      llmProfileId: llmProfileId ?? project.llmProfileId,
       workingDirectory: project.rootPath,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
     this.deps.broadcastSessionCreated(mainSession);

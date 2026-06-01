@@ -10,7 +10,7 @@ interface AgentConfigState {
   loadConfig: () => Promise<void>;
   updateConfig: (updates: {
     enabled?: boolean;
-    providerId?: string | null;
+    llmProfileId?: string | null;
     permissionWorkflowOverrideId?: string | null;
     permissionPolicy?: string | null;
   }) => Promise<boolean>;

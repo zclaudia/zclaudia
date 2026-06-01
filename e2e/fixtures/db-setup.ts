@@ -25,7 +25,7 @@ export async function setupCleanDB(): Promise<void> {
       'sessions',
       'session_messages',
       'projects',
-      'providers',
+      'llm_profiles',
       'servers',
       'settings',
       'permissions',
@@ -75,7 +75,7 @@ export async function seedTestData(): Promise<void> {
 
     // Insert test providers
     db.exec(`
-      INSERT INTO providers (id, name, type, is_default, created_at, updated_at)
+      INSERT INTO llm_profiles (id, name, type, is_default, created_at, updated_at)
       VALUES
         ('test-provider-1', 'Claude', 'claude', 1, datetime('now'), datetime('now')),
         ('test-provider-2', 'OpenAI', 'openai', 0, datetime('now'), datetime('now'));
@@ -123,7 +123,7 @@ export async function createFreshDB(): Promise<void> {
       );
 
       -- Providers table
-      CREATE TABLE IF NOT EXISTS providers (
+      CREATE TABLE IF NOT EXISTS llm_profiles (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         type TEXT NOT NULL,
@@ -146,13 +146,13 @@ export async function createFreshDB(): Promise<void> {
       CREATE TABLE IF NOT EXISTS sessions (
         id TEXT PRIMARY KEY,
         project_id TEXT,
-        provider_id TEXT,
+        llm_profile_id TEXT,
         server_id TEXT,
         name TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (project_id) REFERENCES projects(id),
-        FOREIGN KEY (provider_id) REFERENCES providers(id),
+        FOREIGN KEY (llm_profile_id) REFERENCES llm_profiles(id),
         FOREIGN KEY (server_id) REFERENCES servers(id)
       );
 
@@ -202,7 +202,7 @@ export async function createFreshDB(): Promise<void> {
 
       -- Create indexes
       CREATE INDEX IF NOT EXISTS idx_sessions_project ON sessions(project_id);
-      CREATE INDEX IF NOT EXISTS idx_sessions_provider ON sessions(provider_id);
+      CREATE INDEX IF NOT EXISTS idx_sessions_llm_profile ON sessions(llm_profile_id);
       CREATE INDEX IF NOT EXISTS idx_messages_session ON session_messages(session_id);
     `);
 

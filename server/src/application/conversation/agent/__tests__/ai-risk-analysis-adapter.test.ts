@@ -35,7 +35,7 @@ describe('AIRiskAnalysisAdapter', () => {
       config: {
         confidenceThreshold: 0.8,
         maxAutoApprovalsPerMinute: 10,
-        analysisProviderId: 'prov-id',
+        analysisLlmProfileId: 'prov-id',
       },
     });
 
@@ -46,7 +46,7 @@ describe('AIRiskAnalysisAdapter', () => {
     });
     expect(mockEvaluateAIReview).toHaveBeenCalledWith(
       expect.objectContaining({
-        analysisProviderId: 'prov-id',
+        analysisLlmProfileId: 'prov-id',
         confidenceThreshold: 0.8,
         maxAutoApprovalsPerMinute: 10,
       }),

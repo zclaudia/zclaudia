@@ -109,7 +109,7 @@ export async function handleStopBackgroundTask(
     const providerRow = db.prepare(`
       SELECT pr.type FROM sessions s
       LEFT JOIN projects p ON s.project_id = p.id
-      LEFT JOIN providers pr ON pr.id = COALESCE(s.provider_id, p.provider_id)
+      LEFT JOIN providers pr ON pr.id = COALESCE(s.llm_profile_id, p.llm_profile_id)
       WHERE s.id = ? AND pr.type IS NOT NULL
     `).get(targetSessionId) as { type: string } | undefined;
     resolvedProviderType = providerRow?.type;

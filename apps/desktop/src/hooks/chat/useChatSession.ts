@@ -105,7 +105,7 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
   );
 
   // ── Provider capabilities ──
-  const { providerId, capabilities, commands, commandsCacheKey } = useProviderCapabilities({ sessionId, isConnected });
+  const { llmProfileId, capabilities, commands, commandsCacheKey } = useProviderCapabilities({ sessionId, isConnected });
 
   return {
     // Messages & run state
@@ -133,7 +133,7 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     fileReferenceBackendId,
 
     // Provider
-    providerId,
+    llmProfileId,
     capabilities,
     commands,
     commandsCacheKey,

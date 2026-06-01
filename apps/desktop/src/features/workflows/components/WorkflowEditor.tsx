@@ -54,7 +54,7 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
   const projects = useProjectStore(s => s.projects);
   const project = projects.find(p => p.id === projectId);
   // Fall back to any project with a configured provider (e.g. global workflows have no projectId)
-  const providerId = project?.providerId ?? projects.find(p => p.providerId)?.providerId ?? '';
+  const llmProfileId = project?.llmProfileId ?? projects.find(p => p.llmProfileId)?.llmProfileId ?? '';
 
   useEffect(() => {
     loadStepTypes();
@@ -386,7 +386,7 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
             ) : (
               <NLWorkflowGenerator
                 projectId={projectId}
-                providerId={providerId}
+                llmProfileId={llmProfileId}
                 onGenerated={handleAIGenerated}
               />
             )}

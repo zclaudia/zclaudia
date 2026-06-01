@@ -18,7 +18,7 @@ export interface StepContext {
   readonly stepRunId: string;
   readonly projectId?: string;
   readonly projectRootPath?: string;
-  readonly providerId?: string;
+  readonly llmProfileId?: string;
   readonly results: ReadonlyMap<string, StepResult>;
   readonly eventPayload?: Record<string, unknown>;
   readonly triggerContext?: Record<string, unknown>;
@@ -42,7 +42,7 @@ export interface ApprovalPort {
 export interface AIRunnerPort {
   runPrompt(opts: {
     projectId?: string;
-    providerId: string;
+    llmProfileId: string;
     prompt: string;
     workingDirectory?: string;
     sessionName?: string;
@@ -92,7 +92,7 @@ export interface AIRiskAnalysisPort {
     config: {
       confidenceThreshold: number;
       maxAutoApprovalsPerMinute: number;
-      analysisProviderId?: string;
+      analysisLlmProfileId?: string;
     };
   }): Promise<{
     decision: 'approve' | 'deny' | 'uncertain';

@@ -7,7 +7,7 @@ import { createLocalPRRoutes } from '../../../domains/local-pr/index.js';
 vi.mock('../../../domains/projects/index.js', () => {
   return {
     ProjectRepository: class MockProjectRepo {
-      update = vi.fn().mockReturnValue({ id: 'proj-1', reviewProviderId: 'provider-1' });
+      update = vi.fn().mockReturnValue({ id: 'proj-1', reviewLlmProfileId: 'provider-1' });
     },
   };
 });
@@ -169,7 +169,7 @@ describe('local-prs routes', () => {
     it('starts a review', async () => {
       const res = await request(app)
         .post('/api/local-prs/pr-1/review')
-        .send({ providerId: 'p1' });
+        .send({ llmProfileId: 'p1' });
       expect(res.status).toBe(200);
       expect(service.startReview).toHaveBeenCalledWith('pr-1', 'p1');
     });
@@ -303,12 +303,12 @@ describe('local-prs routes', () => {
     it('sets review provider', async () => {
       const res = await request(app)
         .patch('/api/projects/proj-1/review-provider')
-        .send({ providerId: 'provider-1' });
+        .send({ llmProfileId: 'provider-1' });
       expect(res.status).toBe(200);
       expect(onProjectChanged).toHaveBeenCalledTimes(1);
     });
 
-    it('returns 400 without providerId', async () => {
+    it('returns 400 without llmProfileId', async () => {
       const res = await request(app)
         .patch('/api/projects/proj-1/review-provider')
         .send({});

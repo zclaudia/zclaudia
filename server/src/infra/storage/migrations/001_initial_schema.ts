@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS agent_config (
           permission_policy TEXT,
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
-        , provider_id TEXT, permission_workflow_override_id TEXT REFERENCES workflows(id) ON DELETE SET NULL);
+        , llm_profile_id TEXT, permission_workflow_override_id TEXT REFERENCES workflows(id) ON DELETE SET NULL);
 
 CREATE TABLE IF NOT EXISTS agent_memory (
           id TEXT PRIMARY KEY,
@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS agent_triggers (
           event_pattern TEXT,
           event_filter TEXT,
           prompt_template TEXT NOT NULL,
-          provider_id TEXT,
+          llm_profile_id TEXT,
           project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
           context_template TEXT DEFAULT 'agent',
           feed_delivery INTEGER NOT NULL DEFAULT 1,
@@ -400,8 +400,8 @@ CREATE TABLE IF NOT EXISTS meta_workflow_phases (
       outputs_snapshot TEXT,
       gates_snapshot TEXT,
       execute_config_snapshot TEXT,
-      synthesizer_provider_id TEXT,
-      runtime_provider_id TEXT,
+      synthesizer_llm_profile_id TEXT,
+      runtime_llm_profile_id TEXT,
       created_at INTEGER NOT NULL,
       started_at INTEGER,
       completed_at INTEGER,
@@ -432,7 +432,7 @@ CREATE TABLE IF NOT EXISTS meta_workflow_runs (
       phases_json TEXT,
       smoke_path_run_id TEXT,
       reject_count INTEGER NOT NULL DEFAULT 0,
-      default_provider_id TEXT,
+      default_llm_profile_id TEXT,
       config TEXT,
       worktree_id TEXT,
       created_at INTEGER NOT NULL,
@@ -481,7 +481,7 @@ CREATE TABLE IF NOT EXISTS orchestrator_tasks (
           schedule_type TEXT,
           schedule_config TEXT,
           depends_on TEXT,
-          provider_id TEXT,
+          llm_profile_id TEXT,
           retry_count INTEGER NOT NULL DEFAULT 0,
           max_retries INTEGER NOT NULL DEFAULT 0,
           result_summary TEXT,
@@ -560,20 +560,22 @@ CREATE TABLE IF NOT EXISTS projects (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
           type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-          provider_id TEXT,
+          llm_profile_id TEXT,
           root_path TEXT,
           system_prompt TEXT,
           permission_policy TEXT,
           created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL, agent_permission_override TEXT, is_internal INTEGER NOT NULL DEFAULT 0, agent TEXT, context_sync_status TEXT NOT NULL DEFAULT 'synced', review_provider_id TEXT REFERENCES providers(id) ON DELETE SET NULL, sort_order INTEGER NOT NULL DEFAULT 0, permission_workflow_override_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
-          FOREIGN KEY (provider_id) REFERENCES providers(id) ON DELETE SET NULL
+          updated_at INTEGER NOT NULL, agent_permission_override TEXT, is_internal INTEGER NOT NULL DEFAULT 0, agent TEXT, context_sync_status TEXT NOT NULL DEFAULT 'synced', review_llm_profile_id TEXT REFERENCES llm_profiles(id) ON DELETE SET NULL, sort_order INTEGER NOT NULL DEFAULT 0, permission_workflow_override_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
+          FOREIGN KEY (llm_profile_id) REFERENCES llm_profiles(id) ON DELETE SET NULL
         );
 
-CREATE TABLE IF NOT EXISTS providers (
+CREATE TABLE IF NOT EXISTS llm_profiles (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
-          type TEXT NOT NULL DEFAULT 'zclaudia',
-          cli_path TEXT,
+          provider_type TEXT NOT NULL DEFAULT 'anthropic',
+          base_url TEXT,
+          api_key TEXT,
+          compat TEXT,
           env TEXT,
           is_default INTEGER DEFAULT 0,
           created_at INTEGER NOT NULL,
@@ -648,7 +650,7 @@ CREATE TABLE IF NOT EXISTS sessions (
           id TEXT PRIMARY KEY,
           project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
           name TEXT,
-          provider_id TEXT,
+          llm_profile_id TEXT,
           sdk_session_id TEXT,
           type TEXT CHECK(type IN ('regular', 'background', 'agent')) DEFAULT 'regular',
           parent_session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL,

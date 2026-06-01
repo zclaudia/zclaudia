@@ -16,12 +16,12 @@ import { apiCall, apiCallVoid } from './unwrap';
 export async function initSupervisionAgent(
   projectId: string,
   config?: Partial<SupervisorConfig>,
-  providerId?: string,
+  llmProfileId?: string,
   mode?: AgentMode,
 ): Promise<ProjectAgent> {
   return apiCall<ProjectAgent>(`/api/projects/${projectId}/agent/init`, {
     method: 'POST',
-    body: JSON.stringify({ config, providerId, mode }),
+    body: JSON.stringify({ config, llmProfileId, mode }),
   });
 }
 

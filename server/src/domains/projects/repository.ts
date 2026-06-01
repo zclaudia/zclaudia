@@ -17,13 +17,13 @@ export class ProjectRepository extends BaseRepository<
       id: row.id,
       name: row.name,
       type: row.type,
-      providerId: row.provider_id || undefined,
+      llmProfileId: row.llm_profile_id || undefined,
       rootPath: row.root_path || undefined,
       systemPrompt: row.system_prompt || undefined,
       permissionPolicy: row.permission_policy ? JSON.parse(row.permission_policy) : undefined,
       agentPermissionOverride: row.agent_permission_override ? JSON.parse(row.agent_permission_override) : undefined,
       isInternal: row.is_internal === 1,
-      reviewProviderId: row.review_provider_id || undefined,
+      reviewLlmProfileId: row.review_llm_profile_id || undefined,
       permissionWorkflowOverrideId: row.permission_workflow_override_id || undefined,
       sortOrder: row.sort_order ?? undefined,
       createdAt: row.created_at,
@@ -40,9 +40,9 @@ export class ProjectRepository extends BaseRepository<
     return {
       sql: `
         INSERT INTO projects (
-          id, name, type, provider_id, root_path, system_prompt,
+          id, name, type, llm_profile_id, root_path, system_prompt,
           permission_policy, agent_permission_override, agent, context_sync_status,
-          review_provider_id, permission_workflow_override_id, sort_order, created_at, updated_at
+          review_llm_profile_id, permission_workflow_override_id, sort_order, created_at, updated_at
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
@@ -50,14 +50,14 @@ export class ProjectRepository extends BaseRepository<
         id,
         data.name,
         data.type || 'code',
-        data.providerId || null,
+        data.llmProfileId || null,
         data.rootPath || null,
         data.systemPrompt || null,
         data.permissionPolicy ? JSON.stringify(data.permissionPolicy) : null,
         data.agentPermissionOverride ? JSON.stringify(data.agentPermissionOverride) : null,
         data.agent ? JSON.stringify(data.agent) : null,
         data.contextSyncStatus || 'synced',
-        data.reviewProviderId || null,
+        data.reviewLlmProfileId || null,
         data.permissionWorkflowOverrideId || null,
         data.sortOrder ?? null,
         now,
@@ -78,9 +78,9 @@ export class ProjectRepository extends BaseRepository<
       updates.push('type = ?');
       params.push(data.type);
     }
-    if (data.providerId !== undefined) {
-      updates.push('provider_id = ?');
-      params.push(data.providerId);
+    if (data.llmProfileId !== undefined) {
+      updates.push('llm_profile_id = ?');
+      params.push(data.llmProfileId);
     }
     if (data.rootPath !== undefined) {
       updates.push('root_path = ?');
@@ -106,9 +106,9 @@ export class ProjectRepository extends BaseRepository<
       updates.push('context_sync_status = ?');
       params.push(data.contextSyncStatus || 'synced');
     }
-    if (data.reviewProviderId !== undefined) {
-      updates.push('review_provider_id = ?');
-      params.push(data.reviewProviderId || null);
+    if (data.reviewLlmProfileId !== undefined) {
+      updates.push('review_llm_profile_id = ?');
+      params.push(data.reviewLlmProfileId || null);
     }
     if (data.permissionWorkflowOverrideId !== undefined) {
       updates.push('permission_workflow_override_id = ?');

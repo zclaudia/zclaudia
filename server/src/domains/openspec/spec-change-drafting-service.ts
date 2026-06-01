@@ -15,8 +15,8 @@ export interface SpecChangeDraftingServiceDeps {
   getProjectRoot: (projectId: string) => string;
   /** Total time to wait for AI completion before resolving with partial output. Default 120s. */
   timeoutMs?: number;
-  /** Optional providerId override passed straight to aiRunPort. */
-  providerId?: string;
+  /** Optional llmProfileId override passed straight to aiRunPort. */
+  llmProfileId?: string;
 }
 
 export interface DraftResult {
@@ -139,7 +139,7 @@ export class SpecChangeDraftingService {
         .startVirtualRun({
           input: prompt,
           workingDirectory,
-          providerId: this.deps.providerId,
+          llmProfileId: this.deps.llmProfileId,
           onMessage: (m) => {
             if (m.content) collected += m.content;
             if (

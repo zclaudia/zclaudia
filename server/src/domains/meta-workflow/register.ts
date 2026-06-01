@@ -19,7 +19,7 @@ export interface RegisterMetaWorkflowOptions {
   aiRunPort: AiRunPort;
   worktreeAllocator: WorktreeAllocator;
   defaultProjectId: string;
-  defaultProviderId?: string;
+  defaultLlmProfileId?: string;
 }
 
 export interface RegisteredMetaWorkflow {
@@ -35,7 +35,7 @@ export function registerMetaWorkflow(opts: RegisterMetaWorkflowOptions): Registe
   });
   const runVirtualClient = createRunVirtualClientFromAiRunPort({
     aiRunPort: opts.aiRunPort,
-    defaultProviderId: opts.defaultProviderId,
+    defaultLlmProfileId: opts.defaultLlmProfileId,
   });
   const runEntityForSubagent = createSubagentRunEntity({
     runVirtualClient,

@@ -3,7 +3,7 @@
  * completion/failure, background tasks, agent assistant, and process cleanup.
  */
 
-import type { PermissionMode } from '../../core/provider.js';
+import type { PermissionMode } from '../../core/runtime-capabilities.js';
 import type { SessionType } from '../../core/session.js';
 import type { ToolEffect, UsageInfo } from '../../core/message.js';
 import type { UnifiedPermissionPolicy } from '../../interaction/permissions.js';
@@ -13,7 +13,7 @@ export interface RunStartMessage {
   clientRequestId: string;
   sessionId: string;
   input: string;
-  providerId?: string;
+  llmProfileId?: string;
   permissionMode?: PermissionMode;  // Kept for backwards compat
   mode?: string;  // Generic mode/agent ID (new unified field)
   model?: string;  // Optional: override model (e.g. 'zclaudia-1')
@@ -153,7 +153,7 @@ export interface AgentStartMessage {
   clientRequestId: string;
   sessionId: string;
   input: string;
-  providerId?: string;
+  llmProfileId?: string;
   model?: string;
   tools?: string[];
 }

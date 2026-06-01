@@ -107,7 +107,7 @@ export function useSidebarActions({
       const session = await api.createSession({
         projectId,
         name: newSessionName.trim() || undefined,
-        providerId: newSessionProviderId || undefined,
+        llmProfileId: newSessionProviderId || undefined,
       });
       addSession(session);
       setNewSessionName('');

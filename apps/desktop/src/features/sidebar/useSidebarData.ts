@@ -140,14 +140,14 @@ export function useSidebarData() {
   }, [sessionsByProject]);
 
   const getProviderName = useCallback((session: typeof sessions[0]) => {
-    const pid = session.providerId
-      || projects.find(p => p.id === session.projectId)?.providerId;
+    const pid = session.llmProfileId
+      || projects.find(p => p.id === session.projectId)?.llmProfileId;
     if (pid) {
       const provider = providers.find(p => p.id === pid);
-      return provider?.name || provider?.type || pid;
+      return provider?.name || provider?.providerType || pid;
     }
     const defaultProvider = providers.find(p => p.isDefault);
-    return defaultProvider?.name || defaultProvider?.type || undefined;
+    return defaultProvider?.name || defaultProvider?.providerType || undefined;
   }, [providers, projects]);
 
   const getWorktreeBranch = useCallback((session: typeof sessions[0], project: typeof projects[0] | undefined) => {

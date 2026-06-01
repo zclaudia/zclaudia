@@ -85,7 +85,7 @@ describe('localPRStore', () => {
     expect(retryLocalPRReview).toHaveBeenCalledWith('pr-1');
   });
 
-  it('reviewPR calls API with optional providerId', async () => {
+  it('reviewPR calls API with optional llmProfileId', async () => {
     const pr = mockPR('pr-1', 'reviewing');
     vi.mocked(reviewLocalPR).mockResolvedValue(pr as any);
 

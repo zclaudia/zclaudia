@@ -6,7 +6,7 @@ export interface Session {
   id: string;
   projectId: string;
   name?: string;
-  providerId?: string;
+  llmProfileId?: string;
   sdkSessionId?: string | null;
   type: SessionType;                // 'regular' = user-facing, 'background' = autonomous task
   parentSessionId?: string;          // Which session spawned this one (for background sessions)

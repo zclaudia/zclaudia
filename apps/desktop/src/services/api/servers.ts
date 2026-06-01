@@ -74,7 +74,7 @@ export interface AgentConfig {
   enabled: boolean;
   projectId: string | null;
   sessionId: string | null;
-  providerId: string | null;
+  llmProfileId: string | null;
   permissionWorkflowOverrideId: string | null;
   permissionPolicy: string | null;
 }
@@ -90,7 +90,7 @@ export async function getAgentConfig(): Promise<AgentConfig> {
 
 export async function updateAgentConfig(config: {
   enabled?: boolean;
-  providerId?: string | null;
+  llmProfileId?: string | null;
   permissionWorkflowOverrideId?: string | null;
   permissionPolicy?: string | null;
 }): Promise<AgentConfig> {

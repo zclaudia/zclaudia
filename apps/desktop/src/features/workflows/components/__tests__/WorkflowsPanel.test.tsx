@@ -180,7 +180,7 @@ describe('WorkflowsPanel', () => {
         enabled: true,
         projectId: null,
         sessionId: null,
-        providerId: null,
+        llmProfileId: null,
         permissionWorkflowOverrideId: 'wf-1',
         permissionPolicy: null,
       },

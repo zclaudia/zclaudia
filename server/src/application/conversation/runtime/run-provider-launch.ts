@@ -7,7 +7,7 @@ import { PERIODIC_SAVE_INTERVAL_MS, type ActiveRun, type ConnectedClient } from 
 import { sendMessage } from '../transport/broadcast.js';
 import type { RunStartMessage, RunSessionRecord } from './run-bootstrap.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
-import type { ProviderConfig } from '@zclaudia/shared/core/provider';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 
 interface LaunchProviderRunInput {
@@ -22,8 +22,8 @@ interface LaunchProviderRunInput {
   modeValue: string;
   permissionCallback: (request: import('@zclaudia/shared/interaction/permissions').PermissionRequest) => Promise<PermissionDecision>;
   processedInput: string;
-  providerConfig?: ProviderConfig;
-  providerId: string | null;
+  providerConfig?: LlmProfileConfig;
+  llmProfileId: string | null;
   providerType: string;
   runId: string;
   sdkSessionId?: string;
@@ -51,7 +51,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     permissionCallback,
     processedInput,
     providerConfig,
-    providerId,
+    llmProfileId,
     providerType,
     runId,
     sdkSessionId,
@@ -95,8 +95,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     runId,
     sessionId: message.sessionId,
     input: message.input,
-    providerId,
-    providerType: providerConfig?.type,
+    llmProfileId,
+    providerType: providerConfig?.providerType,
   }).catch((err: unknown) => {
     console.warn('[PluginEvents] Event emission failed:', err instanceof Error ? err.message : err);
   });
@@ -124,7 +124,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     sessionType,
   });
 
-  console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${providerType} mode=${modeValue} model=${message.model || 'default'} cwd=${cwd} cliPath=${providerConfig?.cliPath || 'default'}`);
+  console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${providerType} mode=${modeValue} model=${message.model || 'default'} cwd=${cwd} baseUrl=${providerConfig?.baseUrl || 'default'}`);
   trace.setMeta({ provider: providerType, cwd });
   trace.log('server_norm', 'provider_runner_created', {
     providerType,

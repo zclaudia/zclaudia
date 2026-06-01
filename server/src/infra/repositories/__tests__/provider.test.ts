@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ProviderRepository } from '../../../domains/providers/index.js';
-import type { Database } from 'better-sqlite3';
+import { LlmProfileRepository } from '../../../domains/llm-profiles/index.js';
 
-describe('ProviderRepository', () => {
+describe('LlmProfileRepository', () => {
   let mockDb: any;
-  let repository: ProviderRepository;
+  let repository: LlmProfileRepository;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -17,17 +16,19 @@ describe('ProviderRepository', () => {
       })
     };
 
-    repository = new ProviderRepository(mockDb);
+    repository = new LlmProfileRepository(mockDb);
   });
 
   describe('mapRow', () => {
-    it('maps database row to ProviderConfig entity with all fields', () => {
+    it('maps database row to LlmProfileConfig entity with all fields', () => {
       const row = {
         id: 'prov-123',
         name: 'Test Provider',
-        type: 'zclaudia',
-        cli_path: '/usr/bin/pi-agent',
-        env: '{"ZCLAUDIA_API_KEY":"test-key"}',
+        provider_type: 'anthropic',
+        base_url: null,
+        api_key: null,
+        compat: null,
+        env: '{"ANTHROPIC_API_KEY":"test-key"}',
         is_default: 1,
         created_at: 1000,
         updated_at: 2000
@@ -38,9 +39,11 @@ describe('ProviderRepository', () => {
       expect(result).toEqual({
         id: 'prov-123',
         name: 'Test Provider',
-        type: 'zclaudia',
-        cliPath: '/usr/bin/pi-agent',
-        env: { ZCLAUDIA_API_KEY: "test-key" },
+        providerType: 'anthropic',
+        baseUrl: undefined,
+        apiKey: undefined,
+        compat: undefined,
+        env: { ANTHROPIC_API_KEY: 'test-key' },
         isDefault: true,
         createdAt: 1000,
         updatedAt: 2000
@@ -51,8 +54,10 @@ describe('ProviderRepository', () => {
       const row = {
         id: 'prov-123',
         name: 'Test Provider',
-        type: 'zclaudia',
-        cli_path: null,
+        provider_type: 'anthropic',
+        base_url: null,
+        api_key: null,
+        compat: null,
         env: null,
         is_default: 0,
         created_at: 1000,
@@ -61,7 +66,9 @@ describe('ProviderRepository', () => {
 
       const result = repository.mapRow(row);
 
-      expect(result.cliPath).toBeUndefined();
+      expect(result.baseUrl).toBeUndefined();
+      expect(result.apiKey).toBeUndefined();
+      expect(result.compat).toBeUndefined();
       expect(result.env).toBeUndefined();
       expect(result.isDefault).toBe(false);
     });
@@ -70,7 +77,10 @@ describe('ProviderRepository', () => {
       const row = {
         id: 'prov-123',
         name: 'Provider',
-        type: 'zclaudia',
+        provider_type: 'anthropic',
+        base_url: null,
+        api_key: null,
+        compat: null,
         env: '{"KEY1":"value1","KEY2":"value2"}',
         is_default: 0,
         created_at: 1000,
@@ -90,30 +100,30 @@ describe('ProviderRepository', () => {
     it('generates INSERT query with all fields', () => {
       const data = {
         name: 'New Provider',
-        type: 'zclaudia',
-        cliPath: '/path/to/cli',
+        providerType: 'anthropic',
         env: { API_KEY: 'test' },
         isDefault: true
       };
 
       const { sql, params } = repository.createQuery(data);
 
-      expect(sql).toContain('INSERT INTO providers');
+      expect(sql).toContain('INSERT INTO llm_profiles');
       expect(params[1]).toBe('New Provider');
-      expect(params[2]).toBe('zclaudia');
-      expect(params[3]).toBe('/path/to/cli');
-      expect(params[4]).toBe('{"API_KEY":"test"}');
-      expect(params[5]).toBe(1);
+      expect(params[2]).toBe('anthropic');
+      // base_url, api_key, compat are nullable and come before env
+      expect(params[6]).toBe('{"API_KEY":"test"}');
+      // is_default is the 8th param (index 7)
+      expect(params[7]).toBe(1);
     });
 
-    it('uses default type when not specified', () => {
+    it('uses default provider type when not specified', () => {
       const data = {
         name: 'Default Type'
       } as any;
 
       const { params } = repository.createQuery(data);
 
-      expect(params[2]).toBe('zclaudia');
+      expect(params[2]).toBe('anthropic');
     });
 
     it('converts isDefault to integer', () => {
@@ -123,8 +133,8 @@ describe('ProviderRepository', () => {
       const { params: paramsTrue } = repository.createQuery(dataTrue);
       const { params: paramsFalse } = repository.createQuery(dataFalse);
 
-      expect(paramsTrue[5]).toBe(1);
-      expect(paramsFalse[5]).toBe(0);
+      expect(paramsTrue[7]).toBe(1);
+      expect(paramsFalse[7]).toBe(0);
     });
 
     it('generates UUID for id', () => {
@@ -140,9 +150,9 @@ describe('ProviderRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      expect(params[6]).toBeGreaterThanOrEqual(before);
-      expect(params[6]).toBeLessThanOrEqual(after);
-      expect(params[7]).toBe(params[6]);
+      expect(params[8]).toBeGreaterThanOrEqual(before);
+      expect(params[8]).toBeLessThanOrEqual(after);
+      expect(params[9]).toBe(params[8]);
     });
   });
 
@@ -150,7 +160,7 @@ describe('ProviderRepository', () => {
     it('generates UPDATE query for single field', () => {
       const { sql, params } = repository.updateQuery('prov-123', { name: 'Updated Name' });
 
-      expect(sql).toContain('UPDATE providers SET');
+      expect(sql).toContain('UPDATE llm_profiles SET');
       expect(sql).toContain('name = ?');
       expect(sql).toContain('updated_at = ?');
       expect(params).toContain('Updated Name');
@@ -160,16 +170,13 @@ describe('ProviderRepository', () => {
     it('generates UPDATE query for multiple fields', () => {
       const { sql, params } = repository.updateQuery('prov-123', {
         name: 'New Name',
-        type: 'zclaudia',
-        cliPath: '/new/path'
+        providerType: 'openai',
       });
 
       expect(sql).toContain('name = ?');
-      expect(sql).toContain('type = ?');
-      expect(sql).toContain('cli_path = ?');
+      expect(sql).toContain('provider_type = ?');
       expect(params).toContain('New Name');
-      expect(params).toContain('zclaudia');
-      expect(params).toContain('/new/path');
+      expect(params).toContain('openai');
     });
 
     it('handles env JSON serialization', () => {
@@ -183,7 +190,7 @@ describe('ProviderRepository', () => {
 
     it('handles null env', () => {
       const { params } = repository.updateQuery('prov-123', {
-        env: null
+        env: null as any,
       });
 
       expect(params).toContain(null);
@@ -213,7 +220,10 @@ describe('ProviderRepository', () => {
       const mockRow = {
         id: 'prov-123',
         name: 'Default Provider',
-        type: 'zclaudia',
+        provider_type: 'anthropic',
+        base_url: null,
+        api_key: null,
+        compat: null,
         is_default: 1,
         created_at: 1000,
         updated_at: 2000
@@ -242,6 +252,10 @@ describe('ProviderRepository', () => {
       const mockRow = {
         id: 'prov-123',
         name: 'Test Provider',
+        provider_type: 'anthropic',
+        base_url: null,
+        api_key: null,
+        compat: null,
         is_default: 1,
         created_at: 1000,
         updated_at: 2000
@@ -253,26 +267,26 @@ describe('ProviderRepository', () => {
       const result = repository.setDefault('prov-123');
 
       expect(result.isDefault).toBe(true);
-      expect(mockDb.prepare).toHaveBeenCalledWith('UPDATE providers SET is_default = 0');
+      expect(mockDb.prepare).toHaveBeenCalledWith('UPDATE llm_profiles SET is_default = 0');
     });
 
     it('throws error if provider not found', () => {
-      mockDb.prepare().run.mockReturnValueOnce({ changes: 0 }); // First call for unset
-      mockDb.prepare().run.mockReturnValueOnce({ changes: 0 }); // Second call for set
+      mockDb.prepare().run.mockReturnValueOnce({ changes: 0 });
+      mockDb.prepare().run.mockReturnValueOnce({ changes: 0 });
 
       expect(() => {
         repository.setDefault('non-existent');
-      }).toThrow('Provider not found: non-existent');
+      }).toThrow('LlmProfile not found: non-existent');
     });
 
     it('throws error if update fails', () => {
-      mockDb.prepare().run.mockReturnValueOnce({ changes: 0 }); // Unset
-      mockDb.prepare().run.mockReturnValueOnce({ changes: 1 }); // Set
-      mockDb.prepare().get.mockReturnValue(undefined); // findById returns null
+      mockDb.prepare().run.mockReturnValueOnce({ changes: 0 });
+      mockDb.prepare().run.mockReturnValueOnce({ changes: 1 });
+      mockDb.prepare().get.mockReturnValue(undefined);
 
       expect(() => {
         repository.setDefault('prov-123');
-      }).toThrow('Failed to set default provider: prov-123');
+      }).toThrow('Failed to set default llm profile: prov-123');
     });
   });
 });

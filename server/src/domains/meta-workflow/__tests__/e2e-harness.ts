@@ -11,7 +11,7 @@ import type { AiRunPort, AiRunPortStartArgs } from '../run-entities/subagent-run
 export interface AiRecorded {
   input: string;
   workingDirectory?: string;
-  providerId?: string;
+  llmProfileId?: string;
 }
 
 export interface AiResponder {
@@ -73,7 +73,7 @@ export function buildHarness(opts: HarnessOptions = {}): Harness {
       aiCalls.push({
         input: args.input,
         workingDirectory: args.workingDirectory,
-        providerId: args.providerId,
+        llmProfileId: args.llmProfileId,
       });
       const responder = queue.shift() ?? fallback;
       for (const frag of responder.fragments) {

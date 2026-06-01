@@ -12,7 +12,8 @@ import {
   buildTaskUnlockedSessionPatch,
   type SessionEventPublisherPort,
 } from '../../domains/sessions/index.js';
-import { registerProvidersDomain } from '../../domains/providers/index.js';
+import { registerLlmProfilesDomain } from '../../domains/llm-profiles/index.js';
+import { registerRuntimeRoutes } from '../../infra/providers/runtime-routes.js';
 import { registerNotificationDomain } from '../../domains/notification-feed/index.js';
 import { registerSupervisionDomain, type SupervisionAiRunPort, type SupervisionProjectPort, type SupervisionSessionPort, type SupervisionSessionModelPort } from '../../domains/supervision/index.js';
 import { registerLocalPRDomain, type LocalPRAiSessionPort, type LocalPRSchedulingPort } from '../../domains/local-pr/index.js';
@@ -126,7 +127,8 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
 
   registerProjectsDomain({ db, app, authMiddleware, onProjectChanged: handleProjectChanged });
   registerSessionsDomain({ app, authMiddleware, db, activeRuns, sessionEvents });
-  registerProvidersDomain({ app, authMiddleware, db, toolRegistry });
+  registerLlmProfilesDomain({ app, authMiddleware, db });
+  registerRuntimeRoutes({ app, authMiddleware, db, toolRegistry });
 
   const {
     notificationService: notificationsService,
@@ -355,7 +357,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
       sessionId?: string;
       input: string;
       workingDirectory?: string;
-      providerId?: string;
+      llmProfileId?: string;
       systemContext?: string;
       onMessage?: (m: { kind: string; content?: string }) => void;
     }): Promise<void> {
@@ -366,7 +368,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
         sessionId,
         input: args.input,
         workingDirectory: args.workingDirectory,
-        providerId: args.providerId,
+        llmProfileId: args.llmProfileId,
         systemContext: args.systemContext,
         onMessage: (msg) => {
           if (!args.onMessage) return;

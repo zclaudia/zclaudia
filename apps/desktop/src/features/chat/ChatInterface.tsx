@@ -76,7 +76,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
     sessionToolCalls, sessionContentBlocks, sessionToolCallHistory, useStreamingSegmented,
     lastStreamingBlock, streamingContentSignature,
     currentSession, currentProject, providers, isForcedPlanSession, fileReferenceRoot, fileReferenceBackendId,
-    providerId, capabilities, commands, commandsCacheKey,
+    llmProfileId, capabilities, commands, commandsCacheKey,
     effectiveMode, modelOverride, permissionOverride, currentUsage, currentSystemInfo,
     addMessage, clearMessages, setMode, setModelOverride, setPermissionOverride,
   } = session;
@@ -141,7 +141,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   const { handleCommand, handleResetProviderSession, handleWorktreeChange } = useCommandHandler({
     sessionId, commands, currentSession, currentProject, isForcedPlanSession,
     mode: effectiveMode, modelOverride, addMessage, clearMessages, scrollToBottom, startRun,
-    providerId, commandsCacheKey, setDrawerOpen,
+    llmProfileId, commandsCacheKey, setDrawerOpen,
   });
 
   // Plan status

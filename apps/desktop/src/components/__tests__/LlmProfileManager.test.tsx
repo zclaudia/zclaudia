@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { ProviderManager } from '../../features/settings/ProviderManager';
+import { LlmProfileManager as ProviderManager } from '../../features/settings/LlmProfileManager';
 import * as api from '../../services/api';
 
 const ASYNC_TIMEOUT = 200;
@@ -121,7 +121,7 @@ describe('ProviderManager', () => {
     {
       id: 'p1',
       name: 'ZClaudia Default',
-      type: 'zclaudia' as const,
+      providerType: 'anthropic' as const,
       isDefault: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -129,8 +129,8 @@ describe('ProviderManager', () => {
     {
       id: 'p2',
       name: 'Work ZClaudia',
-      type: 'zclaudia' as const,
-      cliPath: '/usr/local/bin/claude',
+      providerType: 'anthropic' as const,
+      baseUrl: '/usr/local/bin/claude',
       isDefault: false,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -217,11 +217,11 @@ describe('ProviderManager', () => {
       expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
     });
 
-    const badges = screen.getAllByText('zclaudia');
+    const badges = screen.getAllByText('anthropic');
     expect(badges.length).toBeGreaterThan(0);
   });
 
-  it('shows cliPath for provider that has one', async () => {
+  it('shows baseUrl for provider that has one', async () => {
     await renderProviderManager({ onClose: mockOnClose });
 
     await waitForFast(() => {
@@ -301,7 +301,7 @@ describe('ProviderManager', () => {
         expect(api.createProvider).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'New Provider',
-            type: 'zclaudia',
+            providerType: 'anthropic',
           })
         );
       });
@@ -440,7 +440,7 @@ describe('ProviderManager', () => {
         {
           id: 'p1',
           name: 'Only Provider',
-          type: 'zclaudia',
+          providerType: 'anthropic',
           isDefault: true,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -472,7 +472,7 @@ describe('ProviderManager', () => {
       const nameInput = screen.getByPlaceholderText(/Local ZClaudia Agent/);
       fireEvent.change(nameInput, { target: { value: 'New Provider' } });
 
-      const envTextarea = screen.getByPlaceholderText(/ZCLAUDIA_AGENT_MODE/);
+      const envTextarea = screen.getByPlaceholderText(/ANTHROPIC_API_KEY/);
       fireEvent.change(envTextarea, { target: { value: 'invalid json' } });
 
       await clickAsync(screen.getByText('Create'));
@@ -498,7 +498,7 @@ describe('ProviderManager', () => {
       const nameInput = screen.getByPlaceholderText(/Local ZClaudia Agent/);
       fireEvent.change(nameInput, { target: { value: 'New Provider' } });
 
-      const envTextarea = screen.getByPlaceholderText(/ZCLAUDIA_AGENT_MODE/);
+      const envTextarea = screen.getByPlaceholderText(/ANTHROPIC_API_KEY/);
       fireEvent.change(envTextarea, { target: { value: '{"API_KEY": "test"}' } });
 
       await clickAsync(screen.getByText('Create'));
@@ -613,8 +613,8 @@ describe('ProviderManager', () => {
 
       await clickAsync(screen.getByText('Add Provider'));
 
-      // zclaudia is the only supported provider type post-cleanup
-      expect(screen.getByText('ZClaudia Agent')).toBeInTheDocument();
+      // 'anthropic' is the new default after the llm-profile rename
+      expect(screen.getByText('Anthropic')).toBeInTheDocument();
     });
   });
 
@@ -624,7 +624,7 @@ describe('ProviderManager', () => {
         {
           id: 'p1',
           name: 'Provider With Env',
-          type: 'zclaudia' as const,
+          providerType: 'anthropic' as const,
           isDefault: false,
           env: { API_KEY: 'secret' },
           createdAt: Date.now(),
@@ -645,7 +645,7 @@ describe('ProviderManager', () => {
       });
 
       // Env textarea should have JSON content
-      const envTextarea = screen.getByPlaceholderText(/ZCLAUDIA_AGENT_MODE/);
+      const envTextarea = screen.getByPlaceholderText(/ANTHROPIC_API_KEY/);
       expect(envTextarea).toHaveValue(JSON.stringify({ API_KEY: 'secret' }, null, 2));
     });
   });
@@ -675,7 +675,7 @@ describe('ProviderManager', () => {
   });
 
   describe('CLI path in form', () => {
-    it('submits cliPath when provided', async () => {
+    it('submits baseUrl when provided', async () => {
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
@@ -684,13 +684,13 @@ describe('ProviderManager', () => {
 
       await clickAsync(screen.getByText('Add Provider'));
       fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'Custom' } });
-      fireEvent.change(screen.getByPlaceholderText(/\/path\/to\/pi-agent/), { target: { value: '/usr/bin/pi-agent' } });
+      fireEvent.change(screen.getByPlaceholderText(/api\.anthropic\.com/), { target: { value: '/usr/bin/pi-agent' } });
 
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
         expect(api.createProvider).toHaveBeenCalledWith(
-          expect.objectContaining({ cliPath: '/usr/bin/pi-agent' })
+          expect.objectContaining({ baseUrl: '/usr/bin/pi-agent' })
         );
       });
     });

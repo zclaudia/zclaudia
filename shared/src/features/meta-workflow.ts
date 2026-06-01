@@ -96,8 +96,8 @@ export interface PhaseDef {
   outputs: PhaseOutput[];
   acceptanceGates: AcceptanceGate[];
   executeConfig?: PhaseExecuteConfig;
-  synthesizerProviderId?: string;
-  runtimeProviderId?: string;
+  synthesizerLlmProfileId?: string;
+  runtimeLlmProfileId?: string;
   worktreeStrategy?: 'isolated' | 'shared';
   estimatedComplexity?: 'small' | 'medium' | 'large';
 }
@@ -133,7 +133,7 @@ export interface MetaWorkflowRun {
   phasesJson?: string;                  // serialized PhasesDoc
   smokePathRunId?: string;
   rejectCount: number;
-  defaultProviderId?: string;
+  defaultLlmProfileId?: string;
   config?: MetaWorkflowConfig;
   worktreeId?: string;
   createdAt: number;
@@ -161,8 +161,8 @@ export interface MetaWorkflowPhase {
   outputsSnapshot?: PhaseOutput[];
   gatesSnapshot?: AcceptanceGate[];
   executeConfigSnapshot?: PhaseExecuteConfig;
-  synthesizerProviderId?: string;
-  runtimeProviderId?: string;
+  synthesizerLlmProfileId?: string;
+  runtimeLlmProfileId?: string;
   createdAt: number;
   startedAt?: number;
   completedAt?: number;

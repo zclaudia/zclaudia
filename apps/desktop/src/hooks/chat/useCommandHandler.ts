@@ -28,7 +28,7 @@ interface UseCommandHandlerParams {
     model?: string;
     workingDirectory?: string;
   }) => Promise<void>;
-  providerId: string | undefined;
+  llmProfileId: string | undefined;
   commandsCacheKey: string;
   setDrawerOpen: (projectId: string, open: boolean) => void;
 }
@@ -45,7 +45,7 @@ export function useCommandHandler({
   clearMessages,
   scrollToBottom,
   startRun,
-  providerId,
+  llmProfileId,
   commandsCacheKey,
   setDrawerOpen,
 }: UseCommandHandlerParams) {
@@ -162,8 +162,8 @@ export function useCommandHandler({
 
       case 'reload':
         // Re-fetch commands from server (cache already cleared server-side)
-        (providerId
-          ? api.getProviderCommands(providerId, currentProject?.rootPath || undefined)
+        (llmProfileId
+          ? api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined)
           : api.getProviderTypeCommands('claude', currentProject?.rootPath || undefined)
         )
           .then(cmds => {
@@ -210,7 +210,7 @@ export function useCommandHandler({
 
     // Scroll to bottom after command output
     setTimeout(() => scrollToBottom(), 100);
-  }, [sessionId, clearMessages, addMessage, scrollToBottom, providerId, currentProject?.rootPath, commandsCacheKey, currentProject?.id, setDrawerOpen]);
+  }, [sessionId, clearMessages, addMessage, scrollToBottom, llmProfileId, currentProject?.rootPath, commandsCacheKey, currentProject?.id, setDrawerOpen]);
 
   const handleWorktreeChange = useCallback(async (worktreePath: string) => {
     if (isForcedPlanSession) {
@@ -572,7 +572,7 @@ export function useCommandHandler({
       projectPath: currentProject?.rootPath,
       projectName: currentProject?.name,
       sessionId,
-      provider: currentSession?.providerId || currentProject?.providerId || 'claude',
+      provider: currentSession?.llmProfileId || currentProject?.llmProfileId || 'claude',
       model: modelOverride || 'default'
     };
 

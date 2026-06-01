@@ -5,7 +5,7 @@ import { useGatewayStore } from '../stores/gatewayStore';
 import { useConnection } from '../contexts/ConnectionContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useAndroidBack } from '../hooks/useAndroidBack';
-import { ProviderManager } from '../features/settings/ProviderManager';
+import { LlmProfileManager } from '../features/settings/LlmProfileManager';
 import { ServerGatewayConfig } from '../features/settings/ServerGatewayConfig';
 import { PluginSettings } from '../features/settings/PluginSettings';
 import { McpServerSettings } from '../features/settings/McpServerSettings';
@@ -268,7 +268,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
                     ? 'Manage AI providers for your projects on this server. Each provider can have different CLI paths and environment variables.'
                     : 'AI providers configured on this server.'}
                 </p>
-                <ProviderManagerInline key={activeServerId || 'none'} readOnly={!isActiveLocalBackend} />
+                <LlmProfileManagerInline key={activeServerId || 'none'} readOnly={!isActiveLocalBackend} />
               </div>
             )}
 
@@ -363,9 +363,9 @@ function RemoteServerBanner({ serverName, label }: { serverName: string; label: 
   );
 }
 
-function ProviderManagerInline({ readOnly }: { readOnly?: boolean }) {
+function LlmProfileManagerInline({ readOnly }: { readOnly?: boolean }) {
   return (
-    <ProviderManager isOpen={true} onClose={() => {}} inline={true} readOnly={readOnly} />
+    <LlmProfileManager isOpen={true} onClose={() => {}} inline={true} readOnly={readOnly} />
   );
 }
 

@@ -58,7 +58,7 @@ export function handleCreateMetaWorkflowRun(
       projectId: msg.projectId,
       title: msg.title,
       description: msg.description,
-      defaultProviderId: msg.defaultProviderId,
+      defaultLlmProfileId: msg.defaultLlmProfileId,
     });
     broadcastRun(client, run);
   } catch (e) {

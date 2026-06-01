@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getAgentConfig, updateAgentConfig } from '../../services/api/servers';
 import { listAllWorkflows } from '../../features/workflows/api';
 import * as providersApi from '../../services/api/providers';
-import type { ProviderConfig } from '@zclaudia/shared/core/provider';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { useProviderMetaStore } from '../../stores/providerMetaStore';
 import { useServerStore } from '../../stores/serverStore';
 import { Select } from '../../components/ui/Select';
@@ -75,7 +75,7 @@ function AIReviewProviderSelector({ value, onChange, disabled }: {
 }) {
   const activeServerId = useServerStore((s) => s.activeServerId);
   const storeProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
-  const [providers, setProviders] = useState<ProviderConfig[]>(storeProviders);
+  const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
   const [eligibleProviderIds, setEligibleProviderIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
@@ -143,12 +143,12 @@ function AIReviewProviderSelector({ value, onChange, disabled }: {
             ...(selectedProvider && !selectedProviderSupported
               ? [{
                   value: selectedProvider.id,
-                  label: `${selectedProvider.name} (${selectedProvider.type}) - unsupported`,
+                  label: `${selectedProvider.name} (${selectedProvider.providerType}) - unsupported`,
                 }]
               : []),
             ...eligibleProviders.map((provider) => ({
               value: provider.id,
-              label: `${provider.name} (${provider.type})`,
+              label: `${provider.name} (${provider.providerType})`,
             })),
           ]}
         />
@@ -393,8 +393,8 @@ export function PermissionSettings() {
                   />
                 </div>
                 <AIReviewProviderSelector
-                  value={policy.aiReview.analysisProviderId}
-                  onChange={(id) => updateAIReview({ analysisProviderId: id })}
+                  value={policy.aiReview.analysisLlmProfileId}
+                  onChange={(id) => updateAIReview({ analysisLlmProfileId: id })}
                   disabled={saving}
                 />
               </>

@@ -95,7 +95,7 @@ export class SessionLifecycleService {
     const session = this.repo.create({
       projectId: normalizedInput.projectId,
       name: normalizedInput.name,
-      providerId: normalizedInput.providerId ?? undefined,
+      llmProfileId: normalizedInput.llmProfileId ?? undefined,
       type: sessionType,
       parentSessionId: normalizedInput.parentSessionId ?? undefined,
       workingDirectory: normalizedInput.workingDirectory ?? undefined,

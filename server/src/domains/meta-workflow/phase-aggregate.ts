@@ -29,8 +29,8 @@ export class MetaWorkflowPhaseAggregate {
       outputsSnapshot: def.outputs,
       gatesSnapshot: def.acceptanceGates,
       executeConfigSnapshot: def.executeConfig,
-      synthesizerProviderId: def.synthesizerProviderId,
-      runtimeProviderId: def.runtimeProviderId,
+      synthesizerLlmProfileId: def.synthesizerLlmProfileId,
+      runtimeLlmProfileId: def.runtimeLlmProfileId,
       createdAt: now,
     });
   }

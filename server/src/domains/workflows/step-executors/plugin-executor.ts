@@ -6,7 +6,7 @@ export interface PluginStepRegistry {
   execute(type: string, config: Record<string, unknown>, context: {
     projectId?: string;
     projectRootPath?: string;
-    providerId?: string;
+    llmProfileId?: string;
     stepRunId: string;
     runId: string;
   }): Promise<StepResult>;
@@ -31,7 +31,7 @@ export class PluginStepExecutor implements StepExecutorPort {
     return this.registry.execute(node.type, config, {
       projectId: ctx.projectId,
       projectRootPath: ctx.projectRootPath,
-      providerId: ctx.providerId,
+      llmProfileId: ctx.llmProfileId,
       stepRunId: ctx.stepRunId,
       runId: ctx.runId,
     });

@@ -18,7 +18,7 @@ export async function getProjectsForBackend(backendId: string | null): Promise<P
 export async function createProject(data: {
   name: string;
   type?: 'chat_only' | 'code';
-  providerId?: string;
+  llmProfileId?: string;
   rootPath?: string;
 }): Promise<Project> {
   return apiCall<Project>('/api/projects', {
@@ -85,10 +85,10 @@ export async function reorderProjects(orderedIds: string[]): Promise<void> {
 
 export async function setProjectReviewProvider(
   projectId: string,
-  providerId: string,
+  llmProfileId: string,
 ): Promise<void> {
   return apiCallVoidForBackend(getProjectOwnerBackendId(projectId), `/api/projects/${projectId}/review-provider`, {
     method: 'PATCH',
-    body: JSON.stringify({ providerId }),
+    body: JSON.stringify({ llmProfileId }),
   });
 }

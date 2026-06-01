@@ -5,11 +5,13 @@ import { initializeRunBootstrap } from '../run-bootstrap.js';
 function createDb(providerType: string): Database.Database {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE providers (
+    CREATE TABLE llm_profiles (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      type TEXT NOT NULL,
-      cli_path TEXT,
+      provider_type TEXT NOT NULL DEFAULT 'anthropic',
+      base_url TEXT,
+      api_key TEXT,
+      compat TEXT,
       env TEXT,
       is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -18,7 +20,7 @@ function createDb(providerType: string): Database.Database {
 
     CREATE TABLE projects (
       id TEXT PRIMARY KEY,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT
     );
@@ -33,7 +35,7 @@ function createDb(providerType: string): Database.Database {
       project_role TEXT,
       plan_status TEXT,
       task_id TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       last_run_status TEXT,
       created_at INTEGER,
       updated_at INTEGER
@@ -62,17 +64,17 @@ function createDb(providerType: string): Database.Database {
 
   const now = Date.now();
   db.prepare(`
-    INSERT INTO providers (id, name, type, created_at, updated_at)
+    INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at)
     VALUES ('provider-1', ?, ?, ?, ?)
   `).run(providerType, providerType, now, now);
   db.prepare(`
-    INSERT INTO projects (id, provider_id, root_path, system_prompt)
+    INSERT INTO projects (id, llm_profile_id, root_path, system_prompt)
     VALUES ('project-1', 'provider-1', '/tmp/project', NULL)
   `).run();
   db.prepare(`
     INSERT INTO sessions (
       id, project_id, name, sdk_session_id, type, working_directory,
-      project_role, plan_status, task_id, provider_id, created_at, updated_at
+      project_role, plan_status, task_id, llm_profile_id, created_at, updated_at
     )
     VALUES (
       'session-1', 'project-1', 'Test Session', 'sdk-existing', 'regular', '/tmp/project',
@@ -114,14 +116,14 @@ describe('initializeRunBootstrap mode/session policy', () => {
   it('preserves zclaudia sdk_session_id across mode switches (preserve policy)', () => {
     const result = bootstrap('zclaudia', 'plan');
 
-    expect(result?.providerConfig?.type).toBe('zclaudia');
+    expect(result?.providerConfig?.providerType).toBe('zclaudia');
     expect(result?.providerEventState.sdkSessionId).toBe('sdk-existing');
   });
 
   it('preserves sdk_session_id when staying in the default mode', () => {
     const result = bootstrap('zclaudia', 'default');
 
-    expect(result?.providerConfig?.type).toBe('zclaudia');
+    expect(result?.providerConfig?.providerType).toBe('zclaudia');
     expect(result?.providerEventState.sdkSessionId).toBe('sdk-existing');
   });
 });

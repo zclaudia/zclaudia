@@ -111,7 +111,7 @@ const mockSessionModel = {
     name: seed.title,
     type: 'background' as const,
     parentSessionId: seed.parentSessionId ?? null,
-    providerId: seed.providerId ?? null,
+    llmProfileId: seed.llmProfileId ?? null,
     workingDirectory: seed.workingDirectory ?? null,
     projectRole: 'task_planning',
     planStatus: 'drafting',
@@ -146,7 +146,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT DEFAULT 'code',
-      provider_id TEXT,
+      llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT,
       permission_policy TEXT,
@@ -162,7 +162,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -3799,18 +3799,18 @@ describe('SupervisorService', () => {
   });
 
   // ========================================
-  // initAgent() with providerId
+  // initAgent() with llmProfileId
   // ========================================
 
-  describe('initAgent() with providerId', () => {
-    it('passes providerId to session creation', () => {
+  describe('initAgent() with llmProfileId', () => {
+    it('passes llmProfileId to session creation', () => {
       const projectId = seedProject(db);
 
       const agent = service.initAgent(projectId, {}, 'custom-provider');
 
       expect(agent.mainSessionId).toBeDefined();
       const session = sessionRepo.findById(agent.mainSessionId!);
-      expect(session!.providerId).toBe('custom-provider');
+      expect(session!.llmProfileId).toBe('custom-provider');
     });
   });
 });

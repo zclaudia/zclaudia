@@ -259,7 +259,7 @@ export class TaskExecution {
         title: task.title,
         taskId: task.id,
         parentSessionId: project.agent?.mainSessionId,
-        providerId: project.providerId,
+        llmProfileId: project.llmProfileId,
         workingDirectory: project.rootPath,
       }),
     );

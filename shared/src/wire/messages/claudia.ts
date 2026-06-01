@@ -10,7 +10,7 @@ export interface ClaudiaTaskSubmitMessage {
   sessionId: string;     // Claudia hub session
   input: string;
   projectId: string;
-  providerId?: string;
+  llmProfileId?: string;
   activeBranchId?: string;
   forceNewBranch?: boolean;
 }
@@ -107,7 +107,7 @@ export interface ClaudiaMessageMessage {
   projectId: string;
   contextProjectIds?: string[];
   primaryContextProjectId?: string;
-  providerId?: string;
+  llmProfileId?: string;
   activeBranchId?: string;  // Current active branch for reuse/fork decision
   forceNewBranch?: boolean; // Force create new branch (new conversation)
 }

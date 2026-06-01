@@ -331,7 +331,7 @@ export async function handleClaudiaMessage(
     clientRequestId: clientReqId,
     sessionId,
     input: inlineInput,
-    providerId: message.providerId,
+    llmProfileId: message.llmProfileId,
     systemContext: contextSystemPrompt,
     _contextTemplate: 'agent',
   }, db, {}, clients).catch((err) => {
@@ -386,7 +386,7 @@ export async function handleClaudiaTaskSubmit(
     const taskId = await taskCoordination.spawnTask(null, {
       task: taskInput,
       projectId: message.projectId,
-      providerId: message.providerId,
+      llmProfileId: message.llmProfileId,
       initiator: 'claudia',
       branchId: submitAllocation.branchId,
       branchAction: submitAllocation.action,
@@ -452,7 +452,7 @@ export async function handleClaudiaTaskContinue(
     const taskId = await taskCoordination.spawnTask(message.taskId, {
       task: continueInput,
       projectId: parentTask.projectId ?? undefined,
-      providerId: parentTask.providerId,
+      llmProfileId: parentTask.llmProfileId,
       initiator: 'claudia',
       branchId: continueAllocation.branchId,
       branchAction: continueAllocation.action,

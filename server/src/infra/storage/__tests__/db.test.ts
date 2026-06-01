@@ -169,7 +169,7 @@ describe('storage/db', () => {
 
       // Find the call that creates providers table
       const providersCall = mockDb.exec.mock.calls.find(
-        call => call[0].includes('CREATE TABLE IF NOT EXISTS providers')
+        call => call[0].includes('CREATE TABLE IF NOT EXISTS llm_profiles')
       );
       expect(providersCall).toBeDefined();
     });

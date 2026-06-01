@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { ProviderConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared';
 import * as api from '../services/api';
 
 /**
@@ -8,14 +8,14 @@ import * as api from '../services/api';
  */
 export function useProviderManager() {
   const addProvider = useCallback(
-    async (provider: Omit<ProviderConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
+    async (provider: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
       await api.createProvider(provider);
     },
     []
   );
 
   const updateProvider = useCallback(
-    async (id: string, updates: Partial<Omit<ProviderConfig, 'id' | 'createdAt' | 'updatedAt'>>) => {
+    async (id: string, updates: Partial<Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>) => {
       await api.updateProvider(id, updates);
     },
     []

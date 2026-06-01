@@ -1,5 +1,5 @@
 import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff } from 'lucide-react';
-import type { Session, Project, ProviderConfig } from '@zclaudia/shared';
+import type { Session, Project, LlmProfileConfig } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 
 const isDesktopTauri = typeof window !== 'undefined'
@@ -12,7 +12,7 @@ const isStandaloneSessionWindow = typeof window !== 'undefined'
 interface SessionHeaderProps {
   currentSession: Session;
   currentProject: Project | null | undefined;
-  providers: ProviderConfig[];
+  providers: LlmProfileConfig[];
   isMobile: boolean;
   isLoading: boolean;
   isRenamingSession: boolean;
@@ -115,9 +115,9 @@ export function SessionHeader({
       <div className="hidden sm:flex min-w-0 shrink-0 items-center gap-1.5 text-[9px] leading-none text-muted-foreground">
         <span className="uppercase leading-none tracking-[0.16em] text-muted-foreground/70">Session</span>
         {(() => {
-          const pid = currentSession.providerId || currentProject?.providerId;
+          const pid = currentSession.llmProfileId || currentProject?.llmProfileId;
           const prov = pid ? providers.find(p => p.id === pid) : undefined;
-          const name = prov?.name || prov?.type || 'Claude';
+          const name = prov?.name || prov?.providerType || 'Claude';
           return (
             <span className="inline-flex h-4 items-center rounded-full border border-border/70 bg-muted/45 px-1.5 text-[9px] font-medium leading-none text-muted-foreground">
               {name}

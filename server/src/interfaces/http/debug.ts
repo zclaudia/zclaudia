@@ -168,7 +168,7 @@ export function createDebugRoutes(
         confidence: 0,
         durationMs: 0,
         mode: mode ?? 'quick',
-        providerId: null,
+        llmProfileId: null,
         providerType: null,
         pendingPiAgent: true,
       },

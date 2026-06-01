@@ -36,7 +36,7 @@ export interface GenerateResult {
 interface GenerationSession {
   id: string;
   projectId: string;
-  providerId: string;
+  llmProfileId: string;
   currentDefinition: WorkflowDefinition;
   name: string;
   description: string;
@@ -56,8 +56,8 @@ const BUILTIN_STEP_TYPES = [
   { type: 'notify', description: 'Send a notification', configFields: 'type ("system"), message (string, required), title (string, optional), priority (string, optional), tags (string[], optional)' },
   { type: 'condition', description: 'Evaluate a condition to branch the workflow. Uses node.condition.expression field, not config.', configFields: 'none (use node.condition.expression instead, e.g. "${stepId.output.field} == value")' },
   { type: 'wait', description: 'Wait for timeout or manual approval', configFields: 'type ("timeout" | "approval"), durationMs (number, for timeout type)' },
-  { type: 'ai_prompt', description: 'Send a prompt to AI agent for execution (can read/write files, run commands)', configFields: 'prompt (string, required), sessionName (string, optional), workingDirectory (string, optional), providerId (string, optional)' },
-  { type: 'ai_review', description: 'AI code review that checks git diff and outputs reviewPassed/reviewNotes', configFields: 'worktreePath (string, optional), passMarker (string, optional), failMarker (string, optional), providerId (string, optional)' },
+  { type: 'ai_prompt', description: 'Send a prompt to AI agent for execution (can read/write files, run commands)', configFields: 'prompt (string, required), sessionName (string, optional), workingDirectory (string, optional), llmProfileId (string, optional)' },
+  { type: 'ai_review', description: 'AI code review that checks git diff and outputs reviewPassed/reviewNotes', configFields: 'worktreePath (string, optional), passMarker (string, optional), failMarker (string, optional), llmProfileId (string, optional)' },
   { type: 'git_commit', description: 'Auto-commit changes with AI-generated message', configFields: 'cwd (string, optional)' },
   { type: 'git_merge', description: 'Merge a branch into base branch', configFields: 'branch (string, optional), baseBranch (string, required), worktreePath (string, optional)' },
   { type: 'create_worktree', description: 'Create a git worktree with a new branch', configFields: 'branchName (string, required), baseBranch (string, optional)' },
@@ -85,15 +85,15 @@ export class WorkflowGeneratorService {
   /**
    * Generate a workflow from a natural language description.
    */
-  async generate(projectId: string, description: string, providerId: string): Promise<GenerateResult> {
+  async generate(projectId: string, description: string, llmProfileId: string): Promise<GenerateResult> {
     const systemPrompt = this.buildSystemPrompt();
     const userPrompt = description;
 
-    const aiResponse = await this.callAI(projectId, providerId, systemPrompt, userPrompt);
+    const aiResponse = await this.callAI(projectId, llmProfileId, systemPrompt, userPrompt);
     const parsed = this.parseResponse(aiResponse);
 
     // Validate and possibly retry once
-    const validated = await this.validateOrRetry(parsed, projectId, providerId, systemPrompt, userPrompt, aiResponse);
+    const validated = await this.validateOrRetry(parsed, projectId, llmProfileId, systemPrompt, userPrompt, aiResponse);
 
     // Auto-layout
     validated.definition.nodes = autoLayoutGraph(
@@ -103,7 +103,7 @@ export class WorkflowGeneratorService {
     );
 
     // Create session for future refinements
-    const session = this.createSession(projectId, providerId, validated, description, aiResponse);
+    const session = this.createSession(projectId, llmProfileId, validated, description, aiResponse);
 
     return {
       generationId: session.id,
@@ -128,7 +128,7 @@ export class WorkflowGeneratorService {
 
     let aiResponse: string;
     try {
-      aiResponse = await this.callAI(projectId, session.providerId, systemPrompt, userPrompt);
+      aiResponse = await this.callAI(projectId, session.llmProfileId, systemPrompt, userPrompt);
     } catch (err) {
       this.destroySession(generationId);
       throw err;
@@ -136,7 +136,7 @@ export class WorkflowGeneratorService {
 
     const parsed = this.parseResponse(aiResponse);
 
-    const validated = await this.validateOrRetry(parsed, projectId, session.providerId, systemPrompt, userPrompt, aiResponse);
+    const validated = await this.validateOrRetry(parsed, projectId, session.llmProfileId, systemPrompt, userPrompt, aiResponse);
 
     // Auto-layout
     validated.definition.nodes = autoLayoutGraph(
@@ -282,7 +282,7 @@ Generate a workflow definition based on the user's natural language description.
 
   private async callAI(
     projectId: string,
-    providerId: string,
+    llmProfileId: string,
     systemPrompt: string,
     userPrompt: string,
   ): Promise<string> {
@@ -292,7 +292,7 @@ Generate a workflow definition based on the user's natural language description.
       type: 'background',
       projectRole: 'workflow',
       workingDirectory: undefined,
-      providerId,
+      llmProfileId,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 
     return new Promise<string>((resolve, reject) => {
@@ -306,7 +306,7 @@ Generate a workflow definition based on the user's natural language description.
         sessionId: session.id,
         input: userPrompt,
         workingDirectory: undefined,
-        providerId,
+        llmProfileId,
         systemContext: systemPrompt,
         onMessage: (msg: ServerMessage) => {
           if (msg.type === 'run_completed') {
@@ -432,7 +432,7 @@ Generate a workflow definition based on the user's natural language description.
   private async validateOrRetry(
     parsed: { name: string; description: string; definition: WorkflowDefinition; warnings?: string[] },
     projectId: string,
-    providerId: string,
+    llmProfileId: string,
     systemPrompt: string,
     originalUserPrompt: string,
     originalResponse: string,
@@ -444,7 +444,7 @@ Generate a workflow definition based on the user's natural language description.
     const retryPrompt = `${originalUserPrompt}\n\nIMPORTANT: Your previous output had validation errors:\n${errors.map(e => `- ${e}`).join('\n')}\n\nPlease fix these errors and output a corrected JSON.`;
 
     try {
-      const retryResponse = await this.callAI(projectId, providerId, systemPrompt, retryPrompt);
+      const retryResponse = await this.callAI(projectId, llmProfileId, systemPrompt, retryPrompt);
       const retryParsed = this.parseResponse(retryResponse);
       const retryErrors = this.validateDefinition(retryParsed.definition);
 
@@ -470,7 +470,7 @@ Generate a workflow definition based on the user's natural language description.
 
   private createSession(
     projectId: string,
-    providerId: string,
+    llmProfileId: string,
     result: { name: string; description: string; definition: WorkflowDefinition },
     userDescription: string,
     aiResponse: string,
@@ -479,7 +479,7 @@ Generate a workflow definition based on the user's natural language description.
     const session: GenerationSession = {
       id,
       projectId,
-      providerId,
+      llmProfileId,
       currentDefinition: result.definition,
       name: result.name,
       description: result.description,

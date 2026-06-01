@@ -13,11 +13,13 @@ import { providerRegistry } from '../../../infra/providers/registry.js';
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE providers (
+    CREATE TABLE llm_profiles (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'claude',
-      cli_path TEXT,
+      provider_type TEXT NOT NULL DEFAULT 'anthropic',
+      base_url TEXT,
+      api_key TEXT,
+      compat TEXT,
       env TEXT,
       is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -35,10 +37,10 @@ describe('PluginProviderAPI', () => {
     vi.clearAllMocks();
     db = createTestDb();
     const now = Date.now();
-    db.prepare('INSERT INTO providers (id, name, type, cli_path, env, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, env, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
       'prov-1', 'Primary ZClaudia', 'zclaudia', '/usr/bin/pi-agent', null, 1, now, now
     );
-    db.prepare('INSERT INTO providers (id, name, type, cli_path, env, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
+    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, env, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
       'prov-2', 'Secondary ZClaudia', 'zclaudia', null, '{"KEY":"val"}', 0, now, now
     );
     api = new PluginProviderAPI(db, 'test-plugin');

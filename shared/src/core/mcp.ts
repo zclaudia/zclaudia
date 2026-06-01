@@ -1,6 +1,6 @@
 // MCP Server Types
 
-import type { ProviderType } from './provider.js';
+import type { LlmProviderType } from './llm-profile.js';
 
 export interface McpServerConfig {
   id: string;
@@ -10,7 +10,7 @@ export interface McpServerConfig {
   env?: Record<string, string>;
   enabled: boolean;
   description?: string;
-  providerScope?: ProviderType[];
+  providerScope?: LlmProviderType[];
   source: 'user' | 'imported';
   createdAt: number;
   updatedAt: number;

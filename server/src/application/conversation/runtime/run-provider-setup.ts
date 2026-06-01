@@ -3,7 +3,7 @@ import { createPermissionCallback } from './run-permissions.js';
 import type { RunStartMessage, RunSessionRecord } from './run-bootstrap.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
-import type { ProviderConfig } from '@zclaudia/shared/core/provider';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
 
@@ -20,8 +20,8 @@ interface PrepareProviderRunInput {
   db: ActiveRun['db'];
   message: RunStartMessage;
   notificationService: NotificationSender;
-  providerConfig?: ProviderConfig;
-  providerId: string | null;
+  providerConfig?: LlmProfileConfig;
+  llmProfileId: string | null;
   providerType: string;
   runId: string;
   sendMessage: (ws: ConnectedClient['ws'], message: import('@zclaudia/shared/wire/messages').ServerMessage) => void;

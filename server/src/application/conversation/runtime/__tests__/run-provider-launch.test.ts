@@ -43,7 +43,7 @@ describe('ws/run-provider-launch', () => {
       },
     });
     negotiateProfileMock.mockReturnValue({
-      providerId: 'pcp-claude',
+      llmProfileId: 'pcp-claude',
       capabilities: [{ id: 'edit', enabled: true, mode: 'native', reliability: 'high' }],
     });
   });
@@ -85,8 +85,8 @@ describe('ws/run-provider-launch', () => {
       modeValue: 'default',
       permissionCallback,
       processedInput: 'processed hello',
-      providerConfig: { id: 'provider-1', type: 'claude', cliPath: '/usr/bin/claude' } as any,
-      providerId: 'provider-1',
+      providerConfig: { id: 'provider-1', providerType: 'claude', baseUrl: '/usr/bin/claude' } as any,
+      llmProfileId: 'provider-1',
       providerType: 'claude',
       runId: 'run-1',
       sdkSessionId: 'sdk-prev',
@@ -103,7 +103,7 @@ describe('ws/run-provider-launch', () => {
         project_role: null,
         plan_status: null,
         task_id: null,
-        provider_id: 'provider-1',
+        llm_profile_id: 'provider-1',
         system_prompt: null,
       },
       sessionType: 'background',
@@ -113,7 +113,7 @@ describe('ws/run-provider-launch', () => {
 
     expect(negotiateProfileMock).toHaveBeenCalled();
     expect(activeRun.effectiveProfile).toEqual(expect.objectContaining({
-      providerId: 'pcp-claude',
+      llmProfileId: 'pcp-claude',
       sessionId: 'session-1',
     }));
     expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
@@ -129,7 +129,7 @@ describe('ws/run-provider-launch', () => {
     expect(pluginEventsEmitMock).toHaveBeenCalledWith('run.started', expect.objectContaining({
       runId: 'run-1',
       sessionId: 'session-1',
-      providerId: 'provider-1',
+      llmProfileId: 'provider-1',
       providerType: 'claude',
     }));
     expect(sendRunEventMock).toHaveBeenCalledWith({

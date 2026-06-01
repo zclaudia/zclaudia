@@ -4,7 +4,7 @@ import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { Session } from '@zclaudia/shared/core/session';
 import { LocalPRRepository } from './repository.js';
 import { ProjectRepository } from '../projects/repository.js';
-import { ProviderRepository } from '../providers/repository.js';
+import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { SessionRepository } from '../sessions/repository.js';
 import type { LocalPRAiSessionPort } from './ports.js';
 import { WorktreeConfigRepository } from '../../infra/repositories/worktree-config.js';
@@ -56,7 +56,7 @@ export interface LocalPRAIDeps {
 export class LocalPRService {
   private prRepo: LocalPRRepository;
   private projectRepo: ProjectRepository;
-  private providerRepo: ProviderRepository;
+  private llmProfileRepo: LlmProfileRepository;
   private sessionRepo: SessionRepository;
   private wtConfigRepo: WorktreeConfigRepository;
   private mergeLock = new Mutex();
@@ -77,7 +77,7 @@ export class LocalPRService {
     }
     this.prRepo = new LocalPRRepository(db);
     this.projectRepo = new ProjectRepository(db);
-    this.providerRepo = new ProviderRepository(db);
+    this.llmProfileRepo = new LlmProfileRepository(db);
     this.sessionRepo = new SessionRepository(db);
     this.wtConfigRepo = new WorktreeConfigRepository(db);
   }
@@ -356,7 +356,7 @@ export class LocalPRService {
   /**
    * Start an AI review session for the given PR.
    * @param prId - The local PR to review
-   * @param overrideProviderId - Optional provider ID (for manual trigger). Falls back to project.reviewProviderId → project.providerId.
+   * @param overrideProviderId - Optional provider ID (for manual trigger). Falls back to project.reviewLlmProfileId → project.llmProfileId.
    */
   async startReview(prId: string, overrideProviderId?: string): Promise<void> {
     const pr = this.prRepo.findById(prId);
@@ -365,8 +365,8 @@ export class LocalPRService {
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) throw new Error(`Project ${pr.projectId} has no rootPath`);
 
-    const providerId = this.resolveAvailableProviderId(overrideProviderId, project.reviewProviderId, project.providerId);
-    if (!providerId) {
+    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.llmProfileId);
+    if (!llmProfileId) {
       throw new Error(`No provider available for review on project ${pr.projectId}`);
     }
 
@@ -398,7 +398,7 @@ export class LocalPRService {
       type: 'background',
       projectRole: 'review',
       workingDirectory: pr.worktreePath,
-      providerId,
+      llmProfileId,
       isReadOnly: true,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 
@@ -414,7 +414,7 @@ export class LocalPRService {
       sessionId: session.id,
       input: reviewPrompt,
       workingDirectory: pr.worktreePath,
-      providerId,
+      llmProfileId,
       onMessage: (msg: ServerMessage) => {
         this.forwardSessionStream(pr.projectId, session.id, msg);
         if (msg.type === 'run_completed' || msg.type === 'run_failed') {
@@ -726,9 +726,9 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       this.broadcastPRUpdate(this.prRepo.findById(prId)!);
       return;
     }
-    const providerId = this.resolveAvailableProviderId(project.reviewProviderId, project.providerId);
-    if (!providerId) throw new Error(`No provider available for conflict resolution on project ${pr.projectId}`);
-    await this.startConflictResolution(prId, providerId);
+    const llmProfileId = this.resolveAvailableProviderId(project.reviewLlmProfileId, project.llmProfileId);
+    if (!llmProfileId) throw new Error(`No provider available for conflict resolution on project ${pr.projectId}`);
+    await this.startConflictResolution(prId, llmProfileId);
   }
 
   /** Reopen a closed PR back to open state. */
@@ -808,8 +808,8 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) return;
 
-    const providerId = this.resolveAvailableProviderId(overrideProviderId, project.reviewProviderId, project.providerId);
-    if (!providerId) {
+    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.llmProfileId);
+    if (!llmProfileId) {
       console.warn(`[LocalPRService] No provider for conflict resolution on PR ${prId}`);
       return;
     }
@@ -824,7 +824,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       type: 'background',
       projectRole: 'review',
       workingDirectory: pr.worktreePath,
-      providerId,
+      llmProfileId,
       isReadOnly: true,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 
@@ -860,7 +860,7 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
         sessionId: session.id,
         input: conflictPrompt,
         workingDirectory: pr.worktreePath,
-        providerId,
+        llmProfileId,
         onMessage: (msg: ServerMessage) => {
           this.forwardSessionStream(pr.projectId, session.id, msg);
           if (msg.type === 'run_completed' || msg.type === 'run_failed') {
@@ -1125,13 +1125,13 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
     for (const id of preferredIds) {
       if (!id || checked.has(id)) continue;
       checked.add(id);
-      if (this.providerRepo.findById(id)) return id;
+      if (this.llmProfileRepo.findById(id)) return id;
     }
 
-    const defaultProvider = this.providerRepo.findDefault();
+    const defaultProvider = this.llmProfileRepo.findDefault();
     if (defaultProvider?.id) return defaultProvider.id;
 
-    const providers = this.providerRepo.findAll();
+    const providers = this.llmProfileRepo.findAll();
     return providers[0]?.id ?? null;
   }
 

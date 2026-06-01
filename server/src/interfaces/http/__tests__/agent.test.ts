@@ -14,7 +14,7 @@ function createTestDb(): Database.Database {
       enabled INTEGER NOT NULL DEFAULT 1,
       project_id TEXT,
       session_id TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       permission_workflow_override_id TEXT,
       permission_policy TEXT,
       created_at INTEGER NOT NULL,
@@ -25,7 +25,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-      provider_id TEXT,
+      llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT,
       permission_policy TEXT,
@@ -39,7 +39,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -54,7 +54,7 @@ function createTestDb(): Database.Database {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
 
-    CREATE TABLE IF NOT EXISTS providers (
+    CREATE TABLE IF NOT EXISTS llm_profiles (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT NOT NULL DEFAULT 'claude',
@@ -105,7 +105,7 @@ describe('agent routes', () => {
   beforeEach(() => {
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
-    db.exec('DELETE FROM providers');
+    db.exec('DELETE FROM llm_profiles');
     db.exec('DELETE FROM workflows');
     db.exec('DELETE FROM agent_config');
   });
@@ -132,7 +132,7 @@ describe('agent routes', () => {
         enabled: true,
         projectId: null,
         sessionId: null,
-        providerId: null,
+        llmProfileId: null,
         permissionWorkflowOverrideId: null,
         permissionPolicy: null,
       });
@@ -143,7 +143,7 @@ describe('agent routes', () => {
     it('returns configured config with project and session IDs', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO agent_config (id, enabled, project_id, session_id, provider_id, permission_policy, created_at, updated_at)
+        INSERT INTO agent_config (id, enabled, project_id, session_id, llm_profile_id, permission_policy, created_at, updated_at)
         VALUES (1, 0, 'proj-1', 'sess-1', 'prov-1', '{"enabled":true}', ?, ?)
       `).run(now, now);
 
@@ -156,7 +156,7 @@ describe('agent routes', () => {
         enabled: false,
         projectId: 'proj-1',
         sessionId: 'sess-1',
-        providerId: 'prov-1',
+        llmProfileId: 'prov-1',
         permissionWorkflowOverrideId: null,
         permissionPolicy: '{"enabled":true}',
       });
@@ -273,14 +273,14 @@ describe('agent routes', () => {
       expect(res.body.data.enabled).toBe(true);
     });
 
-    it('updates providerId', async () => {
+    it('updates llmProfileId', async () => {
       const res = await request(app)
         .put('/api/agent/config')
-        .send({ providerId: 'my-provider-id' });
+        .send({ llmProfileId: 'my-provider-id' });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.providerId).toBe('my-provider-id');
+      expect(res.body.data.llmProfileId).toBe('my-provider-id');
     });
 
     it('updates permissionPolicy as JSON object', async () => {
@@ -339,14 +339,14 @@ describe('agent routes', () => {
         .put('/api/agent/config')
         .send({
           enabled: false,
-          providerId: 'new-provider',
+          llmProfileId: 'new-provider',
           permissionPolicy: { enabled: false },
         });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.data.enabled).toBe(false);
-      expect(res.body.data.providerId).toBe('new-provider');
+      expect(res.body.data.llmProfileId).toBe('new-provider');
       expect(res.body.data.permissionPolicy).toBe(JSON.stringify({ enabled: false }));
     });
 
@@ -399,7 +399,7 @@ describe('agent routes', () => {
 
     it('preserves unchanged fields when only updating one field', async () => {
       // Pre-configure provider
-      db.prepare("UPDATE agent_config SET provider_id = 'original-provider' WHERE id = 1").run();
+      db.prepare("UPDATE agent_config SET llm_profile_id = 'original-provider' WHERE id = 1").run();
 
       const res = await request(app)
         .put('/api/agent/config')
@@ -407,7 +407,7 @@ describe('agent routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.enabled).toBe(false);
-      expect(res.body.data.providerId).toBe('original-provider');
+      expect(res.body.data.llmProfileId).toBe('original-provider');
     });
 
     it('updates the updatedAt timestamp', async () => {

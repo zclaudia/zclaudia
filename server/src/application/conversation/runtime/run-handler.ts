@@ -53,7 +53,7 @@ export async function handleRunStart(
   trace.log('server_norm', 'run_start_requested', {
     clientRequestId: message.clientRequestId,
     sessionId: message.sessionId,
-    providerId: message.providerId,
+    llmProfileId: message.llmProfileId,
     mode: message.mode,
     model: message.model,
     workingDirectory: message.workingDirectory,
@@ -81,7 +81,7 @@ export async function handleRunStart(
     projectId,
     providerConfig,
     providerEventState,
-    providerId,
+    llmProfileId,
     requestedCwd,
     sendRunEvent,
     session,
@@ -94,7 +94,7 @@ export async function handleRunStart(
   let handedOffToRetry = false;
 
   try {
-    const providerType = providerConfig?.type || 'zclaudia';
+    const providerType = providerConfig?.providerType || 'zclaudia';
     const adapter = ctx!.providerRegistry.getOrDefault(providerType);
 
     // Kimi stores session state under the work_dir scope. Resuming the same
@@ -143,7 +143,7 @@ export async function handleRunStart(
       message,
       notificationService,
       providerConfig,
-      providerId,
+      llmProfileId,
       providerType,
       runId,
       sendMessage,
@@ -167,7 +167,7 @@ export async function handleRunStart(
       permissionCallback,
       processedInput,
       providerConfig,
-      providerId,
+      llmProfileId,
       providerType,
       runId,
       sdkSessionId,

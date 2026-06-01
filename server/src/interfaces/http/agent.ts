@@ -13,7 +13,7 @@ interface AgentConfig {
   enabled: boolean;
   projectId: string | null;
   sessionId: string | null;
-  providerId: string | null;
+  llmProfileId: string | null;
   permissionWorkflowOverrideId: string | null;
   permissionPolicy: string | null;
   createdAt: number;
@@ -25,7 +25,7 @@ interface AgentConfigRow {
   enabled: number;
   project_id: string | null;
   session_id: string | null;
-  provider_id: string | null;
+  llm_profile_id: string | null;
   permission_workflow_override_id: string | null;
   permission_policy: string | null;
   created_at: number;
@@ -43,7 +43,7 @@ function rowToConfig(row: AgentConfigRow): AgentConfig {
     enabled: row.enabled === 1,
     projectId: row.project_id,
     sessionId: row.session_id,
-    providerId: row.provider_id,
+    llmProfileId: row.llm_profile_id,
     permissionWorkflowOverrideId: row.permission_workflow_override_id,
     permissionPolicy: row.permission_policy,
     createdAt: row.created_at,
@@ -214,7 +214,7 @@ export function createAgentRoutes(db: Database.Database): Router {
   // PUT /api/agent/config — Update agent configuration
   router.put('/config', (req: Request, res: Response) => {
     try {
-      const { enabled, permissionPolicy, providerId, permissionWorkflowOverrideId } = req.body;
+      const { enabled, permissionPolicy, llmProfileId, permissionWorkflowOverrideId } = req.body;
       const now = Date.now();
       const serializedPermissionPolicy = permissionPolicy !== undefined
         ? (typeof permissionPolicy === 'string' ? permissionPolicy : JSON.stringify(permissionPolicy))
@@ -222,7 +222,7 @@ export function createAgentRoutes(db: Database.Database): Router {
 
       if (serializedPermissionPolicy !== null) {
         const normalizedPolicy = normalizeToUnifiedPolicy(JSON.parse(serializedPermissionPolicy));
-        const providerValidationError = validateAIReviewProviderId(db, normalizedPolicy.aiReview.analysisProviderId);
+        const providerValidationError = validateAIReviewProviderId(db, normalizedPolicy.aiReview.analysisLlmProfileId);
         if (providerValidationError) {
           res.status(400).json({
             success: false,
@@ -254,7 +254,7 @@ export function createAgentRoutes(db: Database.Database): Router {
         UPDATE agent_config SET
           enabled = COALESCE(?, enabled),
           permission_policy = ?,
-          provider_id = COALESCE(?, provider_id),
+          llm_profile_id = COALESCE(?, llm_profile_id),
           permission_workflow_override_id = CASE
             WHEN ? = 1 THEN ?
             ELSE permission_workflow_override_id
@@ -264,7 +264,7 @@ export function createAgentRoutes(db: Database.Database): Router {
       `).run(
         enabled !== undefined ? (enabled ? 1 : 0) : null,
         serializedPermissionPolicy,
-        providerId !== undefined ? providerId : null,
+        llmProfileId !== undefined ? llmProfileId : null,
         permissionWorkflowOverrideId !== undefined ? 1 : 0,
         permissionWorkflowOverrideId !== undefined ? permissionWorkflowOverrideId : null,
         now

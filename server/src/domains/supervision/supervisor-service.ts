@@ -281,8 +281,8 @@ export class SupervisorService {
   // Agent management (delegates to agentManager)
   // ========================================
 
-  initAgent(projectId: string, config?: Partial<SupervisorConfig>, providerId?: string, mode?: AgentMode): ProjectAgent {
-    return this.agentManager.initAgent(projectId, config, providerId, mode);
+  initAgent(projectId: string, config?: Partial<SupervisorConfig>, llmProfileId?: string, mode?: AgentMode): ProjectAgent {
+    return this.agentManager.initAgent(projectId, config, llmProfileId, mode);
   }
 
   updateAgentPhase(projectId: string, action: 'pause' | 'resume' | 'archive' | 'approve_setup'): ProjectAgent {

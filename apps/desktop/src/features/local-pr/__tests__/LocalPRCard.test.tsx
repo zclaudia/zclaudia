@@ -51,7 +51,7 @@ vi.mock('../../../stores/projectStore', () => {
   const store = vi.fn((selector?: (s: any) => any) => {
     const state = {
       providers: [],
-      projects: [{ id: 'proj-1', providerId: 'prov-1' }],
+      projects: [{ id: 'proj-1', llmProfileId: 'prov-1' }],
       sessions: [],
       selectSession: mockSelectSession,
     };
@@ -348,7 +348,7 @@ describe('LocalPRCard', () => {
     const defaultBtn = screen.getByRole('button', { name: /Default/ });
     fireEvent.click(defaultBtn);
     await waitFor(() => {
-      // The default provider ID comes from project.providerId in the mock which is 'prov-1'
+      // The default provider ID comes from project.llmProfileId in the mock which is 'prov-1'
       expect(mockReviewPR).toHaveBeenCalledWith('pr-1', 'proj-1', 'prov-1');
     });
   });
@@ -426,7 +426,7 @@ describe('LocalPRCard', () => {
           { id: 'prov-1', name: 'Claude', type: 'anthropic' },
           { id: 'prov-2', name: 'GPT-4', type: 'openai' },
         ],
-        projects: [{ id: 'proj-1', providerId: 'prov-1', reviewProviderId: 'prov-1' }],
+        projects: [{ id: 'proj-1', llmProfileId: 'prov-1', reviewLlmProfileId: 'prov-1' }],
         sessions: [],
         selectSession: mockSelectSession,
       };

@@ -70,7 +70,7 @@ describe('AIReviewQueue', () => {
     );
   });
 
-  it('rotates provider instance when analysisProviderId changes', async () => {
+  it('rotates provider instance when analysisLlmProfileId changes', async () => {
     evaluateAIReviewMock
       .mockResolvedValueOnce({
         decision: 'approve',
@@ -107,7 +107,7 @@ describe('AIReviewQueue', () => {
       cwd: '/workspace',
     });
 
-    await queue.enqueue('req-2', { ...baseConfig, analysisProviderId: 'provider-2' }, {
+    await queue.enqueue('req-2', { ...baseConfig, analysisLlmProfileId: 'provider-2' }, {
       toolName: 'Bash',
       toolInput: { command: 'npm run lint' },
       detail: 'npm run lint',

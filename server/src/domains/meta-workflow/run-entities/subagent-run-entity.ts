@@ -70,7 +70,7 @@ export interface AiRunPortStartArgs {
   sessionId?: string;
   input: string;
   workingDirectory?: string;
-  providerId?: string;
+  llmProfileId?: string;
   systemContext?: string;
   onMessage?: (m: { kind: string; content?: string }) => void;
 }
@@ -81,7 +81,7 @@ export interface AiRunPort {
 
 export interface CreateRunVirtualClientFromAiRunPortOptions {
   aiRunPort: AiRunPort;
-  defaultProviderId?: string;
+  defaultLlmProfileId?: string;
   /** Total time to wait for `run_completed` before giving up. Defaults to 5 min. */
   timeoutMs?: number;
 }
@@ -121,7 +121,7 @@ export function createRunVirtualClientFromAiRunPort(
       opts.aiRunPort.startVirtualRun({
         input: args.systemPrompt,
         workingDirectory: args.cwd,
-        providerId: opts.defaultProviderId,
+        llmProfileId: opts.defaultLlmProfileId,
         onMessage: (m) => {
           if (m.content) collected += m.content;
           // Phase E2a: check termination on every message, not just completion.

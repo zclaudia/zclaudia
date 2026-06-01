@@ -109,12 +109,12 @@ export interface WorkflowGenerateResult {
 export async function generateWorkflowFromNL(
   projectId: string,
   description: string,
-  providerId: string,
+  llmProfileId: string,
 ): Promise<WorkflowGenerateResult> {
   return apiCallForBackend<WorkflowGenerateResult>(
     getProjectOwnerBackendId(projectId),
     `/api/projects/${projectId}/workflows/generate`,
-    { method: 'POST', body: JSON.stringify({ description, providerId }) },
+    { method: 'POST', body: JSON.stringify({ description, llmProfileId }) },
   );
 }
 

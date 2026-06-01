@@ -21,7 +21,7 @@ export interface CreateMetaWorkflowRunMessage {
   projectId: string;
   title: string;
   description?: string;
-  defaultProviderId?: string;
+  defaultLlmProfileId?: string;
 }
 
 // Client → Server: submit requirements.md path

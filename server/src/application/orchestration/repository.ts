@@ -25,7 +25,7 @@ interface TaskRow {
   schedule_type: string | null;
   schedule_config: string | null;
   depends_on: string | null;
-  provider_id: string | null;
+  llm_profile_id: string | null;
   retry_count: number;
   max_retries: number;
   result_summary: string | null;
@@ -57,7 +57,7 @@ function rowToTask(row: TaskRow): OrchestratorTask {
     scheduleType: row.schedule_type ?? undefined,
     scheduleConfig: row.schedule_config ?? undefined,
     dependsOn: row.depends_on ? JSON.parse(row.depends_on) : undefined,
-    providerId: row.provider_id ?? undefined,
+    llmProfileId: row.llm_profile_id ?? undefined,
     retryCount: row.retry_count,
     maxRetries: row.max_retries,
     resultSummary: row.result_summary ?? undefined,
@@ -81,7 +81,7 @@ export class TaskRepository {
       INSERT INTO orchestrator_tasks (
         id, parent_task_id, root_task_id, project_id, session_id, branch_id, branch_action, context_reset,
         kind, context_template, status, task, external_id, initiator,
-        schedule_type, schedule_config, depends_on, provider_id,
+        schedule_type, schedule_config, depends_on, llm_profile_id,
         retry_count, max_retries, result_summary, error_summary,
         response_text, tool_count,
         created_at, started_at, completed_at, updated_at
@@ -91,7 +91,7 @@ export class TaskRepository {
       task.branchAction ?? null, task.contextReset ? 1 : 0,
       task.kind, task.contextTemplate, task.status, task.task, task.externalId ?? null, task.initiator,
       task.scheduleType ?? null, task.scheduleConfig ?? null,
-      task.dependsOn ? JSON.stringify(task.dependsOn) : null, task.providerId ?? null,
+      task.dependsOn ? JSON.stringify(task.dependsOn) : null, task.llmProfileId ?? null,
       0, task.maxRetries ?? 0, task.resultSummary ?? null, task.errorSummary ?? null,
       task.responseText ?? null, task.toolCount ?? null,
       now, task.startedAt ?? null, task.completedAt ?? null, now,

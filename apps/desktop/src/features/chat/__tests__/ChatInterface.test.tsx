@@ -277,13 +277,13 @@ vi.mock('../../../hooks/chat/useProviderCapabilities', () => ({
     const currentProject = currentSession
       ? projectState.projects.find((project) => project.id === currentSession.projectId)
       : null;
-    const providerId = currentSession?.providerId || currentProject?.providerId || null;
+    const llmProfileId = currentSession?.llmProfileId || currentProject?.llmProfileId || null;
 
     return {
-      providerId,
+      llmProfileId,
       capabilities: null,
       commands: [],
-      commandsCacheKey: `test:${providerId ?? '_default'}`,
+      commandsCacheKey: `test:${llmProfileId ?? '_default'}`,
     };
   },
 }));
@@ -1427,7 +1427,7 @@ describe('ChatInterface', () => {
   it('shows provider badge when provider is configured', () => {
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', providerId: 'prov-1' }],
+        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', llmProfileId: 'prov-1' }],
         providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
       },
     });

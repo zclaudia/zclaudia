@@ -60,7 +60,7 @@ export function createDomainPorts(deps: CreateDomainPortsDeps): DomainPorts {
   };
 
   const localPrAiSessionPort: LocalPRAiSessionPort = {
-    startAISession: async ({ clientId, sessionId, input, workingDirectory, providerId, onMessage }) => {
+    startAISession: async ({ clientId, sessionId, input, workingDirectory, llmProfileId, onMessage }) => {
       const virtualClient = createVirtualClient(clientId, { send: onMessage });
       await handleRunStart(virtualClient, {
         type: 'run_start',
@@ -68,13 +68,13 @@ export function createDomainPorts(deps: CreateDomainPortsDeps): DomainPorts {
         sessionId,
         input,
         workingDirectory,
-        providerId,
+        llmProfileId,
       }, db);
     },
   };
 
   const workflowAiRunPort: WorkflowAiRunPort = {
-    startVirtualRun: async ({ clientId, sessionId, input, workingDirectory, providerId, systemContext, onMessage }) => {
+    startVirtualRun: async ({ clientId, sessionId, input, workingDirectory, llmProfileId, systemContext, onMessage }) => {
       const virtualClient = createVirtualClient(clientId, { send: onMessage });
       await handleRunStart(virtualClient, {
         type: 'run_start',
@@ -82,7 +82,7 @@ export function createDomainPorts(deps: CreateDomainPortsDeps): DomainPorts {
         sessionId,
         input,
         workingDirectory,
-        providerId,
+        llmProfileId,
         systemContext,
       }, db);
     },

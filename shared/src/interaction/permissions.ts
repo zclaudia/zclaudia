@@ -76,8 +76,8 @@ export interface AIReviewConfig {
   confidenceThreshold: number;
   /** Rate limit: max auto-approvals per minute. Default 10 */
   maxAutoApprovalsPerMinute: number;
-  /** Provider for LLM risk analysis (optional, uses default if not set) */
-  analysisProviderId?: string;
+  /** LlmProfile for LLM risk analysis (optional, uses default if not set) */
+  analysisLlmProfileId?: string;
 }
 
 /** Unified permission policy — single profile for all session types */

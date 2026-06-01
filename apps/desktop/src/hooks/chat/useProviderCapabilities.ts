@@ -27,13 +27,13 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     ? projects.find(p => p.id === currentSession.projectId)
     : null;
 
-  const providerId = currentSession?.providerId || currentProject?.providerId;
+  const llmProfileId = currentSession?.llmProfileId || currentProject?.llmProfileId;
   const isBackendDataReady = dataServerId != null && dataServerId === activeServerId;
   const providerScopeKey =
     resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID)
     || LEGACY_LOCAL_SERVER_ID;
-  const capsCacheKey = `${providerScopeKey}:${providerId || '_default'}`;
-  const commandsCacheKey = `${providerScopeKey}:${providerId || '_default'}`;
+  const capsCacheKey = `${providerScopeKey}:${llmProfileId || '_default'}`;
+  const commandsCacheKey = `${providerScopeKey}:${llmProfileId || '_default'}`;
 
   // Fetch commands when provider or project changes (via HTTP)
   useEffect(() => {
@@ -44,8 +44,8 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
       return () => controller.abort();
     }
 
-    if (providerId) {
-      api.getProviderCommands(providerId, projectRoot || undefined, { signal: controller.signal })
+    if (llmProfileId) {
+      api.getProviderCommands(llmProfileId, projectRoot || undefined, { signal: controller.signal })
         .then(commands => {
           setProviderCommands(commandsCacheKey, commands);
         })
@@ -65,15 +65,15 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     }
 
     return () => controller.abort();
-  }, [currentSession?.providerId, currentProject?.providerId, currentProject?.rootPath, isConnected, isBackendDataReady, commandsCacheKey, providerId, setProviderCommands]);
+  }, [currentSession?.llmProfileId, currentProject?.llmProfileId, currentProject?.rootPath, isConnected, isBackendDataReady, commandsCacheKey, llmProfileId, setProviderCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
     if (!isConnected || !isBackendDataReady) return () => controller.abort();
     if (providerCapabilities[capsCacheKey]) return () => controller.abort();
 
-    const fetchCaps = providerId
-      ? api.getProviderCapabilities(providerId, { signal: controller.signal })
+    const fetchCaps = llmProfileId
+      ? api.getProviderCapabilities(llmProfileId, { signal: controller.signal })
       : api.getProviderTypeCapabilities('claude', { signal: controller.signal });
 
     fetchCaps
@@ -88,7 +88,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
         console.error('Failed to load provider capabilities:', err);
       });
     return () => controller.abort();
-  }, [capsCacheKey, providerId, isConnected, isBackendDataReady, providerCapabilities, setProviderCapabilities, sessionId]);
+  }, [capsCacheKey, llmProfileId, isConnected, isBackendDataReady, providerCapabilities, setProviderCapabilities, sessionId]);
 
   const capabilities: ProviderCapabilities | null = providerCapabilities[capsCacheKey] || null;
 
@@ -116,7 +116,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
   }, [providerCommands, commandsCacheKey]);
 
   return {
-    providerId,
+    llmProfileId,
     capabilities,
     commands,
     commandsCacheKey,

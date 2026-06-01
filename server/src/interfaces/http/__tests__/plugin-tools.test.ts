@@ -64,7 +64,7 @@ describe('plugin-tools routes', () => {
       ] as any);
 
       const profile: PCPEffectiveProfile = {
-        providerId: 'cursor',
+        llmProfileId: 'cursor',
         providerType: 'cursor',
         negotiatedAt: Date.now(),
         capabilities: [
@@ -141,7 +141,7 @@ describe('plugin-tools routes', () => {
 
     it('rejects execution when PCP profile disables the interaction tool', async () => {
       const profile: PCPEffectiveProfile = {
-        providerId: 'cursor',
+        llmProfileId: 'cursor',
         providerType: 'cursor',
         negotiatedAt: Date.now(),
         capabilities: [

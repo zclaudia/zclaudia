@@ -63,7 +63,7 @@ describe('useProviderCapabilities', () => {
     } as any);
   });
 
-  it('loads default provider metadata when no providerId is set', async () => {
+  it('loads default provider metadata when no llmProfileId is set', async () => {
     const { result } = renderHook(() =>
       useProviderCapabilities({ sessionId: 'sess-1', isConnected: true })
     );
@@ -80,7 +80,7 @@ describe('useProviderCapabilities', () => {
       );
     });
 
-    expect(result.current.providerId).toBeUndefined();
+    expect(result.current.llmProfileId).toBeUndefined();
     expect(useProviderMetaStore.getState().providerCommands['local:_default']).toEqual(
       expect.arrayContaining([{ command: '/help', description: 'help', source: 'provider' }])
     );
@@ -90,9 +90,9 @@ describe('useProviderCapabilities', () => {
     expect(useChatStore.getState().setMode).toHaveBeenCalledWith('sess-1', 'plan');
   });
 
-  it('loads provider-specific metadata when session has providerId', async () => {
+  it('loads provider-specific metadata when session has llmProfileId', async () => {
     useProjectStore.setState({
-      sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Session', providerId: 'prov-1' }],
+      sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Session', llmProfileId: 'prov-1' }],
       providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
     } as any);
 
@@ -112,7 +112,7 @@ describe('useProviderCapabilities', () => {
       );
     });
 
-    expect(result.current.providerId).toBe('prov-1');
+    expect(result.current.llmProfileId).toBe('prov-1');
     expect(useProviderMetaStore.getState().providerCommands['local:prov-1']).toEqual(
       expect.arrayContaining([{ command: '/provider', description: 'provider', source: 'provider' }])
     );

@@ -44,7 +44,7 @@ export class AIRiskAnalysisStepExecutor implements StepExecutorPort {
         config: {
           confidenceThreshold,
           maxAutoApprovalsPerMinute,
-          analysisProviderId: config.analysisProviderId as string | undefined,
+          analysisLlmProfileId: config.analysisLlmProfileId as string | undefined,
         },
       });
 

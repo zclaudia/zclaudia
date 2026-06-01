@@ -9,7 +9,7 @@ export interface TaskCoordinationPort {
     config: {
       task: string;
       projectId?: string;
-      providerId?: string;
+      llmProfileId?: string;
       initiator?: 'system' | 'claudia';
       branchId?: string;
       branchAction?: BranchAction;

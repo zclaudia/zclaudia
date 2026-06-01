@@ -28,7 +28,7 @@ export interface OrchestratorTask {
   scheduleType?: string;
   scheduleConfig?: string;
   dependsOn?: string[];
-  providerId?: string;
+  llmProfileId?: string;
   retryCount: number;
   maxRetries: number;
   resultSummary?: string;
@@ -44,7 +44,7 @@ export interface OrchestratorTask {
 export interface SpawnTaskConfig {
   task: string;
   projectId?: string;
-  providerId?: string;
+  llmProfileId?: string;
   contextTemplate?: string;
   initiator?: TaskInitiator;
   branchId?: string;

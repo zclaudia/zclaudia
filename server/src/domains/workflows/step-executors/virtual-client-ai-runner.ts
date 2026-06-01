@@ -26,7 +26,7 @@ export class VirtualClientAIRunner implements AIRunnerPort {
 
   async runPrompt(opts: {
     projectId?: string;
-    providerId: string;
+    llmProfileId: string;
     prompt: string;
     workingDirectory?: string;
     sessionName?: string;
@@ -39,7 +39,7 @@ export class VirtualClientAIRunner implements AIRunnerPort {
       type: 'background',
       projectRole: 'workflow',
       workingDirectory: opts.workingDirectory,
-      providerId: opts.providerId,
+      llmProfileId: opts.llmProfileId,
     } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
 
     opts.onSessionCreated?.(session.id);
@@ -60,7 +60,7 @@ export class VirtualClientAIRunner implements AIRunnerPort {
         sessionId: session.id,
         input: opts.prompt,
         workingDirectory: opts.workingDirectory,
-        providerId: opts.providerId,
+        llmProfileId: opts.llmProfileId,
         onMessage: (msg: ServerMessage) => {
           if (settled) return;
           if (msg.type === 'run_completed') {

@@ -7,7 +7,7 @@ export interface CreateRunInput {
   projectId: string;
   title: string;
   description?: string;
-  defaultProviderId?: string;
+  defaultLlmProfileId?: string;
 }
 
 export class MetaWorkflowRunAggregate {
@@ -21,7 +21,7 @@ export class MetaWorkflowRunAggregate {
       description: input.description,
       status: 'requirement_draft',
       rejectCount: 0,
-      defaultProviderId: input.defaultProviderId,
+      defaultLlmProfileId: input.defaultLlmProfileId,
       createdAt: now,
       updatedAt: now,
     });

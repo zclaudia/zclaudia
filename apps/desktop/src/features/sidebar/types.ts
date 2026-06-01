@@ -5,7 +5,7 @@ import type { SearchSidebarState } from './useSearchSidebar';
 export interface SidebarProvider {
   id: string;
   name?: string;
-  type?: string;
+  providerType?: string;
   isDefault?: boolean;
 }
 

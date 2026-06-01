@@ -5,11 +5,13 @@ import { resolveBaselineProvider } from '../baseline-generator.js';
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
   db.exec(`
-    CREATE TABLE providers (
+    CREATE TABLE llm_profiles (
       id TEXT PRIMARY KEY,
       name TEXT,
-      type TEXT NOT NULL,
-      cli_path TEXT,
+      provider_type TEXT NOT NULL DEFAULT 'anthropic',
+      base_url TEXT,
+      api_key TEXT,
+      compat TEXT,
       env TEXT,
       is_default INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
@@ -30,7 +32,7 @@ describe('baseline-generator', () => {
     const now = Date.now();
 
     db.prepare(`
-      INSERT INTO providers (id, name, type, is_default, created_at, updated_at)
+      INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
     `).run('provider-zclaudia', 'ZClaudia Default', 'zclaudia', 1, now, now);
 

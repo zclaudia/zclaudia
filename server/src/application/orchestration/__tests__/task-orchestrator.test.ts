@@ -23,7 +23,7 @@ function createTestDb(): Database.Database {
       schedule_type TEXT,
       schedule_config TEXT,
       depends_on TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       retry_count INTEGER NOT NULL DEFAULT 0,
       max_retries INTEGER NOT NULL DEFAULT 0,
       result_summary TEXT,
@@ -103,7 +103,7 @@ describe('orchestration/task-orchestrator', () => {
       task: 'Review latest diff',
       projectId: 'project-1',
       contextTemplate: 'review',
-      providerId: 'provider-1',
+      llmProfileId: 'provider-1',
     });
 
     await orchestrator.tick();
@@ -113,7 +113,7 @@ describe('orchestration/task-orchestrator', () => {
       expect.objectContaining({
         type: 'run_start',
         input: 'Review latest diff',
-        providerId: 'provider-1',
+        llmProfileId: 'provider-1',
         _contextTemplate: 'review',
       }),
       db,

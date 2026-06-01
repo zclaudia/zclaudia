@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import type { ProviderConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProviderMetaStore } from '../../stores/providerMetaStore';
@@ -17,7 +17,7 @@ interface CapabilitySummary {
   backgroundTask: CapLevel;
 }
 const PROVIDER_CAPABILITIES: Record<string, CapabilitySummary> = {
-  zclaudia: { stream: 'strict', tools: 'none', interactions: 'none', backgroundTask: 'none' },
+  anthropic: { stream: 'strict', tools: 'none', interactions: 'none', backgroundTask: 'none' },
 };
 
 function CapabilityTags({ providerType }: { providerType: string }) {
@@ -50,14 +50,14 @@ function CapabilityTags({ providerType }: { providerType: string }) {
   );
 }
 
-interface ProviderManagerProps {
+interface LlmProfileManagerProps {
   isOpen: boolean;
   onClose: () => void;
   inline?: boolean;  // When true, renders without modal wrapper
   readOnly?: boolean;
 }
 
-export function ProviderManager({ isOpen, onClose, inline = false, readOnly = false }: ProviderManagerProps) {
+export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = false }: LlmProfileManagerProps) {
   const activeServerId = useServerStore((s) => s.activeServerId);
   const facadeConnectionState = useFacadeStore((s) => s.connectionState);
   const facadeBackends = useFacadeStore((s) => s.backends);
@@ -68,15 +68,15 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
   });
   const storeProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
 
-  const [providers, setProviders] = useState<ProviderConfig[]>([]);
+  const [providers, setProviders] = useState<LlmProfileConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<ProviderConfig | null>(null);
+  const [editingProvider, setEditingProvider] = useState<LlmProfileConfig | null>(null);
 
   // Form state
-  type ProviderType = ProviderConfig['type'];
+  type ProviderType = string;
   const [formName, setFormName] = useState('');
-  const [formType, setFormType] = useState<ProviderType>('zclaudia');
+  const [formType, setFormType] = useState<ProviderType>('anthropic');
   const [formCliPath, setFormCliPath] = useState('');
   const [formEnv, setFormEnv] = useState('');
   const [formIsDefault, setFormIsDefault] = useState(false);
@@ -145,7 +145,7 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
   const resetForm = () => {
     clearDeleteConfirmation();
     setFormName('');
-    setFormType('zclaudia');
+    setFormType('anthropic');
     setFormCliPath('');
     setFormEnv('');
     setFormIsDefault(false);
@@ -153,11 +153,11 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
     setShowAddForm(false);
   };
 
-  const openEditForm = (provider: ProviderConfig) => {
+  const openEditForm = (provider: LlmProfileConfig) => {
     clearDeleteConfirmation();
     setFormName(provider.name);
-    setFormType(provider.type);
-    setFormCliPath(provider.cliPath || '');
+    setFormType(provider.providerType);
+    setFormCliPath(provider.baseUrl || '');
     setFormEnv(provider.env ? JSON.stringify(provider.env, null, 2) : '');
     setFormIsDefault(provider.isDefault || false);
     setEditingProvider(provider);
@@ -182,8 +182,8 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
 
       const data = {
         name: formName.trim(),
-        type: formType,
-        cliPath: formCliPath.trim() || undefined,
+        providerType: formType,
+        baseUrl: formCliPath.trim() || undefined,
         env: envObj,
         isDefault: formIsDefault
       };
@@ -266,15 +266,15 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
       <TypeSelector value={formType} onChange={setFormType} />
 
       <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">Runtime Path (optional)</label>
+        <label className="block text-sm font-medium text-muted-foreground mb-1">Base URL (optional)</label>
         <input
           type="text"
           value={formCliPath}
           onChange={(e) => setFormCliPath(e.target.value)}
-          placeholder="/path/to/pi-agent"
+          placeholder="https://api.anthropic.com"
           className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
         />
-        <p className="text-xs text-muted-foreground mt-1">Reserved path for a future pi-agent runtime binary or entrypoint</p>
+        <p className="text-xs text-muted-foreground mt-1">Reserved for a future custom-endpoint provider</p>
       </div>
 
       <div>
@@ -283,13 +283,13 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
           value={formEnv}
           onChange={(e) => setFormEnv(e.target.value)}
           placeholder={`{
-"ZCLAUDIA_AGENT_MODE": "stub"
+"ANTHROPIC_API_KEY": "..."
 }`}
           rows={5}
           className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Environment variables reserved for the zclaudia/pi-agent runtime
+          Environment variables passed to the runtime
         </p>
       </div>
 
@@ -325,13 +325,13 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
   ) : (
     /* Provider List */
     <div className="space-y-2">
-      {providers.length === 0 ? (
+      {(providers ?? []).length === 0 ? (
         <p className="text-muted-foreground text-center py-8">
           No providers configured.<br />
           Add a provider to get started.
         </p>
       ) : (
-        providers.map((provider) => (
+        (providers ?? []).map((provider) => (
           <div
             key={provider.id}
             className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary"
@@ -345,15 +345,15 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
                   </span>
                 )}
                 <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground text-xs rounded-md">
-                  {provider.type || 'zclaudia'}
+                  {provider.providerType || 'anthropic'}
                 </span>
               </div>
-              {provider.cliPath && (
+              {provider.baseUrl && (
                 <div className="text-xs text-muted-foreground truncate font-mono mt-1">
-                  {provider.cliPath}
+                  {provider.baseUrl}
                 </div>
               )}
-              <CapabilityTags providerType={provider.type || 'zclaudia'} />
+              <CapabilityTags providerType={provider.providerType || 'anthropic'} />
             </div>
             {!readOnly && (
             <div className="flex items-center gap-1 ml-2">
@@ -449,11 +449,13 @@ export function ProviderManager({ isOpen, onClose, inline = false, readOnly = fa
   );
 }
 
-const TYPE_OPTIONS: { value: ProviderConfig['type']; label: string }[] = [
-  { value: 'zclaudia', label: 'ZClaudia Agent' },
+const TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'openai-custom', label: 'OpenAI-compatible (custom)' },
 ];
 
-function TypeSelector({ value, onChange }: { value: string; onChange: (v: ProviderConfig['type']) => void }) {
+function TypeSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

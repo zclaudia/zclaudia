@@ -1,19 +1,20 @@
-import type { ProviderConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
+import type { LlmProfileConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
 import { apiCall, apiCallVoid } from './unwrap';
 
-export async function getProviders(options?: RequestInit): Promise<ProviderConfig[]> {
-  return apiCall<ProviderConfig[]>('/api/providers', options);
+export async function getProviders(options?: RequestInit): Promise<LlmProfileConfig[]> {
+  return apiCall<LlmProfileConfig[]>('/api/llm-profiles', options);
 }
 
 export async function createProvider(data: {
   name: string;
-  type?: string;
-  cliPath?: string;
+  providerType?: string;
+  baseUrl?: string;
+  apiKey?: string;
   env?: Record<string, string>;
   isDefault?: boolean;
-}): Promise<ProviderConfig> {
-  return apiCall<ProviderConfig>('/api/providers', {
+}): Promise<LlmProfileConfig> {
+  return apiCall<LlmProfileConfig>('/api/llm-profiles', {
     method: 'POST',
     body: JSON.stringify(data)
   });
@@ -21,16 +22,16 @@ export async function createProvider(data: {
 
 export async function updateProvider(
   id: string,
-  data: Partial<ProviderConfig>
+  data: Partial<LlmProfileConfig>
 ): Promise<void> {
-  return apiCallVoid(`/api/providers/${id}`, {
+  return apiCallVoid(`/api/llm-profiles/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data)
   });
 }
 
 export async function deleteProvider(id: string): Promise<void> {
-  return apiCallVoid(`/api/providers/${id}`, { method: 'DELETE' });
+  return apiCallVoid(`/api/llm-profiles/${id}`, { method: 'DELETE' });
 }
 
 export async function setDefaultProvider(id: string): Promise<void> {
@@ -38,19 +39,20 @@ export async function setDefaultProvider(id: string): Promise<void> {
     console.warn('[API] setDefaultProvider not supported by active server, skipping');
     return;
   }
-  return apiCallVoid(`/api/providers/${id}/set-default`, { method: 'POST' });
+  return apiCallVoid(`/api/llm-profiles/${id}/set-default`, { method: 'POST' });
 }
 
-// Functions below use activeServerSupports + fallback logic — keep using fetchApi directly
+// Runtime adapter capability/command routes stay under `/api/providers` —
+// they describe the runtime shell, not the LLM connection profile.
 
 export async function getProviderCommands(
-  providerId: string,
+  llmProfileId: string,
   projectRoot?: string,
   options?: RequestInit
 ): Promise<SlashCommand[]> {
   const query = projectRoot ? `?projectRoot=${encodeURIComponent(projectRoot)}` : '';
   if (activeServerSupports('providerCommands')) {
-    const result = await fetchApi<SlashCommand[]>(`/api/providers/${providerId}/commands${query}`, options);
+    const result = await fetchApi<SlashCommand[]>(`/api/providers/${llmProfileId}/commands${query}`, options);
     if (result.success && result.data) return result.data;
   }
   const localResult = await fetchLocalApi<SlashCommand[]>(`/api/providers/type/zclaudia/commands${query}`);
@@ -78,11 +80,11 @@ export async function getProviderTypeCommands(
 }
 
 export async function getProviderCapabilities(
-  providerId: string,
+  llmProfileId: string,
   options?: RequestInit
 ): Promise<ProviderCapabilities> {
   if (activeServerSupports('providerCapabilities')) {
-    const result = await fetchApi<ProviderCapabilities>(`/api/providers/${providerId}/capabilities`, options);
+    const result = await fetchApi<ProviderCapabilities>(`/api/providers/${llmProfileId}/capabilities`, options);
     if (result.success && result.data) return result.data;
   }
   const localResult = await fetchLocalApi<ProviderCapabilities>(`/api/providers/type/zclaudia/capabilities`);

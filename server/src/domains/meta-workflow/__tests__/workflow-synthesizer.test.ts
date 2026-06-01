@@ -63,10 +63,10 @@ describe('workflow synthesizer', () => {
   });
 
   it('propagates runtime provider id to ai_prompt nodes', () => {
-    const def = synthesizeWorkflow({ ...phase, runtimeProviderId: 'provider-x' });
+    const def = synthesizeWorkflow({ ...phase, runtimeLlmProfileId: 'provider-x' });
     const aiNodes = def.nodes.filter((n) => n.type === 'ai_prompt');
     for (const n of aiNodes) {
-      expect((n.config as { providerId?: string }).providerId).toBe('provider-x');
+      expect((n.config as { llmProfileId?: string }).llmProfileId).toBe('provider-x');
     }
   });
 });

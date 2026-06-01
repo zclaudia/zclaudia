@@ -28,21 +28,13 @@ function getZClaudiaCommands(projectRoot?: string): SlashCommand[] {
 
 export function mountCommandRoutes(router: Router, db: Database.Database): void {
   router.get('/:id/commands', (req: Request, res: Response) => {
-    const row = db.prepare('SELECT type FROM providers WHERE id = ?')
-      .get(req.params.id) as { type: string } | undefined;
+    const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?')
+      .get(req.params.id) as { id: string } | undefined;
 
     if (!row) {
       res.status(404).json({
         success: false,
         error: { code: 'NOT_FOUND', message: 'Runtime config not found' },
-      });
-      return;
-    }
-
-    if (row.type !== 'zclaudia') {
-      res.status(404).json({
-        success: false,
-        error: { code: 'NOT_FOUND', message: 'Runtime type not found' },
       });
       return;
     }

@@ -1,22 +1,8 @@
-// Agent runtime types
+// Runtime capabilities and permission modes (drive the UI selectors).
+// These types describe what the runtime adapter exposes to the client; they
+// are intentionally decoupled from the LLM connection profile shape.
 
-export const PROVIDER_TYPES = ['zclaudia'] as const;
-export type ProviderType = typeof PROVIDER_TYPES[number];
-
-export interface ProviderConfig {
-  id: string;
-  name: string;
-  type: ProviderType;
-  cliPath?: string;
-  env?: Record<string, string>;
-  isDefault?: boolean;
-  createdAt: number;
-  updatedAt: number;
-}
-
-// Runtime capabilities (drives UI selectors)
-
-/** Runtime modes supported by the initial zclaudia shell. */
+/** Runtime permission modes supported by the initial zclaudia shell. */
 export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
 /** A selectable option in the Mode dropdown (permission mode, agent, etc.) */

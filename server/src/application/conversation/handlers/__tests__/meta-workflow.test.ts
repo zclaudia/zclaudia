@@ -28,7 +28,7 @@ describe('meta-workflow WS handlers', () => {
     handleCreateMetaWorkflowRun(client, {
       type: 'create_meta_workflow_run', projectId: 'p', title: 't',
     }, service as never);
-    expect(service.createRun).toHaveBeenCalledWith({ projectId: 'p', title: 't', description: undefined, defaultProviderId: undefined });
+    expect(service.createRun).toHaveBeenCalledWith({ projectId: 'p', title: 't', description: undefined, defaultLlmProfileId: undefined });
     expect(sent[0]).toMatchObject({ type: 'meta_workflow_run_update', run: { id: 'r1' } });
   });
 

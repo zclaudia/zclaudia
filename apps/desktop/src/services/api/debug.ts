@@ -117,7 +117,7 @@ export interface SimulateAIReviewRequest {
   toolInput: unknown;
   detail: string;
   cwd: string;
-  providerId?: string;
+  llmProfileId?: string;
   confidenceThreshold?: number;
   mode?: 'quick' | 'full' | 'runtime' | 'workflow';
 }
@@ -128,7 +128,7 @@ export interface SimulateAIReviewResponse {
   confidence: number;
   metadata?: Record<string, unknown>;
   durationMs: number;
-  providerId: string | null;
+  llmProfileId: string | null;
   providerType: string | null;
   mode: 'quick' | 'full' | 'runtime' | 'workflow';
   telemetry?: Record<string, unknown>;

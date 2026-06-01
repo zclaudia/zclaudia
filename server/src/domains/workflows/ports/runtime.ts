@@ -6,7 +6,7 @@ export interface WorkflowAiRunPort {
     sessionId: string;
     input: string;
     workingDirectory?: string;
-    providerId?: string;
+    llmProfileId?: string;
     systemContext?: string;
     onMessage: (msg: ServerMessage) => void;
   }): Promise<void> | void;

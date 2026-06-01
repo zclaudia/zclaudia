@@ -16,7 +16,7 @@ type Update = {
   phasesJson?: string | null;
   smokePathRunId?: string | null;
   rejectCount?: number;
-  defaultProviderId?: string | null;
+  defaultLlmProfileId?: string | null;
   config?: MetaWorkflowRun['config'] | null;
   worktreeId?: string | null;
   updatedAt?: number;
@@ -40,7 +40,7 @@ export class MetaWorkflowRunRepository extends BaseRepository<MetaWorkflowRun, C
       phasesJson: (row.phases_json as string) || undefined,
       smokePathRunId: (row.smoke_path_run_id as string) || undefined,
       rejectCount: row.reject_count as number,
-      defaultProviderId: (row.default_provider_id as string) || undefined,
+      defaultLlmProfileId: (row.default_llm_profile_id as string) || undefined,
       config: row.config ? (JSON.parse(row.config as string) as MetaWorkflowConfig) : undefined,
       worktreeId: (row.worktree_id as string) || undefined,
       createdAt: row.created_at as number,
@@ -55,13 +55,13 @@ export class MetaWorkflowRunRepository extends BaseRepository<MetaWorkflowRun, C
       sql: `INSERT INTO meta_workflow_runs (
         id, project_id, title, description, status,
         requirements_path, phases_json, smoke_path_run_id,
-        reject_count, default_provider_id, config, worktree_id,
+        reject_count, default_llm_profile_id, config, worktree_id,
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
         id, data.projectId, data.title, data.description ?? null, data.status,
         data.requirementsPath ?? null, data.phasesJson ?? null, data.smokePathRunId ?? null,
-        data.rejectCount, data.defaultProviderId ?? null,
+        data.rejectCount, data.defaultLlmProfileId ?? null,
         data.config ? JSON.stringify(data.config) : null,
         data.worktreeId ?? null,
         data.createdAt, data.updatedAt,
@@ -81,7 +81,7 @@ export class MetaWorkflowRunRepository extends BaseRepository<MetaWorkflowRun, C
       ['phasesJson', 'phases_json', (v) => v ?? null],
       ['smokePathRunId', 'smoke_path_run_id', (v) => v ?? null],
       ['rejectCount', 'reject_count', (v) => v],
-      ['defaultProviderId', 'default_provider_id', (v) => v ?? null],
+      ['defaultLlmProfileId', 'default_llm_profile_id', (v) => v ?? null],
       ['config', 'config', (v) => (v ? JSON.stringify(v) : null)],
       ['worktreeId', 'worktree_id', (v) => v ?? null],
       ['updatedAt', 'updated_at', (v) => v],

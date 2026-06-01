@@ -5,7 +5,7 @@ import { generateWorkflowFromNL, refineGeneratedWorkflow } from '../api';
 
 interface NLWorkflowGeneratorProps {
   projectId: string;
-  providerId: string;
+  llmProfileId: string;
   onGenerated: (result: {
     definition: WorkflowDefinition;
     name: string;
@@ -19,7 +19,7 @@ interface HistoryEntry {
   content: string;
 }
 
-export function NLWorkflowGenerator({ projectId, providerId, onGenerated }: NLWorkflowGeneratorProps) {
+export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NLWorkflowGeneratorProps) {
   const [description, setDescription] = useState('');
   const [refineInput, setRefineInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -35,7 +35,7 @@ export function NLWorkflowGenerator({ projectId, providerId, onGenerated }: NLWo
     setWarnings([]);
 
     try {
-      const result = await generateWorkflowFromNL(projectId, description.trim(), providerId);
+      const result = await generateWorkflowFromNL(projectId, description.trim(), llmProfileId);
       setGenerationId(result.generationId);
       setHistory([
         { role: 'user', content: description.trim() },
@@ -53,7 +53,7 @@ export function NLWorkflowGenerator({ projectId, providerId, onGenerated }: NLWo
     } finally {
       setLoading(false);
     }
-  }, [description, projectId, providerId, loading, onGenerated]);
+  }, [description, projectId, llmProfileId, loading, onGenerated]);
 
   const handleRefine = useCallback(async () => {
     if (!refineInput.trim() || !generationId || loading) return;
@@ -131,13 +131,13 @@ export function NLWorkflowGenerator({ projectId, providerId, onGenerated }: NLWo
           />
           <button
             onClick={handleGenerate}
-            disabled={!description.trim() || loading || !providerId}
+            disabled={!description.trim() || loading || !llmProfileId}
             className="flex items-center justify-center gap-1.5 w-full py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             {loading ? 'Generating...' : 'Generate'}
           </button>
-          {!providerId && (
+          {!llmProfileId && (
             <p className="text-[10px] text-destructive">No provider configured.</p>
           )}
           <p className="text-[10px] text-muted-foreground/60">Cmd+Enter to submit</p>

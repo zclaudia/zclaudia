@@ -18,7 +18,7 @@ export type BaselineLanguage = 'zh-CN' | 'en';
 
 export interface BaselineInitOptions {
   mode?: BaselineGenerationMode;
-  providerId?: string;
+  llmProfileId?: string;
   language?: BaselineLanguage;
   force?: boolean;
 }
@@ -168,7 +168,7 @@ export async function generateBaselineWithAi(
   db: Database,
   rootPath: string,
   scanned: { projectMd: string; architectureMd: string },
-  options: { providerId?: string; language: BaselineLanguage },
+  options: { llmProfileId?: string; language: BaselineLanguage },
 ): Promise<{ projectMd: string; architectureMd: string }> {
   void db;
   void rootPath;
@@ -230,22 +230,22 @@ export function parseBaselineGenerationResult(
 
 export function resolveBaselineProvider(
   db: Database,
-  providerId?: string,
+  llmProfileId?: string,
 ): {
   id: string;
   type: string;
   cliPath: string | null;
   env: Record<string, string> | null;
 } | null {
-  if (providerId) {
+  if (llmProfileId) {
     const selected = db.prepare(`
-      SELECT id, type, cli_path as cliPath, env
-      FROM providers
+      SELECT id, provider_type as type, base_url as cliPath, env
+      FROM llm_profiles
       WHERE id = ?
       LIMIT 1
-    `).get(providerId) as { id: string; type: string; cliPath: string | null; env: string | null } | undefined;
+    `).get(llmProfileId) as { id: string; type: string; cliPath: string | null; env: string | null } | undefined;
     if (!selected) {
-      throw new Error(`Provider not found: ${providerId}`);
+      throw new Error(`Provider not found: ${llmProfileId}`);
     }
     return {
       id: selected.id,
@@ -256,9 +256,9 @@ export function resolveBaselineProvider(
   }
 
   const row = db.prepare(`
-    SELECT id, type, cli_path as cliPath, env
-    FROM providers
-    WHERE type = 'zclaudia'
+    SELECT id, provider_type as type, base_url as cliPath, env
+    FROM llm_profiles
+    WHERE provider_type IN ('anthropic','openai','openai-custom','zclaudia')
     ORDER BY is_default DESC, updated_at DESC
     LIMIT 1
   `).get() as { id: string; type: string; cliPath: string | null; env: string | null } | undefined;

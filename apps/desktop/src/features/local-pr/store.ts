@@ -24,13 +24,13 @@ interface LocalPRState {
   ) => Promise<LocalPR>;
   closePR: (prId: string, projectId: string) => Promise<void>;
   retryReview: (prId: string, projectId: string) => Promise<void>;
-  reviewPR: (prId: string, projectId: string, providerId?: string) => Promise<void>;
+  reviewPR: (prId: string, projectId: string, llmProfileId?: string) => Promise<void>;
   mergePR: (prId: string, projectId: string) => Promise<void>;
   cancelMergePR: (prId: string, projectId: string) => Promise<void>;
   resolveConflictPR: (prId: string, projectId: string) => Promise<void>;
   reopenPR: (prId: string, projectId: string) => Promise<void>;
   revertMergedPR: (prId: string, projectId: string) => Promise<void>;
-  setReviewProvider: (projectId: string, providerId: string) => Promise<void>;
+  setReviewProvider: (projectId: string, llmProfileId: string) => Promise<void>;
   upsertPR: (projectId: string, pr: LocalPR) => void;
   removePR: (projectId: string, prId: string) => void;
 }
@@ -59,8 +59,8 @@ export const useLocalPRStore = create<LocalPRState>((set, get) => ({
     get().upsertPR(projectId, pr);
   },
 
-  reviewPR: async (prId, projectId, providerId) => {
-    const pr = await reviewLocalPR(prId, providerId);
+  reviewPR: async (prId, projectId, llmProfileId) => {
+    const pr = await reviewLocalPR(prId, llmProfileId);
     get().upsertPR(projectId, pr);
   },
 
@@ -89,8 +89,8 @@ export const useLocalPRStore = create<LocalPRState>((set, get) => ({
     get().upsertPR(projectId, pr);
   },
 
-  setReviewProvider: async (projectId, providerId) => {
-    await setProjectReviewProvider(projectId, providerId);
+  setReviewProvider: async (projectId, llmProfileId) => {
+    await setProjectReviewProvider(projectId, llmProfileId);
   },
 
   upsertPR: (projectId, pr) =>

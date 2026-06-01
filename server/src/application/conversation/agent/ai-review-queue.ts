@@ -19,7 +19,7 @@ import { evaluateAIReview, type AIReviewContext, type AIReviewProvider } from '.
 
 export interface AIReviewQueueOptions {
   /** Factory to create/resolve the analysis provider. Called once per queue lifetime (or on rotation). */
-  createProvider: (analysisProviderId?: string) => AIReviewProvider | undefined;
+  createProvider: (analysisLlmProfileId?: string) => AIReviewProvider | undefined;
   /** Workspace root for script content reading */
   cwd: string;
 }
@@ -98,13 +98,13 @@ export class AIReviewQueue {
     return this.queue.filter(e => !e.cancelled).length;
   }
 
-  /** Resolve the provider, caching it. Rotates if analysisProviderId changes. */
-  private getProvider(analysisProviderId?: string): AIReviewProvider | undefined {
-    if (this.cachedProvider && this.cachedProviderId === (analysisProviderId || '__default__')) {
+  /** Resolve the provider, caching it. Rotates if analysisLlmProfileId changes. */
+  private getProvider(analysisLlmProfileId?: string): AIReviewProvider | undefined {
+    if (this.cachedProvider && this.cachedProviderId === (analysisLlmProfileId || '__default__')) {
       return this.cachedProvider;
     }
-    this.cachedProvider = this.options.createProvider(analysisProviderId);
-    this.cachedProviderId = analysisProviderId || '__default__';
+    this.cachedProvider = this.options.createProvider(analysisLlmProfileId);
+    this.cachedProviderId = analysisLlmProfileId || '__default__';
     return this.cachedProvider;
   }
 
@@ -127,9 +127,9 @@ export class AIReviewQueue {
         return;
       }
 
-      const provider = this.getProvider(entry.config.analysisProviderId);
+      const provider = this.getProvider(entry.config.analysisLlmProfileId);
       if (!provider) {
-        console.log(`[AI Review Queue] No provider available (analysisProviderId=${entry.config.analysisProviderId || 'default'})`);
+        console.log(`[AI Review Queue] No provider available (analysisLlmProfileId=${entry.config.analysisLlmProfileId || 'default'})`);
         entry.resolve({ decision: 'uncertain', reasoning: 'No AI review provider available', confidence: 0 });
         return;
       }

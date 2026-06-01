@@ -169,7 +169,7 @@ describe('WorkflowStepRegistry', () => {
       const context = {
         projectId: 'proj1',
         projectRootPath: '/tmp/project',
-        providerId: 'claude',
+        llmProfileId: 'claude',
         stepRunId: 'sr1',
         runId: 'r1',
       };

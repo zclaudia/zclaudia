@@ -19,14 +19,14 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-      provider_id TEXT,
+      llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT,
       permission_policy TEXT,
       agent_permission_override TEXT,
       agent TEXT,
       context_sync_status TEXT NOT NULL DEFAULT 'synced',
-      review_provider_id TEXT,
+      review_llm_profile_id TEXT,
       permission_workflow_override_id TEXT,
       is_internal INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
@@ -43,7 +43,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       name TEXT,
-      provider_id TEXT,
+      llm_profile_id TEXT,
       sdk_session_id TEXT,
       type TEXT DEFAULT 'regular',
       parent_session_id TEXT,
@@ -154,14 +154,14 @@ describe('projects routes', () => {
       expect(res.body.error.message).toBe('Name is required');
     });
 
-    it('returns 400 when reviewProviderId is used on chat_only project', async () => {
+    it('returns 400 when reviewLlmProfileId is used on chat_only project', async () => {
       const res = await request(app)
         .post('/api/projects')
-        .send({ name: 'Bad Project', type: 'chat_only', reviewProviderId: 'provider-1' });
+        .send({ name: 'Bad Project', type: 'chat_only', reviewLlmProfileId: 'provider-1' });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
-      expect(res.body.error.message).toContain('reviewProviderId');
+      expect(res.body.error.message).toContain('reviewLlmProfileId');
     });
 
     it('stores project in database', async () => {
@@ -909,8 +909,8 @@ describe('projects routes', () => {
     });
   });
 
-  describe('PUT /api/projects/:id with reviewProviderId', () => {
-    it('updates reviewProviderId', async () => {
+  describe('PUT /api/projects/:id with reviewLlmProfileId', () => {
+    it('updates reviewLlmProfileId', async () => {
       const now = Date.now();
       db.prepare(`
         INSERT INTO projects (id, name, type, created_at, updated_at)
@@ -919,14 +919,14 @@ describe('projects routes', () => {
 
       const res = await request(app)
         .put('/api/projects/p1')
-        .send({ reviewProviderId: 'provider-1' });
+        .send({ reviewLlmProfileId: 'provider-1' });
 
       expect(res.status).toBe(200);
-      const row = db.prepare('SELECT review_provider_id FROM projects WHERE id = ?').get('p1') as any;
-      expect(row.review_provider_id).toBe('provider-1');
+      const row = db.prepare('SELECT review_llm_profile_id FROM projects WHERE id = ?').get('p1') as any;
+      expect(row.review_llm_profile_id).toBe('provider-1');
     });
 
-    it('rejects reviewProviderId for chat_only project', async () => {
+    it('rejects reviewLlmProfileId for chat_only project', async () => {
       const now = Date.now();
       db.prepare(`
         INSERT INTO projects (id, name, type, created_at, updated_at)
@@ -935,26 +935,26 @@ describe('projects routes', () => {
 
       const res = await request(app)
         .put('/api/projects/p1')
-        .send({ reviewProviderId: 'provider-1' });
+        .send({ reviewLlmProfileId: 'provider-1' });
 
       expect(res.status).toBe(400);
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
 
-    it('clears reviewProviderId when set to null', async () => {
+    it('clears reviewLlmProfileId when set to null', async () => {
       const now = Date.now();
       db.prepare(`
-        INSERT INTO projects (id, name, type, review_provider_id, created_at, updated_at)
+        INSERT INTO projects (id, name, type, review_llm_profile_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
       `).run('p1', 'Project', 'code', 'old-provider', now, now);
 
       const res = await request(app)
         .put('/api/projects/p1')
-        .send({ reviewProviderId: null });
+        .send({ reviewLlmProfileId: null });
 
       expect(res.status).toBe(200);
-      const row = db.prepare('SELECT review_provider_id FROM projects WHERE id = ?').get('p1') as any;
-      expect(row.review_provider_id).toBeNull();
+      const row = db.prepare('SELECT review_llm_profile_id FROM projects WHERE id = ?').get('p1') as any;
+      expect(row.review_llm_profile_id).toBeNull();
     });
   });
 
