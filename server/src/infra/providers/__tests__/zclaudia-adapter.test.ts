@@ -3,6 +3,7 @@ import Database from 'better-sqlite3';
 import type { AgentEvent } from '@earendil-works/pi-agent-core';
 import { __testables, ZClaudiaAdapter } from '../zclaudia-adapter.js';
 import type { RunOptions, ClaudeMessage } from '../types.js';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
 // Mock pi-ai's getModel so tests don't hit real model registry.
 vi.mock('@earendil-works/pi-ai', () => ({
@@ -498,5 +499,74 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
     expect(opts.beforeToolCall).toBeDefined();
     expect(opts.afterToolCall).toBeDefined();
     expect(opts.shouldStopAfterTurn).toBeDefined();
+  });
+});
+
+describe('buildModel — profile overrides', () => {
+  const originalEnv = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+  });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('uses profile providerType and apiKey when supplied (built-in provider path)', () => {
+    delete process.env.OPENAI_BASE_URL;
+    const profile: LlmProfileConfig = {
+      id: 'p1',
+      name: 'claude-personal',
+      providerType: 'anthropic',
+      apiKey: 'sk-ant-from-profile',
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const { model, getApiKey } = buildModel(profile);
+    expect(model.provider).toBe('anthropic');
+    expect(getApiKey).toBeDefined();
+  });
+
+  it('uses profile baseUrl + compat when supplied (openai-compatible path)', () => {
+    const profile: LlmProfileConfig = {
+      id: 'p2',
+      name: 'deepseek',
+      providerType: 'openai-custom',
+      baseUrl: 'http://127.0.0.1:3000/v1',
+      apiKey: 'sk-deepseek',
+      compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const { model, getApiKey } = buildModel(profile);
+    expect(model.baseUrl).toBe('http://127.0.0.1:3000/v1');
+    expect(model.api).toBe('openai-completions');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((model as any).compat).toEqual({ supportsDeveloperRole: false, supportsReasoningEffort: false });
+    expect(getApiKey).toBeDefined();
+  });
+
+  it('falls back to env when profile is undefined (regression: sub-project 1 behavior)', () => {
+    delete process.env.OPENAI_BASE_URL;
+    process.env.PI_PROVIDER = 'anthropic';
+    process.env.PI_MODEL = 'claude-sonnet-4-6';
+    const { model } = buildModel(undefined);
+    expect(model.provider).toBe('anthropic');
+  });
+
+  it('profile.apiKey overrides env (even if env is set)', async () => {
+    process.env.OPENAI_BASE_URL = 'http://127.0.0.1:3000/v1';
+    process.env.OPENAI_API_KEY = 'env-key';
+    const profile: LlmProfileConfig = {
+      id: 'p3',
+      name: 'p3',
+      providerType: 'openai-custom',
+      baseUrl: 'http://127.0.0.1:4000/v1',
+      apiKey: 'profile-key',
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    const { model, getApiKey } = buildModel(profile);
+    expect(model.baseUrl).toBe('http://127.0.0.1:4000/v1');
+    expect(await getApiKey!('openai-custom')).toBe('profile-key');
   });
 });

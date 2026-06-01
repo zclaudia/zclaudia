@@ -1,5 +1,6 @@
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { ClaudeMessage, PermissionCallback } from './message-types.js';
@@ -20,6 +21,8 @@ export interface RunOptions {
   serverPort?: number;    // Main server port for MCP bridge
   claudiaSessionId?: string;  // ZClaudia session ID (for interaction tool context)
   db?: Database.Database;  // Database for loading ZClaudia-managed MCP servers
+  /** Resolved LLM profile to drive buildModel. If undefined, buildModel falls back to env. */
+  llmProfileConfig?: LlmProfileConfig;
 }
 
 /** Agent runtime adapter interface. */

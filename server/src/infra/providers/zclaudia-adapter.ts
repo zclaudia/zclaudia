@@ -2,6 +2,7 @@ import { getModel, type Model } from '@earendil-works/pi-ai';
 import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
 import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory } from './pi-runtime/index.js';
 
@@ -46,14 +47,15 @@ const policy: ProviderPolicy = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuiltModel = { model: Model<any>; getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined };
 
-function buildModel(): BuiltModel {
-  // If OPENAI_BASE_URL is set we build a custom openai-completions Model literal so
-  // any OpenAI-compatible endpoint (DeepSeek / vLLM / Azure / corporate proxies / etc.)
-  // works without being pre-registered in pi-ai's model registry.
-  const baseUrl = process.env.OPENAI_BASE_URL;
+function buildModel(profile?: LlmProfileConfig): BuiltModel {
+  // Resolution order: profile field > env > hardcoded default.
+  // If baseUrl is set (via profile or OPENAI_BASE_URL env) we build a custom openai-completions
+  // Model literal so any OpenAI-compatible endpoint (DeepSeek / vLLM / Azure / corporate proxies /
+  // etc.) works without being pre-registered in pi-ai's model registry.
+  const baseUrl = profile?.baseUrl ?? process.env.OPENAI_BASE_URL;
   if (baseUrl) {
-    const id = process.env.OPENAI_MODEL || 'gpt-4o';
-    const provider = process.env.PI_PROVIDER || 'openai-custom';
+    const id = process.env.OPENAI_MODEL || 'gpt-4o';  // model stays env-driven in sub-project A; agent-profile takes over in sub-project B
+    const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? 'openai-custom';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model: Model<any> = {
       id,
@@ -67,13 +69,17 @@ function buildModel(): BuiltModel {
       contextWindow: 128000,
       maxTokens: 8192,
     };
+    if (profile?.compat) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (model as any).compat = profile.compat;
+    }
     return {
       model,
-      getApiKey: async () => process.env.OPENAI_API_KEY ?? '',
+      getApiKey: async () => profile?.apiKey ?? process.env.OPENAI_API_KEY ?? '',
     };
   }
 
-  const provider = process.env.PI_PROVIDER || DEFAULT_PROVIDER;
+  const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? DEFAULT_PROVIDER;
   const modelId = process.env.PI_MODEL || DEFAULT_MODEL;
   // pi-ai's getModel is generically typed on literal provider + model id.
   // Env-derived strings can't satisfy those generic constraints; cast through `string`
@@ -81,7 +87,10 @@ function buildModel(): BuiltModel {
   // Model<T> requires T extends Api, so we use `any` to opt out of that constraint.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const model = (getModel as (provider: string, model: string) => Model<any>)(provider, modelId);
-  return { model };
+  return {
+    model,
+    getApiKey: profile?.apiKey ? async () => profile.apiKey! : undefined,
+  };
 }
 
 class AsyncQueue<T> implements AsyncIterable<T> {
@@ -249,11 +258,11 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // 2. Build the model (config errors stop here)
     let modelInfo: BuiltModel;
     try {
-      modelInfo = buildModel();
+      modelInfo = buildModel(options.llmProfileConfig);
     } catch (err) {
       yield {
         type: 'error',
-        error: `model configuration failed: ${err instanceof Error ? err.message : String(err)}. Check PI_PROVIDER / PI_MODEL / provider API key env vars.`,
+        error: `model configuration failed: ${err instanceof Error ? err.message : String(err)}. Check PI_PROVIDER / PI_MODEL / provider API key env vars or LLM Profile config.`,
         isComplete: true,
       };
       return;
