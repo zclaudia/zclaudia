@@ -1,10 +1,20 @@
+import type Database from 'better-sqlite3';
 import { getModel, type Model } from '@earendil-works/pi-ai';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, ProviderAdapter, RunOptions } from './types.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
+const HISTORY_LIMIT = 50;
+
+interface StoredRow {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  createdAt: number;
+}
 
 const manifest: PCPProviderManifest = {
   id: 'zclaudia',
@@ -47,6 +57,44 @@ function buildModel(): Model<unknown> {
   return getModel(provider, model) as Model<unknown>;
 }
 
+export function loadHistory(db: Database.Database | undefined, sessionId: string | undefined): AgentMessage[] {
+  if (!db || !sessionId) return [];
+
+  const rows = db.prepare<[string, number], StoredRow>(`
+    SELECT id, role, content, created_at as createdAt
+    FROM messages
+    WHERE session_id = ?
+    ORDER BY created_at DESC
+    LIMIT ?
+  `).all(sessionId, HISTORY_LIMIT);
+
+  // Reverse to chronological order
+  const chronological = rows.reverse();
+
+  // Strip trailing user message (the current turn's input, just inserted by run-bootstrap)
+  if (chronological.length > 0 && chronological[chronological.length - 1].role === 'user') {
+    chronological.pop();
+  }
+
+  // Convert to pi AgentMessage format; skip system rows
+  const messages: AgentMessage[] = [];
+  for (const row of chronological) {
+    if (row.role === 'system') continue;
+    if (row.role === 'user') {
+      messages.push({ role: 'user', content: row.content, timestamp: row.createdAt } as AgentMessage);
+    } else if (row.role === 'assistant') {
+      messages.push({
+        role: 'assistant',
+        content: [{ type: 'text', text: row.content }],
+        stopReason: 'end_turn',
+        timestamp: row.createdAt,
+      } as AgentMessage);
+    }
+  }
+
+  return messages;
+}
+
 class AsyncQueue<T> implements AsyncIterable<T> {
   private buffer: T[] = [];
   private waiters: Array<(result: IteratorResult<T>) => void> = [];
@@ -85,7 +133,7 @@ class AsyncQueue<T> implements AsyncIterable<T> {
   }
 }
 
-export const __testables = { AsyncQueue, buildModel };
+export const __testables = { AsyncQueue, buildModel, loadHistory };
 
 function buildStubResponse(input: string, options: RunOptions): string {
   const mode = options.mode || 'default';

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import Database from 'better-sqlite3';
 import { __testables } from '../zclaudia-adapter.js';
 
 // Mock pi-ai's getModel so tests don't hit real model registry.
@@ -10,7 +11,29 @@ vi.mock('@earendil-works/pi-ai', () => ({
   }),
 }));
 
-const { AsyncQueue, buildModel } = __testables;
+const { AsyncQueue, buildModel, loadHistory } = __testables;
+
+function createTestDb(): Database.Database {
+  const db = new Database(':memory:');
+  db.exec(`
+    CREATE TABLE messages (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      role TEXT CHECK(role IN ('user', 'assistant', 'system')) NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at INTEGER NOT NULL,
+      offset INTEGER
+    );
+    CREATE INDEX idx_messages_session_offset ON messages(session_id, offset);
+  `);
+  return db;
+}
+
+function insertMessage(db: Database.Database, row: { id: string; sessionId: string; role: string; content: string; createdAt: number; offset: number }) {
+  db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
+    .run(row.id, row.sessionId, row.role, row.content, row.createdAt, row.offset);
+}
 
 describe('AsyncQueue', () => {
   it('yields pushed values in order then completes on close', async () => {
@@ -85,5 +108,63 @@ describe('buildModel', () => {
   it('propagates getModel errors (model not in registry)', () => {
     process.env.PI_MODEL = 'invalid-model';
     expect(() => buildModel()).toThrow(/unknown model: invalid-model/);
+  });
+});
+
+describe('loadHistory', () => {
+  it('returns empty array when sessionId or db missing', () => {
+    const db = createTestDb();
+    expect(loadHistory(undefined, 's1')).toEqual([]);
+    expect(loadHistory(db, undefined)).toEqual([]);
+    expect(loadHistory(db, 's1')).toEqual([]);
+  });
+
+  it('returns messages in chronological order', () => {
+    const db = createTestDb();
+    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'user', content: 'hi',     createdAt: 100, offset: 1 });
+    insertMessage(db, { id: 'm2', sessionId: 's1', role: 'assistant', content: 'hello',  createdAt: 200, offset: 2 });
+    insertMessage(db, { id: 'm3', sessionId: 's1', role: 'user', content: 'how are you', createdAt: 300, offset: 3 });
+    // bootstrap inserts current input; trailing user should be popped
+    const out = loadHistory(db, 's1');
+    expect(out.map(m => m.role)).toEqual(['user', 'assistant']);
+    expect((out[0] as { content: string }).content).toBe('hi');
+  });
+
+  it('filters out system rows', () => {
+    const db = createTestDb();
+    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'system',    content: 'sys',  createdAt: 100, offset: 1 });
+    insertMessage(db, { id: 'm2', sessionId: 's1', role: 'user',      content: 'hi',   createdAt: 200, offset: 2 });
+    insertMessage(db, { id: 'm3', sessionId: 's1', role: 'assistant', content: 'yo',   createdAt: 300, offset: 3 });
+    const out = loadHistory(db, 's1');
+    expect(out.map(m => m.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('does not pop trailing message when it is an assistant', () => {
+    const db = createTestDb();
+    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'user',      content: 'hi',  createdAt: 100, offset: 1 });
+    insertMessage(db, { id: 'm2', sessionId: 's1', role: 'assistant', content: 'hey', createdAt: 200, offset: 2 });
+    const out = loadHistory(db, 's1');
+    expect(out.map(m => m.role)).toEqual(['user', 'assistant']);
+  });
+
+  it('returns assistant message in pi text-content format', () => {
+    const db = createTestDb();
+    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello world', createdAt: 100, offset: 1 });
+    const out = loadHistory(db, 's1');
+    expect(out[0]).toMatchObject({
+      role: 'assistant',
+      content: [{ type: 'text', text: 'hello world' }],
+    });
+  });
+
+  it('caps at HISTORY_LIMIT most recent messages', () => {
+    const db = createTestDb();
+    for (let i = 0; i < 60; i++) {
+      insertMessage(db, { id: `m${i}`, sessionId: 's1', role: i % 2 === 0 ? 'user' : 'assistant', content: `msg${i}`, createdAt: 100 + i, offset: i + 1 });
+    }
+    const out = loadHistory(db, 's1');
+    // 60 total messages; HISTORY_LIMIT=50 are loaded (newest 50: m10..m59); last (m59 is assistant since 59%2!=0 → assistant)
+    // Trailing assistant -> no pop. So output length = 50.
+    expect(out.length).toBe(50);
   });
 });
