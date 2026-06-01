@@ -879,6 +879,8 @@ CREATE INDEX IF NOT EXISTS idx_file_references_message ON file_references(messag
 
 CREATE INDEX IF NOT EXISTS idx_file_references_session ON file_references(session_id);
 
+CREATE INDEX IF NOT EXISTS idx_llm_profiles_default ON llm_profiles(is_default);
+
 CREATE INDEX IF NOT EXISTS idx_local_issue_comments_issue
       ON local_issue_comments(issue_id, created_at);
 

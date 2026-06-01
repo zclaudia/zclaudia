@@ -23,7 +23,39 @@ export function initDatabase(): Database.Database {
   // Run migrations
   runMigrations(db);
 
+  // Sanity-check that schema is current — catches stale dev DBs that were
+  // created before the providers→llm_profiles rename. Since `001_initial_schema`
+  // was modified in place (not as a new migration), pre-rename DBs already have
+  // the migration record and skip the re-run, so legacy `providers` table sticks
+  // around without `llm_profiles` being created.
+  ensureSchemaIsCurrent(db);
+
   return db;
+}
+
+/**
+ * Detect stale dev DBs where the legacy `providers` table still exists but
+ * `llm_profiles` is missing (i.e. the DB predates the providers→llm_profiles
+ * rename and the migration record blocks the schema rewrite). Throws with a
+ * clear remediation message instead of letting downstream queries fail.
+ */
+export function ensureSchemaIsCurrent(db: Database.Database): void {
+  const tables = db
+    .prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('providers', 'llm_profiles')"
+    )
+    .all() as Array<{ name: string }>;
+
+  const names = new Set(tables.map((t) => t.name));
+  if (names.has('providers') && !names.has('llm_profiles')) {
+    throw new Error(
+      `[ZClaudia] Schema mismatch: legacy 'providers' table exists but 'llm_profiles' is missing. ` +
+        `This happens when an existing dev DB predates the providers→llm_profiles rename. ` +
+        `Wipe the data dir and restart:\n` +
+        `  rm -rf $ZCLAUDIA_DATA_DIR  (or ~/.zclaudia*)\n` +
+        `  bash scripts/dev/start-app.sh`
+    );
+  }
 }
 
 function runMigrations(db: Database.Database): void {
