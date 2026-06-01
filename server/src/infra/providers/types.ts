@@ -18,7 +18,7 @@ export interface RunOptions {
   env?: Record<string, string>;
   mode?: string;
   model?: string;
-  systemPrompt?: string;  // Appended to system prompt (e.g. for agent sessions)
+  systemPrompt?: string;  // Full system prompt sourced from agentProfile.systemPrompt by run-context (§4.6 full replacement)
   sessionTitle?: string;  // Optional session title for providers that support it
   serverPort?: number;    // Main server port for MCP bridge
   claudiaSessionId?: string;  // ZClaudia session ID (for interaction tool context)

@@ -139,12 +139,12 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
   }
 
   const template = ((message as Record<string, unknown>)._contextTemplate || (sessionType === 'agent' ? 'agent' : 'coding')) as ContextTemplate;
-  // NOTE: context-engine assembly is preserved so callers can still introspect
-  // workspace/skill prompts in the future (e.g. via tracing). The RunOptions
-  // systemPrompt below is intentionally driven solely by agentProfile.systemPrompt
-  // per the agent-profiles spec (§4.6 — full replacement). When future work adds
-  // a merge transform (e.g. AGENTS.md injection), this is where it goes.
-  void createContextEngine().assemble(template, {
+  // Call assemble() for side effects: skill-discovery (getDiscoveredSkills / selectSkills
+  // run inside the engine) and workspace tracing hooks that downstream tooling may consume.
+  // Return value is intentionally discarded — systemPrompt now comes from
+  // agentProfile.systemPrompt per §4.6 (full replacement). When a merge transform is
+  // added (e.g. AGENTS.md injection) this call becomes load-bearing.
+  createContextEngine().assemble(template, {
     sessionId: message.sessionId,
     projectId: session.project_id,
     cwd,
