@@ -117,7 +117,7 @@ wait_for_url() {
 # --- Ensure native modules work with the Tauri sidecar Node ---
 ensure_native_modules() {
   local sidecar
-  sidecar=$(ls "$PROJECT_ROOT/apps/desktop/src-tauri/binaries/node-"* 2>/dev/null | head -1)
+  sidecar=$(ls "$PROJECT_ROOT/apps/desktop/src-tauri/binaries/node-"* 2>/dev/null | head -1 || true)
 
   if [[ -n "$sidecar" && -x "$sidecar" ]]; then
     if ! "$sidecar" -e "require('module').createRequire(process.cwd()+'/package.json')('better-sqlite3')" 2>/dev/null; then
@@ -222,7 +222,7 @@ start_standalone() {
   SERVER_PID=$!
 
   info "Starting frontend (vite)..."
-  (cd "$PROJECT_ROOT/apps/desktop" && setup_node && pnpm dev) &
+  (cd "$PROJECT_ROOT/apps/desktop" && setup_node && VITE_LOCAL_SERVER_PORT=3100 pnpm dev) &
   FRONTEND_PID=$!
 
   wait_for_url "http://localhost:3100/api/sessions" 20 "Backend"
