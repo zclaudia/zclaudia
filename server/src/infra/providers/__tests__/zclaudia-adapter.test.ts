@@ -11,7 +11,7 @@ vi.mock('@earendil-works/pi-ai', () => ({
   }),
 }));
 
-const { AsyncQueue, buildModel, loadHistory } = __testables;
+const { AsyncQueue, buildModel, loadHistory, translateEvent } = __testables;
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -166,5 +166,74 @@ describe('loadHistory', () => {
     // 60 total messages; HISTORY_LIMIT=50 are loaded (newest 50: m10..m59); last (m59 is assistant since 59%2!=0 → assistant)
     // Trailing assistant -> no pop. So output length = 50.
     expect(out.length).toBe(50);
+  });
+});
+
+describe('translateEvent', () => {
+  const ctx = { sessionId: 'test-session', model: 'claude-sonnet-4-6', cwd: '/tmp' };
+
+  it('translates agent_start to init', () => {
+    const out = translateEvent({ type: 'agent_start' }, ctx);
+    expect(out).toMatchObject({
+      type: 'init',
+      sessionId: 'test-session',
+      systemInfo: { model: 'claude-sonnet-4-6', cwd: '/tmp' },
+    });
+  });
+
+  it('translates message_update text_delta to assistant chunk', () => {
+    const out = translateEvent({
+      type: 'message_update',
+      message: { role: 'assistant', content: [] },
+      assistantMessageEvent: { type: 'text_delta', delta: 'Hello' },
+    }, ctx);
+    expect(out).toEqual({ type: 'assistant', content: 'Hello' });
+  });
+
+  it('ignores non-text_delta message_update events', () => {
+    const out = translateEvent({
+      type: 'message_update',
+      message: { role: 'assistant', content: [] },
+      assistantMessageEvent: { type: 'thinking_delta', delta: 'pondering' },
+    }, ctx);
+    expect(out).toBeUndefined();
+  });
+
+  it('translates agent_end with usage to result', () => {
+    const out = translateEvent({
+      type: 'agent_end',
+      messages: [],
+    }, ctx, { inputTokens: 42, outputTokens: 17 });
+    expect(out).toMatchObject({
+      type: 'result',
+      isComplete: true,
+      usage: { inputTokens: 42, outputTokens: 17 },
+    });
+  });
+
+  it('translates agent_end without usage to result with zeros', () => {
+    const out = translateEvent({ type: 'agent_end', messages: [] }, ctx);
+    expect(out).toMatchObject({
+      type: 'result',
+      isComplete: true,
+      usage: { inputTokens: 0, outputTokens: 0 },
+    });
+  });
+
+  it('ignores message_start, message_end, turn_start, turn_end', () => {
+    expect(translateEvent({ type: 'message_start', message: { role: 'user', content: 'x', timestamp: 0 } }, ctx)).toBeUndefined();
+    expect(translateEvent({ type: 'message_end', message: { role: 'user', content: 'x', timestamp: 0 } }, ctx)).toBeUndefined();
+    expect(translateEvent({ type: 'turn_start' }, ctx)).toBeUndefined();
+    expect(translateEvent({ type: 'turn_end', message: { role: 'assistant', content: [] }, toolResults: [] }, ctx)).toBeUndefined();
+  });
+
+  it('ignores unknown event types without throwing', () => {
+    const out = translateEvent({ type: '_future_unknown_' as never }, ctx);
+    expect(out).toBeUndefined();
+  });
+
+  it('ignores tool_execution_* events in MVP', () => {
+    expect(translateEvent({ type: 'tool_execution_start', toolCallId: 't1', toolName: 'read', args: {} }, ctx)).toBeUndefined();
+    expect(translateEvent({ type: 'tool_execution_end', toolCallId: 't1', toolName: 'read', result: {}, isError: false }, ctx)).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { getModel, type Model } from '@earendil-works/pi-ai';
-import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, ProviderAdapter, RunOptions } from './types.js';
@@ -134,7 +134,72 @@ class AsyncQueue<T> implements AsyncIterable<T> {
   }
 }
 
-export const __testables = { AsyncQueue, buildModel, loadHistory };
+interface TranslateContext {
+  sessionId: string;
+  model: string;
+  cwd: string;
+  permissionMode?: string;
+}
+
+interface UsageHint {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export function translateEvent(
+  event: AgentEvent,
+  ctx: TranslateContext,
+  usage?: UsageHint,
+): ClaudeMessage | undefined {
+  try {
+    switch (event.type) {
+      case 'agent_start':
+        return {
+          type: 'init',
+          sessionId: ctx.sessionId,
+          systemInfo: {
+            model: ctx.model,
+            cwd: ctx.cwd,
+            permissionMode: ctx.permissionMode || 'default',
+            tools: [],
+            agents: ['zclaudia'],
+          },
+        };
+      case 'message_update': {
+        const sub = event.assistantMessageEvent;
+        if (sub && sub.type === 'text_delta' && typeof sub.delta === 'string') {
+          return { type: 'assistant', content: sub.delta };
+        }
+        return undefined;
+      }
+      case 'agent_end':
+        return {
+          type: 'result',
+          isComplete: true,
+          usage: {
+            inputTokens: usage?.inputTokens ?? 0,
+            outputTokens: usage?.outputTokens ?? 0,
+          },
+        };
+      // Explicit no-ops:
+      case 'message_start':
+      case 'message_end':
+      case 'turn_start':
+      case 'turn_end':
+      case 'tool_execution_start':
+      case 'tool_execution_update':
+      case 'tool_execution_end':
+        return undefined;
+      default:
+        return undefined;
+    }
+  } catch (err) {
+    console.warn('[ZClaudiaAdapter] translateEvent failed:', err);
+    return undefined;
+  }
+}
+
+export const __testables = { AsyncQueue, buildModel, loadHistory, translateEvent };
 
 function buildStubResponse(input: string, options: RunOptions): string {
   const mode = options.mode || 'default';
