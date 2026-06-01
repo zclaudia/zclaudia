@@ -1,7 +1,66 @@
+import { randomUUID } from 'node:crypto';
+
 import type { AgentLoopConfig, StreamFn } from '@earendil-works/pi-agent-core';
 import type { PermissionCallback } from '../types.js';
 
 export const DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
+
+/**
+ * Map pi's lowercase tool names to ZClaudia's canonical (Claude Code style)
+ * tool names. This is required because ZClaudia's permission classifier
+ * (`permission-evaluator.ts`) uses case-sensitive lookups against tool name
+ * lists like `EDIT_TOOLS = ['Write', 'Edit', 'NotebookEdit']`. Without
+ * normalization, pi tools would fall into the default category and bypass
+ * the permission UI.
+ *
+ * We only normalize the name passed to `permissionCallback`; pi's tool
+ * definitions themselves keep the lowercase names so we don't break the
+ * pi-coding-agent contract.
+ */
+const PI_TO_CANONICAL_TOOL: Record<string, string> = {
+  read: 'Read',
+  write: 'Write',
+  edit: 'Edit',
+  bash: 'Bash',
+  grep: 'Grep',
+  // pi's `find` is a glob-style file finder; Claude Code's equivalent is `Glob`.
+  find: 'Glob',
+  ls: 'LS',
+};
+
+function canonicalToolName(piName: string): string {
+  return PI_TO_CANONICAL_TOOL[piName] ?? piName;
+}
+
+/**
+ * Build a short, human-readable preview of the tool call for the permission
+ * UI dialog. Avoids dumping huge arg payloads. Falls back to a truncated
+ * JSON string when no specific extractor applies.
+ */
+function buildToolDetail(piToolName: string, args: unknown): string {
+  if (typeof args !== 'object' || args === null) return piToolName;
+  const argsObj = args as Record<string, unknown>;
+
+  if (piToolName === 'bash' && typeof argsObj.command === 'string') {
+    return argsObj.command;
+  }
+  if ((piToolName === 'read' || piToolName === 'edit' || piToolName === 'write')
+      && typeof argsObj.path === 'string') {
+    return argsObj.path;
+  }
+  if (piToolName === 'grep' && typeof argsObj.pattern === 'string') {
+    return `grep "${argsObj.pattern}"`;
+  }
+  if (piToolName === 'find' && typeof argsObj.pattern === 'string') {
+    return `find ${argsObj.pattern}`;
+  }
+  if (piToolName === 'ls' && typeof argsObj.path === 'string') {
+    return `ls ${argsObj.path}`;
+  }
+
+  const json = JSON.stringify(args);
+  return json.length > 120 ? json.slice(0, 117) + '...' : json;
+}
 
 export interface AgentHooksInput {
   permissionCallback: PermissionCallback;
@@ -68,12 +127,14 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     beforeToolCall: async (ctx: any) => {
       const { toolCall, args } = ctx;
+      const piName: string = toolCall.name;
       const decision = await input.permissionCallback({
-        toolUseId: toolCall.id,
-        toolName: toolCall.name,
+        requestId: randomUUID(),
+        toolName: canonicalToolName(piName),
         toolInput: args,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } as any);
+        detail: buildToolDetail(piName, args),
+        timeoutSeconds: 0,
+      });
 
       if (decision.behavior === 'deny') {
         return { block: true, reason: decision.message ?? 'denied by user' };
