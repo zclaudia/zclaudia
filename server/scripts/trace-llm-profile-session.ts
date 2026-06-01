@@ -1,14 +1,14 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import { WebSocket } from 'ws';
-import type { ProviderConfig, RunStartMessage, ServerMessage, Session } from '@zclaudia/shared';
+import type { LlmProfileConfig, RunStartMessage, ServerMessage, Session } from '@zclaudia/shared';
 
 interface Args {
   api: string;
   token?: string;
   projectId: string;
   providerType?: string;
-  providerId?: string;
+  llmProfileId?: string;
   sessionId?: string;
   sessionName?: string;
   cwd?: string;
@@ -60,14 +60,14 @@ async function fetchJson<T>(api: string, pathname: string, init: RequestInit = {
   return body.data;
 }
 
-async function resolveProviderId(api: string, providerType: string, token?: string): Promise<string> {
-  const providers = await fetchJson<ProviderConfig[]>(api, '/api/providers', { method: 'GET' }, token);
-  const match = providers.find((provider) => provider.type === providerType);
-  if (!match) throw new Error(`No provider found for type "${providerType}"`);
+async function resolveLlmProfileId(api: string, providerType: string, token?: string): Promise<string> {
+  const profiles = await fetchJson<LlmProfileConfig[]>(api, '/api/llm-profiles', { method: 'GET' }, token);
+  const match = profiles.find((profile) => profile.providerType === providerType);
+  if (!match) throw new Error(`No llm profile found for providerType "${providerType}"`);
   return match.id;
 }
 
-async function ensureSession(args: Args, providerId: string | undefined): Promise<Session> {
+async function ensureSession(args: Args, llmProfileId: string | undefined): Promise<Session> {
   if (args.sessionId) {
     return fetchJson<Session>(args.api, `/api/sessions/${args.sessionId}`, { method: 'GET' }, args.token);
   }
@@ -75,8 +75,8 @@ async function ensureSession(args: Args, providerId: string | undefined): Promis
     method: 'POST',
     body: JSON.stringify({
       projectId: args.projectId,
-      providerId,
-      name: args.sessionName || `trace-${args.providerType || providerId || 'provider'}`,
+      llmProfileId,
+      name: args.sessionName || `trace-${args.providerType || llmProfileId || 'llm-profile'}`,
       workingDirectory: args.cwd,
     }),
   }, args.token);
@@ -119,8 +119,8 @@ function summarize(messages: ServerMessage[]) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const providerId = args.providerId || (args.providerType ? await resolveProviderId(args.api, args.providerType, args.token) : undefined);
-  const session = await ensureSession(args, providerId);
+  const llmProfileId = args.llmProfileId || (args.providerType ? await resolveLlmProfileId(args.api, args.providerType, args.token) : undefined);
+  const session = await ensureSession(args, llmProfileId);
   const prompt = args.promptFile ? readFileSync(args.promptFile, 'utf8') : args.prompt!;
   const wsUrl = toWsUrl(args.api);
   const events: Array<{ ts: number; message: ServerMessage }> = [];
@@ -145,7 +145,7 @@ async function main() {
           clientRequestId: `trace_${Date.now()}`,
           sessionId: session.id,
           input: prompt,
-          providerId,
+          llmProfileId,
           workingDirectory: args.cwd,
           ...(args.model ? { model: args.model } : {}),
           ...(args.mode ? { mode: args.mode } : {}),
@@ -181,7 +181,7 @@ async function main() {
   })));
   writeFileSync(summaryPath, `${JSON.stringify({
     api: args.api,
-    providerId,
+    llmProfileId,
     providerType: args.providerType,
     sessionId: session.id,
     cwd: args.cwd || session.workingDirectory || null,

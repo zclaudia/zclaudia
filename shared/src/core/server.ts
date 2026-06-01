@@ -19,7 +19,7 @@ export interface BackendServer {
 export type ServerFeature =
   | 'providerCapabilities'   // GET /api/providers/:id/capabilities, /type/:type/capabilities
   | 'providerCommands'       // GET /api/providers/:id/commands, /type/:type/commands
-  | 'setDefaultProvider'     // POST /api/providers/:id/set-default
+  | 'setDefaultProvider'     // POST /api/llm-profiles/:id/set-default
   | 'search'                 // GET /api/sessions/search/*
   | 'fileUpload'             // POST /api/files/upload
   | 'remoteTerminal'         // WebSocket-based PTY terminal

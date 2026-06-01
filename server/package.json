@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "clean": "rm -rf dist bundle",
     "bundle": "node scripts/bundle.mjs",
-    "trace:provider": "tsx scripts/trace-provider-session.ts",
+    "trace:llm-profile": "tsx scripts/trace-llm-profile-session.ts",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "test": "vitest run",
