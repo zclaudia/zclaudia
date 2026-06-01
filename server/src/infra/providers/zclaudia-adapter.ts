@@ -335,7 +335,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
 
     // 6. Run prompt; close queue on completion or push error on rejection
     agent.prompt(input)
-      .then(() => queue.close())
+      .then(() => { queue.close(); })
       .catch(err => {
         queue.push({
           type: 'error',
@@ -347,7 +347,9 @@ export class ZClaudiaAdapter implements ProviderAdapter {
 
     // 7. Yield translated events
     try {
-      for await (const m of queue) yield m;
+      for await (const m of queue) {
+        yield m;
+      }
     } finally {
       unsubscribe();
       // Cancel any in-flight pi work (token leak prevention on early break /
