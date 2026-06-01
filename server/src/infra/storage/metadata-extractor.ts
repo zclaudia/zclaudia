@@ -4,7 +4,7 @@ interface MessageMetadata {
   toolCalls?: Array<{
     name: string;
     input?: Record<string, unknown>;
-    result?: unknown;
+    output?: unknown;
     isError?: boolean;
     effect?: unknown;
   }>;
@@ -32,7 +32,7 @@ export function extractAndIndexMetadata(
     for (const toolCall of metadata.toolCalls) {
       // Index the tool call itself
       const toolInput = toolCall.input ? JSON.stringify(toolCall.input) : null;
-      const toolResult = toolCall.result ? JSON.stringify(toolCall.result) : null;
+      const toolResult = toolCall.output ? JSON.stringify(toolCall.output) : null;
 
       db.prepare(`
         INSERT INTO tool_call_records (message_rowid, message_id, session_id, tool_name, tool_input, tool_result, is_error, created_at)

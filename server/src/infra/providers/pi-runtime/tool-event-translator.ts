@@ -75,8 +75,7 @@ export function translateToolEvent(
           toolName: (event as any).toolName,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           content: extractPartialText((event as any).partialResult),
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } as any;
+        };
       }
 
       case 'tool_execution_end': {

@@ -209,13 +209,13 @@ describe('metadata-extractor', () => {
           {
             name: 'bash',
             input: { command: 'ls -la' },
-            result: 'file1\nfile2',
+            output: 'file1\nfile2',
             isError: false,
           },
           {
             name: 'read_file',
             input: { file_path: '/src/main.ts' },
-            result: 'content here',
+            output: 'content here',
             isError: false,
           },
         ],
@@ -252,7 +252,7 @@ describe('metadata-extractor', () => {
           {
             name: 'bash',
             input: { command: 'bad-command' },
-            result: 'command not found',
+            output: 'command not found',
             isError: true,
           },
         ],
@@ -332,7 +332,7 @@ describe('metadata-extractor', () => {
 
       extractAndIndexMetadata(db, msgId, rowid, sessionId, {
         toolCalls: [
-          { name: 'bash', input: { file_path: '/a.ts' }, result: 'ok' },
+          { name: 'bash', input: { file_path: '/a.ts' }, output: 'ok' },
           { name: 'read_file', input: { file_path: '/b.ts' } },
         ],
         attachments: [{ path: '/c.ts' }],
@@ -408,7 +408,7 @@ describe('metadata-extractor', () => {
 
       extractAndIndexMetadata(db, msgId, rowid, sessionId, {
         toolCalls: [
-          { name: 'bash', input: { command: 'npm install express' }, result: 'added 50 packages' },
+          { name: 'bash', input: { command: 'npm install express' }, output: 'added 50 packages' },
         ],
       }, now);
 
