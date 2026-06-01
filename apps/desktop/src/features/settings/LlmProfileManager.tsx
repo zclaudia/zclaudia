@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared';
+import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProviderMetaStore } from '../../stores/providerMetaStore';
@@ -66,23 +67,26 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
-  const storeProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const storeProfiles = useProviderMetaStore((s) => s.getProviders(activeServerId));
 
-  const [providers, setProviders] = useState<LlmProfileConfig[]>([]);
+  const [profiles, setProfiles] = useState<LlmProfileConfig[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingProvider, setEditingProvider] = useState<LlmProfileConfig | null>(null);
+  const [editingProfile, setEditingProfile] = useState<LlmProfileConfig | null>(null);
 
   // Form state
-  type ProviderType = string;
   const [formName, setFormName] = useState('');
-  const [formType, setFormType] = useState<ProviderType>('anthropic');
-  const [formCliPath, setFormCliPath] = useState('');
+  const [formProviderType, setFormProviderType] = useState<string>('anthropic');
+  const [formBaseUrl, setFormBaseUrl] = useState('');
+  const [formApiKey, setFormApiKey] = useState('');
+  const [formCompat, setFormCompat] = useState('');
+  const [formCompatError, setFormCompatError] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [formEnv, setFormEnv] = useState('');
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [pendingDeleteProviderId, setPendingDeleteProviderId] = useState<string | null>(null);
-  const [deletingProviderId, setDeletingProviderId] = useState<string | null>(null);
+  const [pendingDeleteProfileId, setPendingDeleteProfileId] = useState<string | null>(null);
+  const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
 
   useAndroidBack(onClose, isOpen && !inline, 20);
@@ -92,20 +96,20 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       window.clearTimeout(deleteConfirmTimeoutRef.current);
       deleteConfirmTimeoutRef.current = null;
     }
-    setPendingDeleteProviderId(null);
+    setPendingDeleteProfileId(null);
   };
 
-  const loadProviders = async () => {
+  const loadProfiles = async () => {
     if (!isConnected) return;
     const current = useProviderMetaStore.getState().getProviders(activeServerId);
     if (current.length > 0) {
-      setProviders(current);
+      setProfiles(current);
     }
     setLoading(true);
     try {
       const data = await api.getProviders();
-      setProviders(data);
-      // Sync to global store so Sidebar's provider dropdown stays current
+      setProfiles(data);
+      // Sync to global store so Sidebar's profile dropdown stays current
       useProviderMetaStore.getState().setProviders(data, activeServerId);
     } catch (error) {
       console.error('Failed to load providers:', error);
@@ -115,21 +119,21 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   useEffect(() => {
-    if (storeProviders.length > 0) {
-      setProviders(storeProviders);
+    if (storeProfiles.length > 0) {
+      setProfiles(storeProfiles);
     }
-  }, [storeProviders]);
+  }, [storeProfiles]);
 
   useEffect(() => {
     // For inline mode, always load when connected
     // For modal mode, only load when open and connected
     if (inline) {
       if (isConnected) {
-        loadProviders();
+        loadProfiles();
       }
     } else {
       if (isOpen && isConnected) {
-        loadProviders();
+        loadProfiles();
       }
     }
   }, [isOpen, isConnected, inline]);
@@ -145,22 +149,31 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const resetForm = () => {
     clearDeleteConfirmation();
     setFormName('');
-    setFormType('anthropic');
-    setFormCliPath('');
+    setFormProviderType('anthropic');
+    setFormBaseUrl('');
+    setFormApiKey('');
+    setFormCompat('');
+    setFormCompatError(null);
+    setShowAdvanced(false);
     setFormEnv('');
     setFormIsDefault(false);
-    setEditingProvider(null);
+    setEditingProfile(null);
     setShowAddForm(false);
   };
 
-  const openEditForm = (provider: LlmProfileConfig) => {
+  const openEditForm = (profile: LlmProfileConfig) => {
     clearDeleteConfirmation();
-    setFormName(provider.name);
-    setFormType(provider.providerType);
-    setFormCliPath(provider.baseUrl || '');
-    setFormEnv(provider.env ? JSON.stringify(provider.env, null, 2) : '');
-    setFormIsDefault(provider.isDefault || false);
-    setEditingProvider(provider);
+    setFormName(profile.name);
+    setFormProviderType(profile.providerType);
+    setFormBaseUrl(profile.baseUrl || '');
+    setFormApiKey(profile.apiKey || '');
+    const hasCompat = profile.compat && Object.keys(profile.compat).length > 0;
+    setFormCompat(hasCompat ? JSON.stringify(profile.compat, null, 2) : '');
+    setFormCompatError(null);
+    setShowAdvanced(Boolean(hasCompat));
+    setFormEnv(profile.env ? JSON.stringify(profile.env, null, 2) : '');
+    setFormIsDefault(profile.isDefault || false);
+    setEditingProfile(profile);
     setShowAddForm(true);
   };
 
@@ -180,55 +193,79 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         }
       }
 
+      let compatObj: LlmProfileCompat | undefined;
+      const compatTrimmed = formCompat.trim();
+      if (compatTrimmed && compatTrimmed !== '{}') {
+        try {
+          const parsed = JSON.parse(compatTrimmed);
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            if (Object.keys(parsed).length > 0) {
+              compatObj = parsed as LlmProfileCompat;
+            }
+          } else {
+            setFormCompatError('Compat must be a JSON object');
+            setSaving(false);
+            return;
+          }
+        } catch {
+          setFormCompatError('Invalid JSON in compat field');
+          setSaving(false);
+          return;
+        }
+      }
+      setFormCompatError(null);
+
       const data = {
         name: formName.trim(),
-        providerType: formType,
-        baseUrl: formCliPath.trim() || undefined,
+        providerType: formProviderType,
+        baseUrl: formBaseUrl.trim() || undefined,
+        apiKey: formApiKey.trim() || undefined,
+        compat: compatObj,
         env: envObj,
         isDefault: formIsDefault
       };
 
-      if (editingProvider) {
-        await api.updateProvider(editingProvider.id, data);
+      if (editingProfile) {
+        await api.updateProvider(editingProfile.id, data);
       } else {
         await api.createProvider(data);
       }
 
-      await loadProviders();
+      await loadProfiles();
       resetForm();
     } catch (error) {
       console.error('Failed to save provider:', error);
       const message = error instanceof Error ? error.message : String(error);
-      alert(`Failed to ${editingProvider ? 'update' : 'create'} provider: ${message}`);
+      alert(`Failed to ${editingProfile ? 'update' : 'create'} provider: ${message}`);
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (deletingProviderId) return;
+    if (deletingProfileId) return;
 
-    if (pendingDeleteProviderId !== id) {
+    if (pendingDeleteProfileId !== id) {
       clearDeleteConfirmation();
-      setPendingDeleteProviderId(id);
+      setPendingDeleteProfileId(id);
       deleteConfirmTimeoutRef.current = window.setTimeout(() => {
-        setPendingDeleteProviderId((current) => (current === id ? null : current));
+        setPendingDeleteProfileId((current) => (current === id ? null : current));
         deleteConfirmTimeoutRef.current = null;
       }, 3000);
       return;
     }
 
     clearDeleteConfirmation();
-    setDeletingProviderId(id);
+    setDeletingProfileId(id);
     try {
       await api.deleteProvider(id);
-      await loadProviders();
+      await loadProfiles();
     } catch (error) {
       console.error('Failed to delete provider:', error);
       const message = error instanceof Error ? error.message : String(error);
       alert(`Failed to delete provider: ${message}`);
     } finally {
-      setDeletingProviderId(null);
+      setDeletingProfileId(null);
     }
   };
 
@@ -236,7 +273,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     clearDeleteConfirmation();
     try {
       await api.setDefaultProvider(id);
-      await loadProviders();
+      await loadProfiles();
     } catch (error) {
       console.error('Failed to set default provider:', error);
     }
@@ -263,18 +300,35 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         />
       </div>
 
-      <TypeSelector value={formType} onChange={setFormType} />
+      <ProviderTypeSelector value={formProviderType} onChange={setFormProviderType} />
 
       <div>
         <label className="block text-sm font-medium text-muted-foreground mb-1">Base URL (optional)</label>
         <input
           type="text"
-          value={formCliPath}
-          onChange={(e) => setFormCliPath(e.target.value)}
-          placeholder="https://api.anthropic.com"
+          value={formBaseUrl}
+          onChange={(e) => setFormBaseUrl(e.target.value)}
+          placeholder="http://api.example.com/v1"
           className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
         />
-        <p className="text-xs text-muted-foreground mt-1">Reserved for a future custom-endpoint provider</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Override default endpoint (required for openai-custom)
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-muted-foreground mb-1">API Key (optional)</label>
+        <input
+          type="password"
+          value={formApiKey}
+          onChange={(e) => setFormApiKey(e.target.value)}
+          placeholder="sk-..."
+          autoComplete="off"
+          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Stored on the server. Falls back to environment if omitted.
+        </p>
       </div>
 
       <div>
@@ -291,6 +345,45 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         <p className="text-xs text-muted-foreground mt-1">
           Environment variables passed to the runtime
         </p>
+      </div>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowAdvanced((v) => !v)}
+          className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ChevronDown
+            size={14}
+            className={`transition-transform duration-200 ${showAdvanced ? 'rotate-0' : '-rotate-90'}`}
+          />
+          Advanced (compat)
+        </button>
+        {showAdvanced && (
+          <div className="mt-2">
+            <textarea
+              value={formCompat}
+              onChange={(e) => {
+                setFormCompat(e.target.value);
+                if (formCompatError) setFormCompatError(null);
+              }}
+              placeholder={`{
+"supportsDeveloperRole": false,
+"supportsReasoningEffort": true,
+"supportsStrictMode": false
+}`}
+              rows={5}
+              aria-label="Compat JSON"
+              className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Per-provider capability overrides (JSON object). Leave empty for defaults.
+            </p>
+            {formCompatError && (
+              <p className="text-xs text-destructive mt-1">{formCompatError}</p>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -312,7 +405,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           disabled={!formName.trim() || saving}
           className="flex-1 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium disabled:opacity-50"
         >
-          {saving ? 'Saving...' : editingProvider ? 'Update' : 'Create'}
+          {saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}
         </button>
         <button
           onClick={resetForm}
@@ -323,43 +416,43 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       </div>
     </div>
   ) : (
-    /* Provider List */
+    /* Profile List */
     <div className="space-y-2">
-      {(providers ?? []).length === 0 ? (
+      {(profiles ?? []).length === 0 ? (
         <p className="text-muted-foreground text-center py-8">
           No providers configured.<br />
           Add a provider to get started.
         </p>
       ) : (
-        (providers ?? []).map((provider) => (
+        (profiles ?? []).map((profile) => (
           <div
-            key={provider.id}
+            key={profile.id}
             className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary"
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="font-medium truncate">{provider.name}</span>
-                {provider.isDefault && (
+                <span className="font-medium truncate">{profile.name}</span>
+                {profile.isDefault && (
                   <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-xs rounded-md">
                     Default
                   </span>
                 )}
                 <span className="px-1.5 py-0.5 bg-secondary text-muted-foreground text-xs rounded-md">
-                  {provider.providerType || 'anthropic'}
+                  {profile.providerType || 'anthropic'}
                 </span>
               </div>
-              {provider.baseUrl && (
+              {profile.baseUrl && (
                 <div className="text-xs text-muted-foreground truncate font-mono mt-1">
-                  {provider.baseUrl}
+                  {profile.baseUrl}
                 </div>
               )}
-              <CapabilityTags providerType={provider.providerType || 'anthropic'} />
+              <CapabilityTags providerType={profile.providerType || 'anthropic'} />
             </div>
             {!readOnly && (
             <div className="flex items-center gap-1 ml-2">
-              {!provider.isDefault && (
+              {!profile.isDefault && (
                 <button
-                  onClick={() => handleSetDefault(provider.id)}
+                  onClick={() => handleSetDefault(profile.id)}
                   className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
                   title="Set as default"
                 >
@@ -369,7 +462,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
                 </button>
               )}
               <button
-                onClick={() => openEditForm(provider)}
+                onClick={() => openEditForm(profile)}
                 className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
                 title="Edit"
               >
@@ -378,14 +471,14 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
                 </svg>
               </button>
               <button
-                onClick={() => handleDelete(provider.id)}
-                disabled={deletingProviderId !== null}
+                onClick={() => handleDelete(profile.id)}
+                disabled={deletingProfileId !== null}
                 className={`p-1.5 rounded-md transition-colors disabled:opacity-50 ${
-                  pendingDeleteProviderId === provider.id
+                  pendingDeleteProfileId === profile.id
                     ? 'bg-destructive/15 text-destructive hover:bg-destructive/25'
                     : 'hover:bg-secondary text-destructive hover:text-destructive'
                 }`}
-                title={pendingDeleteProviderId === provider.id ? 'Click again to confirm delete' : 'Delete'}
+                title={pendingDeleteProfileId === profile.id ? 'Click again to confirm delete' : 'Delete'}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -449,13 +542,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   );
 }
 
-const TYPE_OPTIONS: { value: string; label: string }[] = [
-  { value: 'anthropic', label: 'Anthropic' },
-  { value: 'openai', label: 'OpenAI' },
-  { value: 'openai-custom', label: 'OpenAI-compatible (custom)' },
-];
+const PROVIDER_TYPE_LABELS: Record<string, string> = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  'openai-custom': 'OpenAI-compatible (custom)',
+};
 
-function TypeSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_TYPES.map((value) => ({
+  value,
+  label: PROVIDER_TYPE_LABELS[value] ?? value,
+}));
+
+function ProviderTypeSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -468,11 +566,11 @@ function TypeSelector({ value, onChange }: { value: string; onChange: (v: string
     return () => document.removeEventListener('mousedown', handler);
   }, [open]);
 
-  const selected = TYPE_OPTIONS.find(o => o.value === value);
+  const selected = PROVIDER_TYPE_OPTIONS.find(o => o.value === value);
 
   return (
     <div ref={ref} className="relative">
-      <label className="block text-sm font-medium text-muted-foreground mb-1">Type</label>
+      <label className="block text-sm font-medium text-muted-foreground mb-1">Provider Type</label>
       <button
         type="button"
         onClick={() => setOpen(!open)}
@@ -483,7 +581,7 @@ function TypeSelector({ value, onChange }: { value: string; onChange: (v: string
       </button>
       {open && (
         <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden">
-          {TYPE_OPTIONS.map(opt => (
+          {PROVIDER_TYPE_OPTIONS.map(opt => (
             <button
               key={opt.value}
               type="button"

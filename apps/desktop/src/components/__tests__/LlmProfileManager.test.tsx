@@ -279,7 +279,7 @@ describe('ProviderManager', () => {
 
       // Check for form elements by their text content since labels don't have htmlFor
       expect(screen.getByText(/Name \*/)).toBeInTheDocument();
-      expect(screen.getByText('Type')).toBeInTheDocument();
+      expect(screen.getByText('Provider Type')).toBeInTheDocument();
       expect(screen.getByPlaceholderText(/Local ZClaudia Agent/)).toBeInTheDocument();
     });
 
@@ -674,7 +674,7 @@ describe('ProviderManager', () => {
     });
   });
 
-  describe('CLI path in form', () => {
+  describe('Base URL in form', () => {
     it('submits baseUrl when provided', async () => {
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -684,15 +684,92 @@ describe('ProviderManager', () => {
 
       await clickAsync(screen.getByText('Add Provider'));
       fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'Custom' } });
-      fireEvent.change(screen.getByPlaceholderText(/api\.anthropic\.com/), { target: { value: '/usr/bin/pi-agent' } });
+      fireEvent.change(screen.getByPlaceholderText(/api\.example\.com/), { target: { value: 'http://127.0.0.1:3000/v1' } });
 
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
         expect(api.createProvider).toHaveBeenCalledWith(
-          expect.objectContaining({ baseUrl: '/usr/bin/pi-agent' })
+          expect.objectContaining({ baseUrl: 'http://127.0.0.1:3000/v1' })
         );
       });
+    });
+  });
+
+  describe('New LlmProfile field shape', () => {
+    it('submits the new field shape (providerType + baseUrl + apiKey + compat)', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+
+      // Fill name
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'DeepSeek Local' },
+      });
+
+      // Choose providerType from dropdown: open it, pick openai-custom
+      await clickAsync(screen.getByText('Provider Type').nextElementSibling as Element);
+      await clickAsync(screen.getByText('OpenAI-compatible (custom)'));
+
+      // Fill baseUrl
+      fireEvent.change(screen.getByPlaceholderText(/api\.example\.com/), {
+        target: { value: 'http://127.0.0.1:3000/v1' },
+      });
+
+      // Fill apiKey (password input)
+      fireEvent.change(screen.getByPlaceholderText('sk-...'), {
+        target: { value: 'sk-test-123' },
+      });
+
+      // Reveal advanced compat section + fill JSON
+      await clickAsync(screen.getByText(/Advanced \(compat\)/));
+      fireEvent.change(screen.getByLabelText('Compat JSON'), {
+        target: { value: '{"supportsReasoningEffort": true}' },
+      });
+
+      await clickAsync(screen.getByText('Create'));
+
+      await waitFor(() => {
+        expect(api.createProvider).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'DeepSeek Local',
+            providerType: 'openai-custom',
+            baseUrl: 'http://127.0.0.1:3000/v1',
+            apiKey: 'sk-test-123',
+            compat: { supportsReasoningEffort: true },
+            isDefault: false,
+          })
+        );
+      });
+    });
+
+    it('surfaces an inline error when compat JSON is invalid', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'Broken Compat' },
+      });
+
+      await clickAsync(screen.getByText(/Advanced \(compat\)/));
+      fireEvent.change(screen.getByLabelText('Compat JSON'), {
+        target: { value: 'not-json' },
+      });
+
+      await clickAsync(screen.getByText('Create'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Invalid JSON in compat field')).toBeInTheDocument();
+      });
+      expect(api.createProvider).not.toHaveBeenCalled();
     });
   });
 });

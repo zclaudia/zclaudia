@@ -1,4 +1,4 @@
-import type { LlmProfileConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileCompat, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
 import { apiCall, apiCallVoid } from './unwrap';
 
@@ -11,6 +11,7 @@ export async function createProvider(data: {
   providerType?: string;
   baseUrl?: string;
   apiKey?: string;
+  compat?: LlmProfileCompat;
   env?: Record<string, string>;
   isDefault?: boolean;
 }): Promise<LlmProfileConfig> {
