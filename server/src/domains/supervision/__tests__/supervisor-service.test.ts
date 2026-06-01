@@ -100,6 +100,7 @@ import { ProjectChangeRepository } from '../repositories/project-change.js';
 import { ProjectRepository } from '../../projects/index.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import type { ProjectAgent, SupervisorConfig } from '@zclaudia/shared/features/supervision';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 const mockSupervisionAiRunPort = {
   startVirtualRun: vi.fn(),
@@ -177,14 +178,6 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
     );
 
     CREATE TABLE messages (
@@ -298,6 +291,7 @@ function createTestDb(): Database.Database {
     CREATE INDEX idx_supervision_logs_project ON supervision_logs(project_id);
     CREATE INDEX idx_supervision_logs_task ON supervision_logs(task_id);
   `);
+  createAgentProfilesTable(db);
 
   return db;
 }
@@ -371,11 +365,7 @@ describe('SupervisorService', () => {
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
     db.exec('DELETE FROM agent_profiles');
-    const _agentSeedNow = Date.now();
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
-      VALUES ('default-agent', 'Default', 1, ?, ?)
-    `).run(_agentSeedNow, _agentSeedNow);
+    seedDefaultAgent(db);
     broadcastFn.mockClear();
     mockSupervisionAiRunPort.startVirtualRun.mockReset();
     mockExecSync.mockReset();
@@ -3544,7 +3534,7 @@ describe('SupervisorService', () => {
     it('creates agent with mode=lite and maxConcurrentTasks=1', () => {
       const projectId = seedProject(db);
 
-      const agent = service.initAgent(projectId, {}, undefined, 'lite');
+      const agent = service.initAgent(projectId, {}, 'lite');
 
       expect(agent.mode).toBe('lite');
       expect(agent.config.maxConcurrentTasks).toBe(1);
@@ -3554,7 +3544,7 @@ describe('SupervisorService', () => {
     it('creates session named Workflow Runner for lite mode', () => {
       const projectId = seedProject(db);
 
-      const agent = service.initAgent(projectId, {}, undefined, 'lite');
+      const agent = service.initAgent(projectId, {}, 'lite');
 
       const session = sessionRepo.findById(agent.mainSessionId!);
       expect(session!.name).toBe('Workflow Runner');
@@ -3563,7 +3553,7 @@ describe('SupervisorService', () => {
     it('does not scaffold context manager in lite mode', () => {
       const projectId = seedProject(db);
 
-      service.initAgent(projectId, {}, undefined, 'lite');
+      service.initAgent(projectId, {}, 'lite');
 
       // The context manager should not have been created for lite mode
       // (we can verify by checking no ContextManager scaffold was called)
@@ -3813,16 +3803,16 @@ describe('SupervisorService', () => {
   });
 
   // ========================================
-  // initAgent() with llmProfileId
+  // initAgent() default agent profile
   // ========================================
 
-  describe('initAgent() with llmProfileId', () => {
-    it('creates main session with default agent profile (llmProfileId arg is now informational only)', () => {
+  describe('initAgent() default agent profile', () => {
+    it('creates main session with default agent profile via SessionRepository auto-resolution', () => {
       const projectId = seedProject(db);
 
-      // The llmProfileId parameter is deprecated post agent_profiles introduction —
-      // sessions now FK to agent_profiles, and SessionRepository auto-resolves to default.
-      const agent = service.initAgent(projectId, {}, 'custom-provider');
+      // sessions FK to agent_profiles; SessionRepository auto-resolves the default
+      // agent_profile when the caller omits agentProfileId.
+      const agent = service.initAgent(projectId);
 
       expect(agent.mainSessionId).toBeDefined();
       const session = sessionRepo.findById(agent.mainSessionId!);

@@ -244,7 +244,6 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
         const result = await api.initSupervisionAgent(
           project.id,
           { maxConcurrentTasks: 2, trustLevel: 'medium' },
-          undefined,
           'lite'
         );
         setAgent(project.id, result);

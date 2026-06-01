@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
+import { createAgentProfilesTable } from '../../../../test-helpers/seed-default-agent.js';
 
 const sendMessageMock = vi.fn();
 const broadcastToOthersMock = vi.fn();
@@ -128,15 +129,6 @@ function createDb(): Database.Database {
       system_prompt TEXT
     );
 
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT,
-      llm_profile_id TEXT,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER,
-      updated_at INTEGER
-    );
-
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -181,6 +173,7 @@ function createDb(): Database.Database {
       created_at INTEGER
     );
   `);
+  createAgentProfilesTable(db);
 
   const now = Date.now();
   db.prepare(`

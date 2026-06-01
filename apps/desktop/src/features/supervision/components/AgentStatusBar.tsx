@@ -70,7 +70,6 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
       const result = await api.initSupervisionAgent(
         projectId,
         initConfig as SupervisorConfig,
-        selectedProviderId || undefined,
         initMode,
       );
       setAgent(projectId, result);

@@ -92,11 +92,11 @@ export class SessionLifecycleService {
     });
 
     const sortOrder = this.repo.findNextSortOrder(normalizedInput.projectId);
-    // agentProfileId is auto-resolved by SessionRepository if not supplied.
+    // agentProfileId is auto-resolved by SessionRepository when omitted.
     const session = this.repo.create({
       projectId: normalizedInput.projectId,
       name: normalizedInput.name,
-      agentProfileId: normalizedInput.agentProfileId ?? '',
+      agentProfileId: normalizedInput.agentProfileId ?? undefined,
       type: sessionType,
       parentSessionId: normalizedInput.parentSessionId ?? undefined,
       workingDirectory: normalizedInput.workingDirectory ?? undefined,

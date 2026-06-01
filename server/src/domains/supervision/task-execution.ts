@@ -239,11 +239,10 @@ export class TaskExecution {
         projectId: task.projectId,
         title: task.title,
         taskId: task.id,
-        agentProfileId: '',
         workingDirectory,
       }),
       ...this.deps.sessionModel.buildTaskExecutingSessionPatch(workingDirectory),
-    } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+    });
   }
 
   private resolveLiteTaskSession(task: SupervisionTask, project: Project): Session {
@@ -259,7 +258,6 @@ export class TaskExecution {
         projectId: task.projectId,
         title: task.title,
         taskId: task.id,
-        agentProfileId: '',
         parentSessionId: project.agent?.mainSessionId,
         workingDirectory: project.rootPath,
       }),

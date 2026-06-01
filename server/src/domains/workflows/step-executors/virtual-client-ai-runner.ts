@@ -6,7 +6,6 @@
 
 import type { Database } from 'better-sqlite3';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { Session } from '@zclaudia/shared/core/session';
 import type { AIRunnerPort } from '../ports/step-executor.js';
 import type { WorkflowAiRunPort } from '../ports/runtime.js';
 import { SessionRepository } from '../../sessions/repository.js';
@@ -33,6 +32,9 @@ export class VirtualClientAIRunner implements AIRunnerPort {
     timeoutMs?: number;
     onSessionCreated?: (sessionId: string) => void;
   }): Promise<{ sessionId: string; content: string }> {
+    if (!opts.projectId) {
+      throw new Error('VirtualClientAIRunner.runPrompt: projectId is required');
+    }
     // opts.llmProfileId used downstream for AI dispatch; agentProfileId auto-resolved by SessionRepository.
     const session = this.sessionRepo.create({
       projectId: opts.projectId,
@@ -40,8 +42,7 @@ export class VirtualClientAIRunner implements AIRunnerPort {
       type: 'background',
       projectRole: 'workflow',
       workingDirectory: opts.workingDirectory,
-      agentProfileId: '',
-    } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+    });
 
     opts.onSessionCreated?.(session.id);
 

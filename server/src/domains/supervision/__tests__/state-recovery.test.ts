@@ -6,6 +6,7 @@ import { SupervisionTaskRepository } from '../repositories/supervision-task.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import { ProjectRepository } from '../../projects/index.js';
 import type { ProjectAgent } from '@zclaudia/shared/features/supervision';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -26,14 +27,6 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
     CREATE TABLE sessions (
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
@@ -94,6 +87,7 @@ function createTestDb(): Database.Database {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
   `);
+  createAgentProfilesTable(db);
   return db;
 }
 
@@ -144,11 +138,7 @@ describe('StateRecovery', () => {
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
     db.exec('DELETE FROM agent_profiles');
-    const _now = Date.now();
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
-      VALUES ('default-agent', 'Default', 1, ?, ?)
-    `).run(_now, _now);
+    seedDefaultAgent(db);
     activeRuns = new Map();
     mockSupervisorService = {
       hasWorktreePool: vi.fn().mockReturnValue(false),

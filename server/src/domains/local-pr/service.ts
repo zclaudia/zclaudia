@@ -1,7 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { LocalPR, LocalPRStatus } from '@zclaudia/shared/features/local-pr';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { Session } from '@zclaudia/shared/core/session';
 import { LocalPRRepository } from './repository.js';
 import { ProjectRepository } from '../projects/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
@@ -392,7 +391,7 @@ export class LocalPRService {
     }
 
     // Create background review session (read-only, hidden from sidebar).
-    // agentProfileId auto-resolved by SessionRepository when empty;
+    // agentProfileId auto-resolved by SessionRepository to default agent_profile.
     // llmProfileId is retained for downstream AI run dispatch (not stored on session).
     void llmProfileId;
     const session = this.sessionRepo.create({
@@ -401,9 +400,8 @@ export class LocalPRService {
       type: 'background',
       projectRole: 'review',
       workingDirectory: pr.worktreePath,
-      agentProfileId: '',
       isReadOnly: true,
-    } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+    });
 
     this.prRepo.update(prId, { status: 'reviewing', reviewSessionId: session.id });
     this.broadcastToProject(pr.projectId, { type: 'sessions_created', session });
@@ -828,9 +826,8 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       type: 'background',
       projectRole: 'review',
       workingDirectory: pr.worktreePath,
-      agentProfileId: '',
       isReadOnly: true,
-    } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+    });
 
     this.prRepo.update(prId, {
       conflictSessionId: session.id,

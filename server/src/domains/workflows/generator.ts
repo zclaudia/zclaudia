@@ -12,7 +12,6 @@ import type {
   WorkflowEdgeDef,
 } from '@zclaudia/shared/features/workflows';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { Session } from '@zclaudia/shared/core/session';
 import { SessionRepository } from '../sessions/repository.js';
 import type { WorkflowAiRunPort } from './ports/runtime.js';
 import { isValidCron } from '../../utils/cron.js';
@@ -294,8 +293,7 @@ Generate a workflow definition based on the user's natural language description.
       type: 'background',
       projectRole: 'workflow',
       workingDirectory: undefined,
-      agentProfileId: '',
-    } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+    });
 
     return new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => {

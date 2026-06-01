@@ -139,13 +139,12 @@ export class TaskAdmin {
 
     // Side effect: create session
     const project = this.deps.projectRepo.findById(task.projectId);
-    // agentProfileId auto-resolved by SessionRepository when empty.
+    // agentProfileId auto-resolved by SessionRepository to default agent_profile.
     const taskSession = this.deps.sessionRepo.create(
       this.deps.sessionModel.buildTaskPlanningSession({
         projectId: task.projectId,
         title: task.title,
         taskId: task.id,
-        agentProfileId: '',
         parentSessionId: project?.agent?.mainSessionId,
         workingDirectory: project?.rootPath,
       }),

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { initializeRunBootstrap } from '../run-bootstrap.js';
+import { createAgentProfilesTable } from '../../../../test-helpers/seed-default-agent.js';
 
 interface CreateDbOptions {
   insertProfile?: boolean;
@@ -32,15 +33,6 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT
-    );
-
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT,
-      llm_profile_id TEXT,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER,
-      updated_at INTEGER
     );
 
     CREATE TABLE sessions (
@@ -79,6 +71,7 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       allowed_root TEXT
     );
   `);
+  createAgentProfilesTable(db);
 
   const now = Date.now();
   const insertProfile = options.insertProfile !== false;

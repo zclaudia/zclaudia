@@ -360,7 +360,6 @@ describe('ProjectSettings', () => {
       expect(api.initSupervisionAgent).toHaveBeenCalledWith(
         'proj-1',
         expect.any(Object),
-        undefined,
         'lite'
       );
     });

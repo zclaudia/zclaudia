@@ -3,6 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
 import { createAgentRoutes } from '../agent.js';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 // Create in-memory database for testing
 function createTestDb(): Database.Database {
@@ -65,23 +66,12 @@ function createTestDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      llm_profile_id TEXT,
-      model TEXT NOT NULL DEFAULT 'm',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      enabled_tools TEXT NOT NULL DEFAULT '[]',
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
     CREATE TABLE IF NOT EXISTS workflows (
       id TEXT PRIMARY KEY,
       is_system INTEGER NOT NULL DEFAULT 0
     );
   `);
+  createAgentProfilesTable(db);
 
   return db;
 }
@@ -122,11 +112,7 @@ describe('agent routes', () => {
     db.exec('DELETE FROM workflows');
     db.exec('DELETE FROM agent_config');
     // Seed a default agent profile so /api/agent/ensure can insert sessions.
-    const now = Date.now();
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
-      VALUES ('default-agent', 'Default', 1, ?, ?)
-    `).run(now, now);
+    seedDefaultAgent(db);
   });
 
   describe('GET /api/agent/config', () => {

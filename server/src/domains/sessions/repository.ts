@@ -38,7 +38,7 @@ export class SessionRepository extends BaseRepository<
     const id = uuidv4();
     const now = Date.now();
 
-    const agentProfileId = data.agentProfileId || this.resolveDefaultAgentProfileId();
+    const agentProfileId = data.agentProfileId ?? this.resolveDefaultAgentProfileId();
     if (!agentProfileId) {
       throw new Error(
         'SessionRepository.create: agentProfileId is required and no default agent profile exists. Create one via /api/agent-profiles first.',

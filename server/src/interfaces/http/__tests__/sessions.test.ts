@@ -5,6 +5,7 @@ import Database from 'better-sqlite3';
 import { tmpdir } from 'node:os';
 import { createRequire } from 'node:module';
 import { createSessionRoutes } from '../../../domains/sessions/routes.js';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 const nodeRequire = createRequire(import.meta.url);
 const mutableFs = nodeRequire('node:fs') as typeof import('node:fs');
@@ -81,20 +82,8 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      description TEXT,
-      llm_profile_id TEXT,
-      model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      enabled_tools TEXT NOT NULL DEFAULT '[]',
-      thinking_level TEXT,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
   `);
+  createAgentProfilesTable(db);
 
   return db;
 }
@@ -150,10 +139,7 @@ describe('sessions routes', () => {
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `).run('project-1', 'Test Project', 'code', now, now);
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, model, system_prompt, enabled_tools, is_default, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 1, ?, ?)
-    `).run('default-agent', 'Default', 'claude-sonnet-4-6', '', '[]', now, now);
+    seedDefaultAgent(db);
   });
 
   describe('GET /api/sessions', () => {

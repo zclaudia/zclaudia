@@ -39,6 +39,7 @@ import { ProjectRepository } from '../../projects/index.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import { ContextManager } from '../context-manager.js';
 import type { ProjectAgent, SupervisionTask, TaskResult, ReviewVerdict, MergeResult } from '@zclaudia/shared/features/supervision';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 // ========================================
 // Test DB setup
@@ -84,14 +85,6 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
     );
 
     CREATE TABLE messages (
@@ -153,6 +146,7 @@ function createTestDb(): Database.Database {
     CREATE INDEX idx_supervision_logs_project ON supervision_logs(project_id);
     CREATE INDEX idx_supervision_logs_task ON supervision_logs(task_id);
   `);
+  createAgentProfilesTable(db);
 
   return db;
 }
@@ -280,11 +274,7 @@ describe('ReviewEngine', () => {
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
     db.exec('DELETE FROM agent_profiles');
-    const _now = Date.now();
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
-      VALUES ('default-agent', 'Default', 1, ?, ?)
-    `).run(_now, _now);
+    seedDefaultAgent(db);
 
     broadcastFn = vi.fn();
     logFn = vi.fn();

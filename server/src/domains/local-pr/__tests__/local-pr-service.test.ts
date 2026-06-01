@@ -55,6 +55,7 @@ import type { LocalPRAIDeps } from '../service.js';
 import { LocalPRRepository } from '../repository.js';
 import type { LocalPR } from '@zclaudia/shared/features/local-pr';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 function createAIDeps(overrides?: Partial<LocalPRAIDeps>): LocalPRAIDeps {
   return {
@@ -135,18 +136,6 @@ function createTestDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      llm_profile_id TEXT,
-      model TEXT NOT NULL DEFAULT 'm',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      enabled_tools TEXT NOT NULL DEFAULT '[]',
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
     CREATE TABLE messages (
       id TEXT PRIMARY KEY,
       session_id TEXT NOT NULL,
@@ -178,6 +167,7 @@ function createTestDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
   `);
+  createAgentProfilesTable(db);
 
   return db;
 }
@@ -277,11 +267,7 @@ describe('LocalPRService', () => {
     db = createTestDb();
     createTestProvider(db);
     // Seed a default agent profile so SessionRepository auto-resolves agent_profile_id.
-    const now = Date.now();
-    db.prepare(`
-      INSERT OR IGNORE INTO agent_profiles (id, name, is_default, created_at, updated_at)
-      VALUES ('default-agent', 'Default', 1, ?, ?)
-    `).run(now, now);
+    seedDefaultAgent(db);
   });
 
   afterAll(() => {

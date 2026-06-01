@@ -54,7 +54,8 @@ export interface SupervisionSessionModelPort {
     projectId: string;
     title: string;
     taskId: string;
-    agentProfileId: string;
+    /** When omitted, SessionRepository auto-resolves to the default agent_profile. */
+    agentProfileId?: string;
     parentSessionId?: string;
     workingDirectory?: string;
   }): Omit<Session, 'id' | 'createdAt' | 'updatedAt'>;

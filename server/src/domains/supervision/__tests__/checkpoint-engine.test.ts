@@ -7,6 +7,7 @@ import { ProjectRepository } from '../../projects/index.js';
 import { SessionRepository } from '../../sessions/repository.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { ProjectAgent, SupervisionLogEvent, SupervisionTask } from '@zclaudia/shared/features/supervision';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -46,13 +47,6 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
-    );
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
     );
     CREATE TABLE messages (
       id TEXT PRIMARY KEY,
@@ -104,6 +98,7 @@ function createTestDb(): Database.Database {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     );
   `);
+  createAgentProfilesTable(db);
   return db;
 }
 
@@ -159,11 +154,7 @@ describe('CheckpointEngine', () => {
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');
     db.exec('DELETE FROM agent_profiles');
-    const _now = Date.now();
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
-      VALUES ('default-agent', 'Default', 1, ?, ?)
-    `).run(_now, _now);
+    seedDefaultAgent(db);
 
     broadcastFn = vi.fn();
     logFn = vi.fn();

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { SessionLifecycleError, SessionLifecycleService } from '../lifecycle-service.js';
+import { createAgentProfilesTable, seedDefaultAgent } from '../../../test-helpers/seed-default-agent.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -33,17 +34,8 @@ function createTestDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
-    CREATE TABLE agent_profiles (
-      id TEXT PRIMARY KEY,
-      name TEXT NOT NULL,
-      model TEXT NOT NULL DEFAULT 'm',
-      system_prompt TEXT NOT NULL DEFAULT '',
-      enabled_tools TEXT NOT NULL DEFAULT '[]',
-      is_default INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
   `);
+  createAgentProfilesTable(db);
   return db;
 }
 
@@ -57,10 +49,7 @@ describe('SessionLifecycleService', () => {
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `).run('project-1', 'Test Project', 'code', now, now);
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
-      VALUES ('default-agent', 'Default', 1, ?, ?)
-    `).run(now, now);
+    seedDefaultAgent(db);
   });
 
   afterEach(() => {
