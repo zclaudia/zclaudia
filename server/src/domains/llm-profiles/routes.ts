@@ -4,7 +4,11 @@ import { LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { LlmProfileRepository } from './repository.js';
-import { LlmProfileDeletionService, LlmProfileNotFoundError } from './llm-profile-deletion-service.js';
+import {
+  LlmProfileDeletionService,
+  LlmProfileInUseError,
+  LlmProfileNotFoundError,
+} from './llm-profile-deletion-service.js';
 
 const VALID_PROVIDER_TYPES: readonly string[] = LLM_PROVIDER_TYPES;
 
@@ -148,6 +152,17 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         res.status(404).json({
           success: false,
           error: { code: 'NOT_FOUND', message: error.message },
+        });
+        return;
+      }
+      if (error instanceof LlmProfileInUseError) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'IN_USE',
+            message: error.message,
+            agentCount: error.agentCount,
+          },
         });
         return;
       }

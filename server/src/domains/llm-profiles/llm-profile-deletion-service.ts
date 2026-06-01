@@ -8,6 +8,18 @@ export class LlmProfileNotFoundError extends Error {
   }
 }
 
+export class LlmProfileInUseError extends Error {
+  constructor(
+    public readonly agentCount: number,
+    public readonly llmProfileId: string,
+  ) {
+    super(
+      `LlmProfile ${llmProfileId} is referenced by ${agentCount} agent profile(s) and cannot be deleted`,
+    );
+    this.name = 'LlmProfileInUseError';
+  }
+}
+
 export class LlmProfileDeletionService {
   private readonly repo: LlmProfileRepository;
 
@@ -19,6 +31,17 @@ export class LlmProfileDeletionService {
     const existing = this.repo.findById(llmProfileId);
     if (!existing) {
       throw new LlmProfileNotFoundError(llmProfileId);
+    }
+
+    // Pre-check: agent_profiles.llm_profile_id is FK RESTRICT, so any reference
+    // would otherwise surface as a raw SQLITE_CONSTRAINT_FOREIGNKEY (HTTP 500).
+    // Return a structured 409 from the route handler instead.
+    const row = this.db
+      .prepare('SELECT COUNT(*) AS n FROM agent_profiles WHERE llm_profile_id = ?')
+      .get(llmProfileId) as { n: number } | undefined;
+    const agentCount = row?.n ?? 0;
+    if (agentCount > 0) {
+      throw new LlmProfileInUseError(agentCount, llmProfileId);
     }
 
     const deleteLlmProfileTx = this.db.transaction(() => {
