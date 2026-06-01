@@ -182,11 +182,15 @@ export function upsertAssistantMessage(
   if (run.contentBlocks.length > 0) {
     metadata.contentBlocks = run.contentBlocks;
   }
+  if (run.thinkingBlocks && run.thinkingBlocks.length > 0) {
+    metadata.thinkingBlocks = run.thinkingBlocks;
+  }
 
   const hasPersistableContent =
     run.fullContent.trim().length > 0
     || run.collectedToolCalls.length > 0
-    || run.contentBlocks.length > 0;
+    || run.contentBlocks.length > 0
+    || (run.thinkingBlocks?.length ?? 0) > 0;
 
   if (!hasPersistableContent) return;
 

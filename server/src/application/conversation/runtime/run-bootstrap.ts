@@ -204,6 +204,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     fullContent: '',
     collectedToolCalls: [],
     contentBlocks: [],
+    thinkingBlocks: [],
     startedAt: Date.now(),
     lastActivityAt: Date.now(),
     recentToolCalls: [],

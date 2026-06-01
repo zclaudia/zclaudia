@@ -319,18 +319,52 @@ export function handleProviderEvent({
     }
 
     case 'tool_activity': {
-      const lastAgentToolUseId = [...activeRun.collectedToolCalls]
-        .reverse()
-        .find(tc => tc.name === 'Agent' && !tc.output)?.toolUseId;
-      if (lastAgentToolUseId && msg.content) {
+      // Providers that emit per-tool execution updates (pi-runtime,
+      // tool_execution_update) populate msg.toolUseId directly. Fall back
+      // to the legacy "most recent uncompleted Agent" heuristic for the
+      // Claude SDK path which only emits sub-agent progress text.
+      const targetToolUseId = msg.toolUseId
+        || [...activeRun.collectedToolCalls]
+          .reverse()
+          .find(tc => tc.name === 'Agent' && !tc.output)?.toolUseId;
+      if (targetToolUseId && msg.content) {
         sendRunEvent({
           type: 'tool_activity',
           runId,
           sessionId: activeRun.sessionId,
-          toolUseId: lastAgentToolUseId,
+          toolUseId: targetToolUseId,
           content: msg.content,
         });
       }
+      break;
+    }
+
+    case 'thinking_delta': {
+      if (!activeRun.thinkingBlocks) activeRun.thinkingBlocks = [];
+
+      if (msg.thinkingContent) {
+        let current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
+        if (!current) {
+          current = { text: '' };
+          activeRun.thinkingBlocks.push(current);
+        }
+        current.text += msg.thinkingContent;
+      }
+
+      if (msg.thinkingSignature) {
+        const current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
+        if (current) current.signature = msg.thinkingSignature;
+      }
+
+      if (msg.thinkingRedacted !== undefined) {
+        const current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
+        if (current) current.redacted = msg.thinkingRedacted;
+      }
+
+      // No wire-level streaming for thinking content yet — the desktop UI
+      // currently receives thinking blocks via the final assistant message
+      // metadata persisted in upsertAssistantMessage. A future task can add
+      // a delta event if real-time reasoning rendering is desired.
       break;
     }
 

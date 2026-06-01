@@ -21,6 +21,7 @@ function createRun(clientId: string, completed = false): ActiveRun {
     fullContent: '',
     collectedToolCalls: [],
     contentBlocks: [],
+    thinkingBlocks: [],
     sessionType: 'regular',
     workspaceRoot: '/tmp',
     rememberedDecisions: new Map(),

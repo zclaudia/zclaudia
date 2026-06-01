@@ -723,6 +723,262 @@ describe('ws/run-events', () => {
     vi.clearAllTimers();
   });
 
+  it('emits tool_activity from msg.toolUseId when the provider supplies it directly (pi-runtime path)', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [{ toolUseId: 'bash-1', name: 'Bash', input: {} }],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      thinkingBlocks: [],
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: {
+        type: 'tool_activity',
+        toolUseId: 'bash-1',
+        toolName: 'bash',
+        content: 'partial stdout',
+      } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map([['bash-1', 'Bash']]),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tool_activity',
+      runId: 'run-1',
+      toolUseId: 'bash-1',
+      content: 'partial stdout',
+    }));
+  });
+
+  it('falls back to the latest uncompleted Agent tool when tool_activity has no toolUseId (Claude SDK path)', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      sessionId: 'session-1',
+      providerType: 'claude',
+      collectedToolCalls: [
+        { toolUseId: 'a-1', name: 'Agent', input: {}, output: 'done' },
+        { toolUseId: 'a-2', name: 'Agent', input: {} },
+      ],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: { type: 'tool_activity', content: 'sub-agent text' } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'claude',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tool_activity',
+      toolUseId: 'a-2',
+      content: 'sub-agent text',
+    }));
+  });
+
+  it('accumulates thinking_delta content into activeRun.thinkingBlocks (single block)', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      thinkingBlocks: [],
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    const common = {
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular' as const,
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    };
+
+    handleProviderEvent({ ...common, msg: { type: 'thinking_delta', thinkingContent: 'step 1 ' } as any });
+    handleProviderEvent({ ...common, msg: { type: 'thinking_delta', thinkingContent: 'step 2' } as any });
+
+    expect(activeRun.thinkingBlocks).toHaveLength(1);
+    expect(activeRun.thinkingBlocks[0].text).toBe('step 1 step 2');
+    // thinking_delta does not yet emit a wire-level event — desktop receives
+    // thinking blocks via final assistant message metadata.
+    expect(sendRunEventMock).not.toHaveBeenCalled();
+  });
+
+  it('records signature on the current thinking block when thinkingSignature arrives', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      thinkingBlocks: [{ text: 'reasoning' }],
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: { type: 'thinking_delta', thinkingSignature: 'sig-1' } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(activeRun.thinkingBlocks[0].signature).toBe('sig-1');
+  });
+
+  it('records redaction on the current thinking block when thinkingRedacted arrives', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      thinkingBlocks: [{ text: 'reasoning' }],
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: { type: 'thinking_delta', thinkingRedacted: true } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(activeRun.thinkingBlocks[0].redacted).toBe(true);
+  });
+
+  it('initializes thinkingBlocks lazily when the run lacks the array', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      // thinkingBlocks intentionally undefined to simulate older bootstrap path
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: { type: 'thinking_delta', thinkingContent: 'hello' } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(activeRun.thinkingBlocks).toEqual([{ text: 'hello' }]);
+  });
+
   it('swallows PID backfill errors and logs a warning', async () => {
     findProcessPidsByTaskCommandMock.mockRejectedValue(new Error('ps failed'));
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});

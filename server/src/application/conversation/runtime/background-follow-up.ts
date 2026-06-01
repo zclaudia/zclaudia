@@ -186,6 +186,7 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
     fullContent: '',
     collectedToolCalls: [],
     contentBlocks: [],
+    thinkingBlocks: [],
     startedAt: Date.now(),
     lastActivityAt: Date.now(),
     recentToolCalls: [],

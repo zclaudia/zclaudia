@@ -1,5 +1,5 @@
 import { WebSocket } from 'ws';
-import type { ToolCall, ContentBlock } from '@zclaudia/shared/core/message';
+import type { ToolCall, ContentBlock, ThinkingBlock } from '@zclaudia/shared/core/message';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
 import type { AskUserQuestionItem } from '@zclaudia/shared/interaction/forms';
@@ -49,6 +49,12 @@ export interface ActiveRun {
   fullContent: string;
   collectedToolCalls: (ToolCall & { toolUseId: string })[];
   contentBlocks: ContentBlock[];
+  /**
+   * Reasoning blocks accumulated from provider `thinking_delta` events.
+   * Persisted to message metadata at upsert time so the UI can render
+   * thinking cards alongside assistant content.
+   */
+  thinkingBlocks: ThinkingBlock[];
   saveInterval?: NodeJS.Timeout;
   completed?: boolean;  // True after run_completed/run_failed sent; hides from heartbeat while for-await drains
   sessionType: 'regular' | 'background' | 'agent';  // Session type for this run
