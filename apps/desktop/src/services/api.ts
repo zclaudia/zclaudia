@@ -13,6 +13,7 @@ export * from './api/session-drafts';
 export * from './api/turn-summaries';
 export * from './api/session-search';
 export * from './api/providers';
+export * from './api/agent-profiles';
 export * from './api/servers';
 export * from './api/supervision';
 export * from './api/mcp-servers';

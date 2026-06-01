@@ -6,6 +6,7 @@ import { useConnection } from '../contexts/ConnectionContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useAndroidBack } from '../hooks/useAndroidBack';
 import { LlmProfileManager } from '../features/settings/LlmProfileManager';
+import { AgentManager } from '../features/settings/AgentManager';
 import { ServerGatewayConfig } from '../features/settings/ServerGatewayConfig';
 import { PluginSettings } from '../features/settings/PluginSettings';
 import { McpServerSettings } from '../features/settings/McpServerSettings';
@@ -272,6 +273,20 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
               </div>
             )}
 
+            {activeTab === 'agents' && (
+              <div className="space-y-4">
+                {!isActiveLocalBackend && activeServer && (
+                  <RemoteServerBanner serverName={activeServer.name} label="Viewing agents" />
+                )}
+                <p className="text-sm text-muted-foreground">
+                  {isActiveLocalBackend
+                    ? 'Manage agent profiles — each binds a system prompt, enabled tools, and thinking level to an LLM profile.'
+                    : 'Agent profiles configured on this server.'}
+                </p>
+                <AgentManagerInline key={activeServerId || 'none'} readOnly={!isActiveLocalBackend} />
+              </div>
+            )}
+
             {activeTab === 'notifications' && <NotificationSettingsInline />}
 
             {activeTab === 'gateway' && (
@@ -366,6 +381,12 @@ function RemoteServerBanner({ serverName, label }: { serverName: string; label: 
 function LlmProfileManagerInline({ readOnly }: { readOnly?: boolean }) {
   return (
     <LlmProfileManager isOpen={true} onClose={() => {}} inline={true} readOnly={readOnly} />
+  );
+}
+
+function AgentManagerInline({ readOnly }: { readOnly?: boolean }) {
+  return (
+    <AgentManager isOpen={true} onClose={() => {}} inline={true} readOnly={readOnly} />
   );
 }
 
