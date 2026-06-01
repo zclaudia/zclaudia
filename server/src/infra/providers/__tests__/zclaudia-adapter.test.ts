@@ -530,10 +530,13 @@ describe('buildModel — modelOverride', () => {
 });
 
 describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => {
+  const originalEnv = { ...process.env };
   beforeEach(() => {
+    process.env = { ...originalEnv };
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
   });
+  afterEach(() => { process.env = { ...originalEnv }; });
 
   it('passes options.thinkingLevel into Agent initialState', async () => {
     scriptNextAgent([
@@ -556,9 +559,9 @@ describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => 
     const adapter = new ZClaudiaAdapter();
     await collect(adapter, 'hi', { enabledTools: ['read', 'bash'] as ToolName[] });
 
-    expect(mockAgentInstances[0].initialState.tools).toBeDefined();
-    expect(mockAgentInstances[0].initialState.tools.length).toBe(2);
-    expect(mockAgentInstances[0].initialState.tools.map((t: any) => t.name).sort()).toEqual(['bash', 'read']);
+    expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
+    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(2);
+    expect((mockAgentInstances[0].initialState as any).tools.map((t: any) => t.name).sort()).toEqual(['bash', 'read']);
   });
 
   it('passes options.agentProfile.model into buildModel as override', async () => {
