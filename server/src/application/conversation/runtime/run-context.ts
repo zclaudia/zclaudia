@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import type { ContextTemplate } from '../context/types.js';
 import type { RunOptions } from '../../../infra/providers/types.js';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import {
   buildSkillDirectoryHint,
   getDiscoveredSkills,
@@ -28,11 +29,6 @@ interface SessionContext {
   system_prompt: string | null;
 }
 
-interface ProviderConfigContext {
-  cliPath?: string;
-  env?: Record<string, string>;
-}
-
 interface AdapterContext {
   manifest?: {
     permissionModeMap?: Record<string, string | undefined>;
@@ -56,7 +52,7 @@ export interface BuildRunContextInput {
     permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
   } & Record<string, unknown>;
   modeValue: string;
-  providerConfig?: ProviderConfigContext;
+  providerConfig?: LlmProfileConfig;
   providerType: string;
   sdkSessionId?: string;
   serverPort: number | null;
@@ -158,7 +154,6 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     runOptions: {
       cwd,
       sessionId: sdkSessionId,
-      cliPath: providerConfig?.cliPath,
       env: { ...(providerConfig?.env || {}), ...filePushEnv },
       mode: nativeMode,
       model: message.model,
@@ -167,6 +162,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       serverPort: serverPort || undefined,
       claudiaSessionId: message.sessionId,
       db,
+      llmProfileConfig: providerConfig,
     },
   };
 }

@@ -142,6 +142,10 @@ describe('ws/run-provider-launch', () => {
       providerType: 'claude',
       sdkSessionId: 'sdk-prev',
       sessionType: 'background',
+      providerConfig: expect.objectContaining({
+        id: 'provider-1',
+        providerType: 'claude',
+      }),
     }));
     expect(adapter.run).toHaveBeenCalledWith('processed hello', { cwd: '/tmp/project', mode: 'default' }, permissionCallback);
     expect(activeRun.providerType).toBe('claude');

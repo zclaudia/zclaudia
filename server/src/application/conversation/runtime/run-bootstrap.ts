@@ -14,6 +14,7 @@ import { resolveProviderCwd } from '../../../utils/provider-cwd.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
+import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -117,42 +118,19 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     return null;
   }
 
-  const explicitProviderId = message.llmProfileId || session.llm_profile_id;
-  const llmProfileId = explicitProviderId || (() => {
-    const defaultRow = db.prepare(`SELECT id FROM llm_profiles WHERE is_default = 1 LIMIT 1`).get() as { id: string } | undefined;
-    return defaultRow?.id || null;
-  })();
+  const llmProfileRepo = new LlmProfileRepository(db as unknown as import('better-sqlite3').Database);
+  const explicitProfileId = message.llmProfileId || session.llm_profile_id;
 
   let providerConfig: LlmProfileConfig | undefined;
-  if (llmProfileId) {
-    const providerRow = db.prepare(`
-      SELECT id, name, provider_type as type, base_url as cliPath, env, is_default as isDefault,
-             created_at as createdAt, updated_at as updatedAt
-      FROM llm_profiles WHERE id = ?
-    `).get(llmProfileId) as {
-      id: string;
-      name: string;
-      type: string;
-      cliPath: string | null;
-      env: string | null;
-      isDefault: number;
-      createdAt: number;
-      updatedAt: number;
-    } | undefined;
+  if (explicitProfileId) {
+    providerConfig = llmProfileRepo.findById(explicitProfileId) || undefined;
+  } else {
+    providerConfig = llmProfileRepo.findDefault() || undefined;
+  }
+  const llmProfileId = explicitProfileId || providerConfig?.id || null;
 
-    if (providerRow) {
-      providerConfig = {
-        id: providerRow.id,
-        name: providerRow.name,
-        providerType: providerRow.type,
-        baseUrl: providerRow.cliPath || undefined,
-        env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
-        isDefault: providerRow.isDefault === 1,
-        createdAt: providerRow.createdAt,
-        updatedAt: providerRow.updatedAt,
-      };
-      trace.setMeta({ provider: providerConfig.providerType });
-    }
+  if (providerConfig) {
+    trace.setMeta({ provider: providerConfig.providerType });
   }
 
   const sessionType = (session.session_type || 'regular') as 'regular' | 'background' | 'agent';
