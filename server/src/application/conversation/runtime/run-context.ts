@@ -2,6 +2,8 @@ import type Database from 'better-sqlite3';
 import type { ContextTemplate } from '../context/types.js';
 import type { RunOptions } from '../../../infra/providers/types.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { ToolName } from '@zclaudia/shared/core/tools';
 import {
   buildSkillDirectoryHint,
   getDiscoveredSkills,
@@ -26,7 +28,6 @@ interface SessionContext {
   name: string | null;
   root_path: string | null;
   task_id: string | null;
-  system_prompt: string | null;
 }
 
 interface AdapterContext {
@@ -40,8 +41,10 @@ interface AdapterContext {
 
 export interface BuildRunContextInput {
   adapter: AdapterContext;
+  agentProfile: AgentProfileConfig;
   cwd: string;
   db: Database.Database;
+  enabledTools: ToolName[];
   forcedPlanBySession: boolean;
   message: {
     input: string;
@@ -66,8 +69,10 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
 }> {
   const {
     adapter,
+    agentProfile,
     cwd,
     db,
+    enabledTools,
     forcedPlanBySession,
     message,
     modeValue,
@@ -134,7 +139,12 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
   }
 
   const template = ((message as Record<string, unknown>)._contextTemplate || (sessionType === 'agent' ? 'agent' : 'coding')) as ContextTemplate;
-  const systemPrompt = createContextEngine().assemble(template, {
+  // NOTE: context-engine assembly is preserved so callers can still introspect
+  // workspace/skill prompts in the future (e.g. via tracing). The RunOptions
+  // systemPrompt below is intentionally driven solely by agentProfile.systemPrompt
+  // per the agent-profiles spec (§4.6 — full replacement). When future work adds
+  // a merge transform (e.g. AGENTS.md injection), this is where it goes.
+  void createContextEngine().assemble(template, {
     sessionId: message.sessionId,
     projectId: session.project_id,
     cwd,
@@ -146,8 +156,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     planDocumentPrompt,
     filePushContext,
     interactionToolPrompt,
-    sessionSystemPrompt: session.system_prompt || undefined,
-  }) || undefined;
+  });
 
   return {
     nativeMode,
@@ -156,13 +165,16 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       sessionId: sdkSessionId,
       env: { ...(providerConfig?.env || {}), ...filePushEnv },
       mode: nativeMode,
-      model: message.model,
-      systemPrompt,
+      model: agentProfile.model,
+      systemPrompt: agentProfile.systemPrompt,
       sessionTitle: session.name || undefined,
       serverPort: serverPort || undefined,
       claudiaSessionId: message.sessionId,
       db,
       llmProfileConfig: providerConfig,
+      agentProfile,
+      enabledTools,
+      thinkingLevel: agentProfile.thinkingLevel,
     },
   };
 }

@@ -10,6 +10,8 @@ import type { initDatabase } from '../../../infra/storage/db.js';
 import { isProcessAlive, killProcessTree } from '../../../utils/process-tree.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import { sendMessage } from '../transport/broadcast.js';
+import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
+import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
 
 export async function handleKillLeakedProcesses(
   client: ConnectedClient,
@@ -106,14 +108,20 @@ export async function handleStopBackgroundTask(
   }
 
   if (!resolvedProviderType) {
-    // Resolve provider type via session → agent_profile → llm_profile chain.
-    const providerRow = db.prepare(`
-      SELECT lp.provider_type as type FROM sessions s
-      LEFT JOIN agent_profiles ap ON ap.id = s.agent_profile_id
-      LEFT JOIN llm_profiles lp ON lp.id = COALESCE(ap.llm_profile_id, (SELECT llm_profile_id FROM projects WHERE id = s.project_id))
-      WHERE s.id = ? AND lp.provider_type IS NOT NULL
-    `).get(targetSessionId) as { type: string } | undefined;
-    resolvedProviderType = providerRow?.type;
+    // Resolve provider type via session → agent_profile → llm_profile chain,
+    // using the same repository layer that run-bootstrap.ts uses (avoids the
+    // older LEFT JOIN COALESCE shim that pre-dated agent profiles).
+    const sessionRow = db.prepare('SELECT agent_profile_id FROM sessions WHERE id = ?')
+      .get(targetSessionId) as { agent_profile_id: string | null } | undefined;
+    const agentRepo = new AgentProfileRepository(db as unknown as import('better-sqlite3').Database);
+    const llmRepo = new LlmProfileRepository(db as unknown as import('better-sqlite3').Database);
+    const agentProfile = sessionRow?.agent_profile_id
+      ? agentRepo.findById(sessionRow.agent_profile_id) ?? agentRepo.findDefault()
+      : agentRepo.findDefault();
+    const llmProfile = agentProfile?.llmProfileId
+      ? llmRepo.findById(agentProfile.llmProfileId) ?? llmRepo.findDefault()
+      : llmRepo.findDefault();
+    resolvedProviderType = llmProfile?.providerType;
   }
 
   if (resolvedProviderType && resolvedSdkSessionId) {

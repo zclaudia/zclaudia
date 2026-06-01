@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { ErrorMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { ToolName } from '@zclaudia/shared/core/tools';
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import { getNextOffset } from './run-lifecycle.js';
@@ -15,6 +17,7 @@ import { providerRegistry } from '../../../infra/providers/registry.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
+import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -43,8 +46,6 @@ export interface RunSessionRecord {
   task_id: string | null;
   agent_profile_id: string | null;
   root_path: string | null;
-  llm_profile_id: string | null;
-  system_prompt: string | null;
 }
 
 export interface RunProviderEventState {
@@ -64,9 +65,11 @@ interface InitializeRunBootstrapInput {
 
 export interface RunBootstrapResult {
   activeRun: ActiveRun;
+  agentProfile: AgentProfileConfig;
   broadcastSessionCatalogUpdate: () => void;
   connectedClients: Map<string, ConnectedClient>;
   cwd: string;
+  enabledTools: ToolName[];
   markPendingResolutionResumed: () => void;
   persistSessionWorkingDirectory: (nextWorkingDirectory: string | null | undefined) => void;
   projectId: string;
@@ -84,17 +87,16 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   const { activeRuns, client, clients, db, message, runId, sessionSync, trace } = input;
   const connectedClients = clients ?? new Map<string, ConnectedClient>();
 
-  // Resolve llm_profile_id via session → agent_profile → llm_profile, falling back to project.llm_profile_id.
+  // Load the session row + project root_path. LLM/agent resolution happens below
+  // via AgentProfileRepository → LlmProfileRepository so the runtime can read all
+  // resolved fields (model, systemPrompt, enabledTools, thinkingLevel) — not just llm_profile_id.
   const session = db.prepare(`
     SELECT s.id, s.project_id, s.name, s.sdk_session_id, s.type as session_type,
            s.working_directory, s.project_role, s.plan_status, s.task_id,
            s.agent_profile_id,
-           p.root_path,
-           COALESCE(ap.llm_profile_id, p.llm_profile_id) as llm_profile_id,
-           p.system_prompt
+           p.root_path
     FROM sessions s
     LEFT JOIN projects p ON s.project_id = p.id
-    LEFT JOIN agent_profiles ap ON ap.id = s.agent_profile_id
     WHERE s.id = ?
   `).get(message.sessionId) as RunSessionRecord | undefined;
 
@@ -124,20 +126,42 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     return null;
   }
 
+  // Resolve agent profile → LLM profile. session.agent_profile_id is NOT NULL with
+  // FK RESTRICT (T2 schema), so the lookup should always succeed; warn + fallback
+  // defensively in case integrity is broken.
+  const agentRepo = new AgentProfileRepository(db as unknown as import('better-sqlite3').Database);
   const llmProfileRepo = new LlmProfileRepository(db as unknown as import('better-sqlite3').Database);
-  const explicitProfileId = message.llmProfileId || session.llm_profile_id;
 
-  let providerConfig: LlmProfileConfig | undefined;
-  if (explicitProfileId) {
-    providerConfig = llmProfileRepo.findById(explicitProfileId) ?? undefined;
-    if (!providerConfig) {
-      console.warn(`[run-bootstrap] llm_profile_id ${explicitProfileId} not found, falling back to default`);
-      providerConfig = llmProfileRepo.findDefault() ?? undefined;
+  let agentProfile: AgentProfileConfig | undefined = session.agent_profile_id
+    ? agentRepo.findById(session.agent_profile_id) ?? undefined
+    : undefined;
+  if (!agentProfile) {
+    if (session.agent_profile_id) {
+      console.warn(
+        `[run-bootstrap] agent_profile_id ${session.agent_profile_id} not found, falling back to default agent profile`,
+      );
     }
-  } else {
+    agentProfile = agentRepo.findDefault();
+  }
+  if (!agentProfile) {
+    throw new Error(
+      'No agent profile available — DB integrity broken (ensureDefaultAgentProfile should have seeded one)',
+    );
+  }
+
+  let providerConfig: LlmProfileConfig | undefined = agentProfile.llmProfileId
+    ? llmProfileRepo.findById(agentProfile.llmProfileId) ?? undefined
+    : undefined;
+  if (!providerConfig) {
+    if (agentProfile.llmProfileId) {
+      console.warn(
+        `[run-bootstrap] agent.llm_profile_id ${agentProfile.llmProfileId} not found, falling back to default LLM profile`,
+      );
+    }
     providerConfig = llmProfileRepo.findDefault() ?? undefined;
   }
   const llmProfileId = providerConfig?.id ?? null;
+  const enabledTools = agentProfile.enabledTools as ToolName[];
 
   if (providerConfig) {
     trace.setMeta({ provider: providerConfig.providerType });
@@ -281,9 +305,11 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
 
   return {
     activeRun,
+    agentProfile,
     broadcastSessionCatalogUpdate,
     connectedClients,
     cwd,
+    enabledTools,
     markPendingResolutionResumed,
     persistSessionWorkingDirectory,
     projectId,

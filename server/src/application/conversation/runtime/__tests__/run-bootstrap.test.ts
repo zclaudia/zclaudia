@@ -9,7 +9,15 @@ interface CreateDbOptions {
   apiKey?: string | null;
   baseUrl?: string | null;
   env?: string | null;
-  sessionProfileId?: string | null;
+  /** llm_profile_id stored on the agent profile. `null` ⇒ agent has no llm_profile_id (forces default fallback). */
+  agentLlmProfileId?: string | null;
+  /** Override fields on the seeded agent profile. */
+  agentSystemPrompt?: string;
+  agentEnabledTools?: string[];
+  agentThinkingLevel?: string | null;
+  agentModel?: string;
+  /** Override the agent.id assigned to the session (default 'agent-1'); use to test stale agent_profile_id. */
+  sessionAgentProfileId?: string | null;
 }
 
 function createDb(providerType: string, options: CreateDbOptions = {}): Database.Database {
@@ -75,9 +83,11 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
 
   const now = Date.now();
   const insertProfile = options.insertProfile !== false;
-  const sessionProfileId = options.sessionProfileId === null
+  // Default: agent's llm_profile_id points at the seeded profile (if any). Pass
+  // `agentLlmProfileId: null` to force the agent → no llm_profile_id path.
+  const agentLlmProfileId = options.agentLlmProfileId === null
     ? null
-    : options.sessionProfileId ?? (insertProfile ? 'provider-1' : null);
+    : options.agentLlmProfileId ?? (insertProfile ? 'provider-1' : null);
 
   if (insertProfile) {
     db.prepare(`
@@ -100,15 +110,31 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
     VALUES ('project-1', NULL, '/tmp/project', NULL)
   `).run();
 
-  // Seed an agent_profile that points at sessionProfileId (the llm_profile under test)
-  // so the session → agent_profile → llm_profile lookup chain works in run-bootstrap.
-  if (sessionProfileId) {
-    db.prepare(`
-      INSERT INTO agent_profiles (id, name, llm_profile_id, is_default, created_at, updated_at)
-      VALUES ('agent-1', 'Test Agent', ?, 1, ?, ?)
-    `).run(sessionProfileId, now, now);
-  }
-  const sessionAgentId = sessionProfileId ? 'agent-1' : null;
+  // T2 schema: sessions.agent_profile_id is NOT NULL with FK RESTRICT. The runtime
+  // always resolves session → agent_profile → llm_profile (no per-session llm fallback).
+  // Always seed a default agent so the bootstrap chain works.
+  db.prepare(`
+    INSERT INTO agent_profiles (
+      id, name, llm_profile_id, model, system_prompt, enabled_tools, thinking_level,
+      is_default, created_at, updated_at
+    )
+    VALUES ('agent-1', 'Test Agent', ?, ?, ?, ?, ?, 1, ?, ?)
+  `).run(
+    agentLlmProfileId,
+    options.agentModel ?? 'claude-sonnet-4-6',
+    options.agentSystemPrompt ?? '',
+    JSON.stringify(options.agentEnabledTools ?? ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls']),
+    options.agentThinkingLevel ?? null,
+    now,
+    now,
+  );
+  // `sessionAgentProfileId` lets a test reference a stale agent id (no row exists
+  // for that id) — required for the "stale agent_profile_id fallback" path. Default
+  // is the seeded 'agent-1'. Pass `null` to insert a NULL FK (T2 forbids this at
+  // schema level, but the in-memory test schema is permissive).
+  const sessionAgentId = options.sessionAgentProfileId === null
+    ? null
+    : options.sessionAgentProfileId ?? 'agent-1';
 
   db.prepare(`
     INSERT INTO sessions (
@@ -168,7 +194,7 @@ describe('initializeRunBootstrap mode/session policy', () => {
 });
 
 describe('initializeRunBootstrap LLM profile resolution', () => {
-  it('resolves session.llm_profile_id into a full LlmProfileConfig (id, providerType, baseUrl, apiKey)', () => {
+  it('resolves agent.llm_profile_id into a full LlmProfileConfig (id, providerType, baseUrl, apiKey)', () => {
     const result = bootstrap('anthropic', 'default', {
       apiKey: 'sk-test',
       baseUrl: 'https://example.com/v1',
@@ -182,9 +208,9 @@ describe('initializeRunBootstrap LLM profile resolution', () => {
     expect(result?.providerConfig?.baseUrl).toBe('https://example.com/v1');
   });
 
-  it('falls back to the default profile when session.llm_profile_id is NULL', () => {
+  it('falls back to the default profile when agent.llm_profile_id is NULL', () => {
     const result = bootstrap('anthropic', 'default', {
-      sessionProfileId: null,
+      agentLlmProfileId: null,
       profileIsDefault: true,
       apiKey: 'sk-default',
     });
@@ -195,31 +221,67 @@ describe('initializeRunBootstrap LLM profile resolution', () => {
     expect(result?.providerConfig?.apiKey).toBe('sk-default');
   });
 
-  it('leaves providerConfig undefined when no default and session has no profile', () => {
+  it('leaves providerConfig undefined when no default and agent has no llm_profile_id', () => {
     const result = bootstrap('anthropic', 'default', {
       insertProfile: false,
-      sessionProfileId: null,
+      agentLlmProfileId: null,
     });
 
     expect(result?.llmProfileId).toBeNull();
     expect(result?.providerConfig).toBeUndefined();
   });
+});
 
-  it('falls back to default profile when session.llm_profile_id references a deleted/stale id', () => {
+describe('initializeRunBootstrap Agent profile resolution', () => {
+  it('resolves session.agent_profile_id and expands fields into bootstrap result', () => {
+    const result = bootstrap('anthropic', 'default', {
+      apiKey: 'sk-test',
+      agentSystemPrompt: 'You are a coder.',
+      agentEnabledTools: ['read', 'bash'],
+      agentThinkingLevel: 'medium',
+      agentModel: 'claude-opus-4-7',
+    });
+
+    expect(result?.agentProfile).toBeDefined();
+    expect(result?.agentProfile?.id).toBe('agent-1');
+    expect(result?.agentProfile?.systemPrompt).toBe('You are a coder.');
+    expect(result?.agentProfile?.enabledTools).toEqual(['read', 'bash']);
+    expect(result?.agentProfile?.thinkingLevel).toBe('medium');
+    expect(result?.agentProfile?.model).toBe('claude-opus-4-7');
+    expect(result?.enabledTools).toEqual(['read', 'bash']);
+    expect(result?.providerConfig).toBeDefined();
+    expect(result?.providerConfig?.id).toBe('provider-1');
+  });
+
+  it('falls back to default agent when session.agent_profile_id is stale (warn log)', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     const result = bootstrap('anthropic', 'default', {
-      sessionProfileId: 'nonexistent-profile-id',
+      sessionAgentProfileId: 'nonexistent-agent-id',
+      apiKey: 'sk-test',
+    });
+
+    expect(result?.agentProfile?.id).toBe('agent-1');
+    expect(result?.providerConfig?.id).toBe('provider-1');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-agent-id'));
+
+    warnSpy.mockRestore();
+  });
+
+  it('falls back to default llm when agent.llm_profile_id is stale (warn log)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = bootstrap('anthropic', 'default', {
+      agentLlmProfileId: 'nonexistent-llm-id',
       profileIsDefault: true,
       apiKey: 'sk-default',
     });
 
-    expect(result?.providerConfig).toBeDefined();
+    expect(result?.agentProfile?.id).toBe('agent-1');
     expect(result?.providerConfig?.id).toBe('provider-1');
     expect(result?.providerConfig?.isDefault).toBe(true);
     expect(result?.providerConfig?.apiKey).toBe('sk-default');
-    expect(result?.llmProfileId).toBe('provider-1');
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-profile-id'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-llm-id'));
 
     warnSpy.mockRestore();
   });

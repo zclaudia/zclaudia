@@ -8,15 +8,19 @@ import { sendMessage } from '../transport/broadcast.js';
 import type { RunStartMessage, RunSessionRecord } from './run-bootstrap.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 
 interface LaunchProviderRunInput {
   activeRun: ActiveRun;
   adapter: ProviderAdapter;
+  agentProfile: AgentProfileConfig;
   broadcastSessionCatalogUpdate: () => void;
   client: ConnectedClient;
   cwd: string;
   db: ActiveRun['db'];
+  enabledTools: ToolName[];
   forcedPlanBySession: boolean;
   message: RunStartMessage;
   modeValue: string;
@@ -41,10 +45,12 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   const {
     activeRun,
     adapter,
+    agentProfile,
     broadcastSessionCatalogUpdate,
     client,
     cwd,
     db,
+    enabledTools,
     forcedPlanBySession,
     message,
     modeValue,
@@ -111,8 +117,10 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
 
   const { runOptions } = await buildRunContext({
     adapter,
+    agentProfile,
     cwd,
     db,
+    enabledTools,
     forcedPlanBySession,
     message,
     modeValue,

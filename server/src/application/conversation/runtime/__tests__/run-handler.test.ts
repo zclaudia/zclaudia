@@ -187,8 +187,12 @@ function createDb(): Database.Database {
   `).run();
 
   db.prepare(`
-    INSERT INTO agent_profiles (id, name, llm_profile_id, is_default, created_at, updated_at)
-    VALUES ('agent-1', 'Test Agent', 'provider-1', 1, ?, ?)
+    INSERT INTO agent_profiles (
+      id, name, llm_profile_id, model, system_prompt, enabled_tools,
+      is_default, created_at, updated_at
+    )
+    VALUES ('agent-1', 'Test Agent', 'provider-1', 'claude-sonnet-4-6', 'agent system prompt',
+      '["read","write","edit","bash","grep","find","ls"]', 1, ?, ?)
   `).run(now, now);
 
   return db;
@@ -301,10 +305,17 @@ describe('ws/run-handler', () => {
         activeSkillsContent: 'loaded:/skills/review',
       }),
     );
+    // RunOptions.systemPrompt is now sourced solely from agentProfile.systemPrompt
+    // (full replacement per agent-profiles spec §4.6); the context-engine output is
+    // intentionally not used as systemPrompt anymore. We still verify that the
+    // skill discovery chain ran (via assembleContextMock above) and that the
+    // resolved agent fields flow through into RunOptions.
     expect(providerRunMock).toHaveBeenCalledWith(
       'please review this change',
       expect.objectContaining({
-        systemPrompt: 'assembled system prompt',
+        systemPrompt: 'agent system prompt',
+        agentProfile: expect.objectContaining({ id: 'agent-1', systemPrompt: 'agent system prompt' }),
+        enabledTools: ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls'],
       }),
       expect.any(Function),
     );

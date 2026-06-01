@@ -73,9 +73,11 @@ export async function handleRunStart(
 
   const {
     activeRun,
+    agentProfile,
     broadcastSessionCatalogUpdate,
     connectedClients,
     cwd,
+    enabledTools,
     markPendingResolutionResumed,
     persistSessionWorkingDirectory,
     projectId,
@@ -157,10 +159,12 @@ export async function handleRunStart(
     const { providerRunner } = await launchProviderRun({
       activeRun,
       adapter,
+      agentProfile,
       broadcastSessionCatalogUpdate,
       client,
       cwd,
       db,
+      enabledTools,
       forcedPlanBySession,
       message,
       modeValue,
