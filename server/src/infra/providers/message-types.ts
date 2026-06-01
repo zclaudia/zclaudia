@@ -54,7 +54,8 @@ export interface ClaudeMessage {
     | 'error'
     | 'task_notification'
     | 'tool_activity'
-    | 'mode_transition';
+    | 'mode_transition'
+    | 'thinking_delta';
   sessionId?: string;
   content?: string;
   systemInfo?: SystemInfo;
@@ -98,4 +99,12 @@ export interface ClaudeMessage {
    * into this event so the runtime stays provider-agnostic.
    */
   modeTransition?: ModeTransition;
+
+  /** Thinking content chunk (reasoning text from a reasoning-capable model). */
+  thinkingContent?: string;
+  /** Thinking signature (e.g. Anthropic's encrypted reasoning signature). Set on the
+   *  thinking_end event of a block, not during streaming. */
+  thinkingSignature?: string;
+  /** Whether the thinking block was redacted by safety filters. */
+  thinkingRedacted?: boolean;
 }
