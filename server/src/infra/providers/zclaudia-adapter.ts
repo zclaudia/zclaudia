@@ -60,6 +60,7 @@ function buildModel(): Model<unknown> {
 export function loadHistory(db: Database.Database | undefined, sessionId: string | undefined): AgentMessage[] {
   if (!db || !sessionId) return [];
 
+  // Schema mirrors messages table in server/src/infra/storage/migrations (keep in sync if columns change).
   const rows = db.prepare<[string, number], StoredRow>(`
     SELECT id, role, content, created_at as createdAt
     FROM messages
@@ -86,7 +87,7 @@ export function loadHistory(db: Database.Database | undefined, sessionId: string
       messages.push({
         role: 'assistant',
         content: [{ type: 'text', text: row.content }],
-        stopReason: 'end_turn',
+        stopReason: 'stop',
         timestamp: row.createdAt,
       } as AgentMessage);
     }
