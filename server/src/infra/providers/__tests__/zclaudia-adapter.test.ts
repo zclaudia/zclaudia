@@ -4,6 +4,8 @@ import type { AgentEvent } from '@earendil-works/pi-agent-core';
 import { __testables, ZClaudiaAdapter } from '../zclaudia-adapter.js';
 import type { RunOptions, ClaudeMessage } from '../types.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
+import type { ToolName } from '@zclaudia/shared/core/tools';
 
 // Mock pi-ai's getModel so tests don't hit real model registry.
 vi.mock('@earendil-works/pi-ai', () => ({
@@ -499,6 +501,81 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
     expect(opts.beforeToolCall).toBeDefined();
     expect(opts.afterToolCall).toBeDefined();
     expect(opts.shouldStopAfterTurn).toBeDefined();
+  });
+});
+
+describe('buildModel — modelOverride', () => {
+  const originalEnv = { ...process.env };
+  beforeEach(() => { process.env = { ...originalEnv }; });
+  afterEach(() => { process.env = { ...originalEnv }; });
+
+  it('uses modelOverride when provided (openai-compatible path)', () => {
+    process.env.OPENAI_BASE_URL = 'http://localhost:3000/v1';
+    const { model } = buildModel(undefined, 'kimi-k2.6');
+    expect(model.id).toBe('kimi-k2.6');
+  });
+
+  it('uses modelOverride for built-in provider path', () => {
+    delete process.env.OPENAI_BASE_URL;
+    const { model } = buildModel(undefined, 'custom-claude-id');
+    expect(model.id).toBe('custom-claude-id');
+  });
+
+  it('falls back to env-driven model when no override', () => {
+    process.env.OPENAI_BASE_URL = 'http://localhost:3000/v1';
+    process.env.OPENAI_MODEL = 'env-model';
+    const { model } = buildModel(undefined);
+    expect(model.id).toBe('env-model');
+  });
+});
+
+describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => {
+  beforeEach(() => {
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+
+  it('passes options.thinkingLevel into Agent initialState', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', { thinkingLevel: 'medium' as ThinkingLevel });
+
+    expect(mockAgentInstances[0].initialState.thinkingLevel).toBe('medium');
+  });
+
+  it('passes options.enabledTools to buildTools (filters to subset)', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', { enabledTools: ['read', 'bash'] as ToolName[] });
+
+    expect(mockAgentInstances[0].initialState.tools).toBeDefined();
+    expect(mockAgentInstances[0].initialState.tools.length).toBe(2);
+    expect(mockAgentInstances[0].initialState.tools.map((t: any) => t.name).sort()).toEqual(['bash', 'read']);
+  });
+
+  it('passes options.agentProfile.model into buildModel as override', async () => {
+    process.env.OPENAI_BASE_URL = 'http://localhost:3000/v1';
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const agentProfile: AgentProfileConfig = {
+      id: 'a1', name: 'coder', llmProfileId: 'lp1', model: 'kimi-k2.6',
+      systemPrompt: '', enabledTools: ['read'], createdAt: 0, updatedAt: 0,
+    };
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', { agentProfile });
+
+    expect(mockAgentInstances[0].initialState.model.id).toBe('kimi-k2.6');
   });
 });
 

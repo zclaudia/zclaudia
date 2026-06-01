@@ -1,6 +1,8 @@
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
+import type { ToolName } from '@zclaudia/shared/core/tools';
 import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { ClaudeMessage, PermissionCallback } from './message-types.js';
@@ -23,6 +25,12 @@ export interface RunOptions {
   db?: Database.Database;  // Database for loading ZClaudia-managed MCP servers
   /** Resolved LLM profile to drive buildModel. If undefined, buildModel falls back to env. */
   llmProfileConfig?: LlmProfileConfig;
+  /** Full agent profile resolved by run-bootstrap (for tracing / future). */
+  agentProfile?: AgentProfileConfig;
+  /** Subset of pi tools to enable (derived from agent.enabledTools). */
+  enabledTools?: ToolName[];
+  /** Pi thinking budget; undefined = pi default. */
+  thinkingLevel?: ThinkingLevel;
 }
 
 /** Agent runtime adapter interface. */

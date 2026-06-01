@@ -47,14 +47,14 @@ const policy: ProviderPolicy = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type BuiltModel = { model: Model<any>; getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined };
 
-function buildModel(profile?: LlmProfileConfig): BuiltModel {
-  // Resolution order: profile field > env > hardcoded default.
+function buildModel(profile?: LlmProfileConfig, modelOverride?: string): BuiltModel {
+  // Resolution order: modelOverride > profile field > env > hardcoded default.
   // If baseUrl is set (via profile or OPENAI_BASE_URL env) we build a custom openai-completions
   // Model literal so any OpenAI-compatible endpoint (DeepSeek / vLLM / Azure / corporate proxies /
   // etc.) works without being pre-registered in pi-ai's model registry.
   const baseUrl = profile?.baseUrl ?? process.env.OPENAI_BASE_URL;
   if (baseUrl) {
-    const id = process.env.OPENAI_MODEL || 'gpt-4o';  // model stays env-driven in sub-project A; agent-profile takes over in sub-project B
+    const id = modelOverride ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
     const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? 'openai-custom';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model: Model<any> = {
@@ -80,7 +80,7 @@ function buildModel(profile?: LlmProfileConfig): BuiltModel {
   }
 
   const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? DEFAULT_PROVIDER;
-  const modelId = process.env.PI_MODEL || DEFAULT_MODEL;
+  const modelId = modelOverride ?? process.env.PI_MODEL ?? DEFAULT_MODEL;
   // pi-ai's getModel is generically typed on literal provider + model id.
   // Env-derived strings can't satisfy those generic constraints; cast through `string`
   // to erase the generic and let the runtime registry lookup do the work.
@@ -258,7 +258,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // 2. Build the model (config errors stop here)
     let modelInfo: BuiltModel;
     try {
-      modelInfo = buildModel(options.llmProfileConfig);
+      modelInfo = buildModel(options.llmProfileConfig, options.agentProfile?.model);
     } catch (err) {
       yield {
         type: 'error',
@@ -283,7 +283,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     }
 
     // 4. Construct Agent — wire tools + hooks from pi-runtime
-    const tools = buildTools(options.cwd);
+    const tools = buildTools(options.cwd, options.enabledTools ? { enabled: options.enabledTools } : undefined);
     const hooks = buildAgentHooks({
       permissionCallback: onPermission ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
     });
@@ -295,6 +295,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         model: modelInfo.model,
         messages: history,
         tools,
+        ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
       },
       beforeToolCall: hooks.beforeToolCall,
       afterToolCall: hooks.afterToolCall,
