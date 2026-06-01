@@ -51,10 +51,16 @@ const policy: ProviderPolicy = {
   emptyResultFallback: 'ZClaudia agent completed without additional output.',
 };
 
-function buildModel(): Model<unknown> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildModel(): Model<any> {
   const provider = process.env.PI_PROVIDER || DEFAULT_PROVIDER;
   const model = process.env.PI_MODEL || DEFAULT_MODEL;
-  return getModel(provider, model) as Model<unknown>;
+  // pi-ai's getModel is generically typed on literal provider + model id.
+  // Env-derived strings can't satisfy those generic constraints; cast through `string`
+  // to erase the generic and let the runtime registry lookup do the work.
+  // Model<T> requires T extends Api, so we use `any` to opt out of that constraint.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (getModel as (provider: string, model: string) => Model<any>)(provider, model);
 }
 
 export function loadHistory(db: Database.Database | undefined, sessionId: string | undefined): AgentMessage[] {
