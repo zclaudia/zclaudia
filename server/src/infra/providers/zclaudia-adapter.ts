@@ -3,7 +3,7 @@ import { getModel, type Model } from '@earendil-works/pi-ai';
 import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
-import type { ClaudeMessage, ProviderAdapter, RunOptions } from './types.js';
+import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
@@ -219,7 +219,13 @@ export class ZClaudiaAdapter implements ProviderAdapter {
   readonly manifest = manifest;
   readonly policy = policy;
 
-  async *run(input: string, options: RunOptions): AsyncGenerator<ClaudeMessage, void, void> {
+  async *run(
+    input: string,
+    options: RunOptions,
+    _onPermission?: PermissionCallback,
+  ): AsyncGenerator<ClaudeMessage, void, void> {
+    // MVP: pure conversation, no tools, so onPermission is unused.
+    // Wired into pi `beforeToolCall` hook in a future sub-project.
     const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
     const ctx: TranslateContext = {
       sessionId,
@@ -280,6 +286,9 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // `agent_start` is intentionally not translated by translateEvent; init is
     // emitted manually above as a run-bootstrap concern.
     const queue = new AsyncQueue<ClaudeMessage>();
+    // Listener MUST stay synchronous: we rely on `result` being pushed to the queue
+    // before `agent.prompt(input).then(close)` settles. Making this async would
+    // break the init → ... → result → close ordering guarantee.
     const unsubscribe = agent.subscribe(event => {
       if (event.type === 'agent_end') {
         const usage = extractUsage(event.messages);
