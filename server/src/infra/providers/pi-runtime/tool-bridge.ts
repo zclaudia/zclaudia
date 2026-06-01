@@ -9,17 +9,8 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 
-export type ToolName = 'read' | 'write' | 'edit' | 'bash' | 'grep' | 'find' | 'ls';
-
-export const ALL_TOOL_NAMES: readonly ToolName[] = [
-  'read',
-  'write',
-  'edit',
-  'bash',
-  'grep',
-  'find',
-  'ls',
-] as const;
+import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
+export { ALL_TOOL_NAMES, type ToolName };
 
 const KNOWN_TOOL_SET = new Set<string>(ALL_TOOL_NAMES);
 
