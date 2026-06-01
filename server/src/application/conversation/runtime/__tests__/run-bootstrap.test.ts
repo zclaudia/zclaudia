@@ -191,4 +191,23 @@ describe('initializeRunBootstrap LLM profile resolution', () => {
     expect(result?.llmProfileId).toBeNull();
     expect(result?.providerConfig).toBeUndefined();
   });
+
+  it('falls back to default profile when session.llm_profile_id references a deleted/stale id', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const result = bootstrap('anthropic', 'default', {
+      sessionProfileId: 'nonexistent-profile-id',
+      profileIsDefault: true,
+      apiKey: 'sk-default',
+    });
+
+    expect(result?.providerConfig).toBeDefined();
+    expect(result?.providerConfig?.id).toBe('provider-1');
+    expect(result?.providerConfig?.isDefault).toBe(true);
+    expect(result?.providerConfig?.apiKey).toBe('sk-default');
+    expect(result?.llmProfileId).toBe('provider-1');
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-profile-id'));
+
+    warnSpy.mockRestore();
+  });
 });

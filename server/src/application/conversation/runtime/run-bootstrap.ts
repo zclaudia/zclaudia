@@ -123,11 +123,15 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
 
   let providerConfig: LlmProfileConfig | undefined;
   if (explicitProfileId) {
-    providerConfig = llmProfileRepo.findById(explicitProfileId) || undefined;
+    providerConfig = llmProfileRepo.findById(explicitProfileId) ?? undefined;
+    if (!providerConfig) {
+      console.warn(`[run-bootstrap] llm_profile_id ${explicitProfileId} not found, falling back to default`);
+      providerConfig = llmProfileRepo.findDefault() ?? undefined;
+    }
   } else {
-    providerConfig = llmProfileRepo.findDefault() || undefined;
+    providerConfig = llmProfileRepo.findDefault() ?? undefined;
   }
-  const llmProfileId = explicitProfileId || providerConfig?.id || null;
+  const llmProfileId = providerConfig?.id ?? null;
 
   if (providerConfig) {
     trace.setMeta({ provider: providerConfig.providerType });
