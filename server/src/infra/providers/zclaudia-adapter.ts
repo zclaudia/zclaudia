@@ -52,15 +52,44 @@ const policy: ProviderPolicy = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildModel(): Model<any> {
+type BuiltModel = { model: Model<any>; getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined };
+
+function buildModel(): BuiltModel {
+  // If OPENAI_BASE_URL is set we build a custom openai-completions Model literal so
+  // any OpenAI-compatible endpoint (DeepSeek / vLLM / Azure / corporate proxies / etc.)
+  // works without being pre-registered in pi-ai's model registry.
+  const baseUrl = process.env.OPENAI_BASE_URL;
+  if (baseUrl) {
+    const id = process.env.OPENAI_MODEL || 'gpt-4o';
+    const provider = process.env.PI_PROVIDER || 'openai-custom';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const model: Model<any> = {
+      id,
+      name: id,
+      api: 'openai-completions',
+      provider,
+      baseUrl,
+      reasoning: false,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 8192,
+    };
+    return {
+      model,
+      getApiKey: async () => process.env.OPENAI_API_KEY ?? '',
+    };
+  }
+
   const provider = process.env.PI_PROVIDER || DEFAULT_PROVIDER;
-  const model = process.env.PI_MODEL || DEFAULT_MODEL;
+  const modelId = process.env.PI_MODEL || DEFAULT_MODEL;
   // pi-ai's getModel is generically typed on literal provider + model id.
   // Env-derived strings can't satisfy those generic constraints; cast through `string`
   // to erase the generic and let the runtime registry lookup do the work.
   // Model<T> requires T extends Api, so we use `any` to opt out of that constraint.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (getModel as (provider: string, model: string) => Model<any>)(provider, model);
+  const model = (getModel as (provider: string, model: string) => Model<any>)(provider, modelId);
+  return { model };
 }
 
 export function loadHistory(db: Database.Database | undefined, sessionId: string | undefined): AgentMessage[] {
@@ -248,9 +277,9 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     };
 
     // 2. Build the model (config errors stop here)
-    let model: ReturnType<typeof buildModel>;
+    let modelInfo: BuiltModel;
     try {
-      model = buildModel();
+      modelInfo = buildModel();
     } catch (err) {
       yield {
         type: 'error',
@@ -274,13 +303,17 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     }
 
     // 4. Construct Agent
-    const agent = new Agent({
+    const agentOpts: ConstructorParameters<typeof Agent>[0] = {
       initialState: {
         systemPrompt: options.systemPrompt ?? '',
-        model,
+        model: modelInfo.model,
         messages: history,
       },
-    });
+    };
+    if (modelInfo.getApiKey) {
+      agentOpts.getApiKey = modelInfo.getApiKey;
+    }
+    const agent = new Agent(agentOpts);
 
     // 5. Subscribe → translate → queue
     // `agent_start` is intentionally not translated by translateEvent; init is

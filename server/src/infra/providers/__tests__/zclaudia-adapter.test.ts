@@ -143,22 +143,43 @@ describe('buildModel', () => {
   it('uses defaults when env vars unset', () => {
     delete process.env.PI_PROVIDER;
     delete process.env.PI_MODEL;
-    const model = buildModel();
+    delete process.env.OPENAI_BASE_URL;
+    const { model } = buildModel();
     expect(model.provider).toBe('anthropic');
     expect(model.id).toBe('claude-sonnet-4-6');
   });
 
   it('honors PI_PROVIDER and PI_MODEL env', () => {
+    delete process.env.OPENAI_BASE_URL;
     process.env.PI_PROVIDER = 'openai';
     process.env.PI_MODEL = 'gpt-5';
-    const model = buildModel();
+    const { model } = buildModel();
     expect(model.provider).toBe('openai');
     expect(model.id).toBe('gpt-5');
   });
 
   it('propagates getModel errors (model not in registry)', () => {
+    delete process.env.OPENAI_BASE_URL;
     process.env.PI_MODEL = 'invalid-model';
     expect(() => buildModel()).toThrow(/unknown model: invalid-model/);
+  });
+
+  it('builds custom OpenAI-compatible model when OPENAI_BASE_URL is set', () => {
+    process.env.OPENAI_BASE_URL = 'https://api.deepseek.com/v1';
+    process.env.OPENAI_API_KEY = 'sk-test';
+    process.env.OPENAI_MODEL = 'deepseek-chat';
+    const { model, getApiKey } = buildModel();
+    expect(model.baseUrl).toBe('https://api.deepseek.com/v1');
+    expect(model.id).toBe('deepseek-chat');
+    expect(model.api).toBe('openai-completions');
+    expect(typeof getApiKey).toBe('function');
+  });
+
+  it('OPENAI_BASE_URL custom model: getApiKey returns OPENAI_API_KEY', async () => {
+    process.env.OPENAI_BASE_URL = 'https://example.com/v1';
+    process.env.OPENAI_API_KEY = 'sk-real-key';
+    const { getApiKey } = buildModel();
+    expect(await getApiKey!('whatever')).toBe('sk-real-key');
   });
 });
 
