@@ -16,7 +16,9 @@ vi.mock('@earendil-works/pi-ai', () => ({
 // Hoisted collections used inside vi.mock factory.
 const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
   mockAgentInstances: [] as Array<{
-    initialState: { systemPrompt: string; model: unknown; messages: unknown[] };
+    initialState: { systemPrompt: string; model: unknown; messages: unknown[]; tools?: unknown[] };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructorOpts: any;
     promptCalls: Array<{ input: string }>;
   }>,
   scriptQueue: [] as Array<{ events: AgentEvent[]; rejectWith?: Error }>,
@@ -24,12 +26,15 @@ const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
 
 vi.mock('@earendil-works/pi-agent-core', () => {
   class MockAgent {
-    initialState: { systemPrompt: string; model: unknown; messages: unknown[] };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    initialState: any;
     private listener?: (event: AgentEvent) => void;
-    constructor(opts: { initialState: { systemPrompt: string; model: unknown; messages: unknown[] } }) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(opts: { initialState: any; [k: string]: any }) {
       this.initialState = opts.initialState;
       mockAgentInstances.push({
         initialState: opts.initialState,
+        constructorOpts: opts,
         promptCalls: [],
       });
     }
@@ -62,7 +67,7 @@ function scriptNextAgent(events: AgentEvent[], options?: { rejectWith?: Error })
   scriptQueue.push({ events, rejectWith: options?.rejectWith });
 }
 
-const { AsyncQueue, buildModel, loadHistory, translateEvent } = __testables;
+const { AsyncQueue, buildModel, translateEvent } = __testables;
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -183,64 +188,6 @@ describe('buildModel', () => {
   });
 });
 
-describe('loadHistory', () => {
-  it('returns empty array when sessionId or db missing', () => {
-    const db = createTestDb();
-    expect(loadHistory(undefined, 's1')).toEqual([]);
-    expect(loadHistory(db, undefined)).toEqual([]);
-    expect(loadHistory(db, 's1')).toEqual([]);
-  });
-
-  it('returns messages in chronological order', () => {
-    const db = createTestDb();
-    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'user', content: 'hi',     createdAt: 100, offset: 1 });
-    insertMessage(db, { id: 'm2', sessionId: 's1', role: 'assistant', content: 'hello',  createdAt: 200, offset: 2 });
-    insertMessage(db, { id: 'm3', sessionId: 's1', role: 'user', content: 'how are you', createdAt: 300, offset: 3 });
-    // bootstrap inserts current input; trailing user should be popped
-    const out = loadHistory(db, 's1');
-    expect(out.map(m => m.role)).toEqual(['user', 'assistant']);
-    expect((out[0] as { content: string }).content).toBe('hi');
-  });
-
-  it('filters out system rows', () => {
-    const db = createTestDb();
-    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'system',    content: 'sys',  createdAt: 100, offset: 1 });
-    insertMessage(db, { id: 'm2', sessionId: 's1', role: 'user',      content: 'hi',   createdAt: 200, offset: 2 });
-    insertMessage(db, { id: 'm3', sessionId: 's1', role: 'assistant', content: 'yo',   createdAt: 300, offset: 3 });
-    const out = loadHistory(db, 's1');
-    expect(out.map(m => m.role)).toEqual(['user', 'assistant']);
-  });
-
-  it('does not pop trailing message when it is an assistant', () => {
-    const db = createTestDb();
-    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'user',      content: 'hi',  createdAt: 100, offset: 1 });
-    insertMessage(db, { id: 'm2', sessionId: 's1', role: 'assistant', content: 'hey', createdAt: 200, offset: 2 });
-    const out = loadHistory(db, 's1');
-    expect(out.map(m => m.role)).toEqual(['user', 'assistant']);
-  });
-
-  it('returns assistant message in pi text-content format', () => {
-    const db = createTestDb();
-    insertMessage(db, { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello world', createdAt: 100, offset: 1 });
-    const out = loadHistory(db, 's1');
-    expect(out[0]).toMatchObject({
-      role: 'assistant',
-      content: [{ type: 'text', text: 'hello world' }],
-    });
-  });
-
-  it('caps at HISTORY_LIMIT most recent messages', () => {
-    const db = createTestDb();
-    for (let i = 0; i < 60; i++) {
-      insertMessage(db, { id: `m${i}`, sessionId: 's1', role: i % 2 === 0 ? 'user' : 'assistant', content: `msg${i}`, createdAt: 100 + i, offset: i + 1 });
-    }
-    const out = loadHistory(db, 's1');
-    // 60 total messages; HISTORY_LIMIT=50 are loaded (newest 50: m10..m59); last (m59 is assistant since 59%2!=0 → assistant)
-    // Trailing assistant -> no pop. So output length = 50.
-    expect(out.length).toBe(50);
-  });
-});
-
 describe('translateEvent', () => {
   const ctx = { sessionId: 'test-session', model: 'claude-sonnet-4-6', cwd: '/tmp' };
 
@@ -258,11 +205,12 @@ describe('translateEvent', () => {
     expect(out).toEqual({ type: 'assistant', content: 'Hello' });
   });
 
-  it('ignores non-text_delta message_update events', () => {
+  it('ignores unknown message_update sub-event types', () => {
     const out = translateEvent({
       type: 'message_update',
       message: { role: 'assistant', content: [] },
-      assistantMessageEvent: { type: 'thinking_delta', delta: 'pondering' },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      assistantMessageEvent: { type: '_unknown_sub_event_' as any, delta: 'x' },
     }, ctx);
     expect(out).toBeUndefined();
   });
@@ -342,13 +290,14 @@ describe('ZClaudiaAdapter.run', () => {
     expect(out[out.length - 1].isComplete).toBe(true);
   });
 
-  it('extracts usage from agent_end.messages last assistant', async () => {
+  it('sums usage across all assistant messages in agent_end', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'reply' } },
       { type: 'agent_end', messages: [
         { role: 'user', content: 'hi', timestamp: 0 },
-        { role: 'assistant', content: [{ type: 'text', text: 'reply' }], stopReason: 'stop', usage: { input: 100, output: 50 }, timestamp: 0 } as any,
+        { role: 'assistant', content: [{ type: 'text', text: 'first' }], stopReason: 'toolUse', usage: { input: 100, output: 50 }, timestamp: 0 } as any,
+        { role: 'assistant', content: [{ type: 'text', text: 'final' }], stopReason: 'stop', usage: { input: 30, output: 20 }, timestamp: 0 } as any,
       ] },
     ]);
 
@@ -357,7 +306,7 @@ describe('ZClaudiaAdapter.run', () => {
 
     const last = out[out.length - 1];
     expect(last.type).toBe('result');
-    expect(last.usage).toEqual({ inputTokens: 100, outputTokens: 50 });
+    expect(last.usage).toEqual({ inputTokens: 130, outputTokens: 70 });
   });
 
   it('loads history from DB and passes it to Agent initialState', async () => {
@@ -439,5 +388,115 @@ describe('ZClaudiaAdapter.run', () => {
     const out = await collect(adapter, 'hi', {});
 
     expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'result']);
+  });
+});
+
+describe('ZClaudiaAdapter.run — thinking', () => {
+  beforeEach(() => {
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+
+  it('translates thinking_delta into ClaudeMessage.thinking_delta', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'reasoning step' } },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+
+    const thinkings = out.filter(m => m.type === 'thinking_delta');
+    expect(thinkings).toHaveLength(1);
+    expect((thinkings[0] as any).thinkingContent).toBe('reasoning step');
+  });
+
+  it('captures thinkingSignature from thinking_end content', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'reasoning' } },
+      { type: 'message_update',
+        message: { role: 'assistant', content: [{ type: 'thinking', thinking: 'reasoning', thinkingSignature: 'sig-abc' }] },
+        assistantMessageEvent: { type: 'thinking_end', contentIndex: 0, content: 'reasoning',
+          partial: { role: 'assistant', content: [{ type: 'thinking', thinking: 'reasoning', thinkingSignature: 'sig-abc' }] }
+        }
+      },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+
+    const thinkings = out.filter(m => m.type === 'thinking_delta');
+    const sigEvent = thinkings.find(t => (t as any).thinkingSignature);
+    expect(sigEvent).toBeDefined();
+    expect((sigEvent as any).thinkingSignature).toBe('sig-abc');
+  });
+});
+
+describe('ZClaudiaAdapter.run — tool loop integration', () => {
+  beforeEach(() => {
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+
+  it('full single-tool turn: emits tool_use, tool_activity, tool_result, then assistant + result', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'calling read' } },
+      { type: 'message_end', message: {
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'calling read' },
+          { type: 'toolCall', id: 't1', name: 'read', arguments: { path: '/x' } },
+        ],
+      } },
+      { type: 'tool_execution_update', toolCallId: 't1', toolName: 'read', args: {}, partialResult: { content: [{ type: 'text', text: 'reading...' }] } },
+      { type: 'tool_execution_end', toolCallId: 't1', toolName: 'read', result: { content: [{ type: 'text', text: 'file body' }] }, isError: false },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', contentIndex: 0, delta: 'it says foo' } },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'read /x', {});
+
+    const types = out.map(m => m.type);
+    expect(types[0]).toBe('init');
+    expect(types).toContain('tool_use');
+    expect(types).toContain('tool_activity');
+    expect(types).toContain('tool_result');
+    expect(types.filter(t => t === 'assistant').length).toBeGreaterThanOrEqual(2);
+    expect(types[types.length - 1]).toBe('result');
+  });
+
+  it('passes tools array to pi Agent constructor', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', { cwd: '/tmp' });
+
+    expect(mockAgentInstances.length).toBe(1);
+    expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
+    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(7);
+  });
+
+  it('passes 3 hooks to pi Agent constructor', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {});
+
+    expect(mockAgentInstances.length).toBe(1);
+    const opts = mockAgentInstances[0].constructorOpts;
+    expect(opts.beforeToolCall).toBeDefined();
+    expect(opts.afterToolCall).toBeDefined();
+    expect(opts.shouldStopAfterTurn).toBeDefined();
   });
 });

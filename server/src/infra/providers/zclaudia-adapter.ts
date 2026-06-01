@@ -1,20 +1,12 @@
-import type Database from 'better-sqlite3';
 import { getModel, type Model } from '@earendil-works/pi-ai';
 import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
+import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory } from './pi-runtime/index.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
-const HISTORY_LIMIT = 50;
-
-interface StoredRow {
-  id: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  createdAt: number;
-}
 
 const manifest: PCPProviderManifest = {
   id: 'zclaudia',
@@ -31,10 +23,10 @@ const manifest: PCPProviderManifest = {
   },
   capabilities: [
     { id: 'chat.stream', supported: true, mode: 'emulated', reliability: 'strict' },
-    { id: 'tool.call', supported: false, degradation: 'fallback_to_text' },
+    { id: 'tool.call', supported: true, mode: 'native', reliability: 'strict' },
     { id: 'tool.inject', supported: false, degradation: 'fallback_to_text' },
     { id: 'interaction.form', supported: false, degradation: 'fallback_to_text' },
-    { id: 'interaction.approval', supported: false, degradation: 'fallback_to_text' },
+    { id: 'interaction.approval', supported: true, mode: 'native', reliability: 'strict' },
     { id: 'interaction.todo', supported: false, degradation: 'fallback_to_text' },
     { id: 'input.image', supported: false, degradation: 'fallback_to_notice' },
     { id: 'input.text_file', supported: false, degradation: 'fallback_to_notice' },
@@ -92,45 +84,6 @@ function buildModel(): BuiltModel {
   return { model };
 }
 
-export function loadHistory(db: Database.Database | undefined, sessionId: string | undefined): AgentMessage[] {
-  if (!db || !sessionId) return [];
-
-  // Schema mirrors messages table in server/src/infra/storage/migrations (keep in sync if columns change).
-  const rows = db.prepare<[string, number], StoredRow>(`
-    SELECT id, role, content, created_at as createdAt
-    FROM messages
-    WHERE session_id = ?
-    ORDER BY created_at DESC
-    LIMIT ?
-  `).all(sessionId, HISTORY_LIMIT);
-
-  // Reverse to chronological order
-  const chronological = rows.reverse();
-
-  // Strip trailing user message (the current turn's input, just inserted by run-bootstrap)
-  if (chronological.length > 0 && chronological[chronological.length - 1].role === 'user') {
-    chronological.pop();
-  }
-
-  // Convert to pi AgentMessage format; skip system rows
-  const messages: AgentMessage[] = [];
-  for (const row of chronological) {
-    if (row.role === 'system') continue;
-    if (row.role === 'user') {
-      messages.push({ role: 'user', content: row.content, timestamp: row.createdAt } as AgentMessage);
-    } else if (row.role === 'assistant') {
-      messages.push({
-        role: 'assistant',
-        content: [{ type: 'text', text: row.content }],
-        stopReason: 'stop',
-        timestamp: row.createdAt,
-      } as AgentMessage);
-    }
-  }
-
-  return messages;
-}
-
 class AsyncQueue<T> implements AsyncIterable<T> {
   private buffer: T[] = [];
   private waiters: Array<(result: IteratorResult<T>) => void> = [];
@@ -182,20 +135,23 @@ interface UsageHint {
 }
 
 /**
- * Extract usage from the last assistant message in an `agent_end` payload.
+ * Sum usage across all assistant messages in an `agent_end` payload.
  *
- * pi exports `getLastAssistantUsage`, but it operates on `SessionTreeEntry[]` (session-repo entries),
- * not on `AgentMessage[]` (which is what `agent_end.messages` carries). So we scan inline and
- * extract `usage.input` / `usage.output` from the last assistant message that has a usage block.
+ * A tool-using turn yields multiple assistant messages (one per LLM call); each carries
+ * its own usage block. We sum them so the final `result` event reflects the full turn cost,
+ * not just the last LLM call.
  */
-function extractUsage(messages: AgentMessage[]): UsageHint | undefined {
-  for (let i = messages.length - 1; i >= 0; i--) {
-    const m = messages[i] as { role?: string; usage?: { input?: number; output?: number } };
-    if (m.role === 'assistant' && m.usage) {
-      return { inputTokens: m.usage.input ?? 0, outputTokens: m.usage.output ?? 0 };
+function extractUsage(messages: AgentMessage[]): UsageHint {
+  let inputTokens = 0;
+  let outputTokens = 0;
+  for (const m of messages) {
+    const msg = m as { role?: string; usage?: { input?: number; output?: number } };
+    if (msg.role === 'assistant' && msg.usage) {
+      inputTokens += msg.usage.input ?? 0;
+      outputTokens += msg.usage.output ?? 0;
     }
   }
-  return undefined;
+  return { inputTokens, outputTokens };
 }
 
 export function translateEvent(
@@ -208,9 +164,25 @@ export function translateEvent(
       // agent_start is intentionally not translated; run() emits `init` directly
       // as a run-bootstrap concern (see ZClaudiaAdapter.run).
       case 'message_update': {
-        const sub = event.assistantMessageEvent;
-        if (sub && sub.type === 'text_delta' && typeof sub.delta === 'string') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sub = (event as any).assistantMessageEvent;
+        if (!sub) return undefined;
+        if (sub.type === 'text_delta' && typeof sub.delta === 'string') {
           return { type: 'assistant', content: sub.delta };
+        }
+        if (sub.type === 'thinking_delta' && typeof sub.delta === 'string') {
+          return { type: 'thinking_delta', thinkingContent: sub.delta };
+        }
+        if (sub.type === 'thinking_end') {
+          // Extract thinkingSignature from the partial.content (set by pi when thinking completes)
+          const blocks = sub.partial?.content;
+          if (Array.isArray(blocks) && typeof sub.contentIndex === 'number') {
+            const block = blocks[sub.contentIndex];
+            if (block && block.type === 'thinking' && typeof block.thinkingSignature === 'string') {
+              return { type: 'thinking_delta', thinkingSignature: block.thinkingSignature };
+            }
+          }
+          return undefined;
         }
         return undefined;
       }
@@ -241,7 +213,7 @@ export function translateEvent(
   }
 }
 
-export const __testables = { AsyncQueue, buildModel, loadHistory, translateEvent };
+export const __testables = { AsyncQueue, buildModel, translateEvent };
 
 export class ZClaudiaAdapter implements ProviderAdapter {
   readonly type = 'zclaudia';
@@ -251,10 +223,8 @@ export class ZClaudiaAdapter implements ProviderAdapter {
   async *run(
     input: string,
     options: RunOptions,
-    _onPermission?: PermissionCallback,
+    onPermission?: PermissionCallback,
   ): AsyncGenerator<ClaudeMessage, void, void> {
-    // MVP: pure conversation, no tools, so onPermission is unused.
-    // Wired into pi `beforeToolCall` hook in a future sub-project.
     const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
     const ctx: TranslateContext = {
       sessionId,
@@ -292,7 +262,8 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // 3. Load history (non-fatal failure)
     let history: AgentMessage[] = [];
     try {
-      history = loadHistory(options.db, options.claudiaSessionId);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      history = rebuildHistory(options.db, options.claudiaSessionId) as any;
     } catch (err) {
       console.error('[ZClaudiaAdapter] history load failed:', err);
       yield {
@@ -302,17 +273,28 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       };
     }
 
-    // 4. Construct Agent
-    const agentOpts: ConstructorParameters<typeof Agent>[0] = {
+    // 4. Construct Agent — wire tools + hooks from pi-runtime
+    const tools = buildTools(options.cwd);
+    const hooks = buildAgentHooks({
+      permissionCallback: onPermission ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
+    });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const agentOpts: any = {
       initialState: {
         systemPrompt: options.systemPrompt ?? '',
         model: modelInfo.model,
         messages: history,
+        tools,
       },
+      beforeToolCall: hooks.beforeToolCall,
+      afterToolCall: hooks.afterToolCall,
+      shouldStopAfterTurn: hooks.shouldStopAfterTurn,
     };
-    if (modelInfo.getApiKey) {
-      agentOpts.getApiKey = modelInfo.getApiKey;
-    }
+    if (modelInfo.getApiKey) agentOpts.getApiKey = modelInfo.getApiKey;
+    if (hooks.transformContext) agentOpts.transformContext = hooks.transformContext;
+    if (hooks.streamFn) agentOpts.streamFn = hooks.streamFn;
+
     const agent = new Agent(agentOpts);
 
     // 5. Subscribe → translate → queue
@@ -323,14 +305,24 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // before `agent.prompt(input).then(close)` settles. Making this async would
     // break the init → ... → result → close ordering guarantee.
     const unsubscribe = agent.subscribe(event => {
+      // 1. Text / thinking / result path
       if (event.type === 'agent_end') {
-        const usage = extractUsage(event.messages);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const usage = extractUsage((event as any).messages);
         const result = translateEvent(event as AgentEvent, ctx, usage);
         if (result) queue.push(result);
-        return;
+      } else {
+        const textResult = translateEvent(event as AgentEvent, ctx);
+        if (textResult) queue.push(textResult);
       }
-      const translated = translateEvent(event as AgentEvent, ctx);
-      if (translated) queue.push(translated);
+
+      // 2. Tool path (independent of text path)
+      const toolResult = translateToolEvent(event as AgentEvent, ctx);
+      if (Array.isArray(toolResult)) {
+        for (const r of toolResult) queue.push(r);
+      } else if (toolResult) {
+        queue.push(toolResult);
+      }
     });
 
     // 6. Run prompt; close queue on completion or push error on rejection
