@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import { getModel, type Model } from '@earendil-works/pi-ai';
-import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
+import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, ProviderAdapter, RunOptions } from './types.js';
@@ -201,52 +201,94 @@ export function translateEvent(
 
 export const __testables = { AsyncQueue, buildModel, loadHistory, translateEvent };
 
-function buildStubResponse(input: string, options: RunOptions): string {
-  const mode = options.mode || 'default';
-  const model = options.model || 'stub';
-  const prompt = input.trim() || '(empty prompt)';
-  return [
-    'ZClaudia agent runtime stub is active.',
-    '',
-    `Mode: ${mode}`,
-    `Model: ${model}`,
-    `Prompt: ${prompt}`,
-    '',
-    'pi-agent is not integrated yet; this response confirms the zclaudia runtime path is wired.',
-  ].join('\n');
-}
-
 export class ZClaudiaAdapter implements ProviderAdapter {
   readonly type = 'zclaudia';
   readonly manifest = manifest;
   readonly policy = policy;
 
   async *run(input: string, options: RunOptions): AsyncGenerator<ClaudeMessage, void, void> {
-    const sessionId = options.sessionId || `zclaudia-stub-${Date.now()}`;
+    const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
+    const ctx: TranslateContext = {
+      sessionId,
+      model: process.env.PI_MODEL || DEFAULT_MODEL,
+      cwd: options.cwd,
+      permissionMode: options.mode,
+    };
+
+    // 1. Always yield init first
     yield {
       type: 'init',
       sessionId,
       systemInfo: {
-        model: options.model || 'zclaudia-stub',
+        model: ctx.model,
         cwd: options.cwd,
-        permissionMode: options.mode || 'default',
+        permissionMode: ctx.permissionMode || 'default',
         tools: [],
-        agents: ['zclaudia-stub'],
+        agents: ['zclaudia'],
       },
     };
 
-    yield {
-      type: 'assistant',
-      content: buildStubResponse(input, options),
-    };
+    // 2. Build the model (config errors stop here)
+    let model: ReturnType<typeof buildModel>;
+    try {
+      model = buildModel();
+    } catch (err) {
+      yield {
+        type: 'error',
+        error: `model configuration failed: ${err instanceof Error ? err.message : String(err)}. Check PI_PROVIDER / PI_MODEL / provider API key env vars.`,
+        isComplete: true,
+      };
+      return;
+    }
 
-    yield {
-      type: 'result',
-      usage: {
-        inputTokens: input.length,
-        outputTokens: 0,
+    // 3. Load history (non-fatal failure)
+    let history: AgentMessage[] = [];
+    try {
+      history = loadHistory(options.db, options.claudiaSessionId);
+    } catch (err) {
+      console.error('[ZClaudiaAdapter] history load failed:', err);
+      yield {
+        type: 'error',
+        error: 'history unavailable, continuing fresh',
+        isComplete: false,
+      };
+    }
+
+    // 4. Construct Agent
+    const agent = new Agent({
+      initialState: {
+        systemPrompt: options.systemPrompt ?? '',
+        model,
+        messages: history,
       },
-      isComplete: true,
-    };
+    });
+
+    // 5. Subscribe → translate → queue
+    // Skip translated `init` because we already emitted one manually above;
+    // pi's `agent_start` event translates to `init`, which would duplicate.
+    const queue = new AsyncQueue<ClaudeMessage>();
+    const unsubscribe = agent.subscribe(event => {
+      const translated = translateEvent(event as AgentEvent, ctx);
+      if (translated && translated.type !== 'init') queue.push(translated);
+    });
+
+    // 6. Run prompt; close queue on completion or push error on rejection
+    agent.prompt(input)
+      .then(() => queue.close())
+      .catch(err => {
+        queue.push({
+          type: 'error',
+          error: err instanceof Error ? err.message : String(err),
+          isComplete: true,
+        });
+        queue.close();
+      });
+
+    // 7. Yield translated events
+    try {
+      for await (const m of queue) yield m;
+    } finally {
+      unsubscribe();
+    }
   }
 }

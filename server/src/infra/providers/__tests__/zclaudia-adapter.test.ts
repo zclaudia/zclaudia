@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { __testables } from '../zclaudia-adapter.js';
+import type { AgentEvent } from '@earendil-works/pi-agent-core';
+import { __testables, ZClaudiaAdapter } from '../zclaudia-adapter.js';
+import type { RunOptions, ClaudeMessage } from '../types.js';
 
 // Mock pi-ai's getModel so tests don't hit real model registry.
 vi.mock('@earendil-works/pi-ai', () => ({
@@ -10,6 +12,52 @@ vi.mock('@earendil-works/pi-ai', () => ({
     return { provider, id: model, contextWindow: 200000, maxTokens: 8000 };
   }),
 }));
+
+// Hoisted collections used inside vi.mock factory.
+const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
+  mockAgentInstances: [] as Array<{
+    initialState: { systemPrompt: string; model: unknown; messages: unknown[] };
+    promptCalls: Array<{ input: string }>;
+  }>,
+  scriptQueue: [] as Array<{ events: AgentEvent[]; rejectWith?: Error }>,
+}));
+
+vi.mock('@earendil-works/pi-agent-core', () => {
+  class MockAgent {
+    initialState: { systemPrompt: string; model: unknown; messages: unknown[] };
+    private listener?: (event: AgentEvent) => void;
+    constructor(opts: { initialState: { systemPrompt: string; model: unknown; messages: unknown[] } }) {
+      this.initialState = opts.initialState;
+      mockAgentInstances.push({
+        initialState: opts.initialState,
+        promptCalls: [],
+      });
+    }
+    subscribe(listener: (event: AgentEvent) => void): () => void {
+      this.listener = listener;
+      return () => { this.listener = undefined; };
+    }
+    async prompt(input: string): Promise<void> {
+      const slot = mockAgentInstances[mockAgentInstances.length - 1];
+      slot.promptCalls.push({ input });
+      const script = scriptQueue.shift() ?? { events: [] };
+      // Yield once so the adapter's for-await loop has started consuming.
+      await Promise.resolve();
+      for (const event of script.events) {
+        this.listener?.(event);
+        // Give the queue a microtask between events so consumers can interleave.
+        await Promise.resolve();
+      }
+      if (script.rejectWith) throw script.rejectWith;
+    }
+  }
+  return { Agent: MockAgent };
+});
+
+// Helper to enqueue the script that the next `new Agent()` will play back.
+function scriptNextAgent(events: AgentEvent[], options?: { rejectWith?: Error }) {
+  scriptQueue.push({ events, rejectWith: options?.rejectWith });
+}
 
 const { AsyncQueue, buildModel, loadHistory, translateEvent } = __testables;
 
@@ -235,5 +283,123 @@ describe('translateEvent', () => {
   it('ignores tool_execution_* events in MVP', () => {
     expect(translateEvent({ type: 'tool_execution_start', toolCallId: 't1', toolName: 'read', args: {} }, ctx)).toBeUndefined();
     expect(translateEvent({ type: 'tool_execution_end', toolCallId: 't1', toolName: 'read', result: {}, isError: false }, ctx)).toBeUndefined();
+  });
+});
+
+async function collect(adapter: ZClaudiaAdapter, input: string, options: Partial<RunOptions>): Promise<ClaudeMessage[]> {
+  const opts: RunOptions = {
+    cwd: '/tmp',
+    sessionId: 'sess-test',
+    ...options,
+  } as RunOptions;
+  const out: ClaudeMessage[] = [];
+  for await (const m of adapter.run(input, opts, async () => ({ behavior: 'allow' }))) {
+    out.push(m);
+  }
+  return out;
+}
+
+describe('ZClaudiaAdapter.run', () => {
+  beforeEach(() => {
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+
+  it('happy path: emits init, streamed assistant chunks, and result', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'Hel' } },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'lo' } },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: '!' } },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hello', {});
+
+    expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'assistant', 'assistant', 'result']);
+    expect(out.filter(m => m.type === 'assistant').map(m => m.content)).toEqual(['Hel', 'lo', '!']);
+    expect(out[out.length - 1].isComplete).toBe(true);
+  });
+
+  it('loads history from DB and passes it to Agent initialState', async () => {
+    const db = createTestDb();
+    insertMessage(db, { id: 'h1', sessionId: 'sess-test', role: 'user',      content: 'prev question', createdAt: 100, offset: 1 });
+    insertMessage(db, { id: 'h2', sessionId: 'sess-test', role: 'assistant', content: 'prev answer',   createdAt: 200, offset: 2 });
+
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'follow up', { db, claudiaSessionId: 'sess-test' });
+
+    expect(mockAgentInstances.length).toBe(1);
+    const initialMessages = mockAgentInstances[0].initialState.messages;
+    expect(initialMessages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
+    expect((initialMessages[0] as any).content).toBe('prev question');
+    expect(mockAgentInstances[0].promptCalls[0].input).toBe('follow up');
+  });
+
+  it('config error (getModel throws): yields init then error(isComplete) and stops', async () => {
+    process.env.PI_MODEL = 'invalid-model';
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+    delete process.env.PI_MODEL;
+
+    expect(out.map(m => m.type)).toEqual(['init', 'error']);
+    expect(out[1].isComplete).toBe(true);
+    expect(out[1].error).toMatch(/unknown model/);
+  });
+
+  it('LLM error: yields error(isComplete) at end of stream', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+    ], { rejectWith: new Error('Anthropic 429') });
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+
+    expect(out[0].type).toBe('init');
+    const last = out[out.length - 1];
+    expect(last.type).toBe('error');
+    expect(last.error).toMatch(/Anthropic 429/);
+    expect(last.isComplete).toBe(true);
+  });
+
+  it('history load failure: yields non-terminal error then continues with empty history', async () => {
+    const brokenDb = {
+      prepare: () => { throw new Error('disk error'); },
+    } as unknown as Database.Database;
+
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'ok' } },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', { db: brokenDb, claudiaSessionId: 'sess-test' });
+
+    const errors = out.filter(m => m.type === 'error');
+    expect(errors.length).toBe(1);
+    expect(errors[0].isComplete).toBeFalsy();
+    expect(out[out.length - 1].type).toBe('result');
+    expect(mockAgentInstances[0].initialState.messages).toEqual([]);
+  });
+
+  it('unknown pi event types do not break stream', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: '_future_' as any },
+      { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'a' } },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+
+    expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'result']);
   });
 });
