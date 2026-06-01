@@ -21,7 +21,6 @@ apps/desktop/src-tauri/binaries/
 .env
 .env.local
 .env.*.local
-.env.pi
 
 # Android signing keys
 *.keystore

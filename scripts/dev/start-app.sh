@@ -17,6 +17,36 @@ ok()   { echo -e "\033[0;32m+\033[0m $*"; }
 warn() { echo -e "\033[0;33m!\033[0m $*"; }
 die()  { echo -e "\033[0;31mx\033[0m $*" >&2; exit 1; }
 
+# --- Source .env files (auto-export). Order: most general first, most specific last (later wins). ---
+source_env() {
+  local file=$1
+  if [[ -f "$file" ]]; then
+    info "Loading env from $(basename "$file")"
+    set -a
+    # shellcheck disable=SC1090
+    source "$file"
+    set +a
+  fi
+}
+
+source_env "$PROJECT_ROOT/.env"
+source_env "$PROJECT_ROOT/.env.local"
+
+# --- Soft warning for missing provider key (server starts fine but pi-agent will error on first message) ---
+if [[ -n "${OPENAI_BASE_URL:-}" && -z "${OPENAI_API_KEY:-}" ]]; then
+  warn "OPENAI_BASE_URL set but OPENAI_API_KEY is empty — pi-agent will reject the first message."
+elif [[ "${PI_PROVIDER:-anthropic}" == "anthropic" && -z "${ANTHROPIC_API_KEY:-}" && -z "${OPENAI_BASE_URL:-}" ]]; then
+  warn "ANTHROPIC_API_KEY not set — pi-agent will reject the first message. Add it to .env or .env.local."
+fi
+
+# --- Banner: show pi-agent config (only the keys that matter) ---
+info "pi-agent config:"
+ok "  PI_PROVIDER:     ${PI_PROVIDER:-anthropic (default)}"
+ok "  PI_MODEL:        ${PI_MODEL:-claude-sonnet-4-6 (default)}"
+if [[ -n "${OPENAI_BASE_URL:-}" ]]; then
+  ok "  OPENAI_BASE_URL: ${OPENAI_BASE_URL}"
+fi
+
 # Ensure fnm is available and uses the project's .node-version
 setup_node() {
   eval "$(fnm env --use-on-cd)" 2>/dev/null || die "fnm not found. Install fnm first."
