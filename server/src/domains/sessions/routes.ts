@@ -318,7 +318,7 @@ export function createSessionRoutes(
   router.get('/:id/compactions/:compactionId', (req: Request, res: Response) => {
     try {
       const { id: sessionId, compactionId } = req.params;
-      const compaction = compactionRepo.list(sessionId).find((c) => c.id === compactionId);
+      const compaction = compactionRepo.getById(sessionId, compactionId);
       if (!compaction) {
         sendApiError(res, 404, 'NOT_FOUND', 'Compaction not found');
         return;

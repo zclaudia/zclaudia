@@ -74,4 +74,16 @@ export class SessionCompactionRepository {
     ).all(sessionId);
     return rows.map((r) => this.mapRow(r));
   }
+
+  /**
+   * O(1) single-row lookup. Returns null when the id doesn't exist or doesn't
+   * belong to the given sessionId. Prefer this over `list(sid).find(...)` in
+   * route handlers.
+   */
+  getById(sessionId: string, compactionId: string): SessionCompaction | null {
+    const row = this.db.prepare(
+      `SELECT * FROM session_compactions WHERE session_id = ? AND id = ?`,
+    ).get(sessionId, compactionId);
+    return row ? this.mapRow(row) : null;
+  }
 }

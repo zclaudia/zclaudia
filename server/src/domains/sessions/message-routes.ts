@@ -174,6 +174,12 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
         });
         return;
       }
+      // NB: role='system' is accepted here but is not used by current product
+      // features. The GET messages endpoint emits compaction markers as
+      // synthetic role='system' entries with metadata.compactionMarker —
+      // anyone adding real system-role storage must update the desktop
+      // renderer's marker sentinel check so it doesn't render real system
+      // rows as compaction cards.
 
       if (!repo.sessionExists(req.params.id)) {
         res.status(404).json({
