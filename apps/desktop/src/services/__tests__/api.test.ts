@@ -663,7 +663,7 @@ describe('api', () => {
 
     it('getProviderTypeCapabilities', async () => {
       mockResponse({ streaming: true });
-      const result = await getProviderTypeCapabilities('claude');
+      const result = await getProviderTypeCapabilities('zclaudia');
       expect(result).toEqual({ streaming: true });
     });
   });

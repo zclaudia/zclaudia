@@ -428,7 +428,7 @@ describe('LocalPRCard', () => {
           { id: 'prov-1', name: 'Claude', type: 'anthropic' },
           { id: 'prov-2', name: 'GPT-4', type: 'openai' },
         ],
-        projects: [{ id: 'proj-1', llmProfileId: 'prov-1', reviewLlmProfileId: 'prov-1' }],
+        projects: [{ id: 'proj-1', reviewLlmProfileId: 'prov-1' }],
         sessions: [],
         selectSession: mockSelectSession,
       };

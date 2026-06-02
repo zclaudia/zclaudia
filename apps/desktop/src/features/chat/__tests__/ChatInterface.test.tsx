@@ -10,6 +10,12 @@ import { useServerStore } from '../../../stores/serverStore';
 import { useFileViewerStore } from '../../../stores/fileViewerStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useRecoveryStore } from '../../../stores/recoveryStore';
+import { useAgentProfileMetaStore } from '../../../stores/agentProfileMetaStore';
+
+// Prevent useAgentForSession's loadAll() from hitting the real API
+vi.mock('../../../services/api/agent-profiles', () => ({
+  listAgentProfiles: vi.fn().mockResolvedValue([]),
+}));
 
 // Mock llmProfileMetaStore
 const { mockProviderMetaStore } = vi.hoisted(() => {
@@ -474,6 +480,8 @@ describe('ChatInterface', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Reset real stores that may be seeded per-test
+    useAgentProfileMetaStore.setState({ profiles: {}, loaded: false, loading: false } as any);
   });
 
   // ─── Basic Rendering ─────────────────────────────────────────────────
@@ -1430,14 +1438,38 @@ describe('ChatInterface', () => {
   // ─── Provider Badge ───────────────────────────────────────────────────
 
   it('shows provider badge when provider is configured', () => {
+    // Seed the agent → llm resolution chain so the badge reflects a real provider
+    // name rather than the hardcoded 'Claude' fallback (Option A from code review).
+    useAgentProfileMetaStore.setState({
+      profiles: {
+        'agent-1': {
+          id: 'agent-1',
+          name: 'Coder',
+          llmProfileId: 'prov-1',
+          enabledTools: [],
+          isDefault: true,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      },
+      loaded: true,
+      loading: false,
+    } as any);
+    // Make the llmProfileMetaStore mock return the matching LLM profile
+    mockProviderMetaStore.getState().getProviders.mockReturnValue([
+      { id: 'prov-1', name: 'TestProvider', providerType: 'zclaudia', createdAt: 0, updatedAt: 0 },
+    ]);
     setDefaultStores({
       projectStore: {
-        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', llmProfileId: 'prov-1' }],
-        providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
+        sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', agentProfileId: 'agent-1' }],
+        providers: [],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    expect(container.textContent).toContain('Claude');
+    // Badge must show the resolved provider name, not the hardcoded fallback
+    expect(container.textContent).toContain('TestProvider');
+    // Reset getProviders mock back to empty list for subsequent tests
+    mockProviderMetaStore.getState().getProviders.mockReturnValue([]);
   });
 
   it('does not show provider badge when no provider', () => {

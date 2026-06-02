@@ -43,7 +43,10 @@ export function useAgentForSession(sessionId: string | undefined): AgentForSessi
 
   const agent = agentProfileId ? agentProfiles[agentProfileId] : undefined;
   const llm = agent ? llmProfiles.find((p) => p.id === agent.llmProfileId) : undefined;
-  const loading = agentLoading && !agent;
+  // loading is only meaningful when this session actually needs something:
+  //   - agentLoading matters only when a profile is expected (agentProfileId set) and not yet resolved
+  //   - llmProfileMetaStore has no loading flag; guard is omitted until one is added
+  const loading = agentLoading && !!agentProfileId && !agent;
 
   return { agent, llm, loading };
 }
