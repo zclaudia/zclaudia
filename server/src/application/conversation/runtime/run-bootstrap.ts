@@ -203,6 +203,12 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     aiInitiatedPlanMode: false,
     eventSeq: 0,
     pendingSteers: [],
+    // Attach the resolved profiles so downstream consumers (compaction-service
+    // on agent_end, future /compact handler) can run without re-querying the
+    // DB. providerConfig may be undefined if resolution fell back — that's OK,
+    // compaction simply won't trigger in that degraded mode.
+    agentProfile,
+    llmProfile: providerConfig ?? undefined,
   };
   activeRuns.set(runId, activeRun);
 

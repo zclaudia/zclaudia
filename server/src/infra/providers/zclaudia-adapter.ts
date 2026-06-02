@@ -1,12 +1,10 @@
-import { getModel, type Model, type Usage } from '@earendil-works/pi-ai';
+import type { Usage } from '@earendil-works/pi-ai';
 import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
-import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
-import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory } from './pi-runtime/index.js';
+import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory, buildModel, type BuiltModel } from './pi-runtime/index.js';
 
-const DEFAULT_PROVIDER = 'anthropic';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 const manifest: PCPProviderManifest = {
@@ -44,55 +42,6 @@ const policy: ProviderPolicy = {
   sessionCwdPolicy: 'requested',
   emptyResultFallback: 'ZClaudia agent completed without additional output.',
 };
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type BuiltModel = { model: Model<any>; getApiKey?: (provider: string) => Promise<string | undefined> | string | undefined };
-
-function buildModel(profile?: LlmProfileConfig, modelOverride?: string): BuiltModel {
-  // Resolution order: modelOverride > profile field > env > hardcoded default.
-  // If baseUrl is set (via profile or OPENAI_BASE_URL env) we build a custom openai-completions
-  // Model literal so any OpenAI-compatible endpoint (DeepSeek / vLLM / Azure / corporate proxies /
-  // etc.) works without being pre-registered in pi-ai's model registry.
-  const baseUrl = profile?.baseUrl ?? process.env.OPENAI_BASE_URL;
-  if (baseUrl) {
-    const id = modelOverride ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
-    const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? 'openai-custom';
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const model: Model<any> = {
-      id,
-      name: id,
-      api: 'openai-completions',
-      provider,
-      baseUrl,
-      reasoning: false,
-      input: ['text'],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 128000,
-      maxTokens: 8192,
-    };
-    if (profile?.compat) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (model as any).compat = profile.compat;
-    }
-    return {
-      model,
-      getApiKey: async () => profile?.apiKey ?? process.env.OPENAI_API_KEY ?? '',
-    };
-  }
-
-  const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? DEFAULT_PROVIDER;
-  const modelId = modelOverride ?? process.env.PI_MODEL ?? DEFAULT_MODEL;
-  // pi-ai's getModel is generically typed on literal provider + model id.
-  // Env-derived strings can't satisfy those generic constraints; cast through `string`
-  // to erase the generic and let the runtime registry lookup do the work.
-  // Model<T> requires T extends Api, so we use `any` to opt out of that constraint.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (getModel as (provider: string, model: string) => Model<any>)(provider, modelId);
-  return {
-    model,
-    getApiKey: profile?.apiKey ? async () => profile.apiKey! : undefined,
-  };
-}
 
 class AsyncQueue<T> implements AsyncIterable<T> {
   private buffer: T[] = [];

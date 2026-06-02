@@ -5,11 +5,16 @@ const cleanupPendingPermissionsMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
 const pluginEventsEmitMock = vi.fn(async () => {});
 const sendMessageMock = vi.fn();
+const maybeCompactMock = vi.fn(async () => ({ compacted: false }));
 
 vi.mock('../run-lifecycle.js', () => ({
   cleanupPendingPermissions: cleanupPendingPermissionsMock,
   findProcessPidsByTaskCommand: findProcessPidsByTaskCommandMock,
   upsertAssistantMessage: upsertAssistantMessageMock,
+}));
+
+vi.mock('../../compaction/compaction-service.js', () => ({
+  maybeCompact: maybeCompactMock,
 }));
 
 const mockProviderRegistry = {
@@ -1027,5 +1032,145 @@ describe('ws/run-events', () => {
       'ps failed',
     );
     warnSpy.mockRestore();
+  });
+});
+
+describe('run-events agent_end -> maybeCompact', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.useFakeTimers();
+  });
+
+  it('calls maybeCompact when activeRun has agentProfile and llmProfile', async () => {
+    const sendRunEventMock = vi.fn();
+    const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6', contextWindow: null } as any;
+    const llmProfile = { id: 'lp1', providerType: 'anthropic', apiKey: 'k' } as any;
+    const activeRun = {
+      sessionId: 'session-1',
+      assistantMessageId: 'assistant-1',
+      sessionType: 'regular',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      completed: false,
+      agentProfile,
+      llmProfile,
+    } as any;
+
+    maybeCompactMock.mockResolvedValueOnce({ compacted: false, reason: 'below_threshold' });
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: { fake: true } as any,
+      input: 'hi',
+      modeValue: 'default',
+      msg: {
+        type: 'result',
+        content: 'done',
+        usage: { totalTokens: 1234 },
+      } as any,
+      notificationService: { notify: vi.fn() } as any,
+      notificationsService: { postItem: vi.fn() } as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    // maybeCompact is awaited inside an async branch — let microtasks flush.
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+
+    expect(maybeCompactMock).toHaveBeenCalledTimes(1);
+    expect(maybeCompactMock).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: 'session-1',
+      agentProfile,
+      llmProfile,
+      source: 'auto',
+    }));
+  });
+
+  it('sends compaction_completed event before run_completed when compaction succeeds', async () => {
+    const sendRunEventMock = vi.fn();
+    const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6', contextWindow: 100 } as any;
+    const llmProfile = { id: 'lp1', providerType: 'anthropic', apiKey: 'k' } as any;
+    const activeRun = {
+      sessionId: 'session-1',
+      assistantMessageId: 'assistant-1',
+      sessionType: 'regular',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      completed: false,
+      agentProfile,
+      llmProfile,
+    } as any;
+
+    maybeCompactMock.mockResolvedValueOnce({
+      compacted: true,
+      compactionId: 'c1',
+      tokensBefore: 500,
+    });
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: { fake: true } as any,
+      input: 'hi',
+      modeValue: 'default',
+      msg: {
+        type: 'result',
+        content: 'done',
+        usage: { totalTokens: 500 },
+      } as any,
+      notificationService: { notify: vi.fn() } as any,
+      notificationsService: { postItem: vi.fn() } as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    await vi.runAllTimersAsync();
+    await Promise.resolve();
+
+    const calls = sendRunEventMock.mock.calls.map((c) => c[0]);
+    const compactionIdx = calls.findIndex((e) => e?.type === 'compaction_completed');
+    const completedIdx = calls.findIndex((e) => e?.type === 'run_completed');
+    expect(compactionIdx).toBeGreaterThanOrEqual(0);
+    expect(completedIdx).toBeGreaterThanOrEqual(0);
+    expect(compactionIdx).toBeLessThan(completedIdx);
+    expect(calls[compactionIdx]).toMatchObject({
+      type: 'compaction_completed',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      compactionId: 'c1',
+      tokensBefore: 500,
+    });
   });
 });

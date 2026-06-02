@@ -3,6 +3,8 @@ import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { ToolCall, ContentBlock, ThinkingBlock } from '@zclaudia/shared/core/message';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AskUserQuestionItem } from '@zclaudia/shared/interaction/forms';
 import type { PermissionDecision, SteerHandle, SystemInfo } from '../../../infra/providers/types.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
@@ -82,6 +84,18 @@ export interface ActiveRun {
   eventSeq: number; // Monotonically increasing event sequence number (starts at 0, first event gets seq=1)
   /** PCP effective profile negotiated at run start */
   effectiveProfile?: PCPEffectiveProfile;
+  /**
+   * Agent profile resolved at run start. Carries model + contextWindow used by
+   * compaction-service to decide when to summarize history. Optional so legacy
+   * construction sites (heartbeat reconstruction, supervision paths) keep
+   * compiling — populated eagerly by `run-bootstrap`.
+   */
+  agentProfile?: AgentProfileConfig;
+  /**
+   * LLM provider profile (provider type + api key + base url) for compaction's
+   * `generateSummary` calls. Populated alongside `agentProfile` in bootstrap.
+   */
+  llmProfile?: LlmProfileConfig;
   /**
    * Broadcast a message to ALL connected clients (not just the run's originating client).
    * Set up in run-bootstrap.ts. Falls back to run.client.ws if not wired (e.g. supervision).

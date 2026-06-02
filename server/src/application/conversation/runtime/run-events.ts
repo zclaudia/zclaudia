@@ -1,5 +1,6 @@
 import { sendMessage } from '../transport/broadcast.js';
 import type { ActiveRun } from '../transport/types.js';
+import { maybeCompact } from '../compaction/compaction-service.js';
 import { cleanupPendingPermissions, findProcessPidsByTaskCommand, upsertAssistantMessage } from './run-lifecycle.js';
 import {
   buildStatusOutput,
@@ -450,16 +451,40 @@ export function handleProviderEvent({
         });
       }
 
-      if (activeRun.completed) {
-        if (msg.usage) {
-          sendRunEvent({
-            type: 'run_completed',
-            runId,
-            sessionId: activeRun.sessionId,
-            usage: msg.usage,
-          });
+      // Auto-compaction: if the active run knows its agent + llm profiles and
+      // the assistant turn reported usage, ask the compaction service whether
+      // we should summarize history. The check is cheap (pi shouldCompact +
+      // estimateContextTokens) so it's safe to always run. The summarization
+      // step (LLM call) only happens when the threshold is exceeded.
+      //
+      // Critical ordering: `compaction_completed` MUST precede `run_completed`
+      // on the wire so the client can swap session history before showing the
+      // "ready" state. We achieve that by deferring the run_completed emission
+      // until the compaction promise settles. `activeRun.completed` is still
+      // set synchronously below so the consume-provider-stream loop terminates.
+      const shouldRunCompaction = !activeRun.completed
+        && Boolean(msg.usage)
+        && Boolean(activeRun.agentProfile)
+        && Boolean(activeRun.llmProfile);
+
+      // Track whether the side-effects below (heartbeat / pluginEvents /
+      // notification) should fire. `activeRun.completed` is the canonical "was
+      // this run already terminated" flag — we capture it once before any
+      // pre-emit bookkeeping so the deferred-compaction path still runs the
+      // side-effects exactly once.
+      const wasAlreadyCompleted = activeRun.completed;
+      const emitRunCompleted = () => {
+        if (wasAlreadyCompleted) {
+          if (msg.usage) {
+            sendRunEvent({
+              type: 'run_completed',
+              runId,
+              sessionId: activeRun.sessionId,
+              usage: msg.usage,
+            });
+          }
+          return;
         }
-      } else {
         sendRunEvent({
           type: 'run_completed',
           runId,
@@ -481,14 +506,59 @@ export function handleProviderEvent({
           notificationSender: notificationService,
           notificationsService,
         });
-      }
+      };
 
-      if (sessionType === 'background') {
-        sendRunEvent({
-          type: 'background_task_update',
-          sessionId,
-          status: 'completed',
-        } as import('@zclaudia/shared/wire/messages').BackgroundTaskUpdateMessage);
+      const emitBackgroundUpdate = () => {
+        if (sessionType === 'background') {
+          sendRunEvent({
+            type: 'background_task_update',
+            sessionId,
+            status: 'completed',
+          } as import('@zclaudia/shared/wire/messages').BackgroundTaskUpdateMessage);
+        }
+      };
+
+      if (shouldRunCompaction) {
+        // Mark completed synchronously so consume-provider-stream stops looping.
+        // Wire-level run_completed is deferred until after compaction resolves.
+        activeRun.completed = true;
+        maybeCompact({
+          db,
+          sessionId: activeRun.sessionId,
+          agentProfile: activeRun.agentProfile!,
+          llmProfile: activeRun.llmProfile!,
+          lastAssistantUsage: msg.usage,
+          source: 'auto',
+          signal: activeRun.abortController?.signal,
+        }).then((outcome) => {
+          if (outcome.compacted) {
+            console.log(`[Compaction] auto session=${activeRun.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
+            // The wire-level `compaction_completed` event type is added by T6;
+            // for now we emit it via the same sendRunEvent path with an `any`
+            // cast so the runtime can publish it before the shared protocol
+            // catches up.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            sendRunEvent({
+              type: 'compaction_completed',
+              runId,
+              sessionId: activeRun.sessionId,
+              compactionId: outcome.compactionId!,
+              tokensBefore: outcome.tokensBefore!,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            } as any);
+          }
+        }).catch((err: unknown) => {
+          console.warn('[Compaction] auto-trigger failed:', err instanceof Error ? err.message : err);
+        }).finally(() => {
+          // `completed` is already true; the inner branch of emitRunCompleted
+          // will only send run_completed if msg.usage is present (which it is
+          // here, otherwise shouldRunCompaction would be false).
+          emitRunCompleted();
+          emitBackgroundUpdate();
+        });
+      } else {
+        emitRunCompleted();
+        emitBackgroundUpdate();
       }
       break;
     }
