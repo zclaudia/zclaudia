@@ -2,6 +2,7 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { Session } from '@zclaudia/shared/core/session';
 import { v4 as uuidv4 } from 'uuid';
+import { resolveAgentForSession } from '../agent-profiles/agent-resolver.js';
 
 export class SessionRepository extends BaseRepository<
   Session,
@@ -38,12 +39,14 @@ export class SessionRepository extends BaseRepository<
     const id = uuidv4();
     const now = Date.now();
 
-    const agentProfileId = data.agentProfileId ?? this.resolveDefaultAgentProfileId();
-    if (!agentProfileId) {
-      throw new Error(
-        'SessionRepository.create: agentProfileId is required and no default agent profile exists. Create one via /api/agent-profiles first.',
-      );
-    }
+    // Resolve agent via the shared helper. Throws NoAgentAvailableError when
+    // nothing resolves (caller should map to 400). The helper looks up
+    // explicit > project default > global default and warns on stale ids.
+    const { agent } = resolveAgentForSession(this.db, {
+      explicitAgentId: data.agentProfileId,
+      projectId: data.projectId,
+    });
+    const agentProfileId = agent.id;
 
     return {
       sql: `
@@ -178,21 +181,5 @@ export class SessionRepository extends BaseRepository<
       'SELECT COALESCE(MAX(sort_order), -1) + 1 as sortOrder FROM sessions WHERE project_id = ?'
     ).get(projectId) as { sortOrder: number };
     return row.sortOrder;
-  }
-
-  /**
-   * Look up an agent_profile_id to use when a session is created without one.
-   * Prefers is_default=1, falls back to the oldest agent_profile by created_at.
-   * Returns null if no agent_profile exists (caller should fail loud).
-   */
-  private resolveDefaultAgentProfileId(): string | null {
-    const def = this.db
-      .prepare('SELECT id FROM agent_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1')
-      .get() as { id: string } | undefined;
-    if (def?.id) return def.id;
-    const oldest = this.db
-      .prepare('SELECT id FROM agent_profiles ORDER BY created_at ASC LIMIT 1')
-      .get() as { id: string } | undefined;
-    return oldest?.id ?? null;
   }
 }

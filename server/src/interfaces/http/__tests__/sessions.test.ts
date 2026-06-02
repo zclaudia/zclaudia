@@ -121,6 +121,7 @@ describe('sessions routes', () => {
     db.exec('DELETE FROM projects');
     db.exec('DELETE FROM search_history');
     db.exec('DELETE FROM agent_profiles');
+    db.exec('DELETE FROM llm_profiles');
     activeRuns.clear();
     // Recreate FTS table and trigger
     db.exec(`
@@ -354,6 +355,39 @@ describe('sessions routes', () => {
 
       const row = db.prepare('SELECT sort_order FROM sessions WHERE id = ?').get(res.body.data.id) as { sort_order: number };
       expect(row.sort_order).toBe(2);
+    });
+
+    it('creates session with explicit agentProfileId from body (overrides default)', async () => {
+      // seed a second agent profile that is NOT the default
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO agent_profiles (id, name, is_default, created_at, updated_at)
+        VALUES (?, ?, 0, ?, ?)
+      `).run('agent-explicit', 'Explicit Agent', now, now);
+
+      const res = await request(app)
+        .post('/api/sessions')
+        .send({ projectId: 'project-1', name: 'Explicit Session', agentProfileId: 'agent-explicit' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+
+      const created = db.prepare('SELECT agent_profile_id FROM sessions WHERE id = ?')
+        .get(res.body.data.id) as { agent_profile_id: string };
+      expect(created.agent_profile_id).toBe('agent-explicit');
+    });
+
+    it('returns 400 NO_AGENT when no agent profile available', async () => {
+      db.prepare('DELETE FROM agent_profiles').run();
+
+      const res = await request(app)
+        .post('/api/sessions')
+        .send({ projectId: 'project-1', name: 'No Agent' });
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('NO_AGENT');
+      expect(res.body.error.message).toMatch(/No agent profile available/);
     });
   });
 

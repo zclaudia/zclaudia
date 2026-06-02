@@ -9,10 +9,32 @@ describe('SessionRepository', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
+    // resolveAgentForSession (called from createQuery) issues several SQL queries
+    // against agent_profiles / projects / llm_profiles. The mocked `get` echoes
+    // back the explicit agent id (`createQuery` only triggers the agent lookup
+    // path when explicitAgentId is provided), so the helper resolves to the id
+    // the test passed in instead of throwing NoAgentAvailableError.
+    let lastQueriedId: string | undefined;
+    const buildAgentRow = (id: string) => ({
+      id,
+      name: 'mock',
+      description: null,
+      llm_profile_id: null,
+      model: 'm',
+      system_prompt: '',
+      enabled_tools: '["read"]',
+      thinking_level: null,
+      is_default: 1,
+      created_at: 1,
+      updated_at: 1,
+    });
     mockDb = {
       prepare: vi.fn().mockReturnValue({
         all: vi.fn(),
-        get: vi.fn(),
+        get: vi.fn((...args: unknown[]) => {
+          if (typeof args[0] === 'string') lastQueriedId = args[0];
+          return lastQueriedId ? buildAgentRow(lastQueriedId) : buildAgentRow('agent-default');
+        }),
         run: vi.fn()
       })
     };

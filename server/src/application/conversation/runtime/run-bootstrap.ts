@@ -16,8 +16,7 @@ import { resolveProviderCwd } from '../../../utils/provider-cwd.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
-import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
-import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
+import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -126,40 +125,15 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     return null;
   }
 
-  // Resolve agent profile → LLM profile. session.agent_profile_id is NOT NULL with
-  // FK RESTRICT (T2 schema), so the lookup should always succeed; warn + fallback
-  // defensively in case integrity is broken.
-  const agentRepo = new AgentProfileRepository(db as unknown as import('better-sqlite3').Database);
-  const llmProfileRepo = new LlmProfileRepository(db as unknown as import('better-sqlite3').Database);
-
-  let agentProfile: AgentProfileConfig | undefined = session.agent_profile_id
-    ? agentRepo.findById(session.agent_profile_id) ?? undefined
-    : undefined;
-  if (!agentProfile) {
-    if (session.agent_profile_id) {
-      console.warn(
-        `[run-bootstrap] agent_profile_id ${session.agent_profile_id} not found, falling back to default agent profile`,
-      );
-    }
-    agentProfile = agentRepo.findDefault();
-  }
-  if (!agentProfile) {
-    throw new Error(
-      'No agent profile available — DB integrity broken (ensureDefaultAgentProfile should have seeded one)',
-    );
-  }
-
-  let providerConfig: LlmProfileConfig | undefined = agentProfile.llmProfileId
-    ? llmProfileRepo.findById(agentProfile.llmProfileId) ?? undefined
-    : undefined;
-  if (!providerConfig) {
-    if (agentProfile.llmProfileId) {
-      console.warn(
-        `[run-bootstrap] agent.llm_profile_id ${agentProfile.llmProfileId} not found, falling back to default LLM profile`,
-      );
-    }
-    providerConfig = llmProfileRepo.findDefault() ?? undefined;
-  }
+  // Resolve agent profile → LLM profile via the shared helper. session.agent_profile_id
+  // is NOT NULL with FK RESTRICT (T2 schema), so the lookup should always succeed;
+  // helper warns + falls back defensively at both agent and llm levels if integrity is
+  // broken. `projectId` is intentionally NOT passed — once a session is created, its
+  // agent_profile_id is canonical; project default only matters at session-create time.
+  const { agent: agentProfile, llm: providerConfig } = resolveAgentForSession(
+    db as unknown as import('better-sqlite3').Database,
+    { explicitAgentId: session.agent_profile_id ?? undefined },
+  );
   const llmProfileId = providerConfig?.id ?? null;
   const enabledTools = agentProfile.enabledTools as ToolName[];
 

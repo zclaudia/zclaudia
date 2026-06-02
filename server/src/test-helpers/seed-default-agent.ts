@@ -35,15 +35,33 @@ export function seedDefaultAgent(
 /**
  * Create a minimal in-memory agent_profiles table for tests that bypass
  * applyMigrations() and build schemas inline. Mirrors the columns that
- * SessionRepository.resolveDefaultAgentProfileId() and the seeder rely on,
+ * SessionRepository (via resolveAgentForSession) and the seeder rely on,
  * plus the columns AgentProfileRepository writes (defaulted, so tests that
  * never touch them stay green).
+ *
+ * Also creates an llm_profiles table so resolveAgentForSession's LLM lookup
+ * (LlmProfileRepository.findById / .findDefault) doesn't throw
+ * "no such table" against fixtures that only need agent resolution. The
+ * resolver's LLM lookup falls back gracefully when the table is empty.
  *
  * Most new tests should use applyMigrations(db) instead. This exists so legacy
  * inline-schema tests can drop their bespoke CREATE TABLE blocks.
  */
 export function createAgentProfilesTable(db: Database.Database): void {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS llm_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      provider_type TEXT NOT NULL DEFAULT 'anthropic',
+      base_url TEXT,
+      api_key TEXT,
+      compat TEXT,
+      env TEXT,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS agent_profiles (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,

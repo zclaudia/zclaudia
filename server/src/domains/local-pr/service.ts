@@ -5,6 +5,7 @@ import { LocalPRRepository } from './repository.js';
 import { ProjectRepository } from '../projects/repository.js';
 import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import { SessionRepository } from '../sessions/repository.js';
+import { resolveAgentForSession, NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import type { LocalPRAiSessionPort } from './ports.js';
 import { WorktreeConfigRepository } from '../../infra/repositories/worktree-config.js';
 import { Mutex } from 'async-mutex';
@@ -364,10 +365,9 @@ export class LocalPRService {
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) throw new Error(`Project ${pr.projectId} has no rootPath`);
 
-    // TODO(sub-project-C-T2): pass agent profile id to resolveAgentForSession()
-    // instead of project.defaultAgentProfileId — currently agent id leaks into
-    // LLM-id position; resolveAvailableProviderId silently falls through to default LLM.
-    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.defaultAgentProfileId);
+    // Precedence: explicit override > project.reviewLlmProfileId > project agent's LLM > default LLM.
+    const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
+    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, agentLlmId);
     if (!llmProfileId) {
       throw new Error(`No provider available for review on project ${pr.projectId}`);
     }
@@ -730,10 +730,9 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       this.broadcastPRUpdate(this.prRepo.findById(prId)!);
       return;
     }
-    // TODO(sub-project-C-T2): pass agent profile id to resolveAgentForSession()
-    // instead of project.defaultAgentProfileId — currently agent id leaks into
-    // LLM-id position; resolveAvailableProviderId silently falls through to default LLM.
-    const llmProfileId = this.resolveAvailableProviderId(project.reviewLlmProfileId, project.defaultAgentProfileId);
+    // Precedence: project.reviewLlmProfileId > project agent's LLM > default LLM.
+    const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
+    const llmProfileId = this.resolveAvailableProviderId(project.reviewLlmProfileId, agentLlmId);
     if (!llmProfileId) throw new Error(`No provider available for conflict resolution on project ${pr.projectId}`);
     await this.startConflictResolution(prId, llmProfileId);
   }
@@ -815,10 +814,9 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) return;
 
-    // TODO(sub-project-C-T2): pass agent profile id to resolveAgentForSession()
-    // instead of project.defaultAgentProfileId — currently agent id leaks into
-    // LLM-id position; resolveAvailableProviderId silently falls through to default LLM.
-    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.defaultAgentProfileId);
+    // Precedence: explicit override > project.reviewLlmProfileId > project agent's LLM > default LLM.
+    const agentLlmId = this.resolveAgentLlmIdForProject(pr.projectId);
+    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, agentLlmId);
     if (!llmProfileId) {
       console.warn(`[LocalPRService] No provider for conflict resolution on PR ${prId}`);
       return;
@@ -1143,6 +1141,26 @@ If you cannot resolve it, output: [CONFLICT_UNRESOLVED]`;
 
     const providers = this.llmProfileRepo.findAll();
     return providers[0]?.id ?? null;
+  }
+
+  /**
+   * Resolve the LLM profile id from the project's default agent. Returns undefined
+   * if no agent is available (caller falls through to llm-profile default).
+   *
+   * Used by the review/conflict-resolution paths where the project's agent decides
+   * which LLM serves as the last-resort reviewer when no explicit
+   * `reviewLlmProfileId` is configured.
+   */
+  private resolveAgentLlmIdForProject(projectId: string): string | undefined {
+    try {
+      const { llm } = resolveAgentForSession(this.db, { projectId });
+      return llm?.id;
+    } catch (err) {
+      if (err instanceof NoAgentAvailableError) {
+        return undefined;
+      }
+      throw err;
+    }
   }
 
   private hasAvailableSlot(projectId: string): boolean {

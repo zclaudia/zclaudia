@@ -19,6 +19,7 @@ import type { initDatabase } from '../../../infra/storage/db.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import type { TaskCoordinationPort } from '../../../application/conversation/task-coordination-port.js';
 import { sendMessage } from '../transport/broadcast.js';
+import { resolveAgentForSession, NoAgentAvailableError } from '../../../domains/agent-profiles/agent-resolver.js';
 
 interface ClaudiaHandlerContext {
   activeRuns: Map<string, ActiveRun>;
@@ -132,20 +133,22 @@ export async function handleClaudiaMessage(
 
   // Create new session only if not reusing
   if (!isSessionReuse) {
-    const defaultAgent = db
-      .prepare('SELECT id FROM agent_profiles WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1')
-      .get() as { id?: string } | undefined;
-    const fallbackAgent = defaultAgent?.id
-      ? undefined
-      : (db.prepare('SELECT id FROM agent_profiles ORDER BY created_at ASC LIMIT 1').get() as { id?: string } | undefined);
-    const agentProfileId = defaultAgent?.id ?? fallbackAgent?.id;
-    if (!agentProfileId) {
-      sendMessage(client.ws, {
-        type: 'claudia_message_failed',
-        clientRequestId: clientReqId,
-        error: 'No default agent profile available — create one in Settings first',
-      } as ClaudiaMessageFailedMessage);
-      return;
+    let agentProfileId: string;
+    try {
+      const { agent } = resolveAgentForSession(db as unknown as import('better-sqlite3').Database, {
+        projectId: inlineProjectId,
+      });
+      agentProfileId = agent.id;
+    } catch (err) {
+      if (err instanceof NoAgentAvailableError) {
+        sendMessage(client.ws, {
+          type: 'claudia_message_failed',
+          clientRequestId: clientReqId,
+          error: 'No default agent profile available — create one in Settings first',
+        } as ClaudiaMessageFailedMessage);
+        return;
+      }
+      throw err;
     }
     db.prepare(`
       INSERT INTO sessions (id, project_id, name, agent_profile_id, type, parent_session_id, working_directory, created_at, updated_at)

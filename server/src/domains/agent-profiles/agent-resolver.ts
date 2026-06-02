@@ -65,9 +65,15 @@ export function resolveAgentForSession(db: Database, opts: ResolveOptions): Reso
     throw new NoAgentAvailableError();
   }
 
-  let llm = llmRepo.findById(agent.llmProfileId) ?? undefined;
-  if (!llm) {
-    console.warn(`[agent-resolver] agent.llm_profile_id ${agent.llmProfileId} not found, falling back to default LLM profile`);
+  let llm: LlmProfileConfig | undefined;
+  if (agent.llmProfileId) {
+    llm = llmRepo.findById(agent.llmProfileId) ?? undefined;
+    if (!llm) {
+      console.warn(`[agent-resolver] agent.llm_profile_id ${agent.llmProfileId} not found, falling back to default LLM profile`);
+      llm = llmRepo.findDefault() ?? undefined;
+    }
+  } else {
+    // Agent has no llm_profile_id (legacy seed or test fixture); fall through to default.
     llm = llmRepo.findDefault() ?? undefined;
   }
 

@@ -141,7 +141,35 @@ describe('WorkflowEngine', () => {
 
     mockBroadcast = vi.fn();
 
-    const mockDb = { prepare: vi.fn().mockReturnValue({ all: vi.fn().mockReturnValue([]), get: vi.fn().mockReturnValue(undefined), run: vi.fn().mockReturnValue({ changes: 0 }) }) } as any;
+    // resolveAgentForSession (used by engine.startRun for trace LLM lookup)
+    // instantiates a real AgentProfileRepository / LlmProfileRepository against
+    // this db mock. Return a row keyed off the queried SQL so the resolver picks
+    // up the agent + llm and reports the expected 'prov1' id downstream
+    // (preserves prior tests' expectation that `defaultAgentProfileId: 'prov1'`
+    // ends up as the trace llmProfileId).
+    const mockDb = {
+      prepare: vi.fn().mockImplementation((sql: string) => ({
+        all: vi.fn().mockReturnValue([]),
+        get: vi.fn().mockImplementation(() => {
+          if (sql.includes('FROM agent_profiles')) {
+            return {
+              id: 'agent-1', name: 'mock', description: null, llm_profile_id: 'prov1',
+              model: 'm', system_prompt: '', enabled_tools: '["read"]', thinking_level: null,
+              is_default: 1, created_at: 1, updated_at: 1,
+            };
+          }
+          if (sql.includes('FROM llm_profiles')) {
+            return {
+              id: 'prov1', name: 'mock', provider_type: 'anthropic',
+              base_url: null, api_key: null, compat: null, env: null,
+              is_default: 1, created_at: 1, updated_at: 1,
+            };
+          }
+          return undefined;
+        }),
+        run: vi.fn().mockReturnValue({ changes: 0 }),
+      })),
+    } as any;
     engine = createEngineWithDb(mockDb, mockBroadcast);
   });
 
@@ -1230,7 +1258,19 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', defaultAgentProfileId: undefined });
 
-      await engine.startRun('wf-ai-no-provider', 'p1', def as any, 'manual');
+      // Force resolver to throw NoAgentAvailableError so the step sees no LLM.
+      // The default mockDb returns an agent for FROM agent_profiles — override
+      // it locally so neither project default nor global default resolves.
+      const noAgentDb = {
+        prepare: vi.fn().mockReturnValue({
+          all: vi.fn().mockReturnValue([]),
+          get: vi.fn().mockReturnValue(undefined),
+          run: vi.fn().mockReturnValue({ changes: 0 }),
+        }),
+      } as any;
+      const noAgentEngine = createEngineWithDb(noAgentDb, mockBroadcast);
+
+      await noAgentEngine.startRun('wf-ai-no-provider', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(100);
 
       expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
@@ -1300,7 +1340,17 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
       mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', defaultAgentProfileId: undefined });
 
-      await engine.startRun('wf-review-no-prov', 'p1', def as any, 'manual');
+      // See sibling test above: force resolver to throw NoAgentAvailableError.
+      const noAgentDb = {
+        prepare: vi.fn().mockReturnValue({
+          all: vi.fn().mockReturnValue([]),
+          get: vi.fn().mockReturnValue(undefined),
+          run: vi.fn().mockReturnValue({ changes: 0 }),
+        }),
+      } as any;
+      const noAgentEngine = createEngineWithDb(noAgentDb, mockBroadcast);
+
+      await noAgentEngine.startRun('wf-review-no-prov', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(100);
 
       expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
@@ -1318,9 +1368,27 @@ describe('WorkflowEngine', () => {
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
       const mockDb = {
-        prepare: vi.fn().mockReturnValue({
+        prepare: vi.fn().mockImplementation((sql: string) => ({
           all: vi.fn().mockReturnValue([{ content: 'Code looks good. [REVIEW_PASSED]' }]),
-        }),
+          get: vi.fn().mockImplementation(() => {
+            if (sql.includes('FROM agent_profiles')) {
+              return {
+                id: 'agent-1', name: 'mock', description: null, llm_profile_id: 'prov1',
+                model: 'm', system_prompt: '', enabled_tools: '["read"]', thinking_level: null,
+                is_default: 1, created_at: 1, updated_at: 1,
+              };
+            }
+            if (sql.includes('FROM llm_profiles')) {
+              return {
+                id: 'prov1', name: 'mock', provider_type: 'anthropic',
+                base_url: null, api_key: null, compat: null, env: null,
+                is_default: 1, created_at: 1, updated_at: 1,
+              };
+            }
+            return undefined;
+          }),
+          run: vi.fn().mockReturnValue({ changes: 0 }),
+        })),
       };
       // Re-create engine with mockDb
       const engineWithDb = createEngineWithDb(mockDb as any, mockBroadcast);

@@ -16,6 +16,7 @@ import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { WorkflowRunRepository } from './workflow-run-repository.js';
 import { WorkflowStepRunRepository } from './workflow-step-run-repository.js';
 import { ProjectRepository } from '../projects/repository.js';
+import { resolveAgentForSession, NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import { renderConfig, type RenderContext } from './template-renderer.js';
 import type { StepExecutorPort, StepResult, StepContext, ApprovalPort } from './ports/step-executor.js';
 import type { Database } from 'better-sqlite3';
@@ -267,10 +268,20 @@ export class WorkflowEngine implements ApprovalPort {
       this.runEventPayloads.set(run.id, triggerData.eventPayload);
     }
 
-    // TODO(sub-project-C-T2): project.defaultAgentProfileId is an agent id, but
-    // downstream code expects an llm profile id. Currently traced-only in run-handler
-    // so not load-bearing; T2 should route through resolveAgentForSession.
-    this.executeGraph(agg, definition, project?.rootPath, project?.defaultAgentProfileId, triggerData)
+    // Resolve the actual LLM id from the project's agent (this value is traced by
+    // run-handler.ts:56, so populating it correctly keeps traces meaningful).
+    // Falls back to undefined silently when no agent is configured.
+    let traceLlmId: string | undefined;
+    if (projectId) {
+      try {
+        const { llm } = resolveAgentForSession(this.db, { projectId });
+        traceLlmId = llm?.id;
+      } catch (err) {
+        if (!(err instanceof NoAgentAvailableError)) throw err;
+        traceLlmId = undefined;
+      }
+    }
+    this.executeGraph(agg, definition, project?.rootPath, traceLlmId, triggerData)
       .catch((err) => {
         console.error(`[Workflow] Run ${run.id} failed:`, err);
         const currentRun = this.runRepo.findById(run.id);

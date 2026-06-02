@@ -13,6 +13,7 @@ import { buildSessionUpdatePatch, isSessionValidationError } from './model.js';
 import type { SessionEventPublisherPort } from './session-event-port.js';
 import { hasForegroundActiveRunForSession, findForegroundActiveRunIdForSession, hasAnyActiveRunForSession } from '../../utils/run-state.js';
 import { sendApiError } from '../../interfaces/http/response.js';
+import { NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
@@ -154,6 +155,10 @@ export function createSessionRoutes(
     } catch (error) {
       if (error instanceof SessionLifecycleError) {
         sendApiError(res, error.status, error.code, error.message);
+        return;
+      }
+      if (error instanceof NoAgentAvailableError) {
+        sendApiError(res, 400, 'NO_AGENT', error.message);
         return;
       }
       console.error('Error creating session:', error);
