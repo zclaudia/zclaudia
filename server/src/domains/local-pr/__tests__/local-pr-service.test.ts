@@ -77,7 +77,7 @@ function createTestDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT DEFAULT 'code',
-      llm_profile_id TEXT,
+      default_agent_profile_id TEXT,
       review_llm_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT,
@@ -176,19 +176,19 @@ function createTestProject(db: Database.Database, overrides: Partial<{
   id: string;
   name: string;
   rootPath: string;
-  llmProfileId: string;
+  defaultAgentProfileId: string;
   reviewLlmProfileId: string;
 }> = {}): string {
   const id = overrides.id || `test-project-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
   const rootPath = 'rootPath' in overrides ? (overrides.rootPath || null) : '/test/root';
   db.prepare(`
-    INSERT OR REPLACE INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at)
+    INSERT OR REPLACE INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at)
     VALUES (?, ?, 'code', ?, ?, ?, ?)
   `).run(
     id,
     overrides.name || 'Test Project',
-    overrides.llmProfileId || 'test-provider',
+    overrides.defaultAgentProfileId || 'test-provider',
     rootPath,
     now,
     now
@@ -561,7 +561,7 @@ describe('LocalPRService', () => {
       // Create project with explicit null rootPath
       const projId = `proj-noroot-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
       await expect(service.createPR(projId, '/test/wt')).rejects.toThrow('has no rootPath');
     });
 
@@ -690,7 +690,7 @@ describe('LocalPRService', () => {
     });
 
     it('starts review session for valid PR', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', llmProfileId: 'test-provider' });
+      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-review-${Date.now()}`,
         status: 'open',
@@ -713,7 +713,7 @@ describe('LocalPRService', () => {
         createAIDeps({ isProjectSlotAvailable: () => false }),
       );
 
-      const projectId = createTestProject(db, { rootPath: '/test/root', llmProfileId: 'test-provider' });
+      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-queue-${Date.now()}`,
         status: 'open',
@@ -727,7 +727,7 @@ describe('LocalPRService', () => {
     });
 
     it('skips when review already in progress', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', llmProfileId: 'test-provider' });
+      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-dup-review-${Date.now()}`,
         status: 'open',
@@ -873,7 +873,7 @@ describe('LocalPRService', () => {
       // Create a service with a fresh DB that has no providers
       const emptyDb = new Database(':memory:');
       emptyDb.exec(`
-        CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, type TEXT DEFAULT 'code', llm_profile_id TEXT, root_path TEXT, system_prompt TEXT, permission_policy TEXT, agent_permission_override TEXT, agent TEXT, context_sync_status TEXT DEFAULT 'synced', is_internal INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
+        CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, type TEXT DEFAULT 'code', default_agent_profile_id TEXT, root_path TEXT, system_prompt TEXT, permission_policy TEXT, agent_permission_override TEXT, agent TEXT, context_sync_status TEXT DEFAULT 'synced', is_internal INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
         CREATE TABLE local_prs (id TEXT PRIMARY KEY, project_id TEXT, worktree_path TEXT, branch_name TEXT, base_branch TEXT, title TEXT, description TEXT, status TEXT DEFAULT 'open', commits TEXT, diff_summary TEXT, review_notes TEXT, status_message TEXT, merged_at INTEGER, merge_commit_sha TEXT, review_session_id TEXT, conflict_session_id TEXT, auto_triggered INTEGER DEFAULT 0, auto_review INTEGER DEFAULT 0, execution_state TEXT DEFAULT 'idle', pending_action TEXT DEFAULT 'none', created_at INTEGER, updated_at INTEGER);
         CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, name TEXT, agent_profile_id TEXT, sdk_session_id TEXT, type TEXT DEFAULT 'regular', parent_session_id TEXT, working_directory TEXT, project_role TEXT, task_id TEXT, archived_at INTEGER, plan_status TEXT, is_read_only INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
         CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, created_at INTEGER);
@@ -1032,7 +1032,7 @@ describe('LocalPRService', () => {
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-revert-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-revert-norp-${Date.now()}`,
         status: 'merged',
@@ -1433,7 +1433,7 @@ describe('LocalPRService', () => {
 
   describe('processQueue', () => {
     it('starts queued review when slot available', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', llmProfileId: 'test-provider' });
+      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-queue-review-${Date.now()}`,
         status: 'open',
@@ -1448,7 +1448,7 @@ describe('LocalPRService', () => {
 
     it('skips queued PR when no slot available', async () => {
       const noSlotService = new LocalPRService(db, mockBroadcast, createAIDeps({ isProjectSlotAvailable: () => false }));
-      const projectId = createTestProject(db, { rootPath: '/test/root', llmProfileId: 'test-provider' });
+      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-queue-noslot-${Date.now()}`,
         status: 'open',
@@ -1608,7 +1608,7 @@ describe('LocalPRService', () => {
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-review-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-review-norp-${Date.now()}`,
         status: 'open',
@@ -1622,7 +1622,7 @@ describe('LocalPRService', () => {
       const emptyService = new LocalPRService(emptyDb, mockBroadcast, createAIDeps());
       const projId = `proj-noprov-${Date.now()}`;
       const now = Date.now();
-      emptyDb.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Prov', 'code', 'missing-provider', '/test/root', ?, ?)`).run(projId, now, now);
+      emptyDb.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Prov', 'code', 'missing-provider', '/test/root', ?, ?)`).run(projId, now, now);
       const pr = createTestLocalPR(emptyDb, projId, {
         worktreePath: `/test/wt-review-noprov-${Date.now()}`,
         status: 'open',
@@ -1641,7 +1641,7 @@ describe('LocalPRService', () => {
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-merge-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-merge-norp-${Date.now()}`,
         status: 'approved',
@@ -1698,7 +1698,7 @@ describe('LocalPRService', () => {
     it('throws when project has no rootPath', async () => {
       const projId = `proj-norp-conflict-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
       const pr = createTestLocalPR(db, projId, {
         worktreePath: `/test/wt-conflict-norp-${Date.now()}`,
         status: 'conflict',
@@ -1724,7 +1724,7 @@ describe('LocalPRService', () => {
     });
 
     it('starts conflict resolution when slot available', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', llmProfileId: 'test-provider' });
+      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-conflict-start-${Date.now()}`,
         status: 'conflict',
@@ -1743,7 +1743,7 @@ describe('LocalPRService', () => {
 
   describe('startConflictResolution', () => {
     it('skips when already in progress', async () => {
-      const projectId = createTestProject(db, { rootPath: '/test/root', llmProfileId: 'test-provider' });
+      const projectId = createTestProject(db, { rootPath: '/test/root', defaultAgentProfileId: 'test-provider' });
       const pr = createTestLocalPR(db, projectId, {
         worktreePath: `/test/wt-conflict-dup-${Date.now()}`,
         status: 'conflict',
@@ -1768,7 +1768,7 @@ describe('LocalPRService', () => {
       const emptyService = new LocalPRService(emptyDb, mockBroadcast, createAIDeps());
       const projId = `proj-noprov-conflict-${Date.now()}`;
       const now = Date.now();
-      emptyDb.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'NoProv', 'code', 'missing', '/test/root', ?, ?)`).run(projId, now, now);
+      emptyDb.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'NoProv', 'code', 'missing', '/test/root', ?, ?)`).run(projId, now, now);
       const pr = createTestLocalPR(emptyDb, projId, {
         worktreePath: `/test/wt-conflict-noprov-${Date.now()}`,
         status: 'conflict',
@@ -1837,7 +1837,7 @@ describe('LocalPRService', () => {
     it('returns null when project has no rootPath', async () => {
       const projId = `proj-norp-auto-${Date.now()}`;
       const now = Date.now();
-      db.prepare(`INSERT INTO projects (id, name, type, llm_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
+      db.prepare(`INSERT INTO projects (id, name, type, default_agent_profile_id, root_path, created_at, updated_at) VALUES (?, 'No Root', 'code', 'test-provider', NULL, ?, ?)`).run(projId, now, now);
       const wt = `/test/wt-auto-norp-${Date.now()}`;
       db.prepare(`
         INSERT INTO worktree_configs (id, project_id, worktree_path, auto_create_pr, auto_review, created_at, updated_at)

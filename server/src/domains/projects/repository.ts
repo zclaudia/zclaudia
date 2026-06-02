@@ -17,7 +17,7 @@ export class ProjectRepository extends BaseRepository<
       id: row.id,
       name: row.name,
       type: row.type,
-      llmProfileId: row.llm_profile_id || undefined,
+      defaultAgentProfileId: row.default_agent_profile_id || undefined,
       rootPath: row.root_path || undefined,
       systemPrompt: row.system_prompt || undefined,
       permissionPolicy: row.permission_policy ? JSON.parse(row.permission_policy) : undefined,
@@ -40,7 +40,7 @@ export class ProjectRepository extends BaseRepository<
     return {
       sql: `
         INSERT INTO projects (
-          id, name, type, llm_profile_id, root_path, system_prompt,
+          id, name, type, default_agent_profile_id, root_path, system_prompt,
           permission_policy, agent_permission_override, agent, context_sync_status,
           review_llm_profile_id, permission_workflow_override_id, sort_order, created_at, updated_at
         )
@@ -50,7 +50,7 @@ export class ProjectRepository extends BaseRepository<
         id,
         data.name,
         data.type || 'code',
-        data.llmProfileId || null,
+        data.defaultAgentProfileId || null,
         data.rootPath || null,
         data.systemPrompt || null,
         data.permissionPolicy ? JSON.stringify(data.permissionPolicy) : null,
@@ -78,9 +78,9 @@ export class ProjectRepository extends BaseRepository<
       updates.push('type = ?');
       params.push(data.type);
     }
-    if (data.llmProfileId !== undefined) {
-      updates.push('llm_profile_id = ?');
-      params.push(data.llmProfileId);
+    if (data.defaultAgentProfileId !== undefined) {
+      updates.push('default_agent_profile_id = ?');
+      params.push(data.defaultAgentProfileId);
     }
     if (data.rootPath !== undefined) {
       updates.push('root_path = ?');

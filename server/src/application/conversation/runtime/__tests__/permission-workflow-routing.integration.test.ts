@@ -95,7 +95,7 @@ function createDb(): Database.Database {
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT NOT NULL,
-      llm_profile_id TEXT,
+      default_agent_profile_id TEXT,
       root_path TEXT,
       system_prompt TEXT,
       permission_policy TEXT,

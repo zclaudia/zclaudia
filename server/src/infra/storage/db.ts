@@ -89,6 +89,20 @@ export function ensureSchemaIsCurrent(db: Database.Database): void {
       );
     }
   }
+
+  const projectsTableExists = db
+    .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = 'projects'")
+    .get() as { name: string } | undefined;
+  if (projectsTableExists) {
+    const projectCols = db.prepare("PRAGMA table_info(projects)").all() as Array<{ name: string }>;
+    const projectColNames = new Set(projectCols.map((c) => c.name));
+    if (projectColNames.has('llm_profile_id') && !projectColNames.has('default_agent_profile_id')) {
+      throw new Error(
+        `[ZClaudia] Schema mismatch: projects.llm_profile_id exists but projects.default_agent_profile_id is missing. ` +
+          `Pre-agent-ui schema. Wipe the data dir and restart:\n  rm -rf $ZCLAUDIA_DATA_DIR`
+      );
+    }
+  }
 }
 
 function runMigrations(db: Database.Database): void {

@@ -267,7 +267,7 @@ export class WorkflowEngine implements ApprovalPort {
       this.runEventPayloads.set(run.id, triggerData.eventPayload);
     }
 
-    this.executeGraph(agg, definition, project?.rootPath, project?.llmProfileId, triggerData)
+    this.executeGraph(agg, definition, project?.rootPath, project?.defaultAgentProfileId, triggerData)
       .catch((err) => {
         console.error(`[Workflow] Run ${run.id} failed:`, err);
         const currentRun = this.runRepo.findById(run.id);

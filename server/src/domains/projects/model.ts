@@ -2,7 +2,7 @@ import type { Project, PermissionPolicy, ProjectType } from '@zclaudia/shared/co
 
 type ProjectStateFields = Pick<
   Project,
-  'name' | 'type' | 'llmProfileId' | 'rootPath' | 'systemPrompt' |
+  'name' | 'type' | 'defaultAgentProfileId' | 'rootPath' | 'systemPrompt' |
   'reviewLlmProfileId' | 'permissionWorkflowOverrideId' | 'agent' | 'permissionPolicy' | 'agentPermissionOverride' |
   'sortOrder'
 >;
@@ -83,7 +83,7 @@ export function buildProjectCreateState(
   const project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'> = {
     name,
     type,
-    llmProfileId: typeof body.llmProfileId === 'string' ? body.llmProfileId : undefined,
+    defaultAgentProfileId: typeof body.defaultAgentProfileId === 'string' ? body.defaultAgentProfileId : undefined,
     rootPath: typeof body.rootPath === 'string' ? body.rootPath : undefined,
     systemPrompt: typeof body.systemPrompt === 'string' ? body.systemPrompt : undefined,
     permissionPolicy: (body.permissionPolicy as PermissionPolicy | undefined) ?? undefined,
@@ -103,7 +103,7 @@ export function buildProjectPatch(body: Record<string, unknown>): ProjectPatch {
 
   if (hasOwn(body, 'name')) patch.name = body.name == null ? null : String(body.name).trim();
   if (hasOwn(body, 'type')) patch.type = body.type == null ? null : body.type as ProjectType;
-  if (hasOwn(body, 'llmProfileId')) patch.llmProfileId = body.llmProfileId == null ? null : String(body.llmProfileId);
+  if (hasOwn(body, 'defaultAgentProfileId')) patch.defaultAgentProfileId = body.defaultAgentProfileId == null ? null : String(body.defaultAgentProfileId);
   if (hasOwn(body, 'rootPath')) patch.rootPath = body.rootPath == null ? null : String(body.rootPath);
   if (hasOwn(body, 'systemPrompt')) patch.systemPrompt = body.systemPrompt == null ? null : String(body.systemPrompt);
   if (hasOwn(body, 'permissionPolicy')) patch.permissionPolicy = (body.permissionPolicy ?? null) as PermissionPolicy | null;
@@ -122,7 +122,7 @@ export function applyProjectPatch(
   const nextState: ProjectStateFields = {
     name: patch.name === undefined ? existing.name : (patch.name ?? ''),
     type: patch.type === undefined ? existing.type : (patch.type ?? '' as ProjectType),
-    llmProfileId: patch.llmProfileId === undefined ? existing.llmProfileId : patch.llmProfileId ?? undefined,
+    defaultAgentProfileId: patch.defaultAgentProfileId === undefined ? existing.defaultAgentProfileId : patch.defaultAgentProfileId ?? undefined,
     rootPath: patch.rootPath === undefined ? existing.rootPath : patch.rootPath ?? undefined,
     systemPrompt: patch.systemPrompt === undefined ? existing.systemPrompt : patch.systemPrompt ?? undefined,
     permissionPolicy: patch.permissionPolicy === undefined ? existing.permissionPolicy : patch.permissionPolicy ?? undefined,

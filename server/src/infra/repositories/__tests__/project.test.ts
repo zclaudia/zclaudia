@@ -26,7 +26,7 @@ describe('ProjectRepository', () => {
         id: 'proj-123',
         name: 'Test Project',
         type: 'code',
-        llm_profile_id: 'prov-456',
+        default_agent_profile_id: 'prov-456',
         root_path: '/path/to/project',
         system_prompt: 'Test prompt',
         permission_policy: '{"mode":"autoApprove"}',
@@ -41,7 +41,7 @@ describe('ProjectRepository', () => {
         id: 'proj-123',
         name: 'Test Project',
         type: 'code',
-        llmProfileId: 'prov-456',
+        defaultAgentProfileId: 'prov-456',
         rootPath: '/path/to/project',
         systemPrompt: 'Test prompt',
         permissionPolicy: { mode: 'autoApprove' },
@@ -58,7 +58,7 @@ describe('ProjectRepository', () => {
         id: 'proj-123',
         name: 'Test',
         type: 'code',
-        llm_profile_id: null,
+        default_agent_profile_id: null,
         root_path: null,
         system_prompt: null,
         permission_policy: null,
@@ -69,7 +69,7 @@ describe('ProjectRepository', () => {
 
       const result = repository.mapRow(row);
 
-      expect(result.llmProfileId).toBeUndefined();
+      expect(result.defaultAgentProfileId).toBeUndefined();
       expect(result.rootPath).toBeUndefined();
       expect(result.systemPrompt).toBeUndefined();
       expect(result.permissionPolicy).toBeUndefined();
@@ -121,7 +121,7 @@ describe('ProjectRepository', () => {
       const data = {
         name: 'New Project',
         type: 'code',
-        llmProfileId: 'prov-789',
+        defaultAgentProfileId: 'prov-789',
         rootPath: '/new/path',
         systemPrompt: 'New prompt',
         permissionPolicy: { mode: 'askUser' }
@@ -164,7 +164,7 @@ describe('ProjectRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      // params: [id, name, type, llmProfileId, rootPath, systemPrompt, permissionPolicy,
+      // params: [id, name, type, defaultAgentProfileId, rootPath, systemPrompt, permissionPolicy,
       // agentPermissionOverride, agent, contextSyncStatus, reviewLlmProfileId, permissionWorkflowOverrideId, sortOrder, createdAt, updatedAt]
       expect(params[13]).toBeGreaterThanOrEqual(before);
       expect(params[13]).toBeLessThanOrEqual(after);
@@ -187,12 +187,12 @@ describe('ProjectRepository', () => {
       const { sql, params } = repository.updateQuery('proj-123', {
         name: 'New Name',
         type: 'sdk',
-        llmProfileId: 'new-prov'
+        defaultAgentProfileId: 'new-prov'
       });
 
       expect(sql).toContain('name = ?');
       expect(sql).toContain('type = ?');
-      expect(sql).toContain('llm_profile_id = ?');
+      expect(sql).toContain('default_agent_profile_id = ?');
       expect(params).toContain('New Name');
       expect(params).toContain('sdk');
       expect(params).toContain('new-prov');

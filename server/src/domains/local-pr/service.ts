@@ -355,7 +355,7 @@ export class LocalPRService {
   /**
    * Start an AI review session for the given PR.
    * @param prId - The local PR to review
-   * @param overrideProviderId - Optional provider ID (for manual trigger). Falls back to project.reviewLlmProfileId → project.llmProfileId.
+   * @param overrideProviderId - Optional provider ID (for manual trigger). Falls back to project.reviewLlmProfileId → project.defaultAgentProfileId.
    */
   async startReview(prId: string, overrideProviderId?: string): Promise<void> {
     const pr = this.prRepo.findById(prId);
@@ -364,7 +364,7 @@ export class LocalPRService {
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) throw new Error(`Project ${pr.projectId} has no rootPath`);
 
-    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.llmProfileId);
+    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.defaultAgentProfileId);
     if (!llmProfileId) {
       throw new Error(`No provider available for review on project ${pr.projectId}`);
     }
@@ -727,7 +727,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
       this.broadcastPRUpdate(this.prRepo.findById(prId)!);
       return;
     }
-    const llmProfileId = this.resolveAvailableProviderId(project.reviewLlmProfileId, project.llmProfileId);
+    const llmProfileId = this.resolveAvailableProviderId(project.reviewLlmProfileId, project.defaultAgentProfileId);
     if (!llmProfileId) throw new Error(`No provider available for conflict resolution on project ${pr.projectId}`);
     await this.startConflictResolution(prId, llmProfileId);
   }
@@ -809,7 +809,7 @@ Be thorough but pragmatic. Minor style issues do not warrant REVIEW_FAILED.`;
     const project = this.projectRepo.findById(pr.projectId);
     if (!project?.rootPath) return;
 
-    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.llmProfileId);
+    const llmProfileId = this.resolveAvailableProviderId(overrideProviderId, project.reviewLlmProfileId, project.defaultAgentProfileId);
     if (!llmProfileId) {
       console.warn(`[LocalPRService] No provider for conflict resolution on PR ${prId}`);
       return;

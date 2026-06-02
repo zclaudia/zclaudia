@@ -560,13 +560,12 @@ CREATE TABLE IF NOT EXISTS projects (
           id TEXT PRIMARY KEY,
           name TEXT NOT NULL,
           type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-          llm_profile_id TEXT,
+          default_agent_profile_id TEXT REFERENCES agent_profiles(id) ON DELETE SET NULL,
           root_path TEXT,
           system_prompt TEXT,
           permission_policy TEXT,
           created_at INTEGER NOT NULL,
-          updated_at INTEGER NOT NULL, agent_permission_override TEXT, is_internal INTEGER NOT NULL DEFAULT 0, agent TEXT, context_sync_status TEXT NOT NULL DEFAULT 'synced', review_llm_profile_id TEXT REFERENCES llm_profiles(id) ON DELETE SET NULL, sort_order INTEGER NOT NULL DEFAULT 0, permission_workflow_override_id TEXT REFERENCES workflows(id) ON DELETE SET NULL,
-          FOREIGN KEY (llm_profile_id) REFERENCES llm_profiles(id) ON DELETE SET NULL
+          updated_at INTEGER NOT NULL, agent_permission_override TEXT, is_internal INTEGER NOT NULL DEFAULT 0, agent TEXT, context_sync_status TEXT NOT NULL DEFAULT 'synced', review_llm_profile_id TEXT REFERENCES llm_profiles(id) ON DELETE SET NULL, sort_order INTEGER NOT NULL DEFAULT 0, permission_workflow_override_id TEXT REFERENCES workflows(id) ON DELETE SET NULL
         );
 
 CREATE TABLE IF NOT EXISTS llm_profiles (

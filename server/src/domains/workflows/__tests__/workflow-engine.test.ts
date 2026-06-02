@@ -24,7 +24,7 @@ const mockStepRunRepo = {
   findByRunAndStep: vi.fn(),
 };
 const mockProjectRepo = {
-  findById: vi.fn().mockReturnValue({ id: 'p1', llmProfileId: 'prov1', rootPath: '/test' }),
+  findById: vi.fn().mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' }),
 };
 const mockSessionRepo = {
   create: vi.fn().mockReturnValue({ id: 'sess1' }),
@@ -132,7 +132,7 @@ describe('WorkflowEngine', () => {
       }
       return null;
     });
-    mockProjectRepo.findById.mockReturnValue({ id: 'p1', llmProfileId: 'prov1', rootPath: '/test' });
+    mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
     mockSessionRepo.create.mockReturnValue({ id: 'sess1' });
     mockWorkflowAiRunPort.startVirtualRun.mockReset();
     mockWorkflowStepRegistry.get.mockReset();
@@ -1051,13 +1051,13 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: undefined, llmProfileId: 'prov1' });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: undefined, defaultAgentProfileId: 'prov1' });
 
       await engine.startRun('wf-commit-no-cwd', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(100);
 
       // Reset project repo
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', llmProfileId: 'prov1', rootPath: '/test' });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
     });
   });
 
@@ -1192,13 +1192,13 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: undefined, llmProfileId: 'prov1' });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: undefined, defaultAgentProfileId: 'prov1' });
 
       await engine.startRun('wf-pr-no-cwd', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(100);
 
       // Reset
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', llmProfileId: 'prov1', rootPath: '/test' });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
     });
   });
 
@@ -1228,13 +1228,13 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', llmProfileId: undefined });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', defaultAgentProfileId: undefined });
 
       await engine.startRun('wf-ai-no-provider', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(100);
 
       expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', llmProfileId: 'prov1', rootPath: '/test' });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
     });
 
     it('completes when run_completed message received', async () => {
@@ -1298,13 +1298,13 @@ describe('WorkflowEngine', () => {
       };
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', llmProfileId: undefined });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', rootPath: '/test', defaultAgentProfileId: undefined });
 
       await engine.startRun('wf-review-no-prov', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(100);
 
       expect(mockRunRepo.update).toHaveBeenCalledWith('r1', expect.objectContaining({ status: 'failed' }));
-      mockProjectRepo.findById.mockReturnValue({ id: 'p1', llmProfileId: 'prov1', rootPath: '/test' });
+      mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
     });
 
     it('completes with review passed', async () => {

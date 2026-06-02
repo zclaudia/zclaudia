@@ -21,17 +21,28 @@ function createTestDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS agent_profiles (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      llm_profile_id TEXT NOT NULL,
+      model TEXT NOT NULL,
+      system_prompt TEXT NOT NULL,
+      enabled_tools TEXT NOT NULL,
+      is_default INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE TABLE IF NOT EXISTS projects (
       id TEXT PRIMARY KEY,
       name TEXT NOT NULL,
       type TEXT CHECK(type IN ('chat_only', 'code')) DEFAULT 'code',
-      llm_profile_id TEXT,
+      default_agent_profile_id TEXT REFERENCES agent_profiles(id) ON DELETE SET NULL,
       root_path TEXT,
       system_prompt TEXT,
       permission_policy TEXT,
       created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (llm_profile_id) REFERENCES llm_profiles(id) ON DELETE SET NULL
+      updated_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS sessions (
@@ -184,8 +195,9 @@ describe('Database Operations', () => {
       expect(project).toBeUndefined();
     });
 
-    it('links project to provider', () => {
+    it('links project to default agent profile', () => {
       const llmProfileId = uuidv4();
+      const agentProfileId = uuidv4();
       const projectId = uuidv4();
       const now = Date.now();
 
@@ -195,15 +207,20 @@ describe('Database Operations', () => {
       `).run(llmProfileId, 'Provider', 'anthropic', now, now);
 
       db.prepare(`
-        INSERT INTO projects (id, name, type, llm_profile_id, created_at, updated_at)
+        INSERT INTO agent_profiles (id, name, llm_profile_id, model, system_prompt, enabled_tools, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(agentProfileId, 'Agent', llmProfileId, 'm', '', '["read"]', now, now);
+
+      db.prepare(`
+        INSERT INTO projects (id, name, type, default_agent_profile_id, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(projectId, 'Project', 'code', llmProfileId, now, now);
+      `).run(projectId, 'Project', 'code', agentProfileId, now, now);
 
       const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(projectId) as {
-        llm_profile_id: string;
+        default_agent_profile_id: string;
       };
 
-      expect(project.llm_profile_id).toBe(llmProfileId);
+      expect(project.default_agent_profile_id).toBe(agentProfileId);
     });
   });
 
