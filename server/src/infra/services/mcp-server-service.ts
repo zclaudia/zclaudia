@@ -1,6 +1,6 @@
 import type Database from 'better-sqlite3';
 import type { McpServerConfig } from '@zclaudia/shared/core/mcp';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 export interface McpServerRow {
   id: string;
@@ -88,7 +88,7 @@ export class McpServerService {
       throw new McpServerServiceError(409, 'DUPLICATE', `MCP server "${input.name}" already exists`);
     }
 
-    const id = uuidv4();
+    const id = newId();
     const now = this.now();
 
     this.db.prepare(`

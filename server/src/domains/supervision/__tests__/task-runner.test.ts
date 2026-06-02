@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 // Hoist mocks so they are available before module imports
 const { mockExec, mockExecSync } = vi.hoisted(() => ({
@@ -132,7 +132,7 @@ function createTestDb(): Database.Database {
 }
 
 function seedProject(db: Database.Database, rootPath = '/tmp/test-project'): string {
-  const id = uuidv4();
+  const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
@@ -142,7 +142,7 @@ function seedProject(db: Database.Database, rootPath = '/tmp/test-project'): str
 }
 
 function seedSession(db: Database.Database, projectId: string): string {
-  const id = uuidv4();
+  const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
@@ -158,7 +158,7 @@ function seedMessage(
   content: string,
   createdAt?: number,
 ): string {
-  const id = uuidv4();
+  const id = newId();
   const ts = createdAt ?? Date.now();
   db.prepare(
     `INSERT INTO messages (id, session_id, role, content, created_at)
@@ -762,7 +762,7 @@ describe('TaskRunner', () => {
       // Create a session with a worktree path
       const worktreePath = '/tmp/worktrees/supervision/slot-0';
       const now = Date.now();
-      const sessionId = uuidv4();
+      const sessionId = newId();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, working_directory, created_at, updated_at)
          VALUES (?, ?, 'task-session', ?, ?, ?)`,

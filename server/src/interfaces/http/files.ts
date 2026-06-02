@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import * as fs from 'fs';
 import * as os from 'os';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import multer from 'multer';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { DirectoryListingResponse, FileContentResponse } from '@zclaudia/shared/files';
@@ -19,7 +19,7 @@ const upload = multer({
   storage: multer.diskStorage({
     destination: os.tmpdir(),
     filename: (_req, _file, cb) => {
-      cb(null, `claudia-upload-${uuidv4()}`);
+      cb(null, `claudia-upload-${newId()}`);
     },
   }),
   limits: {

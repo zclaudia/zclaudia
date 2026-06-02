@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 export interface WorkflowSchedule {
   id: string;
@@ -44,7 +44,7 @@ export class WorkflowScheduleRepository {
       return { ...existing, triggerIndex, nextRun, enabled };
     }
 
-    const id = uuidv4();
+    const id = newId();
     this.db.prepare(
       'INSERT INTO workflow_schedules (id, workflow_id, trigger_index, next_run, enabled) VALUES (?, ?, ?, ?, ?)'
     ).run(id, workflowId, triggerIndex, nextRun, enabled ? 1 : 0);

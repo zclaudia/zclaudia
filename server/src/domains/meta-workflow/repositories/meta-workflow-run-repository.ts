@@ -5,7 +5,7 @@ import type {
   MetaWorkflowRunStatus,
   MetaWorkflowConfig,
 } from '@zclaudia/shared/features/meta-workflow';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 type Create = Omit<MetaWorkflowRun, 'id' | 'completedAt'>;
 type Update = {
@@ -50,7 +50,7 @@ export class MetaWorkflowRunRepository extends BaseRepository<MetaWorkflowRun, C
   }
 
   createQuery(data: Create): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     return {
       sql: `INSERT INTO meta_workflow_runs (
         id, project_id, title, description, status,

@@ -6,7 +6,7 @@ import type {
   SpecChangeUpdate,
   SpecChangeStatus,
 } from '@zclaudia/shared/features/spec-change';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 interface Row {
   id: string;
@@ -55,7 +55,7 @@ export class SpecChangeRepository extends BaseRepository<
   }
 
   createQuery(data: SpecChangeCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     const base = `openspec/changes/${data.slug}`;
     return {

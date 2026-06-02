@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { SessionDraft } from '@zclaudia/shared/core/session';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 const LOCK_EXPIRY_MS = 60_000;
 const MAX_CONTENT_SIZE = 100 * 1024;
@@ -71,7 +71,7 @@ export class SessionDraftRepository {
       return this.findBySessionId(sessionId)!;
     }
 
-    const id = uuidv4();
+    const id = newId();
     this.db.prepare(`
       INSERT INTO session_drafts (id, session_id, content, editing_by, editing_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)

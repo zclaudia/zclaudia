@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import { StateRecovery } from '../state-recovery.js';
 import { SupervisionTaskRepository } from '../repositories/supervision-task.js';
 import { SessionRepository } from '../../sessions/repository.js';
@@ -106,7 +106,7 @@ function seedProject(
   db: Database.Database,
   opts: { agent?: ProjectAgent; rootPath?: string } = {},
 ): string {
-  const id = uuidv4();
+  const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
@@ -211,7 +211,7 @@ describe('StateRecovery', () => {
       db.prepare(
         `INSERT INTO supervision_tasks (id, project_id, title, description, source, status, priority, attempt, created_at, updated_at)
          VALUES (?, ?, 'orphan', 'd', 'user', 'running', 0, 1, ?, ?)`,
-      ).run(uuidv4(), projectId, Date.now(), Date.now());
+      ).run(newId(), projectId, Date.now(), Date.now());
 
       const recovery = createRecovery();
       const report = recovery.recover();

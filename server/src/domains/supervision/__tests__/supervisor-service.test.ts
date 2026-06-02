@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 const { mockExecSync, mockContextManagerLoadAll, mockValidatePlanFile, mockComputeNextCronRun } = vi.hoisted(() => ({
   mockExecSync: vi.fn(),
@@ -300,7 +300,7 @@ function seedProject(
   db: Database.Database,
   opts: { rootPath?: string; agent?: ProjectAgent } = {},
 ): string {
-  const id = uuidv4();
+  const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
@@ -428,7 +428,7 @@ describe('SupervisorService', () => {
     });
 
     it('throws if project has no rootPath', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
@@ -1830,7 +1830,7 @@ describe('SupervisorService', () => {
 
     it('sums input and output tokens from messages metadata', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
-      const sessionId = uuidv4();
+      const sessionId = newId();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
          VALUES (?, ?, 'test', ?, ?)`
@@ -1839,19 +1839,19 @@ describe('SupervisorService', () => {
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'hello', ?, ?)`
-      ).run(uuidv4(), sessionId, JSON.stringify({ usage: { input_tokens: 100, output_tokens: 50 } }), Date.now());
+      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 100, output_tokens: 50 } }), Date.now());
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'world', ?, ?)`
-      ).run(uuidv4(), sessionId, JSON.stringify({ usage: { input_tokens: 200, output_tokens: 75 } }), Date.now());
+      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 200, output_tokens: 75 } }), Date.now());
 
       expect(service.getTokenUsage(projectId)).toBe(425); // 100+50+200+75
     });
 
     it('handles NULL metadata gracefully', () => {
       const projectId = seedProject(db, { agent: makeAgent() });
-      const sessionId = uuidv4();
+      const sessionId = newId();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
          VALUES (?, ?, 'test', ?, ?)`
@@ -1860,7 +1860,7 @@ describe('SupervisorService', () => {
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'hello', NULL, ?)`
-      ).run(uuidv4(), sessionId, Date.now());
+      ).run(newId(), sessionId, Date.now());
 
       expect(service.getTokenUsage(projectId)).toBe(0);
     });
@@ -1880,7 +1880,7 @@ describe('SupervisorService', () => {
       });
 
       // Add messages with token usage
-      const sessionId = uuidv4();
+      const sessionId = newId();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
          VALUES (?, ?, 'test', ?, ?)`
@@ -1888,7 +1888,7 @@ describe('SupervisorService', () => {
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'x', ?, ?)`
-      ).run(uuidv4(), sessionId, JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }), Date.now());
+      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }), Date.now());
 
       // Budget = 100, usage = 110 → should pause
       const result = (service as any).checkBudgetLimits(projectId);
@@ -1922,7 +1922,7 @@ describe('SupervisorService', () => {
 
   describe('checkMainSessionOverflow()', () => {
     it('rotates session when message count > 200', () => {
-      const mainSessionId = uuidv4();
+      const mainSessionId = newId();
       const projectId = seedProject(db, {
         agent: makeAgent({ mainSessionId }),
       });
@@ -1937,7 +1937,7 @@ describe('SupervisorService', () => {
         db.prepare(
           `INSERT INTO messages (id, session_id, role, content, created_at)
            VALUES (?, ?, 'assistant', 'msg', ?)`
-        ).run(uuidv4(), mainSessionId, Date.now());
+        ).run(newId(), mainSessionId, Date.now());
       }
 
       service.checkMainSessionOverflow(projectId);
@@ -1953,7 +1953,7 @@ describe('SupervisorService', () => {
     });
 
     it('does nothing when message count <= 200', () => {
-      const mainSessionId = uuidv4();
+      const mainSessionId = newId();
       const projectId = seedProject(db, {
         agent: makeAgent({ mainSessionId }),
       });
@@ -1968,7 +1968,7 @@ describe('SupervisorService', () => {
         db.prepare(
           `INSERT INTO messages (id, session_id, role, content, created_at)
            VALUES (?, ?, 'assistant', 'msg', ?)`
-        ).run(uuidv4(), mainSessionId, Date.now());
+        ).run(newId(), mainSessionId, Date.now());
       }
 
       service.checkMainSessionOverflow(projectId);
@@ -2404,7 +2404,7 @@ describe('SupervisorService', () => {
       });
 
       // Seed token usage exceeding budget
-      const sessionId = uuidv4();
+      const sessionId = newId();
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at)
          VALUES (?, ?, 'test', ?, ?)`,
@@ -2412,7 +2412,7 @@ describe('SupervisorService', () => {
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, metadata, created_at)
          VALUES (?, ?, 'assistant', 'x', ?, ?)`,
-      ).run(uuidv4(), sessionId, JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }), Date.now());
+      ).run(newId(), sessionId, JSON.stringify({ usage: { input_tokens: 80, output_tokens: 30 } }), Date.now());
 
       // Create a queued task
       const task = taskRepo.create({
@@ -2676,7 +2676,7 @@ describe('SupervisorService', () => {
     });
 
     it('throws when project has no rootPath', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
@@ -2789,7 +2789,7 @@ describe('SupervisorService', () => {
 
   describe('getContextDocuments()', () => {
     it('returns empty array when project has no rootPath', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)
@@ -3744,7 +3744,7 @@ describe('SupervisorService', () => {
 
   describe('reloadContext()', () => {
     it('throws when project has no rootPath', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, created_at, updated_at)

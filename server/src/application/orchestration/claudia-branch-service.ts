@@ -9,7 +9,7 @@
  * 5. Explicit new conversation → force fork
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 
 export type BranchAction = 'reused' | 'forked' | 'created';
@@ -76,7 +76,7 @@ export class ClaudiaBranchService {
     hostProjectId: string;
     title: string;
   }): ClaudiaBranch {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     this.db.prepare(`
       INSERT INTO claudia_branches (id, host_project_id, active_session_id, title, created_at, updated_at)

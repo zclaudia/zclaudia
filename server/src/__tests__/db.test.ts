@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../utils/uuid.js';
 
 // Create in-memory database for testing
 function createTestDb(): Database.Database {
@@ -95,7 +95,7 @@ describe('Database Operations', () => {
 
   describe('Providers', () => {
     it('creates a provider', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -117,7 +117,7 @@ describe('Database Operations', () => {
     });
 
     it('stores and retrieves env as JSON string', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
       const env = { ANTHROPIC_API_KEY: 'test-key', HOME: '/custom/home' };
 
@@ -137,7 +137,7 @@ describe('Database Operations', () => {
 
   describe('Projects', () => {
     it('creates a project', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -159,7 +159,7 @@ describe('Database Operations', () => {
     });
 
     it('updates a project', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -181,7 +181,7 @@ describe('Database Operations', () => {
     });
 
     it('deletes a project', () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -196,9 +196,9 @@ describe('Database Operations', () => {
     });
 
     it('links project to default agent profile', () => {
-      const llmProfileId = uuidv4();
-      const agentProfileId = uuidv4();
-      const projectId = uuidv4();
+      const llmProfileId = newId();
+      const agentProfileId = newId();
+      const projectId = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -226,8 +226,8 @@ describe('Database Operations', () => {
 
   describe('Sessions', () => {
     it('creates a session linked to project', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -252,8 +252,8 @@ describe('Database Operations', () => {
     });
 
     it('cascades delete when project is deleted', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -273,8 +273,8 @@ describe('Database Operations', () => {
     });
 
     it('stores sdk_session_id for resume', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
       const sdkSessionId = 'sdk-session-123';
       const now = Date.now();
 
@@ -298,9 +298,9 @@ describe('Database Operations', () => {
 
   describe('Messages', () => {
     it('creates a message linked to session', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
-      const messageId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
+      const messageId = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -332,8 +332,8 @@ describe('Database Operations', () => {
     });
 
     it('retrieves messages in chronological order', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -373,9 +373,9 @@ describe('Database Operations', () => {
     });
 
     it('cascades delete when session is deleted', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
-      const messageId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
+      const messageId = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -402,8 +402,8 @@ describe('Database Operations', () => {
 
   describe('Role constraints', () => {
     it('allows valid roles: user, assistant, system', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
       const now = Date.now();
 
       db.prepare(`
@@ -437,8 +437,8 @@ describe('Database Operations', () => {
     });
 
     it('rejects invalid roles', () => {
-      const projectId = uuidv4();
-      const sessionId = uuidv4();
+      const projectId = newId();
+      const sessionId = newId();
       const now = Date.now();
 
       db.prepare(`

@@ -5,7 +5,7 @@ import type {
   MetaWorkflowArtifact,
   MetaWorkflowGateResult,
 } from '@zclaudia/shared/features/meta-workflow';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 type Create = Omit<MetaWorkflowArtifact, 'id'>;
 type Update = {
@@ -41,7 +41,7 @@ export class MetaWorkflowArtifactRepository extends BaseRepository<MetaWorkflowA
   }
 
   createQuery(data: Create): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     return {
       sql: `INSERT INTO meta_workflow_artifacts (
         id, phase_record_id, version, commit_sha, artifact_files,

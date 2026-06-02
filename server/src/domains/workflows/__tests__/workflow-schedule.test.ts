@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WorkflowScheduleRepository } from '../workflow-schedule-repository.js';
 
-vi.mock('uuid', () => ({ v4: () => 'mock-uuid' }));
+vi.mock('uuid', () => ({ v4: () => 'mock-uuid', v7: () => 'mock-uuid' }));
 
 describe('WorkflowScheduleRepository', () => {
   let mockDb: any;

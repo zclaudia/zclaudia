@@ -7,7 +7,7 @@ import type {
   ExecutorStatus,
   ExecutorType,
 } from '@zclaudia/shared/features/executor';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 interface Row {
   id: string;
@@ -50,7 +50,7 @@ export class ExecutorInstanceRepository extends BaseRepository<
   }
 
   createQuery(data: ExecutorInstanceCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     return {
       sql: `INSERT INTO executor_instances

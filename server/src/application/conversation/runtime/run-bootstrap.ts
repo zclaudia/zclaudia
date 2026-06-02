@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type { ErrorMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
@@ -186,7 +186,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     db,
     sessionId: message.sessionId,
     projectId,
-    assistantMessageId: uuidv4(),
+    assistantMessageId: newId(),
     fullContent: '',
     collectedToolCalls: [],
     contentBlocks: [],
@@ -211,7 +211,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
 
   let userMessageId: string | undefined;
   if (!message.resend) {
-    userMessageId = uuidv4();
+    userMessageId = newId();
     const userOffset = getNextOffset(db, message.sessionId);
     db.prepare(`
       INSERT INTO messages (id, session_id, role, content, created_at, offset)

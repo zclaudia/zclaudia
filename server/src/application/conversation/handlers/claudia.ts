@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type {
   ClaudiaMessageMessage,
   ClaudiaTaskSubmitMessage,
@@ -113,7 +113,7 @@ export async function handleClaudiaMessage(
 
   // Branch allocation
   const branchService = ctx.taskCoordination;
-  const freshSessionId = uuidv4();
+  const freshSessionId = newId();
   const allocation = branchService.allocateBranch({
     hostProjectId: inlineProjectId,
     activeBranchId: message.activeBranchId,
@@ -172,7 +172,7 @@ export async function handleClaudiaMessage(
     ).get(clientReqId, 'claudia') as { id: string } | undefined;
     if (existing) return existing.id;
 
-    const taskId = uuidv4();
+    const taskId = newId();
     const updatedAt = extra?.updatedAt ?? Date.now();
     db.prepare(`
       INSERT INTO orchestrator_tasks (
@@ -198,7 +198,7 @@ export async function handleClaudiaMessage(
     promoted = true;
     clearTimeout(promoteTimer);
 
-    const taskId = uuidv4();
+    const taskId = newId();
     const taskNow = Date.now();
 
     db.prepare(`
@@ -389,7 +389,7 @@ export async function handleClaudiaTaskSubmit(
   const title = taskInput.replace(/\s+/g, ' ').slice(0, 80);
   try {
     const submitBranchService = taskCoordination;
-    const submitSessionId = uuidv4();
+    const submitSessionId = newId();
     const submitAllocation = submitBranchService.allocateBranch({
       hostProjectId: message.projectId,
       activeBranchId: message.activeBranchId,
@@ -456,7 +456,7 @@ export async function handleClaudiaTaskContinue(
   const title = continueInput.replace(/\s+/g, ' ').slice(0, 80);
   try {
     const continueBranchService = taskCoordination;
-    const continueSessionId = uuidv4();
+    const continueSessionId = newId();
     const continueAllocation = continueBranchService.allocateForContinue({
       taskBranchId: parentTask.branchId,
       hostProjectId: parentTask.projectId ?? '',

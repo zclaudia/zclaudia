@@ -5,7 +5,7 @@ import type {
   LocalIssueStatus,
   LocalIssueType,
 } from '@zclaudia/shared/features/local-issue';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 /**
  * Create payload. `type` and `isAnonymous` default in the repo if omitted
@@ -49,7 +49,7 @@ export class LocalIssueRepository extends BaseRepository<LocalIssue, LocalIssueC
   }
 
   createQuery(data: LocalIssueCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     return {
       sql: `INSERT INTO local_issues (

@@ -6,7 +6,7 @@ import type {
   MetaSubagentTerminationCondition,
   ReusePoolSourceType,
 } from '@zclaudia/shared/features/meta-workflow';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 type Create = Omit<MetaSubagentTemplate, 'id'>;
 type Update = {
@@ -40,7 +40,7 @@ export class MetaSubagentTemplateRepository extends BaseRepository<MetaSubagentT
   }
 
   createQuery(data: Create): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     return {
       sql: `INSERT INTO meta_subagent_templates (
         id, name, system_prompt, allowed_tools, max_turns,

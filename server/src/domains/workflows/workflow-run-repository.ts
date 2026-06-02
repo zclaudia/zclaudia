@@ -1,7 +1,7 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { WorkflowRun, WorkflowRunStatus, WorkflowRunTriggerSource } from '@zclaudia/shared/features/workflows';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 type WorkflowRunCreate = Omit<WorkflowRun, 'id' | 'completedAt' | 'error'>;
 type WorkflowRunUpdate = Partial<Omit<WorkflowRun, 'id' | 'workflowId' | 'projectId' | 'startedAt'>>;
@@ -28,7 +28,7 @@ export class WorkflowRunRepository extends BaseRepository<WorkflowRun, WorkflowR
   }
 
   createQuery(data: WorkflowRunCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     return {
       sql: `INSERT INTO workflow_runs (
         id, workflow_id, project_id, status, trigger_source, trigger_detail,

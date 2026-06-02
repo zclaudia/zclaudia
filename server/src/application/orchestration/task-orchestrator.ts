@@ -5,7 +5,7 @@
  * External tasks (supervision/workflow/scheduled) are mirrored via syncExternalTask().
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import type { NotificationSource } from '@zclaudia/shared/features/notification-feed';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -277,7 +277,7 @@ export function createTaskOrchestrator(deps: TaskOrchestratorDeps): TaskOrchestr
       virtualClient,
       {
         type: 'run_start',
-        clientRequestId: uuidv4(),
+        clientRequestId: newId(),
         sessionId,
         input: task.task,
         llmProfileId: task.llmProfileId,
@@ -294,7 +294,7 @@ export function createTaskOrchestrator(deps: TaskOrchestratorDeps): TaskOrchestr
 
   const orchestrator: TaskOrchestrator = {
     async spawnTask(parentId, config) {
-      const id = uuidv4();
+      const id = newId();
       const rootId = parentId
         ? (repo.findById(parentId)?.rootTaskId ?? parentId)
         : id;

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 /**
  * AttachmentStore — persistent disk-backed storage for business attachments.
@@ -36,7 +36,7 @@ class AttachmentStore {
    * Store an attachment from a Buffer. Used by JSON/base64 upload path.
    */
   storeFromBuffer(buffer: Buffer): StoredAttachmentMeta {
-    const id = uuidv4();
+    const id = newId();
     const storageKey = this.makeStorageKey(id);
     const absPath = this.absolutePath(storageKey);
     fs.mkdirSync(path.dirname(absPath), { recursive: true });
@@ -51,7 +51,7 @@ class AttachmentStore {
    * Falls back to copy+delete on cross-device renames.
    */
   storeByMoving(sourcePath: string): StoredAttachmentMeta {
-    const id = uuidv4();
+    const id = newId();
     const storageKey = this.makeStorageKey(id);
     const absPath = this.absolutePath(storageKey);
     fs.mkdirSync(path.dirname(absPath), { recursive: true });
@@ -77,7 +77,7 @@ class AttachmentStore {
    * Copy an existing local file into the store.
    */
   storeByCopying(sourcePath: string): StoredAttachmentMeta {
-    const id = uuidv4();
+    const id = newId();
     const storageKey = this.makeStorageKey(id);
     const absPath = this.absolutePath(storageKey);
     fs.mkdirSync(path.dirname(absPath), { recursive: true });

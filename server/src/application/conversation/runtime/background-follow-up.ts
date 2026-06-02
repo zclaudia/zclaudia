@@ -8,7 +8,7 @@
  * sees it as a separate message.
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { ClaudeMessage } from '../../../infra/providers/types.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
@@ -171,8 +171,8 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
   activeRun: ActiveRun;
   sendRunEvent: (event: ServerMessage) => void;
 } {
-  const runId = uuidv4();
-  const assistantMessageId = uuidv4();
+  const runId = newId();
+  const assistantMessageId = newId();
 
   const activeRun: ActiveRun = {
     runId,

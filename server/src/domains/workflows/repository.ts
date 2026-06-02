@@ -2,7 +2,7 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import { normalizeWorkflowDefinition } from '@zclaudia/shared/features/workflows';
 import type { Workflow, WorkflowStatus, WorkflowDefinition } from '@zclaudia/shared/features/workflows';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 type WorkflowCreate = Omit<Workflow, 'id' | 'createdAt' | 'updatedAt'>;
 type WorkflowUpdate = Partial<Omit<Workflow, 'id' | 'projectId' | 'createdAt'>>;
@@ -39,7 +39,7 @@ export class WorkflowRepository extends BaseRepository<Workflow, WorkflowCreate,
   }
 
   createQuery(data: WorkflowCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     return {
       sql: `INSERT INTO workflows (

@@ -1,6 +1,6 @@
 import { BaseRepository } from '../../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 /**
  * Phase G4 Task 1 — bootstrap scan repository.
@@ -80,7 +80,7 @@ export class BootstrapScanRepository extends BaseRepository<
   }
 
   createQuery(data: BootstrapScanCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     return {
       sql: `INSERT INTO bootstrap_scans (id, project_id, status, started_at, applied_count, pending_count) VALUES (?, ?, ?, ?, ?, ?)`,

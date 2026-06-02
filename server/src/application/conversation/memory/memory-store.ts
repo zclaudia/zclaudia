@@ -3,7 +3,7 @@
  * Project-scoped (project_id set) or global (project_id = NULL).
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 
 export interface MemoryEntry {
@@ -43,7 +43,7 @@ export class MemoryStore {
       this.db.prepare(
         `INSERT INTO agent_memory (id, project_id, namespace, key, value, author_scope, created_at, updated_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-      ).run(uuidv4(), projectId, namespace, key, value, authorScope, now, now);
+      ).run(newId(), projectId, namespace, key, value, authorScope, now, now);
     }
   }
 

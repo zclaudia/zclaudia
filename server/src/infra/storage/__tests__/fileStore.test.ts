@@ -24,8 +24,10 @@ vi.mock('fs', () => ({
 
 vi.mock('uuid', () => {
   let counter = 0;
+  const gen = vi.fn(() => `mock-uuid-${++counter}`);
   return {
-    v4: vi.fn(() => `mock-uuid-${++counter}`),
+    v4: gen,
+    v7: gen,
   };
 });
 

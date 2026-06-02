@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 const mockSupervisionAiRunPort = {
   startVirtualRun: vi.fn(),
@@ -174,7 +174,7 @@ function seedProject(
   db: Database.Database,
   opts: { name?: string; rootPath?: string; agent?: ProjectAgent } = {},
 ): string {
-  const id = uuidv4();
+  const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
@@ -233,7 +233,7 @@ function insertMessage(
   role: 'user' | 'assistant' | 'system',
   content: string,
 ): void {
-  const id = uuidv4();
+  const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO messages (id, session_id, role, content, created_at)
@@ -462,8 +462,8 @@ Suggested_Changes:
   describe('buildReviewPrompt()', () => {
     function makeTask(overrides: Partial<SupervisionTask> = {}): SupervisionTask {
       return {
-        id: uuidv4(),
-        projectId: uuidv4(),
+        id: newId(),
+        projectId: newId(),
         title: 'Fix login bug',
         description: 'The login form does not validate email',
         source: 'user',
@@ -591,7 +591,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: ['file.ts'] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = { approved: true, notes: 'Looks great!' };
 
       engine.handleReviewComplete(task, verdict, reviewSessionId);
@@ -613,7 +613,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = {
         approved: false,
         notes: 'Missing error handling',
@@ -640,7 +640,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = {
         approved: false,
         notes: 'Still broken after multiple attempts',
@@ -662,7 +662,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
 
       engine.handleReviewComplete(task, null, reviewSessionId);
 
@@ -682,7 +682,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = { approved: true, notes: 'All good' };
 
       engine.handleReviewComplete(task, verdict, reviewSessionId);
@@ -708,7 +708,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = {
         approved: false,
         notes: 'Needs work',
@@ -736,7 +736,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
 
       engine.handleReviewComplete(task, null, reviewSessionId);
 
@@ -773,7 +773,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = { approved: true, notes: 'Looks good' };
 
       engine.handleReviewComplete(task, verdict, reviewSessionId);
@@ -794,7 +794,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = {
         approved: false,
         notes: 'Needs work',
@@ -819,7 +819,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      const reviewSessionId = uuidv4();
+      const reviewSessionId = newId();
       const verdict: ReviewVerdict = { approved: true, notes: 'Good' };
 
       engine.handleReviewComplete(task, verdict, reviewSessionId);
@@ -925,7 +925,7 @@ Suggested_Changes:
     });
 
     it('does nothing when project has no rootPath', async () => {
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
       db.prepare(
         `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
@@ -1202,7 +1202,7 @@ Suggested_Changes:
       });
 
       const verdict: ReviewVerdict = { approved: false, notes: 'Try again' };
-      engine.handleReviewComplete(task, verdict, uuidv4());
+      engine.handleReviewComplete(task, verdict, newId());
 
       expect(logFn).toHaveBeenCalledWith(
         task.projectId,
@@ -1238,7 +1238,7 @@ Suggested_Changes:
       });
 
       const verdict: ReviewVerdict = { approved: false, notes: 'No good' };
-      engine.handleReviewComplete(task, verdict, uuidv4());
+      engine.handleReviewComplete(task, verdict, newId());
 
       expect(logFn).toHaveBeenCalledWith(
         task.projectId,
@@ -1271,7 +1271,7 @@ Suggested_Changes:
         result: { summary: 'Done', filesChanged: [] },
       });
 
-      engine.handleReviewComplete(task, null, uuidv4());
+      engine.handleReviewComplete(task, null, newId());
 
       expect(logFn).toHaveBeenCalledWith(
         task.projectId,
@@ -1416,7 +1416,7 @@ Suggested_Changes:
       mockPool.mergeBack.mockResolvedValue({ success: true });
 
       const verdict: ReviewVerdict = { approved: true, notes: 'LGTM' };
-      await engineWithPool.handleReviewComplete(updatedTask, verdict, uuidv4());
+      await engineWithPool.handleReviewComplete(updatedTask, verdict, newId());
 
       const result = taskRepo.findById(task.id)!;
       expect(result.status).toBe('integrated');
@@ -1451,7 +1451,7 @@ Suggested_Changes:
       });
 
       const verdict: ReviewVerdict = { approved: true, notes: 'Looks fine' };
-      await engineWithPool.handleReviewComplete(updatedTask, verdict, uuidv4());
+      await engineWithPool.handleReviewComplete(updatedTask, verdict, newId());
 
       const result = taskRepo.findById(task.id)!;
       expect(result.status).toBe('merge_conflict');
@@ -1481,7 +1481,7 @@ Suggested_Changes:
       const updatedTask = taskRepo.findById(task.id)!;
 
       const verdict: ReviewVerdict = { approved: false, notes: 'Needs work' };
-      await engineWithPool.handleReviewComplete(updatedTask, verdict, uuidv4());
+      await engineWithPool.handleReviewComplete(updatedTask, verdict, newId());
 
       const result = taskRepo.findById(task.id)!;
       expect(result.status).toBe('queued');
@@ -1509,7 +1509,7 @@ Suggested_Changes:
       const updatedTask = taskRepo.findById(task.id)!;
 
       const verdict: ReviewVerdict = { approved: true, notes: 'OK' };
-      await engineWithPool.handleReviewComplete(updatedTask, verdict, uuidv4());
+      await engineWithPool.handleReviewComplete(updatedTask, verdict, newId());
 
       const result = taskRepo.findById(task.id)!;
       expect(result.status).toBe('integrated');

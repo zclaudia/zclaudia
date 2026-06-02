@@ -1,7 +1,7 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { Session } from '@zclaudia/shared/core/session';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import { resolveAgentForSession } from '../agent-profiles/agent-resolver.js';
 
 export class SessionRepository extends BaseRepository<
@@ -36,7 +36,7 @@ export class SessionRepository extends BaseRepository<
   }
 
   createQuery(data: Omit<Session, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
 
     // Resolve agent via the shared helper. Throws NoAgentAvailableError when

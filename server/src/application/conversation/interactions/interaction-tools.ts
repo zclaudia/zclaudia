@@ -11,7 +11,7 @@
  * - push_file: fire-and-forget, pushes a local file to user's device
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import http from 'http';
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { interactionDispatcher } from './interaction-dispatcher.js';
@@ -83,7 +83,7 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
     },
     handler: async (args, context) => {
       const sessionId = (context?.sessionId as string) || '';
-      const interactionId = uuidv4();
+      const interactionId = newId();
       const todos = normalizeTodoItems(args.todos);
 
       // Auto-complete items in previous todo lists that disappeared from the new list
@@ -163,7 +163,7 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
     },
     handler: async (args, context) => {
       const sessionId = (context?.sessionId as string) || '';
-      const interactionId = uuidv4();
+      const interactionId = newId();
 
       const event: InteractionPromptMessage = {
         type: 'interaction_prompt',
@@ -212,7 +212,7 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
     },
     handler: async (args, context) => {
       const sessionId = (context?.sessionId as string) || '';
-      const interactionId = uuidv4();
+      const interactionId = newId();
 
       const event: ApprovalInteractionMessage = {
         type: 'interaction_approval',
@@ -356,7 +356,7 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
     },
     handler: async (args, context) => {
       const sessionId = (context?.sessionId as string) || '';
-      const interactionId = uuidv4();
+      const interactionId = newId();
 
       const event: PlanReviewInteractionMessage = {
         type: 'interaction_plan_review',

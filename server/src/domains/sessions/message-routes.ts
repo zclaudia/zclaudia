@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { Message, MessageMetadata, MessageRole } from '@zclaudia/shared/core/message';
@@ -130,7 +130,7 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
         return;
       }
 
-      const id = uuidv4();
+      const id = newId();
       const now = Date.now();
 
       const storedMessage = repo.create({

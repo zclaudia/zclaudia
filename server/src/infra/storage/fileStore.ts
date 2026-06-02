@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import { systemTaskRegistry } from '../../application/services/system-task-registry.js';
 
@@ -29,7 +29,7 @@ class FileStore {
   }
 
   storeFile(name: string, mimeType: string, data: string): string {
-    const fileId = uuidv4();
+    const fileId = newId();
     const size = Buffer.from(data, 'base64').length;
     const createdAt = Date.now();
 
@@ -116,7 +116,7 @@ class FileStore {
    * Used by upload-json endpoint to avoid double base64 decode.
    */
   storeFileFromBuffer(name: string, mimeType: string, buffer: Buffer): string {
-    const fileId = uuidv4();
+    const fileId = newId();
     const size = buffer.length;
     const createdAt = Date.now();
 
@@ -137,7 +137,7 @@ class FileStore {
    * Falls back to copy+delete if rename fails (cross-device).
    */
   storeFileByMoving(sourcePath: string, name: string, mimeType: string): string {
-    const fileId = uuidv4();
+    const fileId = newId();
     const stat = fs.statSync(sourcePath);
     const size = stat.size;
     const createdAt = Date.now();
@@ -168,7 +168,7 @@ class FileStore {
    * Unlike storeFile(), this avoids loading the entire file into memory as base64.
    */
   storeFileFromPath(sourcePath: string, name: string, mimeType: string): string {
-    const fileId = uuidv4();
+    const fileId = newId();
     const stat = fs.statSync(sourcePath);
     const size = stat.size;
     const createdAt = Date.now();

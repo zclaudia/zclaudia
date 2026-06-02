@@ -20,7 +20,7 @@ interface StepRegistryPort {
   getAllMeta(): Array<{ type: string; name: string; description: string; category: string }>;
 }
 import { BUILTIN_WORKFLOW_TEMPLATES } from './templates.js';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 // ── Types ────────────────────────────────────────────────────
 
@@ -475,7 +475,7 @@ Generate a workflow definition based on the user's natural language description.
     userDescription: string,
     aiResponse: string,
   ): GenerationSession {
-    const id = uuidv4();
+    const id = newId();
     const session: GenerationSession = {
       id,
       projectId,

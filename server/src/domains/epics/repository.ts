@@ -4,7 +4,7 @@
 // containers for LocalIssues; lifecycle is just open/closed/cancelled.
 
 import type { Database } from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type { Epic, EpicStatus } from '@zclaudia/shared/features/epic';
 
 export interface EpicCreate {
@@ -42,7 +42,7 @@ export class EpicRepository {
   }
 
   create(data: EpicCreate): Epic {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     this.db.prepare(`
       INSERT INTO epics (

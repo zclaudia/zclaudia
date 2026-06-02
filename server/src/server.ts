@@ -2,7 +2,7 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { createServer as createHttpServer, Server, IncomingMessage } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from './utils/uuid.js';
 import type {
   ClientMessage,
   ServerMessage,
@@ -226,7 +226,7 @@ export async function createServer(): Promise<ServerContext> {
   }
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-    const clientId = uuidv4();
+    const clientId = newId();
     const clientIsLocal = isLocalhost(req);
     const client: ConnectedClient = {
       id: clientId,
@@ -353,7 +353,7 @@ export async function createServer(): Promise<ServerContext> {
       }
 
       const request: CorrelatedRequest = {
-        id: uuidv4(),
+        id: newId(),
         type: message.type,
         payload: message,
         timestamp: Date.now(),

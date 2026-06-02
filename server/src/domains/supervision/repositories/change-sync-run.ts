@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 export interface ChangeSyncRunRecord {
   id: string;
@@ -33,7 +33,7 @@ export class ChangeSyncRunRepository {
 
   create(changeId: string, summary: string): ChangeSyncRunRecord | undefined {
     if (!this.hasTable()) return undefined;
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     this.db.prepare(`
       INSERT INTO change_sync_runs

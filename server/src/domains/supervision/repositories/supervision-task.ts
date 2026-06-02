@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type { SupervisionTask, TaskStatus, TaskResult } from '@zclaudia/shared/features/supervision';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 export class SupervisionTaskRepository {
   private schemaCache: {
@@ -78,7 +78,7 @@ export class SupervisionTaskRepository {
     scheduleEnabled?: boolean;
     retryDelayMs?: number;
   }): SupervisionTask {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
 
     const columns = [

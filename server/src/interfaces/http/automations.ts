@@ -8,7 +8,7 @@
 import { Router, type Request, type Response } from 'express';
 import type { WorkflowService } from '../../domains/workflows/index.js';
 import type { WorkflowNodeDef, WorkflowTrigger, WorkflowTriggerType } from '@zclaudia/shared/features/workflows';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 interface SimpleAutomationBody {
   name: string;
@@ -79,7 +79,7 @@ export function createAutomationRoutes(workflowService: WorkflowService): Router
         });
       }
 
-      const nodeId = uuidv4().slice(0, 8);
+      const nodeId = newId().slice(0, 8);
       const trigger: WorkflowTrigger = {
         type: body.trigger.type,
         cron: body.trigger.cron,

@@ -5,7 +5,7 @@ import type {
   MetaSubagentTerminationCondition,
 } from '@zclaudia/shared/features/meta-workflow';
 import { getPhaseTemplate } from './phase-templates/index.js';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 const READ_ONLY_TOOLS = ['Read', 'Grep', 'Glob', 'Bash', 'WebFetch', 'WebSearch'];
 
@@ -23,7 +23,7 @@ export function synthesizeSubagent(phase: PhaseDef): MetaSubagentTemplate {
 
   const now = Date.now();
   return {
-    id: uuidv4(),
+    id: newId(),
     name: undefined,
     systemPrompt,
     allowedTools: [...READ_ONLY_TOOLS],

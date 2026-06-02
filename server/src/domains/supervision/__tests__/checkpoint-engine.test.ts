@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import { CheckpointEngine, type CheckpointResult } from '../checkpoint-engine.js';
 import { SupervisionTaskRepository } from '../repositories/supervision-task.js';
 import { ProjectRepository } from '../../projects/index.js';
@@ -117,7 +117,7 @@ function seedProject(
   db: Database.Database,
   opts: { agent?: ProjectAgent; rootPath?: string; name?: string } = {},
 ): string {
-  const id = uuidv4();
+  const id = newId();
   const now = Date.now();
   db.prepare(
     `INSERT INTO projects (id, name, type, root_path, agent, created_at, updated_at)
@@ -159,7 +159,7 @@ describe('CheckpointEngine', () => {
     broadcastFn = vi.fn();
     logFn = vi.fn();
     createTaskFn = vi.fn().mockImplementation(
-      (_pid: string, data: any) => ({ id: uuidv4(), ...data, status: 'proposed', createdAt: Date.now() }),
+      (_pid: string, data: any) => ({ id: newId(), ...data, status: 'proposed', createdAt: Date.now() }),
     );
     mockAiRunPort = { startVirtualRun: vi.fn() };
 
@@ -306,21 +306,21 @@ describe('CheckpointEngine', () => {
 
   describe('parseCheckpointResult()', () => {
     it('returns null when no CHECKPOINT_RESULT block exists', () => {
-      const sessionId = uuidv4();
+      const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
       ).run(sessionId, projectId, Date.now(), Date.now());
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', 'no result here', ?)`,
-      ).run(uuidv4(), sessionId, Date.now());
+      ).run(newId(), sessionId, Date.now());
 
       const engine = createEngine();
       expect(engine.parseCheckpointResult(sessionId)).toBeNull();
     });
 
     it('parses project_summary_update', () => {
-      const sessionId = uuidv4();
+      const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
@@ -336,7 +336,7 @@ After text`;
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
-      ).run(uuidv4(), sessionId, content, Date.now());
+      ).run(newId(), sessionId, content, Date.now());
 
       const engine = createEngine();
       const result = engine.parseCheckpointResult(sessionId);
@@ -345,7 +345,7 @@ After text`;
     });
 
     it('parses discovered_tasks', () => {
-      const sessionId = uuidv4();
+      const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
@@ -361,7 +361,7 @@ discovered_tasks:
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
-      ).run(uuidv4(), sessionId, content, Date.now());
+      ).run(newId(), sessionId, content, Date.now());
 
       const engine = createEngine();
       const result = engine.parseCheckpointResult(sessionId);
@@ -372,7 +372,7 @@ discovered_tasks:
     });
 
     it('returns empty result for empty block', () => {
-      const sessionId = uuidv4();
+      const sessionId = newId();
       const projectId = seedProject(db, { agent: makeAgent() });
       db.prepare(
         `INSERT INTO sessions (id, project_id, name, created_at, updated_at) VALUES (?, ?, 'test', ?, ?)`,
@@ -383,7 +383,7 @@ discovered_tasks:
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
-      ).run(uuidv4(), sessionId, content, Date.now());
+      ).run(newId(), sessionId, content, Date.now());
 
       const engine = createEngine();
       const result = engine.parseCheckpointResult(sessionId);
@@ -478,7 +478,7 @@ discovered_tasks:
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
-      ).run(uuidv4(), sessionId, resultContent, Date.now());
+      ).run(newId(), sessionId, resultContent, Date.now());
 
       // Simulate run_completed
       capturedCallback!({ type: 'run_completed' } as ServerMessage);
@@ -598,7 +598,7 @@ knowledge_updates:
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
-      ).run(uuidv4(), sessionId, content, Date.now());
+      ).run(newId(), sessionId, content, Date.now());
 
       capturedCallback!({ type: 'run_completed' } as ServerMessage);
 
@@ -643,7 +643,7 @@ discovered_tasks:
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
-      ).run(uuidv4(), sessionId, content, Date.now());
+      ).run(newId(), sessionId, content, Date.now());
 
       capturedCallback!({ type: 'run_completed' } as ServerMessage);
 
@@ -683,7 +683,7 @@ discovered_tasks:
 
       db.prepare(
         `INSERT INTO messages (id, session_id, role, content, created_at) VALUES (?, ?, 'assistant', ?, ?)`,
-      ).run(uuidv4(), sessionId, content, Date.now());
+      ).run(newId(), sessionId, content, Date.now());
 
       capturedCallback!({ type: 'run_completed' } as ServerMessage);
 

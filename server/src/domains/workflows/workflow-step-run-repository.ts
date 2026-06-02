@@ -1,7 +1,7 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { WorkflowStepRun, WorkflowStepRunStatus, WorkflowStepType } from '@zclaudia/shared/features/workflows';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 type StepRunCreate = Omit<WorkflowStepRun, 'id' | 'input' | 'output' | 'error' | 'startedAt' | 'completedAt'>;
 type StepRunUpdate = Partial<Omit<WorkflowStepRun, 'id' | 'runId' | 'stepId' | 'stepType'>>;
@@ -30,7 +30,7 @@ export class WorkflowStepRunRepository extends BaseRepository<WorkflowStepRun, S
   }
 
   createQuery(data: StepRunCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     return {
       sql: `INSERT INTO workflow_step_runs (
         id, run_id, step_id, step_type, status, attempt, session_id

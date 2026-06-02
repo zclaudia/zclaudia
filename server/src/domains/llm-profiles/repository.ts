@@ -1,7 +1,7 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared/core/llm-profile';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 export class LlmProfileRepository extends BaseRepository<
   LlmProfileConfig,
@@ -37,7 +37,7 @@ export class LlmProfileRepository extends BaseRepository<
   }
 
   createQuery(data: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
 
     return {

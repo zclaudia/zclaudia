@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type {
   DesignGateDecision,
   ExecutionGateDecision,
@@ -45,7 +45,7 @@ export class ChangeGateReviewRepository {
   request(changeId: string, gateType: GateType, notes?: string): ChangeGateReviewRecord | undefined {
     if (!this.hasTable()) return undefined;
     const now = Date.now();
-    const id = uuidv4();
+    const id = newId();
     this.db.prepare(`
       INSERT INTO change_gate_reviews
       (id, change_id, gate_type, status, notes, created_at)
@@ -68,7 +68,7 @@ export class ChangeGateReviewRepository {
       ORDER BY created_at DESC
       LIMIT 1
     `).get(changeId, gateType) as { id: string } | undefined;
-    const id = pending?.id ?? uuidv4();
+    const id = pending?.id ?? newId();
     const now = Date.now();
     if (pending) {
       this.db.prepare(`

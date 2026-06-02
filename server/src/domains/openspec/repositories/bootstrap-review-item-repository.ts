@@ -1,6 +1,6 @@
 import { BaseRepository } from '../../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 /**
  * Phase G4 Task 1 — bootstrap review item repository.
@@ -75,7 +75,7 @@ export class BootstrapReviewItemRepository extends BaseRepository<
   }
 
   createQuery(data: BootstrapReviewItemCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     return {
       sql: `INSERT INTO bootstrap_review_items (id, scan_id, capability, operation, payload_json, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       params: [id, data.scanId, data.capability, data.operation, data.payloadJson, 'pending', Date.now()],

@@ -1,7 +1,7 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { LocalPR, LocalPRStatus, ExecutionState, PendingAction } from '@zclaudia/shared/features/local-pr';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 type LocalPRCreate = Omit<LocalPR, 'id' | 'createdAt' | 'updatedAt'>;
 type LocalPRUpdate = Partial<Omit<LocalPR, 'id' | 'createdAt'>>;
@@ -41,7 +41,7 @@ export class LocalPRRepository extends BaseRepository<LocalPR, LocalPRCreate, Lo
   }
 
   createQuery(data: LocalPRCreate): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     return {
       sql: `INSERT INTO local_prs (

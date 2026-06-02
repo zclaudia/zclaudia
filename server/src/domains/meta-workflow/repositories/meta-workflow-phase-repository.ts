@@ -11,7 +11,7 @@ import type {
   AcceptanceGate,
   PhaseExecuteConfig,
 } from '@zclaudia/shared/features/meta-workflow';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 
 type Create = Omit<MetaWorkflowPhase, 'id' | 'startedAt' | 'completedAt'>;
 type Update = {
@@ -77,7 +77,7 @@ export class MetaWorkflowPhaseRepository extends BaseRepository<MetaWorkflowPhas
   }
 
   createQuery(data: Create): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     return {
       sql: `INSERT INTO meta_workflow_phases (
         id, run_id, phase_id, phase_type, status, execute_entity,

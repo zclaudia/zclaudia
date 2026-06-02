@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type { ProjectChange, ChangeStatus } from '@zclaudia/shared/features/supervision';
 
 function slugify(title: string): string {
@@ -94,7 +94,7 @@ export class ProjectChangeRepository {
       throw new Error(`Project ${data.projectId} already has an active change`);
     }
 
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     const slugBase = slugify(data.title);
     let slug = slugBase;

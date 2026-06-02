@@ -2,7 +2,7 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import { ALL_TOOL_NAMES } from '@zclaudia/shared/core/tools';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 const VALID_THINKING_LEVELS = new Set<ThinkingLevel>(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 
@@ -56,7 +56,7 @@ export class AgentProfileRepository extends BaseRepository<
   }
 
   createQuery(data: Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: unknown[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     return {
       sql: `

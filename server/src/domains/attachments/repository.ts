@@ -3,7 +3,7 @@ import type {
   AttachmentKind,
   AttachmentOwnerKind,
 } from '@zclaudia/shared/features/attachment';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import { BaseRepository } from '../../infra/repositories/base.js';
 
 export interface AttachmentRow {
@@ -63,7 +63,7 @@ export class AttachmentRepository extends BaseRepository<
   }
 
   createQuery(data: AttachmentCreateInput): { sql: string; params: unknown[] } {
-    const id = data.id ?? uuidv4();
+    const id = data.id ?? newId();
     const createdAt = data.createdAt ?? Date.now();
     return {
       sql: `INSERT INTO attachments (

@@ -1,7 +1,7 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { Project } from '@zclaudia/shared/core/project';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 
 export class ProjectRepository extends BaseRepository<
   Project,
@@ -34,7 +34,7 @@ export class ProjectRepository extends BaseRepository<
   }
 
   createQuery(data: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
 
     return {

@@ -3,7 +3,7 @@
  * Records session-level summaries on run completion.
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 
 export interface ActivityLogEntry {
@@ -24,7 +24,7 @@ export function recordActivity(
     INSERT INTO agent_activity_log (id, project_id, session_id, type, summary, metadata, created_at)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `).run(
-    uuidv4(),
+    newId(),
     entry.projectId,
     entry.sessionId,
     entry.type,

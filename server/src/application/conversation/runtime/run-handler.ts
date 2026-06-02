@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import * as fs from 'fs';
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
@@ -44,7 +44,7 @@ export async function handleRunStart(
   const notificationsService = ctx!.notificationsService;
   const serverPort = ctx!.serverPort;
   const broadcastHeartbeat = ctx!.broadcastHeartbeat;
-  const runId = uuidv4();
+  const runId = newId();
   const trace = createTraceRecorder({
     runId,
     sessionId: message.sessionId,

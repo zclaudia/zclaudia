@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import type Database from 'better-sqlite3';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { normalizeToUnifiedPolicy } from '@zclaudia/shared/interaction/permissions';
 import { toolRegistry } from '../../application/plugins/tool-registry.js';
@@ -92,7 +92,7 @@ export function createAgentRoutes(db: Database.Database): Router {
         LIMIT 1
       `).get(CLAUDIA_HOST_PROJECT_NAME, LEGACY_AGENT_PROJECT_NAME) as { id: string } | undefined;
 
-      const projectId = reusableProject?.id ?? uuidv4();
+      const projectId = reusableProject?.id ?? newId();
       if (reusableProject) {
         db.prepare(`
           UPDATE projects
@@ -115,7 +115,7 @@ export function createAgentRoutes(db: Database.Database): Router {
         LIMIT 1
       `).get(projectId, CLAUDIA_HOST_SESSION_NAME, LEGACY_AGENT_SESSION_NAME) as { id: string } | undefined;
 
-      const sessionId = reusableSession?.id ?? uuidv4();
+      const sessionId = reusableSession?.id ?? newId();
       if (reusableSession) {
         db.prepare(`
           UPDATE sessions

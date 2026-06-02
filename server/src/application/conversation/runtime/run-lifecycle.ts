@@ -1,6 +1,6 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../../utils/uuid.js';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { Request as CorrelatedRequest } from '@zclaudia/shared/wire/correlation';
 import { isRequest } from '@zclaudia/shared/wire/correlation';
@@ -286,7 +286,7 @@ export function parseMessage(data: string): { request: CorrelatedRequest; isOldF
 
   // Old format - wrap in Request envelope
   const request: CorrelatedRequest = {
-    id: uuidv4(),
+    id: newId(),
     type: parsed.type,
     payload: parsed,
     timestamp: Date.now(),

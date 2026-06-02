@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type { Database } from 'better-sqlite3';
 import type { Session } from '@zclaudia/shared/core/session';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -616,7 +616,7 @@ export class SupervisorService {
     detail?: Record<string, unknown>,
     taskId?: string,
   ): void {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     try {
       this.db

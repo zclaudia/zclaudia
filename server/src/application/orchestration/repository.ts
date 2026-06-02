@@ -2,7 +2,7 @@
  * OrchestratorTask repository — CRUD for orchestrator_tasks table.
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import type { OrchestratorTask, TaskStatus, TaskKind, TaskInitiator } from './types.js';
 import type { BranchAction } from '@zclaudia/shared/wire/messages';
@@ -75,7 +75,7 @@ export class TaskRepository {
   constructor(private db: Database.Database) {}
 
   create(task: Omit<OrchestratorTask, 'id' | 'createdAt' | 'updatedAt' | 'retryCount'> & { id?: string }): OrchestratorTask {
-    const id = task.id || uuidv4();
+    const id = task.id || newId();
     const now = Date.now();
     this.db.prepare(`
       INSERT INTO orchestrator_tasks (

@@ -1,4 +1,4 @@
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import {
   EMPTY_NOTIFICATION_UNREAD_COUNTS_BY_TAB,
@@ -55,7 +55,7 @@ export class NotificationRepository {
   constructor(private db: Database.Database) {}
 
   create(item: Omit<NotificationItem, 'id' | 'createdAt'>): NotificationItem {
-    const id = uuidv4();
+    const id = newId();
     const now = Date.now();
     const normalizedItem: Omit<NotificationItem, 'id' | 'createdAt'> = {
       ...item,

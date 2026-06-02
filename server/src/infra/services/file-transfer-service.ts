@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { v4 as uuidv4 } from 'uuid';
+import { newId } from '../../utils/uuid.js';
 import type { FilePushMetadata } from '@zclaudia/shared/core/message';
 import type { FilePushNotificationMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type WebSocket from 'ws';
@@ -220,7 +220,7 @@ export class FileTransferService {
     ).get(sessionId);
 
     if (sessionExists) {
-      messageId = uuidv4();
+      messageId = newId();
       const metadata: { filePush: FilePushMetadata } = {
         filePush: {
           fileId: payload.fileId,
