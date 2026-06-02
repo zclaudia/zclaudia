@@ -7,6 +7,7 @@ import { usePromptRequestStore } from '../../stores/promptRequestStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useServerStore } from '../../stores/serverStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
+import { getSessionCompaction } from '../api/sessions';
 
 export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext): boolean {
   const { serverId, backendId, serverRunsRef, logTag } = ctx;
@@ -224,6 +225,46 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         }
       }
       return true;
+
+    case 'compaction_completed': {
+      // Wire-level event: server has persisted a session_compactions row. Fetch
+      // the full marker payload and append a synthetic system message carrying
+      // it via metadata.compactionMarker (mirrors how the server's messages
+      // list endpoint surfaces persisted markers). The result: the
+      // CompactionMarkerCard appears inline without a full history reload.
+      const sessionId = msg.sessionId;
+      const compactionId = msg.compactionId;
+      if (!sessionId || !compactionId) {
+        console.warn(`[${logTag}] compaction_completed missing sessionId/compactionId, ignoring`);
+        return true;
+      }
+      void getSessionCompaction(sessionId, compactionId)
+        .then((c) => {
+          useChatStore.getState().addMessage(sessionId, {
+            id: c.id,
+            sessionId: c.sessionId,
+            role: 'system',
+            content: '',
+            createdAt: c.createdAt,
+            metadata: {
+              compactionMarker: {
+                compactionId: c.id,
+                summary: c.summary,
+                tokensBefore: c.tokensBefore,
+                source: c.source,
+                customInstructions: c.customInstructions ?? undefined,
+                readFiles: c.details?.readFiles ?? [],
+                modifiedFiles: c.details?.modifiedFiles ?? [],
+                createdAt: c.createdAt,
+              },
+            },
+          });
+        })
+        .catch((err: unknown) => {
+          console.warn(`[${logTag}] compaction_completed: failed to fetch compaction ${compactionId}:`, err);
+        });
+      return true;
+    }
 
     default:
       return false;

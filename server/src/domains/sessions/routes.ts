@@ -4,6 +4,7 @@ import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { Message } from '@zclaudia/shared/core/message';
 import type { Session } from '@zclaudia/shared/core/session';
 import { SessionRepository } from './repository.js';
+import { SessionCompactionRepository } from './compaction-repository.js';
 import { mountSearchRoutes } from './search-routes.js';
 import { mountMessageRoutes } from './message-routes.js';
 import { SessionLifecycleError, SessionLifecycleService } from './lifecycle-service.js';
@@ -307,6 +308,25 @@ export function createSessionRoutes(
       }
       console.error('Error reordering sessions:', error);
       sendApiError(res, 500, 'DB_ERROR', 'Failed to reorder sessions');
+    }
+  });
+
+  // Get a single compaction record (UI uses this to populate marker card details
+  // after receiving a compaction_completed event without re-fetching the whole
+  // messages list).
+  const compactionRepo = new SessionCompactionRepository(db);
+  router.get('/:id/compactions/:compactionId', (req: Request, res: Response) => {
+    try {
+      const { id: sessionId, compactionId } = req.params;
+      const compaction = compactionRepo.list(sessionId).find((c) => c.id === compactionId);
+      if (!compaction) {
+        sendApiError(res, 404, 'NOT_FOUND', 'Compaction not found');
+        return;
+      }
+      res.json({ success: true, data: compaction });
+    } catch (error) {
+      console.error('Error fetching compaction:', error);
+      sendApiError(res, 500, 'DB_ERROR', 'Failed to fetch compaction');
     }
   });
 

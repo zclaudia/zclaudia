@@ -98,7 +98,21 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     db,
     getNextOffset: (sid: string) => getNextOffset(db, sid),
   }));
-  app.use('/api/commands', authMiddleware, createCommandsRoutes());
+  app.use('/api/commands', authMiddleware, createCommandsRoutes({
+    db,
+    // Broadcast helper for command handlers that need to push wire-level
+    // events (e.g. /compact emitting compaction_completed). Mirrors the
+    // pattern in broadcastPluginState / broadcastHeartbeat — all authenticated
+    // clients receive it; the client-side message dispatcher filters by
+    // sessionId before applying.
+    broadcast: (event) => {
+      clients.forEach((client) => {
+        if (client.authenticated) {
+          sendMessage(client.ws, event);
+        }
+      });
+    },
+  }));
   app.use('/api/agent', authMiddleware, createAgentRoutes(db));
   app.use('/api/delegation', authMiddleware, createDelegationRoutes(db));
   app.use('/api/claudia', authMiddleware, createClaudiaRoutes(db));

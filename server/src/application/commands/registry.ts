@@ -22,6 +22,10 @@
  */
 
 import type { SlashCommand, CommandExecuteResponse } from '@zclaudia/shared/features/commands';
+import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
+import type { Database } from 'better-sqlite3';
 
 // ============================================
 // Types
@@ -36,6 +40,22 @@ export interface CommandContext {
   provider?: string;
   model?: string;
   tokenUsage?: { used: number; total: number };
+
+  // ── Server-resolved fields ────────────────────────────────────────
+  // These are NEVER set by the client. The HTTP /execute route resolves them
+  // from `sessionId` (when present) and injects them before calling `execute`.
+  // Builtin handlers that need server-side state (e.g. /compact runs LLM calls
+  // through the runtime) read them from this same context object.
+  db?: Database;
+  agentProfile?: AgentProfileConfig;
+  llmProfile?: LlmProfileConfig;
+  /**
+   * Broadcast a wire-level event back to clients (e.g. compaction_completed).
+   * Provided when the route layer can identify a target — currently broadcasts
+   * to all authenticated clients of the originating server.
+   */
+  sendEvent?: (event: ServerMessage) => void;
+  abortSignal?: AbortSignal;
 }
 
 export type CommandHandler = (

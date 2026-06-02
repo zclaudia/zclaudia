@@ -6,9 +6,10 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import type { CommandExecuteResponse, CommandExecuteRequest } from '@zclaudia/shared/features/commands';
+import type { CommandExecuteResponse } from '@zclaudia/shared/features/commands';
 import { LOCAL_COMMANDS } from '@zclaudia/shared/features/commands';
-import { commandRegistry } from './registry.js';
+import { commandRegistry, type CommandContext, type CommandHandler } from './registry.js';
+import { forceCompact } from '../conversation/compaction/compaction-service.js';
 
 // ============================================
 // Helper Functions
@@ -39,8 +40,6 @@ function formatUptime(seconds: number): string {
 // ============================================
 // Command Handlers
 // ============================================
-
-type CommandContext = CommandExecuteRequest['context'];
 
 const clearHandler = (_args: string[], _context?: CommandContext): CommandExecuteResponse => ({
   type: 'builtin',
@@ -193,6 +192,73 @@ const reloadHandler = (_args: string[], _context?: CommandContext): CommandExecu
   };
 };
 
+/**
+ * /compact — manually compacts the current session's history.
+ *
+ * Required server-resolved context: `sessionId`, `db`, `agentProfile`, `llmProfile`.
+ * The HTTP /execute route injects these from `context.sessionId` before
+ * calling `commandRegistry.execute`. If anything is missing, we return
+ * `data.ok=false` instead of throwing — the route still 200s and lets the
+ * UI surface a structured error message.
+ *
+ * Optional args are joined as `customInstructions` for `generateSummary`.
+ *
+ * On success we emit `compaction_completed` so listening clients can refresh
+ * their timeline without a full reload. The HTTP response also carries
+ * the outcome so the issuing client can show immediate feedback even if
+ * its WS connection happened to be a separate transport.
+ */
+const compactHandler: CommandHandler = async (args, context) => {
+  const buildResponse = (data: Record<string, unknown>): CommandExecuteResponse => ({
+    type: 'builtin',
+    command: '/compact',
+    action: 'compact',
+    data,
+  });
+
+  if (!context?.sessionId || !context.db || !context.agentProfile || !context.llmProfile) {
+    return buildResponse({
+      ok: false,
+      message: 'Cannot compact: missing session context. Open a session and try again.',
+    });
+  }
+
+  const instructions = args.join(' ').trim() || undefined;
+  const outcome = await forceCompact({
+    db: context.db,
+    sessionId: context.sessionId,
+    agentProfile: context.agentProfile,
+    llmProfile: context.llmProfile,
+    customInstructions: instructions,
+    source: 'manual',
+    signal: context.abortSignal,
+  });
+
+  if (outcome.compacted) {
+    console.log(`[Compaction] manual session=${context.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
+    if (context.sendEvent) {
+      context.sendEvent({
+        type: 'compaction_completed',
+        sessionId: context.sessionId,
+        compactionId: outcome.compactionId!,
+        tokensBefore: outcome.tokensBefore!,
+      });
+    }
+    return buildResponse({
+      ok: true,
+      compactionId: outcome.compactionId,
+      tokensBefore: outcome.tokensBefore,
+      message: `Compacted ${outcome.tokensBefore} tokens.`,
+    });
+  }
+
+  return buildResponse({
+    ok: false,
+    message: `Compaction not run: ${outcome.reason ?? 'unknown'}`,
+    reason: outcome.reason,
+  });
+};
+
 // ============================================
 // Register Built-in Commands
 // ============================================
@@ -208,6 +274,7 @@ export function registerBuiltinCommands(): void {
     { command: '/config', description: 'Open settings', handler: configHandler },
     { command: '/new-session', description: 'Create a new session', handler: newSessionHandler },
     { command: '/reload', description: 'Reload custom commands', handler: reloadHandler },
+    { command: '/compact', description: 'Compact this session\'s history into a summary. Optional instructions guide the summary.', handler: compactHandler },
   ];
 
   for (const cmd of commands) {

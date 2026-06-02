@@ -1,6 +1,34 @@
 import type { Session, Message } from '@zclaudia/shared';
 import { fetchApiForBackend } from './base';
 import { apiCall, apiCallForBackend, apiCallVoid, apiCallVoidForBackend } from './unwrap';
+
+/**
+ * Server-side shape of a single compaction record. Mirrors
+ * `SessionCompactionRepository.SessionCompaction` — we keep it inline rather
+ * than crossing the server/desktop boundary with that type so the desktop
+ * package doesn't import server internals.
+ */
+export interface SessionCompactionResponse {
+  id: string;
+  sessionId: string;
+  summary: string;
+  firstKeptMessageId: string;
+  tokensBefore: number;
+  details: { readFiles: string[]; modifiedFiles: string[] } | null;
+  source: 'auto' | 'manual';
+  customInstructions: string | null;
+  createdAt: number;
+}
+
+export async function getSessionCompaction(
+  sessionId: string,
+  compactionId: string,
+): Promise<SessionCompactionResponse> {
+  return apiCallForBackend<SessionCompactionResponse>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/compactions/${compactionId}`,
+  );
+}
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { resolveSessionOwnerBackendId } from '../../utils/sessionOwnership';
 

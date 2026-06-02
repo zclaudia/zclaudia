@@ -2,14 +2,29 @@ import { Router, Request, Response } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { CommandExecuteRequest, CommandExecuteResponse, SlashCommand } from '@zclaudia/shared/features/commands';
 import { LOCAL_COMMANDS } from '@zclaudia/shared/features/commands';
-import { commandRegistry } from '../../application/commands/registry.js';
+import { commandRegistry, type CommandContext } from '../../application/commands/registry.js';
 import { ensureBuiltinCommandsRegistered } from '../../application/commands/init.js';
+import { resolveAgentForSession } from '../../domains/agent-profiles/agent-resolver.js';
+import { SessionRepository } from '../../domains/sessions/repository.js';
 
 // Ensure built-in commands are registered
 ensureBuiltinCommandsRegistered();
+
+export interface CommandsRoutesDeps {
+  db: Database.Database;
+  /**
+   * Broadcast a wire-level event to all interested clients. Currently the
+   * implementation in bootstrap broadcasts to all authenticated clients
+   * (mirrors how plugin / heartbeat events are pushed). Pass-through is
+   * intentional so the route does not need to know the transport.
+   */
+  broadcast: (event: ServerMessage) => void;
+}
 
 // Scan directory for custom command files (.md)
 async function scanCommandsDirectory(dir: string, namespace: 'project' | 'user'): Promise<SlashCommand[]> {
@@ -59,8 +74,9 @@ async function scanCommandsDirectory(dir: string, namespace: 'project' | 'user')
   return commands;
 }
 
-export function createCommandsRoutes(): Router {
+export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
   const router = Router();
+  const sessionRepo = deps?.db ? new SessionRepository(deps.db) : null;
 
   // POST /api/commands/list - List all available commands
   router.post('/list', async (req: Request, res: Response) => {
@@ -115,7 +131,32 @@ export function createCommandsRoutes(): Router {
 
       // Handle built-in commands via CommandRegistry
       if (commandRegistry.has(commandName)) {
-        const result = await commandRegistry.execute(commandName, args, context);
+        // Server-resolved context fields (NEVER come from the client body).
+        // Resolved from sessionId when present. Handlers that don't need them
+        // (e.g. /clear, /help) simply ignore the extra fields.
+        const enriched: CommandContext = { ...(context as CommandContext) };
+        if (deps?.db) enriched.db = deps.db;
+        if (deps?.broadcast) enriched.sendEvent = deps.broadcast;
+
+        if (context?.sessionId && sessionRepo && deps?.db) {
+          const session = sessionRepo.findById(context.sessionId);
+          if (session) {
+            try {
+              const { agent, llm } = resolveAgentForSession(deps.db, {
+                explicitAgentId: session.agentProfileId,
+                projectId: session.projectId,
+              });
+              enriched.agentProfile = agent;
+              if (llm) enriched.llmProfile = llm;
+            } catch (err) {
+              // Stale agent / no agent configured — leave enriched fields unset
+              // so the handler can fail soft with a structured message.
+              console.warn(`[commands.execute] agent resolution failed for session ${context.sessionId}:`, err instanceof Error ? err.message : err);
+            }
+          }
+        }
+
+        const result = await commandRegistry.execute(commandName, args, enriched);
         res.json({ success: true, data: result } as ApiResponse<CommandExecuteResponse>);
         return;
       }

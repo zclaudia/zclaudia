@@ -158,6 +158,10 @@ vi.mock('../sessionSync', () => ({
 vi.mock('../api/projects', () => ({
   getProjectsForBackend: (...args: any[]) => mockGetProjectsForBackend(...args),
 }));
+const mockGetSessionCompaction = vi.fn();
+vi.mock('../api/sessions', () => ({
+  getSessionCompaction: (...args: any[]) => mockGetSessionCompaction(...args),
+}));
 
 import { cleanupServerSyncState, handleServerMessage } from '../messageHandler';
 import { downloadPushedFile } from '../fileDownload';
@@ -601,6 +605,63 @@ describe('handleServerMessage', () => {
     it('warns on untracked run', () => {
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
       handleServerMessage({ type: 'system_info', runId: 'r1', systemInfo: {} }, makeCtx());
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
+    });
+  });
+
+  describe('compaction_completed', () => {
+    it('fetches the compaction record and appends a synthetic marker message', async () => {
+      mockGetSessionCompaction.mockResolvedValue({
+        id: 'c1',
+        sessionId: 's1',
+        summary: 'rolled up summary',
+        firstKeptMessageId: 'm5',
+        tokensBefore: 4242,
+        details: { readFiles: ['/a.ts'], modifiedFiles: ['/b.ts'] },
+        source: 'manual',
+        customInstructions: 'focus on auth',
+        createdAt: 9999,
+      });
+
+      handleServerMessage({
+        type: 'compaction_completed',
+        sessionId: 's1',
+        compactionId: 'c1',
+        tokensBefore: 4242,
+      }, makeCtx());
+
+      // The handler kicks off the fetch synchronously and appends on resolve.
+      // Flush microtasks so we observe the appendMessage call.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(mockGetSessionCompaction).toHaveBeenCalledWith('s1', 'c1');
+      expect(mockChatStore.addMessage).toHaveBeenCalledWith('s1', expect.objectContaining({
+        id: 'c1',
+        sessionId: 's1',
+        role: 'system',
+        content: '',
+        createdAt: 9999,
+        metadata: expect.objectContaining({
+          compactionMarker: expect.objectContaining({
+            compactionId: 'c1',
+            summary: 'rolled up summary',
+            tokensBefore: 4242,
+            source: 'manual',
+            customInstructions: 'focus on auth',
+            readFiles: ['/a.ts'],
+            modifiedFiles: ['/b.ts'],
+            createdAt: 9999,
+          }),
+        }),
+      }));
+    });
+
+    it('ignores the event when sessionId or compactionId is missing', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      handleServerMessage({ type: 'compaction_completed', sessionId: '', compactionId: 'c1' } as any, makeCtx());
+      expect(mockGetSessionCompaction).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalled();
       warn.mockRestore();
     });

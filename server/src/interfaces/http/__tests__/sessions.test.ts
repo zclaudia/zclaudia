@@ -82,6 +82,21 @@ function createTestDb(): Database.Database {
       created_at INTEGER NOT NULL
     );
 
+    -- session_compactions is consulted by GET /:id/messages to interleave
+    -- compaction markers. Create an empty table so the query is a no-op.
+    CREATE TABLE IF NOT EXISTS session_compactions (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      first_kept_message_id TEXT NOT NULL,
+      tokens_before INTEGER NOT NULL,
+      details TEXT,
+      source TEXT NOT NULL,
+      custom_instructions TEXT,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+    );
+
   `);
   createAgentProfilesTable(db);
 
@@ -116,6 +131,7 @@ describe('sessions routes', () => {
     // Drop FTS trigger to avoid conflicts during cleanup, then recreate
     db.exec('DROP TRIGGER IF EXISTS messages_fts_insert');
     db.exec('DROP TABLE IF EXISTS messages_fts');
+    db.exec('DELETE FROM session_compactions');
     db.exec('DELETE FROM messages');
     db.exec('DELETE FROM sessions');
     db.exec('DELETE FROM projects');

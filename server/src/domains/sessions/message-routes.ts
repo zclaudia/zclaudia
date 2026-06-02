@@ -2,16 +2,45 @@ import { Router, Request, Response } from 'express';
 import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
-import type { Message, MessageMetadata, MessageRole } from '@zclaudia/shared/core/message';
+import type { Message, MessageMetadata, MessageRole, CompactionMarker } from '@zclaudia/shared/core/message';
 import { extractAndIndexMetadata } from '../../infra/storage/metadata-extractor.js';
 import { findForegroundActiveRunIdForSession } from '../../utils/run-state.js';
 import { parsePersistedMessageMetadata } from '../../utils/persisted-message.js';
 import { SessionMessageRepository } from './message-repository.js';
+import { SessionCompactionRepository, type SessionCompaction } from './compaction-repository.js';
 /** Minimal shape — avoids depending on application/conversation types */
 type ActiveRunsMap = Map<string, { sessionId?: string; completed?: boolean; sessionType?: string }>;
 
+/**
+ * Wrap a stored compaction row as a synthetic system-role Message whose
+ * `metadata.compactionMarker` carries the UI payload. We use the marker's
+ * own `compactionId` as the message id so the desktop dedup/merge logic
+ * (which keys on `id`) treats repeat fetches idempotently.
+ */
+function compactionToTimelineEntry(compaction: SessionCompaction): Message {
+  const marker: CompactionMarker = {
+    compactionId: compaction.id,
+    summary: compaction.summary,
+    tokensBefore: compaction.tokensBefore,
+    source: compaction.source,
+    customInstructions: compaction.customInstructions ?? undefined,
+    readFiles: compaction.details?.readFiles ?? [],
+    modifiedFiles: compaction.details?.modifiedFiles ?? [],
+    createdAt: compaction.createdAt,
+  };
+  return {
+    id: compaction.id,
+    sessionId: compaction.sessionId,
+    role: 'system',
+    content: '',
+    metadata: { compactionMarker: marker },
+    createdAt: compaction.createdAt,
+  };
+}
+
 export function mountMessageRoutes(router: Router, db: Database.Database, activeRuns: ActiveRunsMap): void {
   const repo = new SessionMessageRepository(db);
+  const compactionRepo = new SessionCompactionRepository(db);
 
   router.get('/:id/messages', (req: Request, res: Response) => {
     try {
@@ -58,10 +87,34 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
         trimmed.reverse();
       }
 
-      const result = trimmed.map((message) => ({
+      const parsedMessages = trimmed.map((message) => ({
         ...message,
         metadata: parsePersistedMessageMetadata<MessageMetadata>(message.metadata),
       }));
+
+      // Interleave compaction markers chronologically. We only inject markers
+      // whose createdAt falls within the time window of the returned page so we
+      // don't surface them in an empty / out-of-band slot. For the common "no
+      // filter" full-history view this becomes the entire compaction list.
+      const oldestInPage = parsedMessages.length > 0 ? parsedMessages[0].createdAt : undefined;
+      const newestInPage = parsedMessages.length > 0 ? parsedMessages[parsedMessages.length - 1].createdAt : undefined;
+      const allCompactions = compactionRepo.list(req.params.id);
+      const markerEntries = allCompactions
+        .filter((c) => {
+          if (oldestInPage == null || newestInPage == null) return parsedMessages.length === 0;
+          return c.createdAt >= oldestInPage && c.createdAt <= newestInPage;
+        })
+        .map(compactionToTimelineEntry);
+
+      // Stable interleave by createdAt; messages with offset come from the
+      // messages table and keep relative ordering; markers slot between them.
+      // The cast is necessary because StoredSessionMessage uses `offset:
+      // number | null` while Message uses `offset?: number`; the marker shape
+      // omits offset entirely. Both shapes round-trip safely through the API.
+      const result = markerEntries.length === 0
+        ? parsedMessages
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        : ([...parsedMessages, ...(markerEntries as any)] as typeof parsedMessages).sort((a, b) => a.createdAt - b.createdAt);
 
       const total = repo.countBySession(req.params.id);
       const hasMore = wasTrimmed

@@ -61,6 +61,31 @@ export interface MessageMetadata {
   thinkingBlocks?: ThinkingBlock[];
   /** True when this user message was injected mid-run via steering (vs. normal user send). */
   steered?: boolean;
+  /**
+   * Set on synthetic system messages that represent a compaction event in the timeline.
+   * The renderer detects this and replaces the default system-message bubble with a
+   * dedicated CompactionMarkerCard. These messages are NOT persisted in the messages
+   * table — the sessions messages-list endpoint synthesizes them from the
+   * session_compactions table and interleaves by createdAt.
+   */
+  compactionMarker?: CompactionMarker;
+}
+
+/**
+ * Timeline-entry view of a session_compactions row. The wire-level event
+ * `compaction_completed` carries only ids; the marker (which the UI cards)
+ * is fetched separately from `GET /api/sessions/:sid/compactions/:cid`
+ * and injected into the messages list by the server.
+ */
+export interface CompactionMarker {
+  compactionId: string;
+  summary: string;
+  tokensBefore: number;
+  source: 'auto' | 'manual';
+  customInstructions?: string;
+  readFiles: string[];
+  modifiedFiles: string[];
+  createdAt: number;
 }
 
 export interface FilePushMetadata {

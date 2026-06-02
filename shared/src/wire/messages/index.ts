@@ -152,6 +152,7 @@ import type {
   BackgroundTaskUpdateMessage, BackgroundPermissionPendingMessage,
   TaskNotificationMessage, TaskProgressMessage, TaskStatusNotificationMessage,
   ProcessCleanupResultMessage,
+  CompactionCompletedEvent,
 } from './run.js';
 import type {
   ProjectsListMessage, SessionsListMessage, ServersListMessage,
@@ -220,6 +221,7 @@ export type ServerMessage =
   | ModeChangeMessage
   | RunCompletedMessage
   | RunFailedMessage
+  | CompactionCompletedEvent
   | MessageAppendedMessage
   | PermissionRequestMessage
   | AgentPermissionInterceptedMessage

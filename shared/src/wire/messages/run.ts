@@ -143,6 +143,21 @@ export interface RunCompletedMessage {
   seq?: number;
 }
 
+/**
+ * Emitted after the session_compactions row is persisted. Carries ids only —
+ * clients fetch full marker details via `GET /api/sessions/:sid/compactions/:cid`.
+ * `runId` is set when compaction is triggered automatically inside a run (the
+ * common auto-compaction path); it is omitted for manual `/compact` runs which
+ * fire outside a run context.
+ */
+export interface CompactionCompletedEvent {
+  type: 'compaction_completed';
+  runId?: string;
+  sessionId: string;
+  compactionId: string;
+  tokensBefore: number;
+}
+
 export interface RunFailedMessage {
   type: 'run_failed';
   runId: string;

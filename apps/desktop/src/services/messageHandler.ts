@@ -145,6 +145,7 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
       'mode_change',
       'system_info',
       'message_appended',
+      'compaction_completed',
     ],
     handle: handleRunMessage,
   },

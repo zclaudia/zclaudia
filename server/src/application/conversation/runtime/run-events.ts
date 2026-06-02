@@ -533,19 +533,13 @@ export function handleProviderEvent({
         }).then((outcome) => {
           if (outcome.compacted) {
             console.log(`[Compaction] auto session=${activeRun.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
-            // The wire-level `compaction_completed` event type is added by T6;
-            // for now we emit it via the same sendRunEvent path with an `any`
-            // cast so the runtime can publish it before the shared protocol
-            // catches up.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             sendRunEvent({
               type: 'compaction_completed',
               runId,
               sessionId: activeRun.sessionId,
               compactionId: outcome.compactionId!,
               tokensBefore: outcome.tokensBefore!,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            } as any);
+            });
           }
         }).catch((err: unknown) => {
           console.warn('[Compaction] auto-trigger failed:', err instanceof Error ? err.message : err);
