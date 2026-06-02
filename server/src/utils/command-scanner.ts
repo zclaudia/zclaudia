@@ -101,6 +101,8 @@ async function scanDirectory(
     if (!entry.name.endsWith('.md')) continue;
 
     const filePath = path.join(dir, entry.name);
+    // lstat semantics (via pi ExecutionEnv): symlinks to .md files have kind 'symlink'
+    // and are skipped here. This differs from the original fs.statSync (follow-symlinks).
     const info = await env.fileInfo(filePath);
     if (!info.ok || info.value.kind !== 'file') continue;
 
@@ -187,6 +189,7 @@ async function scanPluginCommands(env: ExecutionEnv): Promise<SlashCommand[]> {
         if (!entry.name.endsWith('.md') || excludedFiles.includes(lowerFile)) continue;
 
         const filePath = path.join(dir, entry.name);
+        // lstat semantics — symlinks to .md files have kind 'symlink' and are skipped.
         const info = await env.fileInfo(filePath);
         if (!info.ok || info.value.kind !== 'file') continue;
 
