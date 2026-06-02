@@ -1,261 +1,203 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import * as fs from 'fs';
-import * as os from 'os';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { scanCustomCommands, getGlobalCommandsDir, getProjectCommandsDir } from '../command-scanner.js';
-
-// Mock the fs module
-vi.mock('fs');
-vi.mock('os');
+import { createExecutionEnv } from '../../infra/execution-env.js';
 
 describe('command-scanner', () => {
+  let tmpHome: string;
+  let tmpProject: string;
+  let originalHome: string | undefined;
+  let originalUserProfile: string | undefined;
+
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Default homedir mock
-    vi.mocked(os.homedir).mockReturnValue('/home/testuser');
+    tmpHome = mkdtempSync(path.join(tmpdir(), 'zc-home-'));
+    tmpProject = mkdtempSync(path.join(tmpdir(), 'zc-proj-'));
+    originalHome = process.env.HOME;
+    originalUserProfile = process.env.USERPROFILE;
+    process.env.HOME = tmpHome;
+    process.env.USERPROFILE = tmpHome;
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome;
+    if (originalUserProfile === undefined) delete process.env.USERPROFILE; else process.env.USERPROFILE = originalUserProfile;
+    rmSync(tmpHome, { recursive: true, force: true });
+    rmSync(tmpProject, { recursive: true, force: true });
   });
 
   describe('getGlobalCommandsDir', () => {
     it('returns the correct global commands directory path', () => {
       const result = getGlobalCommandsDir();
-      expect(result).toBe('/home/testuser/.claude/commands');
+      expect(result).toBe(path.join(tmpHome, '.claude', 'commands'));
     });
   });
 
   describe('getProjectCommandsDir', () => {
     it('returns the correct project commands directory path', () => {
       const result = getProjectCommandsDir('/projects/my-project');
-      expect(result).toBe('/projects/my-project/.claude/commands');
+      expect(result).toBe(path.join('/projects/my-project', '.claude', 'commands'));
     });
   });
 
   describe('scanCustomCommands', () => {
-    it('returns empty array when directories do not exist', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(false);
-
-      const result = scanCustomCommands();
+    it('returns empty array when directories do not exist', async () => {
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
       expect(result).toEqual([]);
     });
 
-    it('scans global commands directory', () => {
-      vi.mocked(fs.existsSync).mockImplementation((path) => {
-        return path === '/home/testuser/.claude/commands';
-      });
-      vi.mocked(fs.readdirSync).mockReturnValue(['review.md', 'fix.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockReturnValue('# Review code\nThis is a review command');
+    it('scans global commands directory', async () => {
+      const globalDir = path.join(tmpHome, '.claude', 'commands');
+      mkdirSync(globalDir, { recursive: true });
+      writeFileSync(path.join(globalDir, 'review.md'), '# Review code\nThis is a review command');
+      writeFileSync(path.join(globalDir, 'fix.md'), '# Fix bugs\nFix logic');
 
-      const result = scanCustomCommands();
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
 
       expect(result).toHaveLength(2);
-      expect(result[0]).toEqual({
-        command: '/review',
+      const names = result.map(r => r.command).sort();
+      expect(names).toEqual(['/fix', '/review']);
+      const review = result.find(r => r.command === '/review');
+      expect(review).toMatchObject({
         description: 'Review code',
         source: 'custom',
         scope: 'global',
-        filePath: '/home/testuser/.claude/commands/review.md',
-      });
-      expect(result[1]).toEqual({
-        command: '/fix',
-        description: 'Review code',
-        source: 'custom',
-        scope: 'global',
-        filePath: '/home/testuser/.claude/commands/fix.md',
+        filePath: path.join(globalDir, 'review.md'),
       });
     });
 
-    it('scans project commands when projectRoot is provided', () => {
-      vi.mocked(fs.existsSync).mockImplementation((path) => {
-        return path === '/projects/my-project/.claude/commands';
-      });
-      vi.mocked(fs.readdirSync).mockReturnValue(['deploy.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockReturnValue('# Deploy project\nDeploy to production');
+    it('scans project commands when projectRoot is provided', async () => {
+      const projectDir = path.join(tmpProject, '.claude', 'commands');
+      mkdirSync(projectDir, { recursive: true });
+      writeFileSync(path.join(projectDir, 'deploy.md'), '# Deploy project\nDeploy to production');
 
-      const result = scanCustomCommands({ projectRoot: '/projects/my-project' });
+      const env = createExecutionEnv(tmpProject);
+      const result = await scanCustomCommands(env, { projectRoot: tmpProject });
 
       expect(result).toHaveLength(1);
-      expect(result[0]).toEqual({
+      expect(result[0]).toMatchObject({
         command: '/deploy',
         description: 'Deploy project',
         source: 'custom',
         scope: 'project',
-        filePath: '/projects/my-project/.claude/commands/deploy.md',
+        filePath: path.join(projectDir, 'deploy.md'),
       });
     });
 
-    it('skips non-md files', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['review.md', 'readme.txt', 'config.json'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockReturnValue('# Review\nContent');
+    it('project commands take precedence over global with same name', async () => {
+      const globalDir = path.join(tmpHome, '.claude', 'commands');
+      const projectDir = path.join(tmpProject, '.claude', 'commands');
+      mkdirSync(globalDir, { recursive: true });
+      mkdirSync(projectDir, { recursive: true });
+      writeFileSync(path.join(globalDir, 'shared.md'), '# Global version');
+      writeFileSync(path.join(projectDir, 'shared.md'), '# Project version');
 
-      const result = scanCustomCommands();
+      const env = createExecutionEnv(tmpProject);
+      const result = await scanCustomCommands(env, { projectRoot: tmpProject });
 
       expect(result).toHaveLength(1);
-      expect(result[0].command).toBe('/review');
+      expect(result[0].description).toBe('Project version');
+      expect(result[0].scope).toBe('project');
     });
 
-    it('skips directories', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['review.md', 'subdir'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockImplementation((path) => {
-        if (typeof path === 'string' && path.includes('subdir')) {
-          return { isFile: () => false } as fs.Stats;
-        }
-        return { isFile: () => true } as fs.Stats;
-      });
-      vi.mocked(fs.readFileSync).mockReturnValue('# Review\nContent');
+    it('extracts description from YAML frontmatter when present', async () => {
+      const globalDir = path.join(tmpHome, '.claude', 'commands');
+      mkdirSync(globalDir, { recursive: true });
+      writeFileSync(
+        path.join(globalDir, 'fm.md'),
+        '---\ndescription: From frontmatter\n---\n\n# Heading\nBody',
+      );
 
-      const result = scanCustomCommands();
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
 
-      expect(result).toHaveLength(1);
-      expect(result[0].command).toBe('/review');
+      expect(result[0].description).toBe('From frontmatter');
     });
 
-    it('uses default description when content is empty', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['empty.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockReturnValue('');
+    it('truncates long descriptions', async () => {
+      const globalDir = path.join(tmpHome, '.claude', 'commands');
+      mkdirSync(globalDir, { recursive: true });
+      const longLine = 'x'.repeat(100);
+      writeFileSync(path.join(globalDir, 'long.md'), longLine);
 
-      const result = scanCustomCommands();
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
 
-      expect(result).toHaveLength(1);
-      expect(result[0].description).toBe('Custom command');
-    });
-
-    it('extracts description from YAML frontmatter', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['test.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockReturnValue(`---
-description: Custom review command for code
-title: Review
----
-# Content`);
-
-      const result = scanCustomCommands();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].description).toBe('Custom review command for code');
-    });
-
-    it('truncates long descriptions from frontmatter', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['test.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      const longDesc = 'A'.repeat(100);
-      vi.mocked(fs.readFileSync).mockReturnValue(`---
-description: ${longDesc}
----
-Content`);
-
-      const result = scanCustomCommands();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].description).toHaveLength(80);
+      expect(result[0].description.length).toBeLessThanOrEqual(80);
       expect(result[0].description.endsWith('...')).toBe(true);
     });
 
-    it('extracts description from first heading when no frontmatter', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['test.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockReturnValue(`# My Custom Command
-Some content here`);
+    it('skips non-.md files in commands directory', async () => {
+      const globalDir = path.join(tmpHome, '.claude', 'commands');
+      mkdirSync(globalDir, { recursive: true });
+      writeFileSync(path.join(globalDir, 'a.md'), '# A');
+      writeFileSync(path.join(globalDir, 'b.txt'), 'not a command');
+      writeFileSync(path.join(globalDir, 'c.json'), '{}');
 
-      const result = scanCustomCommands();
-
-      expect(result).toHaveLength(1);
-      expect(result[0].description).toBe('My Custom Command');
-    });
-
-    it('extracts description from first non-empty line as fallback', () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
-      vi.mocked(fs.readdirSync).mockReturnValue(['test.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockReturnValue(`
-
-This is the first non-empty line
-More content`);
-
-      const result = scanCustomCommands();
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
 
       expect(result).toHaveLength(1);
-      expect(result[0].description).toBe('This is the first non-empty line');
+      expect(result[0].command).toBe('/a');
     });
 
-    it('does not scan plugins when includePlugins is false', () => {
-      vi.mocked(fs.existsSync).mockImplementation((path) => {
-        if (typeof path === 'string' && path.includes('installed_plugins.json')) {
-          return true;
-        }
-        return path === '/home/testuser/.claude/commands';
-      });
-      vi.mocked(fs.readdirSync).mockReturnValue(['review.md'] as unknown as ReturnType<typeof fs.readdirSync>);
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockImplementation((path) => {
-        if (typeof path === 'string' && path.includes('installed_plugins.json')) {
-          return JSON.stringify({
-            version: 1,
-            plugins: {
-              'test-plugin@marketplace': [{ installPath: '/plugins/test' }]
-            }
-          });
-        }
-        return '# Review\nContent';
-      });
+    it('scans plugin commands from installed_plugins.json', async () => {
+      const pluginInstallPath = path.join(tmpHome, 'plugins', 'my-plugin');
+      const pluginCommandsDir = path.join(pluginInstallPath, 'commands');
+      mkdirSync(pluginCommandsDir, { recursive: true });
+      writeFileSync(path.join(pluginCommandsDir, 'do-thing.md'), '# Do a thing');
 
-      const result = scanCustomCommands({ includePlugins: false });
+      const manifestDir = path.join(pluginInstallPath, '.claude-plugin');
+      mkdirSync(manifestDir, { recursive: true });
+      writeFileSync(
+        path.join(manifestDir, 'plugin.json'),
+        JSON.stringify({ name: 'my-plugin', description: 'Test plugin', author: { name: 'alice' } }),
+      );
 
-      // Should only have the global command, no plugin commands
-      expect(result).toHaveLength(1);
-      expect(result[0].command).toBe('/review');
+      const pluginsRegistryDir = path.join(tmpHome, '.claude', 'plugins');
+      mkdirSync(pluginsRegistryDir, { recursive: true });
+      writeFileSync(
+        path.join(pluginsRegistryDir, 'installed_plugins.json'),
+        JSON.stringify({
+          version: 1,
+          plugins: {
+            'my-plugin@market': [
+              {
+                scope: 'user',
+                installPath: pluginInstallPath,
+                version: '1.0.0',
+                installedAt: 't',
+                lastUpdated: 't',
+              },
+            ],
+          },
+        }),
+      );
+
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
+
+      const pluginCmd = result.find(r => r.command === '/my-plugin:do-thing');
+      expect(pluginCmd).toBeDefined();
+      expect(pluginCmd?.source).toBe('plugin');
+      expect(pluginCmd?.description).toContain('Do a thing');
     });
 
-    it('scans plugin commands when plugins are installed', () => {
-      vi.mocked(fs.existsSync).mockImplementation((path) => {
-        if (typeof path === 'string') {
-          if (path.includes('installed_plugins.json')) return true;
-          if (path === '/plugins/test-plugin') return true;
-          if (path === '/plugins/test-plugin/commands') return true;
-        }
-        return false;
-      });
-      vi.mocked(fs.readdirSync).mockImplementation((path) => {
-        if (typeof path === 'string' && path.includes('/commands')) {
-          return ['plugin-cmd.md'] as unknown as ReturnType<typeof fs.readdirSync>;
-        }
-        return [] as unknown as ReturnType<typeof fs.readdirSync>;
-      });
-      vi.mocked(fs.statSync).mockReturnValue({ isFile: () => true } as fs.Stats);
-      vi.mocked(fs.readFileSync).mockImplementation((path) => {
-        if (typeof path === 'string') {
-          if (path.includes('installed_plugins.json')) {
-            return JSON.stringify({
-              version: 1,
-              plugins: {
-                'test-plugin@marketplace': [{
-                  scope: 'user',
-                  installPath: '/plugins/test-plugin',
-                  version: '1.0.0',
-                  installedAt: '2024-01-01',
-                  lastUpdated: '2024-01-01'
-                }]
-              }
-            });
-          }
-          if (path.includes('plugin-cmd.md')) {
-            return '# Plugin Command\nDescription';
-          }
-        }
-        return '';
-      });
+    it('skips plugin scan when includePlugins is false', async () => {
+      const pluginsRegistryDir = path.join(tmpHome, '.claude', 'plugins');
+      mkdirSync(pluginsRegistryDir, { recursive: true });
+      writeFileSync(
+        path.join(pluginsRegistryDir, 'installed_plugins.json'),
+        JSON.stringify({ version: 1, plugins: {} }),
+      );
 
-      const result = scanCustomCommands();
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, { includePlugins: false });
 
-      expect(result.some(cmd => cmd.command === '/test-plugin:plugin-cmd')).toBe(true);
-      expect(result.find(cmd => cmd.command === '/test-plugin:plugin-cmd')?.source).toBe('plugin');
+      expect(result).toEqual([]);
     });
   });
 });

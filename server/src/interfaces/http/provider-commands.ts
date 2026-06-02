@@ -4,6 +4,7 @@ import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import { LOCAL_COMMANDS, CLI_COMMANDS } from '@zclaudia/shared/features/commands';
 import { scanCustomCommands } from '../../utils/command-scanner.js';
+import { createExecutionEnv } from '../../infra/execution-env.js';
 import { commandRegistry } from '../../application/commands/registry.js';
 
 function deduplicateCommands(commands: SlashCommand[]): SlashCommand[] {
@@ -15,8 +16,9 @@ function deduplicateCommands(commands: SlashCommand[]): SlashCommand[] {
   });
 }
 
-function getZClaudiaCommands(projectRoot?: string): SlashCommand[] {
-  const customCommands = scanCustomCommands({ projectRoot });
+async function getZClaudiaCommands(projectRoot?: string): Promise<SlashCommand[]> {
+  const env = createExecutionEnv(projectRoot ?? process.cwd());
+  const customCommands = await scanCustomCommands(env, { projectRoot });
   const pluginCommands = commandRegistry.getCommandsBySource('plugin');
   return deduplicateCommands([
     ...LOCAL_COMMANDS,
@@ -27,7 +29,7 @@ function getZClaudiaCommands(projectRoot?: string): SlashCommand[] {
 }
 
 export function mountCommandRoutes(router: Router, db: Database.Database): void {
-  router.get('/:id/commands', (req: Request, res: Response) => {
+  router.get('/:id/commands', async (req: Request, res: Response) => {
     const row = db.prepare('SELECT id FROM llm_profiles WHERE id = ?')
       .get(req.params.id) as { id: string } | undefined;
 
@@ -40,10 +42,10 @@ export function mountCommandRoutes(router: Router, db: Database.Database): void 
     }
 
     const projectRoot = req.query.projectRoot as string | undefined;
-    res.json({ success: true, data: getZClaudiaCommands(projectRoot) } as ApiResponse<SlashCommand[]>);
+    res.json({ success: true, data: await getZClaudiaCommands(projectRoot) } as ApiResponse<SlashCommand[]>);
   });
 
-  router.get('/type/:type/commands', (req: Request, res: Response) => {
+  router.get('/type/:type/commands', async (req: Request, res: Response) => {
     if (req.params.type !== 'zclaudia') {
       res.status(404).json({
         success: false,
@@ -53,6 +55,6 @@ export function mountCommandRoutes(router: Router, db: Database.Database): void 
     }
 
     const projectRoot = req.query.projectRoot as string | undefined;
-    res.json({ success: true, data: getZClaudiaCommands(projectRoot) } as ApiResponse<SlashCommand[]>);
+    res.json({ success: true, data: await getZClaudiaCommands(projectRoot) } as ApiResponse<SlashCommand[]>);
   });
 }

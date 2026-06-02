@@ -1,7 +1,7 @@
-import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
+import { type ExecutionEnv } from '../infra/execution-env.js';
 
 /**
  * Scans for custom slash commands in .claude/commands directories
@@ -22,11 +22,10 @@ import type { SlashCommand } from '@zclaudia/shared/features/commands';
  */
 
 interface ScanOptions {
-  projectRoot?: string;  // If provided, also scan project-level commands
-  includePlugins?: boolean;  // If true, also scan plugin commands (default: true)
+  projectRoot?: string;
+  includePlugins?: boolean;
 }
 
-// Structure of installed_plugins.json
 interface InstalledPluginsFile {
   version: number;
   plugins: Record<string, PluginInstallation[]>;
@@ -40,7 +39,6 @@ interface PluginInstallation {
   lastUpdated: string;
 }
 
-// Structure of plugin.json
 interface PluginManifest {
   name: string;
   description: string;
@@ -50,18 +48,11 @@ interface PluginManifest {
   };
 }
 
-/**
- * Extract description from markdown file
- * First checks YAML frontmatter for 'description' field,
- * then falls back to first non-empty line or first heading
- */
 function extractDescription(content: string): string {
-  // Check for YAML frontmatter
   if (content.startsWith('---')) {
     const endIndex = content.indexOf('---', 3);
     if (endIndex !== -1) {
       const frontmatter = content.substring(3, endIndex);
-      // Simple YAML parsing for description field
       const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
       if (descMatch) {
         const desc = descMatch[1].trim();
@@ -76,14 +67,11 @@ function extractDescription(content: string): string {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    // If it's a heading, extract the text
     if (trimmed.startsWith('#')) {
       return trimmed.replace(/^#+\s*/, '').trim();
     }
 
-    // Use first non-empty, non-heading line
-    if (!trimmed.startsWith('---')) {  // Skip frontmatter separators
-      // Limit description length
+    if (!trimmed.startsWith('---')) {
       return trimmed.length > 80 ? trimmed.substring(0, 77) + '...' : trimmed;
     }
   }
@@ -91,213 +79,190 @@ function extractDescription(content: string): string {
   return 'Custom command';
 }
 
-/**
- * Scan a directory for command files
- */
-function scanDirectory(
+async function scanDirectory(
+  env: ExecutionEnv,
   dir: string,
-  scope: 'global' | 'project'
-): SlashCommand[] {
+  scope: 'global' | 'project',
+): Promise<SlashCommand[]> {
   const commands: SlashCommand[] = [];
 
-  if (!fs.existsSync(dir)) {
+  const dirExists = await env.exists(dir);
+  if (!dirExists.ok || !dirExists.value) {
     return commands;
   }
 
-  try {
-    const files = fs.readdirSync(dir);
+  const listResult = await env.listDir(dir);
+  if (!listResult.ok) {
+    console.error(`Error scanning directory ${dir}:`, listResult.error);
+    return commands;
+  }
 
-    for (const file of files) {
-      // Only process .md files
-      if (!file.endsWith('.md')) continue;
+  for (const entry of listResult.value) {
+    if (!entry.name.endsWith('.md')) continue;
 
-      const filePath = path.join(dir, file);
-      const stat = fs.statSync(filePath);
+    const filePath = path.join(dir, entry.name);
+    const info = await env.fileInfo(filePath);
+    if (!info.ok || info.value.kind !== 'file') continue;
 
-      if (!stat.isFile()) continue;
+    const baseName = path.basename(entry.name, '.md');
+    const commandName = `/${baseName}`;
 
-      // Extract command name from filename
-      const baseName = path.basename(file, '.md');
-
-      // Command name: /<baseName> for both global and project scopes
-      // (matches Claude Code CLI behavior — project commands don't need a prefix)
-      const commandName = `/${baseName}`;
-
-      // Read file content to extract description
-      let description = 'Custom command';
-      try {
-        const content = fs.readFileSync(filePath, 'utf-8');
-        description = extractDescription(content);
-      } catch {
-        // Use default description if file can't be read
-      }
-
-      commands.push({
-        command: commandName,
-        description,
-        source: 'custom',
-        scope,
-        filePath,
-      });
+    let description = 'Custom command';
+    const read = await env.readTextFile(filePath);
+    if (read.ok) {
+      description = extractDescription(read.value);
     }
-  } catch (error) {
-    console.error(`Error scanning directory ${dir}:`, error);
+
+    commands.push({
+      command: commandName,
+      description,
+      source: 'custom',
+      scope,
+      filePath,
+    });
   }
 
   return commands;
 }
 
-/**
- * Scan plugin commands from installed plugin directories
- */
-function scanPluginCommands(): SlashCommand[] {
+async function scanPluginCommands(env: ExecutionEnv): Promise<SlashCommand[]> {
   const commands: SlashCommand[] = [];
   const pluginsFile = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
 
-  if (!fs.existsSync(pluginsFile)) {
+  const pluginsFileExists = await env.exists(pluginsFile);
+  if (!pluginsFileExists.ok || !pluginsFileExists.value) {
     return commands;
   }
 
+  const pluginsRead = await env.readTextFile(pluginsFile);
+  if (!pluginsRead.ok) {
+    console.error('Error reading installed plugins:', pluginsRead.error);
+    return commands;
+  }
+
+  let pluginsData: InstalledPluginsFile;
   try {
-    const content = fs.readFileSync(pluginsFile, 'utf-8');
-    const pluginsData: InstalledPluginsFile = JSON.parse(content);
+    pluginsData = JSON.parse(pluginsRead.value);
+  } catch (error) {
+    console.error('Error parsing installed plugins:', error);
+    return commands;
+  }
 
-    for (const [pluginKey, installations] of Object.entries(pluginsData.plugins)) {
-      // Plugin key format: "name@marketplace" e.g. "commit-commands@claude-plugins-official"
-      const pluginName = pluginKey.split('@')[0];
+  for (const [pluginKey, installations] of Object.entries(pluginsData.plugins)) {
+    const pluginName = pluginKey.split('@')[0];
+    const installation = installations[0];
+    if (!installation?.installPath) continue;
 
-      // Get the first (usually only) installation
-      const installation = installations[0];
-      if (!installation?.installPath) continue;
+    const installPath = installation.installPath;
+    const installExists = await env.exists(installPath);
+    if (!installExists.ok || !installExists.value) continue;
 
-      const installPath = installation.installPath;
-      if (!fs.existsSync(installPath)) continue;
+    const commandsDir = path.join(installPath, 'commands');
+    const commandsDirExists = await env.exists(commandsDir);
 
-      // Scan for command files in the plugin
-      // Commands can be in:
-      // 1. <installPath>/commands/*.md
-      // 2. <installPath>/*.md (excluding README.md)
-      const commandsDir = path.join(installPath, 'commands');
-      const locations = [
-        { dir: commandsDir, exists: fs.existsSync(commandsDir) },
-        { dir: installPath, exists: true }
-      ];
+    const locations: Array<{ dir: string; exists: boolean }> = [
+      { dir: commandsDir, exists: commandsDirExists.ok && commandsDirExists.value },
+      { dir: installPath, exists: true },
+    ];
 
-      for (const { dir, exists } of locations) {
-        if (!exists) continue;
+    for (const { dir, exists } of locations) {
+      if (!exists) continue;
 
-        try {
-          const files = fs.readdirSync(dir);
+      const listResult = await env.listDir(dir);
+      if (!listResult.ok) {
+        console.error(`Error scanning plugin directory ${dir}:`, listResult.error);
+        continue;
+      }
 
-          for (const file of files) {
-            // Only process .md files, exclude common documentation files
-            const lowerFile = file.toLowerCase();
-            const excludedFiles = [
-              'readme.md',
-              'contributing.md',
-              'code_of_conduct.md',
-              'changelog.md',
-              'license.md',
-              'security.md'
-            ];
-            if (!file.endsWith('.md') || excludedFiles.includes(lowerFile)) continue;
+      for (const entry of listResult.value) {
+        const lowerFile = entry.name.toLowerCase();
+        const excludedFiles = [
+          'readme.md',
+          'contributing.md',
+          'code_of_conduct.md',
+          'changelog.md',
+          'license.md',
+          'security.md',
+        ];
+        if (!entry.name.endsWith('.md') || excludedFiles.includes(lowerFile)) continue;
 
-            const filePath = path.join(dir, file);
-            const stat = fs.statSync(filePath);
+        const filePath = path.join(dir, entry.name);
+        const info = await env.fileInfo(filePath);
+        if (!info.ok || info.value.kind !== 'file') continue;
 
-            if (!stat.isFile()) continue;
+        const baseName = path.basename(entry.name, '.md');
+        const commandName = `/${pluginName}:${baseName}`;
 
-            // Extract command name from filename
-            const baseName = path.basename(file, '.md');
+        let description = 'Plugin command';
+        const read = await env.readTextFile(filePath);
+        if (read.ok) {
+          description = extractDescription(read.value);
+        }
 
-            // Build command name: /plugin-name:command-name
-            // e.g., /commit-commands:commit, /code-review:code-review
-            const commandName = `/${pluginName}:${baseName}`;
-
-            // Read file content to extract description
-            let description = 'Plugin command';
+        let pluginDescription = '';
+        const manifestPath = path.join(installPath, '.claude-plugin', 'plugin.json');
+        const manifestExists = await env.exists(manifestPath);
+        if (manifestExists.ok && manifestExists.value) {
+          const manifestRead = await env.readTextFile(manifestPath);
+          if (manifestRead.ok) {
             try {
-              const fileContent = fs.readFileSync(filePath, 'utf-8');
-              description = extractDescription(fileContent);
+              const manifest: PluginManifest = JSON.parse(manifestRead.value);
+              pluginDescription = ` (plugin:${pluginName}@${manifest.author?.name || 'unknown'})`;
             } catch {
-              // Use default description if file can't be read
-            }
-
-            // Get plugin description from manifest
-            let pluginDescription = '';
-            const manifestPath = path.join(installPath, '.claude-plugin', 'plugin.json');
-            if (fs.existsSync(manifestPath)) {
-              try {
-                const manifest: PluginManifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
-                pluginDescription = ` (plugin:${pluginName}@${manifest.author?.name || 'unknown'})`;
-              } catch {
-                pluginDescription = ` (plugin:${pluginName})`;
-              }
-            } else {
               pluginDescription = ` (plugin:${pluginName})`;
             }
-
-            commands.push({
-              command: commandName,
-              description: description + pluginDescription,
-              source: 'plugin',
-              scope: 'global',
-              filePath,
-            });
+          } else {
+            pluginDescription = ` (plugin:${pluginName})`;
           }
-        } catch (error) {
-          console.error(`Error scanning plugin directory ${dir}:`, error);
+        } else {
+          pluginDescription = ` (plugin:${pluginName})`;
         }
+
+        commands.push({
+          command: commandName,
+          description: description + pluginDescription,
+          source: 'plugin',
+          scope: 'global',
+          filePath,
+        });
       }
     }
-  } catch (error) {
-    console.error('Error reading installed plugins:', error);
   }
 
   return commands;
 }
 
-/**
- * Scan for all custom commands
- */
-export function scanCustomCommands(options: ScanOptions = {}): SlashCommand[] {
+export async function scanCustomCommands(
+  env: ExecutionEnv,
+  options: ScanOptions = {},
+): Promise<SlashCommand[]> {
   const commands: SlashCommand[] = [];
-  const includePlugins = options.includePlugins !== false;  // Default to true
+  const includePlugins = options.includePlugins !== false;
 
-  // Scan global commands (~/.claude/commands)
   const globalDir = path.join(os.homedir(), '.claude', 'commands');
-  const globalCommands = scanDirectory(globalDir, 'global');
+  const globalCommands = await scanDirectory(env, globalDir, 'global');
 
-  // Scan project commands if projectRoot is provided
-  // Project commands take priority over global ones with the same name
   if (options.projectRoot) {
     const projectDir = path.join(options.projectRoot, '.claude', 'commands');
-    const projectCommands = scanDirectory(projectDir, 'project');
-    const projectNames = new Set(projectCommands.map(c => c.command));
+    const projectCommands = await scanDirectory(env, projectDir, 'project');
+    const projectNames = new Set(projectCommands.map((c) => c.command));
     commands.push(...projectCommands);
-    commands.push(...globalCommands.filter(c => !projectNames.has(c.command)));
+    commands.push(...globalCommands.filter((c) => !projectNames.has(c.command)));
   } else {
     commands.push(...globalCommands);
   }
 
-  // Scan plugin commands
   if (includePlugins) {
-    commands.push(...scanPluginCommands());
+    commands.push(...(await scanPluginCommands(env)));
   }
 
   return commands;
 }
 
-/**
- * Get the full path to the global commands directory
- */
 export function getGlobalCommandsDir(): string {
   return path.join(os.homedir(), '.claude', 'commands');
 }
 
-/**
- * Get the full path to a project's commands directory
- */
 export function getProjectCommandsDir(projectRoot: string): string {
   return path.join(projectRoot, '.claude', 'commands');
 }
