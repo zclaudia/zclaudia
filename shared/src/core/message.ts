@@ -81,10 +81,21 @@ export interface ToolCall {
   effect?: ToolEffect;
 }
 
+export interface UsageCost {
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  total: number;
+}
+
 export interface UsageInfo {
-  inputTokens: number;
-  outputTokens: number;
-  contextWindow?: number;
+  input: number;
+  output: number;
+  cacheRead: number;
+  cacheWrite: number;
+  totalTokens: number;
+  cost: UsageCost;
 }
 
 // Note: ToolDefinition and AIToolCall are defined in plugin-types.ts

@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import type { Message } from '@earendil-works/pi-ai';
+import type { Message, Usage } from '@earendil-works/pi-ai';
 
 export const HISTORY_LIMIT = 50;
 
@@ -28,6 +28,7 @@ interface ParsedThinkingBlock {
 interface ParsedMetadata {
   toolCalls?: ParsedToolCall[];
   thinkingBlocks?: ParsedThinkingBlock[];
+  usage?: Usage;
 }
 
 function parseMetadata(metadata: string | null): ParsedMetadata | null {
@@ -38,6 +39,13 @@ function parseMetadata(metadata: string | null): ParsedMetadata | null {
     console.warn('[rebuildHistory] metadata JSON parse failed:', err);
     return null;
   }
+}
+
+function defaultZeroUsage(): Usage {
+  return {
+    input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  };
 }
 
 function serializeToolOutput(output: unknown): Array<{ type: 'text'; text: string }> {
@@ -128,7 +136,7 @@ export function rebuildHistory(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       provider: 'unknown' as any,
       model: 'unknown',
-      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      usage: meta?.usage ?? defaultZeroUsage(),
       stopReason: toolCalls.length > 0 ? 'toolUse' : 'stop',
       timestamp: row.createdAt,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

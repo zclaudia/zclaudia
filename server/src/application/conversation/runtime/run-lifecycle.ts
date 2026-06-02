@@ -2,6 +2,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { newId } from '../../../utils/uuid.js';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import type { Usage } from '@earendil-works/pi-ai';
 import type { Request as CorrelatedRequest } from '@zclaudia/shared/wire/correlation';
 import { isRequest } from '@zclaudia/shared/wire/correlation';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
@@ -210,7 +211,7 @@ export function getNextOffset(db: import('better-sqlite3').Database, sessionId: 
  */
 export function upsertAssistantMessage(
   run: ActiveRun,
-  options?: { usage?: { inputTokens: number; outputTokens: number }; indexMetadata?: boolean }
+  options?: { usage?: Usage; indexMetadata?: boolean }
 ): void {
   const metadata: Record<string, unknown> = {};
   if (options?.usage) {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import Database from 'better-sqlite3';
+import type { Usage } from '@earendil-works/pi-ai';
 import { rebuildHistory, HISTORY_LIMIT } from '../history-rebuilder.js';
 
 function createTestDb(): Database.Database {
@@ -156,5 +157,32 @@ describe('rebuildHistory', () => {
     const out = rebuildHistory(db, 's');
     expect(out.length).toBe(50);
     expect(HISTORY_LIMIT).toBe(50);
+  });
+});
+
+describe('history-rebuilder — usage handling', () => {
+  it('reconstructs real usage from assistant metadata when present', () => {
+    const db = createTestDb();
+    const usage: Usage = {
+      input: 100, output: 200, cacheRead: 5, cacheWrite: 0, totalTokens: 305,
+      cost: { input: 0.001, output: 0.005, cacheRead: 0, cacheWrite: 0, total: 0.006 },
+    };
+    insertMsg(db, { id: 'm1', sessionId: 'sess1', role: 'user', content: 'hi', createdAt: 999, offset: 1 });
+    insertMsg(db, { id: 'm2', sessionId: 'sess1', role: 'assistant', content: 'hello', metadata: { usage }, createdAt: 1000, offset: 2 });
+
+    const messages = rebuildHistory(db, 'sess1');
+    const assistant = messages.find((m) => m.role === 'assistant');
+    expect((assistant as any).usage).toEqual(usage);
+  });
+
+  it('falls back to zero usage when metadata.usage is missing', () => {
+    const db = createTestDb();
+    insertMsg(db, { id: 'm1', sessionId: 'sess1', role: 'user', content: 'hi', createdAt: 999, offset: 1 });
+    insertMsg(db, { id: 'm2', sessionId: 'sess1', role: 'assistant', content: 'hello', createdAt: 1000, offset: 2 });
+
+    const messages = rebuildHistory(db, 'sess1');
+    const assistant = messages.find((m) => m.role === 'assistant');
+    expect((assistant as any).usage.totalTokens).toBe(0);
+    expect((assistant as any).usage.input).toBe(0);
   });
 });

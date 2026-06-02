@@ -228,14 +228,18 @@ describe('translateEvent', () => {
   });
 
   it('translates agent_end with usage to result', () => {
+    const usage = {
+      input: 42, output: 17, cacheRead: 0, cacheWrite: 0, totalTokens: 59,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
     const out = translateEvent({
       type: 'agent_end',
       messages: [],
-    }, ctx, { inputTokens: 42, outputTokens: 17 });
+    }, ctx, usage);
     expect(out).toMatchObject({
       type: 'result',
       isComplete: true,
-      usage: { inputTokens: 42, outputTokens: 17 },
+      usage,
     });
   });
 
@@ -244,7 +248,7 @@ describe('translateEvent', () => {
     expect(out).toMatchObject({
       type: 'result',
       isComplete: true,
-      usage: { inputTokens: 0, outputTokens: 0 },
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0 },
     });
   });
 
@@ -308,8 +312,8 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'text_delta', delta: 'reply' } },
       { type: 'agent_end', messages: [
         { role: 'user', content: 'hi', timestamp: 0 },
-        { role: 'assistant', content: [{ type: 'text', text: 'first' }], stopReason: 'toolUse', usage: { input: 100, output: 50 }, timestamp: 0 } as any,
-        { role: 'assistant', content: [{ type: 'text', text: 'final' }], stopReason: 'stop', usage: { input: 30, output: 20 }, timestamp: 0 } as any,
+        { role: 'assistant', content: [{ type: 'text', text: 'first' }], stopReason: 'toolUse', usage: { input: 100, output: 50, cacheRead: 5, cacheWrite: 0, totalTokens: 155, cost: { input: 0.001, output: 0.002, cacheRead: 0, cacheWrite: 0, total: 0.003 } }, timestamp: 0 } as any,
+        { role: 'assistant', content: [{ type: 'text', text: 'final' }], stopReason: 'stop', usage: { input: 30, output: 20, cacheRead: 0, cacheWrite: 2, totalTokens: 52, cost: { input: 0.0003, output: 0.0008, cacheRead: 0, cacheWrite: 0, total: 0.0011 } }, timestamp: 0 } as any,
       ] },
     ]);
 
@@ -318,7 +322,7 @@ describe('ZClaudiaAdapter.run', () => {
 
     const last = out[out.length - 1];
     expect(last.type).toBe('result');
-    expect(last.usage).toEqual({ inputTokens: 130, outputTokens: 70 });
+    expect(last.usage).toMatchObject({ input: 130, output: 70, cacheRead: 5, cacheWrite: 2, totalTokens: 207 });
   });
 
   it('loads history from DB and passes it to Agent initialState', async () => {

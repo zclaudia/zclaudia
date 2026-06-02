@@ -5,6 +5,7 @@
  * adapter implementation.
  */
 
+import type { Usage } from '@earendil-works/pi-ai';
 import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
 import type { ToolEffect } from '@zclaudia/shared/core/message';
 import type { ToolSemantic } from '@zclaudia/shared/wire/messages/run';
@@ -82,11 +83,7 @@ export interface ClaudeMessage {
   toolResult?: unknown;
   isToolError?: boolean;
   error?: string;
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-    contextWindow?: number;
-  };
+  usage?: Usage;
   isComplete?: boolean;
   taskId?: string;
   taskStatus?: string;

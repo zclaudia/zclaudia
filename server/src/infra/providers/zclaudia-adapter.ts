@@ -1,4 +1,4 @@
-import { getModel, type Model } from '@earendil-works/pi-ai';
+import { getModel, type Model, type Usage } from '@earendil-works/pi-ai';
 import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
@@ -139,9 +139,11 @@ interface TranslateContext {
   permissionMode?: string;
 }
 
-interface UsageHint {
-  inputTokens: number;
-  outputTokens: number;
+function zeroUsage(): Usage {
+  return {
+    input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  };
 }
 
 /**
@@ -151,23 +153,32 @@ interface UsageHint {
  * its own usage block. We sum them so the final `result` event reflects the full turn cost,
  * not just the last LLM call.
  */
-function extractUsage(messages: AgentMessage[]): UsageHint {
-  let inputTokens = 0;
-  let outputTokens = 0;
+function extractUsage(messages: AgentMessage[]): Usage {
+  const acc = zeroUsage();
   for (const m of messages) {
-    const msg = m as { role?: string; usage?: { input?: number; output?: number } };
+    const msg = m as { role?: string; usage?: Partial<Usage> & { cost?: Partial<Usage['cost']> } };
     if (msg.role === 'assistant' && msg.usage) {
-      inputTokens += msg.usage.input ?? 0;
-      outputTokens += msg.usage.output ?? 0;
+      acc.input += msg.usage.input ?? 0;
+      acc.output += msg.usage.output ?? 0;
+      acc.cacheRead += msg.usage.cacheRead ?? 0;
+      acc.cacheWrite += msg.usage.cacheWrite ?? 0;
+      acc.totalTokens += msg.usage.totalTokens ?? 0;
+      if (msg.usage.cost) {
+        acc.cost.input += msg.usage.cost.input ?? 0;
+        acc.cost.output += msg.usage.cost.output ?? 0;
+        acc.cost.cacheRead += msg.usage.cost.cacheRead ?? 0;
+        acc.cost.cacheWrite += msg.usage.cost.cacheWrite ?? 0;
+        acc.cost.total += msg.usage.cost.total ?? 0;
+      }
     }
   }
-  return { inputTokens, outputTokens };
+  return acc;
 }
 
 export function translateEvent(
   event: AgentEvent,
   ctx: TranslateContext,
-  usage?: UsageHint,
+  usage?: Usage,
 ): ClaudeMessage | undefined {
   try {
     switch (event.type) {
@@ -200,10 +211,7 @@ export function translateEvent(
         return {
           type: 'result',
           isComplete: true,
-          usage: {
-            inputTokens: usage?.inputTokens ?? 0,
-            outputTokens: usage?.outputTokens ?? 0,
-          },
+          usage: usage ?? zeroUsage(),
         };
       // Explicit no-ops:
       case 'message_start':
