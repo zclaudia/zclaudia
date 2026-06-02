@@ -591,6 +591,7 @@ CREATE TABLE IF NOT EXISTS agent_profiles (
           enabled_tools TEXT NOT NULL DEFAULT '["read","write","edit","bash","grep","find","ls"]',
           thinking_level TEXT,
           is_default INTEGER DEFAULT 0,
+          context_window INTEGER,
           created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         );
@@ -677,6 +678,19 @@ CREATE TABLE IF NOT EXISTS sessions (
           updated_at INTEGER NOT NULL,
           archived_at INTEGER
         , sort_order INTEGER NOT NULL DEFAULT 0);
+
+CREATE TABLE IF NOT EXISTS session_compactions (
+  id TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  summary TEXT NOT NULL,
+  first_kept_message_id TEXT NOT NULL,
+  tokens_before INTEGER NOT NULL,
+  details TEXT,
+  source TEXT NOT NULL CHECK(source IN ('auto', 'manual')) DEFAULT 'auto',
+  custom_instructions TEXT,
+  created_at INTEGER NOT NULL,
+  FOREIGN KEY (first_kept_message_id) REFERENCES messages(id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS spec_changes (
       id TEXT PRIMARY KEY,
@@ -998,6 +1012,9 @@ CREATE INDEX IF NOT EXISTS idx_search_history_created_at ON search_history(creat
 CREATE INDEX IF NOT EXISTS idx_search_history_user_id ON search_history(user_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_servers_is_default ON servers(is_default);
+
+CREATE INDEX IF NOT EXISTS idx_session_compactions_session_created
+  ON session_compactions(session_id, created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_session_drafts_session ON session_drafts(session_id);
 

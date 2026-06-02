@@ -11,6 +11,8 @@ export interface AgentProfileConfig {
   enabledTools: string[];
   thinkingLevel?: ThinkingLevel;
   isDefault?: boolean;
+  /** Optional per-agent context window override (tokens). Null/undefined means use provider default. */
+  contextWindow?: number | null;
   createdAt: number;
   updatedAt: number;
 }
