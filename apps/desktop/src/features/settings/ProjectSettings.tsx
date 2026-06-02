@@ -226,7 +226,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
         rootPath: rootPath.trim() || undefined,
         // Empty selection sends `null` so the backend clears any existing
         // default (FK becomes NULL → falls back to global default).
-        defaultAgentProfileId: (selectedAgentId || null) as string | undefined,
+        defaultAgentProfileId: selectedAgentId || null,
         reviewLlmProfileId: reviewLlmProfileId || undefined,
         permissionWorkflowOverrideId: permissionWorkflowOverrideId || undefined,
         systemPrompt: systemPrompt.trim() || undefined,

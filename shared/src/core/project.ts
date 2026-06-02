@@ -9,7 +9,7 @@ export interface Project {
   id: string;
   name: string;
   type: ProjectType;
-  defaultAgentProfileId?: string;
+  defaultAgentProfileId?: string | null;
   rootPath?: string;
   systemPrompt?: string;
   permissionPolicy?: PermissionPolicy;
