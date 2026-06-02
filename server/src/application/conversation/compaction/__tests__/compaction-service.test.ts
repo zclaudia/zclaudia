@@ -99,8 +99,10 @@ describe('compaction-service', () => {
     expect(created.source).toBe('auto');
   });
 
-  it('forceCompact ignores threshold', async () => {
-    const { agentProfile, llmProfile } = seedSession(db, 4);
+  it('forceCompact ignores threshold (long conversation)', async () => {
+    // Seed enough messages so total tokens exceed DEFAULT keepRecentTokens (20000).
+    // Each fixture message is ~500 tokens; 100 messages ⇒ ~50k tokens total.
+    const { agentProfile, llmProfile } = seedSession(db, 100);
     const result = await forceCompact({
       db, sessionId: 's1', agentProfile, llmProfile,
       source: 'manual',
@@ -110,6 +112,15 @@ describe('compaction-service', () => {
     const created = new SessionCompactionRepository(db).getLatest('s1')!;
     expect(created.source).toBe('manual');
     expect(created.customInstructions).toBe('focus on auth');
+  });
+
+  it('forceCompact returns no_cut_point on short conversations (recent budget covers all)', async () => {
+    const { agentProfile, llmProfile } = seedSession(db, 4);
+    const result = await forceCompact({
+      db, sessionId: 's1', agentProfile, llmProfile, source: 'manual',
+    });
+    expect(result.compacted).toBe(false);
+    expect(result.reason).toBe('no_cut_point');
   });
 
   it('returns no_messages when session has no messages', async () => {
@@ -153,7 +164,8 @@ describe('compaction-service', () => {
   });
 
   it('stores correct boundary id (matches a real message id)', async () => {
-    const { agentProfile, llmProfile } = seedSession(db, 10);
+    // Long enough conversation that findCutPoint finds a meaningful boundary.
+    const { agentProfile, llmProfile } = seedSession(db, 100);
     const result = await forceCompact({
       db, sessionId: 's1', agentProfile, llmProfile, source: 'manual',
     });

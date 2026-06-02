@@ -53,18 +53,19 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
 
 /**
  * Manual entry — skips the threshold check and always attempts compaction.
- * Intended for the `/compact` slash command (T6).
+ * Intended for the `/compact` slash command (T6). Still respects
+ * `keepRecentTokens` so the most recent turn(s) are preserved verbatim;
+ * we only skip the "is context full enough" gate.
  *
- * Because the user is asking explicitly, we shrink `keepRecentTokens` so even
- * tiny conversations get cut: keep at most the last message-pair instead of
- * the default 20k-token recent budget (which would otherwise leave nothing to
- * compact in a short session).
+ * On short conversations where everything fits inside the keep-recent budget,
+ * this correctly returns `no_cut_point` — there's nothing meaningful to
+ * compact.
  */
 export async function forceCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
   const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
   if (messages.length === 0) return { compacted: false, reason: 'no_messages' };
   const tokens = estimateContextTokens(messages).tokens;
-  return runCompaction(ctx, messages, dbIds, tokens, { manualKeepRecentTokens: 1 });
+  return runCompaction(ctx, messages, dbIds, tokens);
 }
 
 /**
@@ -90,11 +91,9 @@ async function runCompaction(
   messages: AgentMessage[],
   dbIds: (string | null)[],
   tokens: number,
-  options?: { manualKeepRecentTokens?: number },
 ): Promise<CompactionOutcome> {
   const entries = wrapAsEntries(messages);
-  const keepRecentTokens = options?.manualKeepRecentTokens ?? DEFAULT_COMPACTION_SETTINGS.keepRecentTokens;
-  const cut = findCutPoint(entries, 0, entries.length, keepRecentTokens);
+  const cut = findCutPoint(entries, 0, entries.length, DEFAULT_COMPACTION_SETTINGS.keepRecentTokens);
   if (cut.firstKeptEntryIndex <= 0) {
     return { compacted: false, tokensBefore: tokens, reason: 'no_cut_point' };
   }
