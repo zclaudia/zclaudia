@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { PermissionSettings } from '../PermissionSettings';
-import { useProviderMetaStore } from '../../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../../stores/serverStore';
 
 const mockGetAgentConfig = vi.fn();
@@ -19,8 +19,8 @@ vi.mock('../../../features/workflows/api', () => ({
   listAllWorkflows: (...args: unknown[]) => mockListAllWorkflows(...args),
 }));
 
-vi.mock('../../../services/api/providers', () => ({
-  getProviders: (...args: unknown[]) => mockGetProviders(...args),
+vi.mock('../../../services/api/llm-profiles', () => ({
+  listLlmProfiles: (...args: unknown[]) => mockGetProviders(...args),
   getProviderCapabilities: (...args: unknown[]) => mockGetProviderCapabilities(...args),
 }));
 
@@ -33,7 +33,7 @@ describe('PermissionSettings', () => {
     mockGetProviderCapabilities.mockReset();
 
     useServerStore.setState({ activeServerId: 'local' } as any);
-    useProviderMetaStore.setState({
+    useLlmProfileMetaStore.setState({
       providersByBackend: {
         local: [
           {
@@ -113,7 +113,7 @@ describe('PermissionSettings', () => {
   });
 
   it('loads providers when provider store is empty', async () => {
-    useProviderMetaStore.setState({
+    useLlmProfileMetaStore.setState({
       providersByBackend: { local: [] },
     } as any);
 

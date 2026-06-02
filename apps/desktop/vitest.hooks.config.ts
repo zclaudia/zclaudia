@@ -35,6 +35,7 @@ export default defineConfig({
       'src/hooks/__tests__/useProjectManager.test.ts',
       'src/hooks/__tests__/useProviderManager.test.ts',
       'src/hooks/__tests__/useSessionManager.test.ts',
+      'src/hooks/__tests__/useAgentForSession.test.ts',
       'src/hooks/chat/__tests__/useProviderCapabilities.test.ts',
       'src/hooks/chat/__tests__/useMobileViewport.test.tsx',
     ],

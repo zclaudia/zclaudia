@@ -54,7 +54,7 @@ vi.mock('../../services/api', () => ({
   updateAgentProfile: vi.fn(),
   deleteAgentProfile: vi.fn(),
   setDefaultAgentProfile: vi.fn(),
-  getProviders: vi.fn(),
+  listLlmProfiles: vi.fn(),
 }));
 
 describe('AgentManager', () => {
@@ -97,7 +97,7 @@ describe('AgentManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(api.listAgentProfiles).mockResolvedValue(mockAgents);
-    vi.mocked(api.getProviders).mockResolvedValue(mockLlmProfiles);
+    vi.mocked(api.listLlmProfiles).mockResolvedValue(mockLlmProfiles);
     vi.mocked(api.createAgentProfile).mockResolvedValue(mockAgents[0]);
     vi.mocked(api.updateAgentProfile).mockResolvedValue(mockAgents[0]);
     vi.mocked(api.deleteAgentProfile).mockResolvedValue(undefined);
@@ -121,7 +121,7 @@ describe('AgentManager', () => {
 
     await waitForFast(() => {
       expect(api.listAgentProfiles).toHaveBeenCalled();
-      expect(api.getProviders).toHaveBeenCalled();
+      expect(api.listLlmProfiles).toHaveBeenCalled();
     });
 
     expect(screen.getByText('Agent Management')).toBeInTheDocument();

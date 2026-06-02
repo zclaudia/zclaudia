@@ -51,7 +51,7 @@ vi.mock('../../../stores/projectStore', () => {
   const store = vi.fn((selector?: (s: any) => any) => {
     const state = {
       providers: [],
-      projects: [{ id: 'proj-1', llmProfileId: 'prov-1' }],
+      projects: [{ id: 'proj-1', defaultAgentProfileId: 'ap-1' }],
       sessions: [],
       selectSession: mockSelectSession,
     };
@@ -348,8 +348,10 @@ describe('LocalPRCard', () => {
     const defaultBtn = screen.getByRole('button', { name: /Default/ });
     fireEvent.click(defaultBtn);
     await waitFor(() => {
-      // The default provider ID comes from project.llmProfileId in the mock which is 'prov-1'
-      expect(mockReviewPR).toHaveBeenCalledWith('pr-1', 'proj-1', 'prov-1');
+      // After sub-project C: defaultLlmProfileId falls back to
+      // `project.reviewLlmProfileId` (unset → '' → coerced to undefined
+      // by handleReview before forwarding to reviewPR).
+      expect(mockReviewPR).toHaveBeenCalledWith('pr-1', 'proj-1', undefined);
     });
   });
 

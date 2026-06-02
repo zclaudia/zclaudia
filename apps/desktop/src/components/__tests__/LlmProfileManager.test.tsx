@@ -41,7 +41,7 @@ const mockFacadeState = {
   backends: [{ backendId: 'local', runtimeState: 'ready' }],
 };
 
-const { mockProviderMetaState, useProviderMetaStoreMock } = vi.hoisted(() => {
+const { mockProviderMetaState, useLlmProfileMetaStoreMock } = vi.hoisted(() => {
   const state = {
     getProviders: vi.fn(() => []),
     setProviders: vi.fn(),
@@ -58,7 +58,7 @@ const { mockProviderMetaState, useProviderMetaStoreMock } = vi.hoisted(() => {
 
   return {
     mockProviderMetaState: state,
-    useProviderMetaStoreMock: store,
+    useLlmProfileMetaStoreMock: store,
   };
 });
 
@@ -85,8 +85,8 @@ vi.mock('../../utils/platform', () => ({
   isAndroid: vi.fn(() => false),
 }));
 
-vi.mock('../../stores/providerMetaStore', () => ({
-  useProviderMetaStore: useProviderMetaStoreMock,
+vi.mock('../../stores/llmProfileMetaStore', () => ({
+  useLlmProfileMetaStore: useLlmProfileMetaStoreMock,
 }));
 
 const mockSetProviders = vi.fn();
@@ -104,11 +104,11 @@ vi.mock('../../hooks/useAndroidBack', () => ({
 
 // Mock the api module
 vi.mock('../../services/api', () => ({
-  getProviders: vi.fn(),
-  createProvider: vi.fn(),
-  updateProvider: vi.fn(),
-  deleteProvider: vi.fn(),
-  setDefaultProvider: vi.fn(),
+  listLlmProfiles: vi.fn(),
+  createLlmProfile: vi.fn(),
+  updateLlmProfile: vi.fn(),
+  deleteLlmProfile: vi.fn(),
+  setDefaultLlmProfile: vi.fn(),
 }));
 
 import { useServerStore } from '../../stores/serverStore';
@@ -139,11 +139,11 @@ describe('ProviderManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(api.getProviders).mockResolvedValue(mockProviders);
-    vi.mocked(api.createProvider).mockResolvedValue(mockProviders[0]);
-    vi.mocked(api.updateProvider).mockResolvedValue(undefined);
-    vi.mocked(api.deleteProvider).mockResolvedValue(undefined);
-    vi.mocked(api.setDefaultProvider).mockResolvedValue(undefined);
+    vi.mocked(api.listLlmProfiles).mockResolvedValue(mockProviders);
+    vi.mocked(api.createLlmProfile).mockResolvedValue(mockProviders[0]);
+    vi.mocked(api.updateLlmProfile).mockResolvedValue(undefined);
+    vi.mocked(api.deleteLlmProfile).mockResolvedValue(undefined);
+    vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
     mockProviderMetaState.getProviders.mockReturnValue([]);
     mockServerState.activeServerId = 'local';
     mockServerState.connections.local.status = 'connected';
@@ -186,14 +186,14 @@ describe('ProviderManager', () => {
     await renderProviderManager({ onClose: mockOnClose });
 
     expect(screen.getByText('Connect to a server first')).toBeInTheDocument();
-    expect(api.getProviders).not.toHaveBeenCalled();
+    expect(api.listLlmProfiles).not.toHaveBeenCalled();
   });
 
   it('loads and displays providers on open', async () => {
     await renderProviderManager({ onClose: mockOnClose });
 
     await waitForFast(() => {
-      expect(api.getProviders).toHaveBeenCalled();
+      expect(api.listLlmProfiles).toHaveBeenCalled();
     });
 
     expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
@@ -230,7 +230,7 @@ describe('ProviderManager', () => {
   });
 
   it('shows empty state when no providers', async () => {
-    vi.mocked(api.getProviders).mockResolvedValue([]);
+    vi.mocked(api.listLlmProfiles).mockResolvedValue([]);
 
     await renderProviderManager({ onClose: mockOnClose });
 
@@ -298,7 +298,7 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Create'));
 
       await waitForFast(() => {
-        expect(api.createProvider).toHaveBeenCalledWith(
+        expect(api.createLlmProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'New Provider',
             providerType: 'anthropic',
@@ -375,7 +375,7 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Update'));
 
       await waitFor(() => {
-        expect(api.updateProvider).toHaveBeenCalledWith(
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
           'p1',
           expect.objectContaining({
             name: 'Updated Name',
@@ -396,13 +396,13 @@ describe('ProviderManager', () => {
       const deleteButton = screen.getAllByTitle('Delete')[0];
       await clickAsync(deleteButton);
 
-      expect(api.deleteProvider).not.toHaveBeenCalled();
+      expect(api.deleteLlmProfile).not.toHaveBeenCalled();
       expect(deleteButton).toHaveAttribute('title', 'Click again to confirm delete');
 
       await clickAsync(deleteButton);
 
       await waitFor(() => {
-        expect(api.deleteProvider).toHaveBeenCalledWith('p1');
+        expect(api.deleteLlmProfile).toHaveBeenCalledWith('p1');
       });
     });
 
@@ -416,7 +416,7 @@ describe('ProviderManager', () => {
       const deleteButtons = screen.getAllByTitle('Delete');
       await clickAsync(deleteButtons[0]);
 
-      expect(api.deleteProvider).not.toHaveBeenCalled();
+      expect(api.deleteLlmProfile).not.toHaveBeenCalled();
     });
   });
 
@@ -432,11 +432,11 @@ describe('ProviderManager', () => {
       const setDefaultButtons = screen.getAllByTitle('Set as default');
       await clickAsync(setDefaultButtons[0]);
 
-      expect(api.setDefaultProvider).toHaveBeenCalledWith('p2');
+      expect(api.setDefaultLlmProfile).toHaveBeenCalledWith('p2');
     });
 
     it('does not show set default button for already default provider', async () => {
-      vi.mocked(api.getProviders).mockResolvedValue([
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
         {
           id: 'p1',
           name: 'Only Provider',
@@ -481,7 +481,7 @@ describe('ProviderManager', () => {
         expect(alertSpy).toHaveBeenCalledWith('Invalid JSON in environment variables');
       });
 
-      expect(api.createProvider).not.toHaveBeenCalled();
+      expect(api.createLlmProfile).not.toHaveBeenCalled();
 
       alertSpy.mockRestore();
     });
@@ -504,7 +504,7 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
-        expect(api.createProvider).toHaveBeenCalledWith(
+        expect(api.createLlmProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             env: { API_KEY: 'test' },
           })
@@ -517,7 +517,7 @@ describe('ProviderManager', () => {
     it('shows alert when createProvider fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-      vi.mocked(api.createProvider).mockRejectedValueOnce(new Error('Network error'));
+      vi.mocked(api.createLlmProfile).mockRejectedValueOnce(new Error('Network error'));
 
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -539,7 +539,7 @@ describe('ProviderManager', () => {
     it('shows alert when deleteProvider fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-      vi.mocked(api.deleteProvider).mockRejectedValueOnce(new Error('Delete error'));
+      vi.mocked(api.deleteLlmProfile).mockRejectedValueOnce(new Error('Delete error'));
 
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -560,7 +560,7 @@ describe('ProviderManager', () => {
 
     it('logs error when setDefaultProvider fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.mocked(api.setDefaultProvider).mockRejectedValueOnce(new Error('Set default error'));
+      vi.mocked(api.setDefaultLlmProfile).mockRejectedValueOnce(new Error('Set default error'));
 
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -578,7 +578,7 @@ describe('ProviderManager', () => {
 
     it('logs error when getProviders fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      vi.mocked(api.getProviders).mockRejectedValueOnce(new Error('Load error'));
+      vi.mocked(api.listLlmProfiles).mockRejectedValueOnce(new Error('Load error'));
 
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -620,7 +620,7 @@ describe('ProviderManager', () => {
 
   describe('Edit form with env', () => {
     it('populates env field when editing provider with env', async () => {
-      vi.mocked(api.getProviders).mockResolvedValue([
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
         {
           id: 'p1',
           name: 'Provider With Env',
@@ -667,7 +667,7 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
-        expect(api.createProvider).toHaveBeenCalledWith(
+        expect(api.createLlmProfile).toHaveBeenCalledWith(
           expect.objectContaining({ isDefault: true })
         );
       });
@@ -689,7 +689,7 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
-        expect(api.createProvider).toHaveBeenCalledWith(
+        expect(api.createLlmProfile).toHaveBeenCalledWith(
           expect.objectContaining({ baseUrl: 'http://127.0.0.1:3000/v1' })
         );
       });
@@ -734,7 +734,7 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
-        expect(api.createProvider).toHaveBeenCalledWith(
+        expect(api.createLlmProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'DeepSeek Local',
             providerType: 'openai-custom',
@@ -769,7 +769,7 @@ describe('ProviderManager', () => {
       await waitFor(() => {
         expect(screen.getByText('Invalid JSON in compat field')).toBeInTheDocument();
       });
-      expect(api.createProvider).not.toHaveBeenCalled();
+      expect(api.createLlmProfile).not.toHaveBeenCalled();
     });
   });
 });

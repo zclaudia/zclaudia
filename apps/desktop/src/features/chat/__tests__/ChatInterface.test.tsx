@@ -11,7 +11,7 @@ import { useFileViewerStore } from '../../../stores/fileViewerStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useRecoveryStore } from '../../../stores/recoveryStore';
 
-// Mock providerMetaStore
+// Mock llmProfileMetaStore
 const { mockProviderMetaStore } = vi.hoisted(() => {
   const state = {
     providersByBackend: {}, providerCommands: {}, providerCapabilities: {},
@@ -25,8 +25,8 @@ const { mockProviderMetaStore } = vi.hoisted(() => {
   store.destroy = vi.fn();
   return { mockProviderMetaStore: store };
 });
-vi.mock('../../../stores/providerMetaStore', () => ({
-  useProviderMetaStore: mockProviderMetaStore,
+vi.mock('../../../stores/llmProfileMetaStore', () => ({
+  useLlmProfileMetaStore: mockProviderMetaStore,
 }));
 
 const { paginationHookState, planStatusHookState } = vi.hoisted(() => ({
@@ -277,7 +277,12 @@ vi.mock('../../../hooks/chat/useProviderCapabilities', () => ({
     const currentProject = currentSession
       ? projectState.projects.find((project) => project.id === currentSession.projectId)
       : null;
-    const llmProfileId = currentSession?.llmProfileId || currentProject?.llmProfileId || null;
+    // Mirrors useProviderCapabilities post-C: agent profile chain is resolved
+    // server-side / via useAgentForSession; tests stub it to null since
+    // they don't exercise that path.
+    void currentSession;
+    void currentProject;
+    const llmProfileId: string | null = null;
 
     return {
       llmProfileId,

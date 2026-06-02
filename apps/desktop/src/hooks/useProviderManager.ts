@@ -9,21 +9,21 @@ import * as api from '../services/api';
 export function useProviderManager() {
   const addProvider = useCallback(
     async (provider: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>) => {
-      await api.createProvider(provider);
+      await api.createLlmProfile(provider);
     },
     []
   );
 
   const updateProvider = useCallback(
     async (id: string, updates: Partial<Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>) => {
-      await api.updateProvider(id, updates);
+      await api.updateLlmProfile(id, updates);
     },
     []
   );
 
   const deleteProvider = useCallback(
     async (id: string) => {
-      await api.deleteProvider(id);
+      await api.deleteLlmProfile(id);
     },
     []
   );

@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { useChatStore } from '../../stores/chatStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useProviderCapabilities } from './useProviderCapabilities';
@@ -78,7 +78,7 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
   const projects = useProjectStore((s) => s.projects);
   const legacyProviders = useProjectStore((s) => s.providers);
   const activeServerId = useServerStore((s) => s.activeServerId);
-  const scopedProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const providers = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
 
   const currentSession = sessions.find(s => s.id === sessionId);

@@ -4,7 +4,7 @@ import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import * as api from '../../services/api';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
@@ -67,7 +67,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
-  const storeProfiles = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const storeProfiles = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
 
   const [profiles, setProfiles] = useState<LlmProfileConfig[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,16 +101,16 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
   const loadProfiles = async () => {
     if (!isConnected) return;
-    const current = useProviderMetaStore.getState().getProviders(activeServerId);
+    const current = useLlmProfileMetaStore.getState().getProviders(activeServerId);
     if (current.length > 0) {
       setProfiles(current);
     }
     setLoading(true);
     try {
-      const data = await api.getProviders();
+      const data = await api.listLlmProfiles();
       setProfiles(data);
       // Sync to global store so Sidebar's profile dropdown stays current
-      useProviderMetaStore.getState().setProviders(data, activeServerId);
+      useLlmProfileMetaStore.getState().setProviders(data, activeServerId);
     } catch (error) {
       console.error('Failed to load providers:', error);
     } finally {
@@ -226,9 +226,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       };
 
       if (editingProfile) {
-        await api.updateProvider(editingProfile.id, data);
+        await api.updateLlmProfile(editingProfile.id, data);
       } else {
-        await api.createProvider(data);
+        await api.createLlmProfile(data);
       }
 
       await loadProfiles();
@@ -258,7 +258,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     clearDeleteConfirmation();
     setDeletingProfileId(id);
     try {
-      await api.deleteProvider(id);
+      await api.deleteLlmProfile(id);
       await loadProfiles();
     } catch (error) {
       console.error('Failed to delete provider:', error);
@@ -272,7 +272,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const handleSetDefault = async (id: string) => {
     clearDeleteConfirmation();
     try {
-      await api.setDefaultProvider(id);
+      await api.setDefaultLlmProfile(id);
       await loadProfiles();
     } catch (error) {
       console.error('Failed to set default provider:', error);

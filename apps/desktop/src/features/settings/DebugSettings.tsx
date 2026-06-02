@@ -257,7 +257,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
 
   // Load providers for AI Review Simulator
   useEffect(() => {
-    api.getProviders()
+    api.listLlmProfiles()
       .then((providers) => {
         const list = providers ?? [];
         setSimProviders(list);

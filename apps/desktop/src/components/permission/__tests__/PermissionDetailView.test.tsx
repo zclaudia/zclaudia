@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { PermissionDetailView } from '../PermissionDetailView';
 
-// Mock providerMetaStore
+// Mock llmProfileMetaStore
 const { mockProviderMetaStore } = vi.hoisted(() => {
   const state = {
     providersByBackend: {}, providerCommands: {}, providerCapabilities: {},
@@ -16,8 +16,8 @@ const { mockProviderMetaStore } = vi.hoisted(() => {
   store.destroy = vi.fn();
   return { mockProviderMetaStore: store };
 });
-vi.mock('../../../stores/providerMetaStore', () => ({
-  useProviderMetaStore: mockProviderMetaStore,
+vi.mock('../../../stores/llmProfileMetaStore', () => ({
+  useLlmProfileMetaStore: mockProviderMetaStore,
 }));
 
 // Mock ThemeContext

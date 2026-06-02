@@ -9,7 +9,7 @@ vi.mock('../../services/api', () => ({
   getServers: vi.fn().mockResolvedValue([]),
   getProjects: vi.fn().mockResolvedValue([]),
   getSessions: vi.fn().mockResolvedValue([]),
-  getProviders: vi.fn().mockResolvedValue([]),
+  listLlmProfiles: vi.fn().mockResolvedValue([]),
   fetchAndSyncPlugins: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -74,7 +74,7 @@ describe('useDataLoader', () => {
     });
     expect(api.getProjects).toHaveBeenCalled();
     expect(api.getSessions).toHaveBeenCalled();
-    expect(api.getProviders).toHaveBeenCalled();
+    expect(api.listLlmProfiles).toHaveBeenCalled();
   });
 
   it('does not auto-select sessions from newly loaded internal projects', async () => {

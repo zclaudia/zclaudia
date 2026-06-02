@@ -67,7 +67,7 @@ vi.mock('../../services/api', async (importOriginal) => {
 
 import { Sidebar } from '../../features/sidebar/Sidebar';
 import { useProjectStore } from '../../stores/projectStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -97,7 +97,7 @@ const baseSession = { id: 'sess-1', name: 'Session 1', projectId: 'proj-1', crea
 const LOCAL_BACKEND_ID = 'local-standalone';
 
 function setupStores(overrides: Record<string, any> = {}) {
-  useProviderMetaStore.setState({
+  useLlmProfileMetaStore.setState({
     providersByBackend: {},
     providerCommands: {},
     providerCapabilities: {},
@@ -448,43 +448,9 @@ describe('Sidebar', () => {
   });
 
   // ---- Provider name resolution ----
-
-  it('shows provider name from project llmProfileId', () => {
-    // Sub-project B removed `session.llmProfileId`; `getProviderName` now
-    // resolves via `project.llmProfileId` (see
-    // `apps/desktop/src/features/sidebar/useSidebarData.ts` TODO(agent-profiles) —
-    // will move to `agent_profile.llm_profile_id` in sub-project C).
-    setupStores({
-      projectStore: {
-        projects: [{ ...baseProject, llmProfileId: 'prov-1' }],
-        sessions: [baseSession as any],
-        providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
-      },
-    });
-
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
-    fireEvent.click(projBtn);
-
-    expect(container.querySelector('[data-testid="provider-name"]')?.textContent).toBe('Claude');
-  });
-
-  it('falls back to default provider when session has no llmProfileId', () => {
-    setupStores({
-      projectStore: {
-        sessions: [baseSession as any],
-        providers: [{ id: 'default-prov', name: 'DefaultAI', type: 'openai', isDefault: true }],
-      },
-    });
-
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
-    fireEvent.click(projBtn);
-
-    expect(container.querySelector('[data-testid="provider-name"]')?.textContent).toBe('DefaultAI');
-  });
+  // Sub-project C removed per-row provider/agent labels from the sidebar
+  // (see spec §4.4). The session row now never renders a provider-name badge,
+  // so the two previous tests covering `getProviderName` were deleted.
 
   // ---- Worktree branch hint ----
 

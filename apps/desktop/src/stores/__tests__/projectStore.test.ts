@@ -118,7 +118,7 @@ describe('projectStore', () => {
         id: 'local-p1',
         name: 'Local Full',
         rootPath: '/repo/full',
-        llmProfileId: 'provider-1',
+        defaultAgentProfileId: 'agent-1',
       });
       useOwnershipStore.getState().setProjectOwner('local-p1', 'local-backend-1');
       useProjectStore.setState({
@@ -130,7 +130,7 @@ describe('projectStore', () => {
           id: 'local-p1',
           name: 'Local Snapshot',
           rootPath: undefined,
-          llmProfileId: undefined,
+          defaultAgentProfileId: undefined,
           updatedAt: localFull.updatedAt + 1,
         }),
       ]);
@@ -140,7 +140,7 @@ describe('projectStore', () => {
           id: 'local-p1',
           name: 'Local Snapshot',
           rootPath: '/repo/full',
-          llmProfileId: 'provider-1',
+          defaultAgentProfileId: 'agent-1',
         }),
       ]);
     });
@@ -254,7 +254,7 @@ describe('projectStore', () => {
         id: 'shared-id',
         name: 'Remote Original',
         rootPath: '/repo/root',
-        llmProfileId: 'provider-1',
+        defaultAgentProfileId: 'agent-1',
       });
       useOwnershipStore.getState().setProjectOwner('shared-id', 'remote-1');
       useProjectStore.setState({
@@ -265,7 +265,7 @@ describe('projectStore', () => {
         id: 'shared-id',
         name: 'Remote Updated',
         rootPath: undefined,
-        llmProfileId: undefined,
+        defaultAgentProfileId: undefined,
         updatedAt: remoteOriginal.updatedAt + 1,
       }));
 
@@ -274,7 +274,7 @@ describe('projectStore', () => {
           id: 'shared-id',
           name: 'Remote Updated',
           rootPath: '/repo/root',
-          llmProfileId: 'provider-1',
+          defaultAgentProfileId: 'agent-1',
         }),
       ]);
     });

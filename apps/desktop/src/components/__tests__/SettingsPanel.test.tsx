@@ -7,7 +7,7 @@ const mockRestartEmbeddedServer = vi.fn().mockResolvedValue(undefined);
 // Mock Tauri
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue([]) }));
 
-// Mock providerMetaStore (used by projectStore internally)
+// Mock llmProfileMetaStore (used by projectStore internally)
 const { mockProviderMetaStore } = vi.hoisted(() => {
   const state = {
     providersByBackend: {},
@@ -25,8 +25,8 @@ const { mockProviderMetaStore } = vi.hoisted(() => {
   store.destroy = vi.fn();
   return { mockProviderMetaStore: store };
 });
-vi.mock('../../stores/providerMetaStore', () => ({
-  useProviderMetaStore: mockProviderMetaStore,
+vi.mock('../../stores/llmProfileMetaStore', () => ({
+  useLlmProfileMetaStore: mockProviderMetaStore,
 }));
 
 // Mock child components

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAgentConfig, updateAgentConfig } from '../../services/api/servers';
 import { listAllWorkflows } from '../../features/workflows/api';
-import * as providersApi from '../../services/api/providers';
+import * as providersApi from '../../services/api/llm-profiles';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
 import { Select } from '../../components/ui/Select';
 import type {
@@ -74,7 +74,7 @@ function AIReviewProviderSelector({ value, onChange, disabled }: {
   disabled: boolean;
 }) {
   const activeServerId = useServerStore((s) => s.activeServerId);
-  const storeProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const storeProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
   const [eligibleProviderIds, setEligibleProviderIds] = useState<Record<string, boolean>>({});
 
@@ -85,11 +85,11 @@ function AIReviewProviderSelector({ value, onChange, disabled }: {
     }
 
     let cancelled = false;
-    void providersApi.getProviders()
+    void providersApi.listLlmProfiles()
       .then((loadedProviders) => {
         if (cancelled) return;
         setProviders(loadedProviders);
-        useProviderMetaStore.getState().setProviders(loadedProviders, activeServerId);
+        useLlmProfileMetaStore.getState().setProviders(loadedProviders, activeServerId);
       })
       .catch(() => {});
 

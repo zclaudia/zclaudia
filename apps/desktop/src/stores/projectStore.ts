@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Project, Session, SlashCommand, LlmProfileConfig, ProviderCapabilities } from '@zclaudia/shared';
 import { useChatStore } from './chatStore';
-import { useProviderMetaStore } from './providerMetaStore';
+import { useLlmProfileMetaStore } from './llmProfileMetaStore';
 import { useServerStore } from './serverStore';
 import { useOwnershipStore } from './ownershipStore';
 import { parseBackendId } from './gatewayStore';
@@ -27,8 +27,8 @@ interface ProjectState {
 
   /**
    * Provider data is kept here for backward compatibility.
-   * New code should use useProviderMetaStore directly.
-   * Writes are synced to providerMetaStore automatically.
+   * New code should use useLlmProfileMetaStore directly.
+   * Writes are synced to llmProfileMetaStore automatically.
    */
   providers: LlmProfileConfig[];
   providerCommands: Record<string, SlashCommand[]>;
@@ -53,7 +53,7 @@ interface ProjectState {
   setSessionActive: (sessionId: string, isActive: boolean) => void;
   reorderSessions: (projectId: string, orderedIds: string[]) => void;
 
-  // Actions — providers (synced to providerMetaStore)
+  // Actions — providers (synced to llmProfileMetaStore)
   setProviders: (providers: LlmProfileConfig[]) => void;
   setDataServerId: (serverId: string | null) => void;
 
@@ -62,7 +62,7 @@ interface ProjectState {
   selectSession: (id: string | null, projectId?: string | null) => void;
   setDashboardView: (projectId: string, view: ProjectDashboardView) => void;
 
-  // Actions — provider metadata (synced to providerMetaStore)
+  // Actions — provider metadata (synced to llmProfileMetaStore)
   setProviderCommands: (llmProfileId: string, commands: SlashCommand[]) => void;
   setProviderCapabilities: (llmProfileId: string, capabilities: ProviderCapabilities) => void;
 }
@@ -351,11 +351,11 @@ export const useProjectStore = create<ProjectState>((set) => ({
       return { sessions: nextSessions };
     }),
 
-  // ── Provider actions (synced to providerMetaStore) ──
+  // ── Provider actions (synced to llmProfileMetaStore) ──
 
   setProviders: (providers) => {
     const getState = (useServerStore as { getState?: () => { activeServerId?: string | null } }).getState;
-    useProviderMetaStore.getState().setProviders(providers, getState?.().activeServerId);
+    useLlmProfileMetaStore.getState().setProviders(providers, getState?.().activeServerId);
   },
 
   setDataServerId: (serverId) => set({ dataServerId: serverId }),
@@ -399,19 +399,19 @@ export const useProjectStore = create<ProjectState>((set) => ({
       };
     }),
 
-  // ── Provider metadata (synced to providerMetaStore) ──
+  // ── Provider metadata (synced to llmProfileMetaStore) ──
 
   setProviderCommands: (llmProfileId, commands) => {
-    useProviderMetaStore.getState().setProviderCommands(llmProfileId, commands);
+    useLlmProfileMetaStore.getState().setProviderCommands(llmProfileId, commands);
   },
 
   setProviderCapabilities: (llmProfileId, capabilities) => {
-    useProviderMetaStore.getState().setProviderCapabilities(llmProfileId, capabilities);
+    useLlmProfileMetaStore.getState().setProviderCapabilities(llmProfileId, capabilities);
   },
 }));
 
 function syncLegacyProviderSnapshot(activeServerId?: string | null): void {
-  const providerMetaState = useProviderMetaStore.getState();
+  const providerMetaState = useLlmProfileMetaStore.getState();
   useProjectStore.setState({
     providers: providerMetaState.getProviders(activeServerId),
     providerCommands: providerMetaState.providerCommands,
@@ -428,7 +428,7 @@ function syncSelectionSnapshot(): void {
   });
 }
 
-const providerMetaSubscribe = (useProviderMetaStore as typeof useProviderMetaStore & {
+const providerMetaSubscribe = (useLlmProfileMetaStore as typeof useLlmProfileMetaStore & {
   subscribe?: (listener: () => void) => () => void;
 }).subscribe;
 
@@ -533,7 +533,7 @@ function mergeProjectPreservingFields(existing: Project | undefined, incoming: P
     ...existing,
     ...incoming,
     rootPath: incoming.rootPath ?? existing.rootPath,
-    llmProfileId: incoming.llmProfileId ?? existing.llmProfileId,
+    defaultAgentProfileId: incoming.defaultAgentProfileId ?? existing.defaultAgentProfileId,
     systemPrompt: incoming.systemPrompt ?? existing.systemPrompt,
     permissionPolicy: incoming.permissionPolicy ?? existing.permissionPolicy,
     agent: incoming.agent ?? existing.agent,

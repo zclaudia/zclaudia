@@ -77,7 +77,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     try {
       const [agentData, llmData] = await Promise.all([
         api.listAgentProfiles(),
-        api.getProviders(),
+        api.listLlmProfiles(),
       ]);
       setAgents(agentData);
       setLlmProfiles(llmData);

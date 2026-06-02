@@ -17,7 +17,7 @@ import {
 import { useState } from 'react';
 import { useLocalPRStore } from '../store';
 import { useProjectStore } from '../../../stores/projectStore';
-import { useProviderMetaStore } from '../../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useIsMobile } from '../../../hooks/useMediaQuery';
 import * as api from '../../../services/api';
@@ -65,7 +65,7 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
   } = useLocalPRStore();
   const activeServerId = useServerStore((s) => s.activeServerId);
   const legacyProviders = useProjectStore((s) => s.providers);
-  const scopedProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const providers = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
   const projects = useProjectStore((s) => s.projects);
   const sessions = useProjectStore((s) => s.sessions);
@@ -75,7 +75,12 @@ export function LocalPRCard({ pr, projectId }: LocalPRCardProps) {
   const showExecutionState = pr.executionState !== 'idle';
 
   const project = projects.find((p) => p.id === projectId);
-  const defaultLlmProfileId = project?.reviewLlmProfileId || project?.llmProfileId || '';
+  // NOTE: prior to sub-project C this fell back to `project.llmProfileId`. That field
+  // has been replaced by `project.defaultAgentProfileId`, which points at an
+  // agent profile, not an LLM profile. The agent → llm resolution is now done
+  // server-side by the review pipeline; the UI only forwards the explicit
+  // `reviewLlmProfileId` override (if any).
+  const defaultLlmProfileId = project?.reviewLlmProfileId || '';
 
   const branchShort = pr.branchName.replace(/^(feat|fix|chore|refactor)\//, '');
   const commitCount = pr.commits?.length ?? 0;

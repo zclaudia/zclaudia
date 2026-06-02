@@ -1,11 +1,12 @@
 import { useEffect, useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useChatStore } from '../../stores/chatStore';
 import * as api from '../../services/api';
 import type { ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
+import { useAgentForSession } from '../useAgentForSession';
 
 interface UseProviderCapabilitiesOptions {
   sessionId: string;
@@ -13,10 +14,10 @@ interface UseProviderCapabilitiesOptions {
 }
 
 export function useProviderCapabilities({ sessionId, isConnected }: UseProviderCapabilitiesOptions) {
-  const providerCommands = useProviderMetaStore((s) => s.providerCommands);
-  const providerCapabilities = useProviderMetaStore((s) => s.providerCapabilities);
-  const setProviderCapabilities = useProviderMetaStore((s) => s.setProviderCapabilities);
-  const setProviderCommands = useProviderMetaStore((s) => s.setProviderCommands);
+  const providerCommands = useLlmProfileMetaStore((s) => s.providerCommands);
+  const providerCapabilities = useLlmProfileMetaStore((s) => s.providerCapabilities);
+  const setProviderCapabilities = useLlmProfileMetaStore((s) => s.setProviderCapabilities);
+  const setProviderCommands = useLlmProfileMetaStore((s) => s.setProviderCommands);
   const dataServerId = useProjectStore((s) => s.dataServerId);
   const sessions = useProjectStore((s) => s.sessions);
   const projects = useProjectStore((s) => s.projects);
@@ -27,8 +28,8 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     ? projects.find(p => p.id === currentSession.projectId)
     : null;
 
-  // TODO(agent-profiles): resolve via session.agentProfileId → agent_profile.llm_profile_id once exposed.
-  const llmProfileId = currentProject?.llmProfileId;
+  const { llm } = useAgentForSession(currentSession?.id);
+  const llmProfileId = llm?.id;
   const isBackendDataReady = dataServerId != null && dataServerId === activeServerId;
   const providerScopeKey =
     resolveCanonicalBackendId(activeServerId ?? LEGACY_LOCAL_SERVER_ID, LEGACY_LOCAL_SERVER_ID)
@@ -55,7 +56,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
           console.error('Failed to load provider commands:', err);
         });
     } else {
-      api.getProviderTypeCommands('claude', projectRoot || undefined, { signal: controller.signal })
+      api.getProviderTypeCommands('zclaudia', projectRoot || undefined, { signal: controller.signal })
         .then(commands => {
           setProviderCommands(commandsCacheKey, commands);
         })
@@ -66,7 +67,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     }
 
     return () => controller.abort();
-  }, [currentProject?.llmProfileId, currentProject?.rootPath, isConnected, isBackendDataReady, commandsCacheKey, llmProfileId, setProviderCommands]);
+  }, [llm?.id, currentProject?.rootPath, isConnected, isBackendDataReady, commandsCacheKey, llmProfileId, setProviderCommands]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -75,7 +76,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
 
     const fetchCaps = llmProfileId
       ? api.getProviderCapabilities(llmProfileId, { signal: controller.signal })
-      : api.getProviderTypeCapabilities('claude', { signal: controller.signal });
+      : api.getProviderTypeCapabilities('zclaudia', { signal: controller.signal });
 
     fetchCaps
       .then(caps => {

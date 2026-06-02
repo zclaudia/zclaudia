@@ -4,7 +4,7 @@ import type { ProjectAgent, AgentMode, SupervisorConfig, TrustLevel, LlmProfileC
 import * as api from '../../../services/api';
 import { useSupervisionStore } from '../store';
 import { useProjectStore } from '../../../stores/projectStore';
-import { useProviderMetaStore } from '../../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { Select } from '../../../components/ui/Select';
 
@@ -45,7 +45,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
   const selectSession = useProjectStore((s) => s.selectSession);
   const legacyProviders = useProjectStore((s) => s.providers);
   const activeServerId = useServerStore((s) => s.activeServerId);
-  const scopedProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const storeProviders = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
 
   // Load providers when init form opens
@@ -56,7 +56,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
       const defaultProvider = storeProviders.find((p) => p.isDefault) ?? storeProviders[0];
       if (defaultProvider && !selectedProviderId) setSelectedProviderId(defaultProvider.id);
     } else {
-      api.getProviders().then((data) => {
+      api.listLlmProfiles().then((data) => {
         setProviders(data);
         const defaultProvider = data.find((p) => p.isDefault) ?? data[0];
         if (defaultProvider && !selectedProviderId) setSelectedProviderId(defaultProvider.id);

@@ -49,6 +49,7 @@ const CONFIGS = [
       'src/hooks/__tests__/useProjectManager.test.ts',
       'src/hooks/__tests__/useProviderManager.test.ts',
       'src/hooks/__tests__/useSessionManager.test.ts',
+      'src/hooks/__tests__/useAgentForSession.test.ts',
       'src/hooks/chat/__tests__/useProviderCapabilities.test.ts',
     ],
     exclude: [
@@ -79,6 +80,7 @@ const CONFIGS = [
       'src/hooks/__tests__/useProjectManager.test.ts',
       'src/hooks/__tests__/useProviderManager.test.ts',
       'src/hooks/__tests__/useSessionManager.test.ts',
+      'src/hooks/__tests__/useAgentForSession.test.ts',
       'src/hooks/chat/__tests__/useProviderCapabilities.test.ts',
       'src/services/__tests__/api.test.ts',
       'src/services/__tests__/fileDownload.test.ts',

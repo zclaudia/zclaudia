@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { ProjectSettings } from '../../features/settings/ProjectSettings';
 import { useServerStore } from '../../stores/serverStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
@@ -18,7 +18,7 @@ vi.mock('../../utils/platform', async (importOriginal) => {
 });
 
 vi.mock('../../services/api', () => ({
-  getProviders: vi.fn(() => new Promise(() => {})),
+  listLlmProfiles: vi.fn(() => new Promise(() => {})),
   updateProject: vi.fn().mockResolvedValue({}),
   getSupervisionAgent: vi.fn(() => new Promise(() => {})),
   initSupervisionAgent: vi.fn().mockResolvedValue({
@@ -95,7 +95,7 @@ describe('ProjectSettings', () => {
     } as any);
     vi.mocked(isAndroid).mockReturnValue(false);
 
-    useProviderMetaStore.setState({
+    useLlmProfileMetaStore.setState({
       providersByBackend: {},
       providerCommands: {},
       providerCapabilities: {},
@@ -258,7 +258,7 @@ describe('ProjectSettings', () => {
 
     await renderProjectSettings();
 
-    expect(api.getProviders).not.toHaveBeenCalled();
+    expect(api.listLlmProfiles).not.toHaveBeenCalled();
   });
 
   it('calls api.updateProject and onClose when Save is clicked', async () => {

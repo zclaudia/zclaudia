@@ -76,7 +76,7 @@ function WorkflowEditorWindowContent({ projectId, workflowId, serverUrl, authTok
       try {
         const [projects, providers] = await Promise.all([
           api.getProjects(),
-          api.getProviders(),
+          api.listLlmProfiles(),
         ]);
         if (cancelled) return;
         const store = useProjectStore.getState();

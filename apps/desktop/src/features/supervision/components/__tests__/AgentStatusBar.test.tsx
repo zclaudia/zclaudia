@@ -15,7 +15,7 @@ const mockProjectState = {
 vi.mock('../../../../services/api', () => ({
   initSupervisionAgent: (...args: unknown[]) => mockInitSupervisionAgent(...args),
   updateSupervisionAgentAction: (...args: unknown[]) => mockUpdateSupervisionAgentAction(...args),
-  getProviders: vi.fn().mockResolvedValue([]),
+  listLlmProfiles: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../store', () => ({

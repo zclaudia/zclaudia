@@ -53,8 +53,15 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
   const { createWorkflow, updateWorkflow, loadStepTypes } = useWorkflowStore();
   const projects = useProjectStore(s => s.projects);
   const project = projects.find(p => p.id === projectId);
-  // Fall back to any project with a configured provider (e.g. global workflows have no projectId)
-  const llmProfileId = project?.llmProfileId ?? projects.find(p => p.llmProfileId)?.llmProfileId ?? '';
+  // The workflow editor only needs an LLM profile id for AI-assisted generation.
+  // Sub-project C replaced project.llmProfileId with project.defaultAgentProfileId
+  // (an agent profile id, not an LLM profile id). We no longer resolve a default
+  // LLM profile id from the project at this layer — the LLM is selected via the
+  // agent profile chain at runtime. Pass empty string to keep the existing
+  // contract; T4 may wire this through useAgentForSession if needed.
+  const llmProfileId = '';
+  // Reference `project` and `projects` to preserve the prior signature.
+  void project; void projects;
 
   useEffect(() => {
     loadStepTypes();

@@ -1,7 +1,7 @@
 import { useMemo, useCallback, useEffect } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSelectionStore } from '../../stores/selectionStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
@@ -37,7 +37,7 @@ export function useSidebarData() {
     connectionState: facadeConnectionState,
     backends: facadeBackends,
   });
-  const scopedProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const providers = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
 
   const storeSupervisorAgents = useSupervisionStore((s) => s.agents);
@@ -139,16 +139,11 @@ export function useSidebarData() {
     return sessionsByProject.get(projectId) || [];
   }, [sessionsByProject]);
 
-  const getProviderName = useCallback((session: typeof sessions[0]) => {
-    // TODO(agent-profiles): use session.agentProfileId → agent_profile.llm_profile_id once exposed.
-    const pid = projects.find(p => p.id === session.projectId)?.llmProfileId;
-    if (pid) {
-      const provider = providers.find(p => p.id === pid);
-      return provider?.name || provider?.providerType || pid;
-    }
-    const defaultProvider = providers.find(p => p.isDefault);
-    return defaultProvider?.name || defaultProvider?.providerType || undefined;
-  }, [providers, projects]);
+  // Per spec §4.4 sub-project C: sidebar session rows no longer display a
+  // provider/agent label — the new SessionHeader exposes it instead. We keep
+  // a no-op `getProviderName` for now to avoid touching every Sidebar consumer
+  // in this task (the next task removes the prop drilling altogether).
+  const getProviderName = useCallback((_session: typeof sessions[0]): string | undefined => undefined, []);
 
   const getWorktreeBranch = useCallback((session: typeof sessions[0], project: typeof projects[0] | undefined) => {
     const wd = session.workingDirectory;

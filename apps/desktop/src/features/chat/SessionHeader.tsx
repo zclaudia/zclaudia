@@ -1,6 +1,7 @@
 import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff } from 'lucide-react';
 import type { Session, Project, LlmProfileConfig } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
+import { useAgentForSession } from '../../hooks/useAgentForSession';
 
 const isDesktopTauri = typeof window !== 'undefined'
   && '__TAURI_INTERNALS__' in window
@@ -56,6 +57,7 @@ export function SessionHeader({
   const connectionQuality = useServerStore(s =>
     activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined,
   );
+  const { llm } = useAgentForSession(currentSession?.id);
 
   return (
     <div className="flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 border-b border-border bg-card safe-top-pad">
@@ -115,10 +117,9 @@ export function SessionHeader({
       <div className="hidden sm:flex min-w-0 shrink-0 items-center gap-1.5 text-[9px] leading-none text-muted-foreground">
         <span className="uppercase leading-none tracking-[0.16em] text-muted-foreground/70">Session</span>
         {(() => {
-          // TODO(agent-profiles): resolve provider via session.agentProfileId → agent_profile.llm_profile_id.
-          // For now, fall back to the project's llm_profile_id since session-level llm_profile_id is gone.
-          const pid = currentProject?.llmProfileId;
-          const prov = pid ? providers.find(p => p.id === pid) : undefined;
+          const prov = llm
+            ? providers.find(p => p.id === llm.id) ?? llm
+            : undefined;
           const name = prov?.name || prov?.providerType || 'Claude';
           return (
             <span className="inline-flex h-4 items-center rounded-full border border-border/70 bg-muted/45 px-1.5 text-[9px] font-medium leading-none text-muted-foreground">
@@ -127,6 +128,9 @@ export function SessionHeader({
           );
         })()}
       </div>
+      {/* currentProject is retained on the props contract — T4 will use it to surface
+          agent / project metadata in a richer header layout. */}
+      <span className="hidden" data-stub-project-id={currentProject?.id} />
       {connectionQuality === 'degraded' && (
         <div
           className="flex items-center gap-1 rounded-full border border-warning/40 bg-warning/10 px-1.5 py-0.5 text-[9px] font-medium text-warning shrink-0"

@@ -8,7 +8,7 @@ vi.mock('../notch/PluginPanelRenderer', () => ({
   PluginPanelRenderer: ({ activePluginPanelId }: any) => <div data-testid="plugin-panel">Plugin:{activePluginPanelId}</div>,
 }));
 
-// Mock providerMetaStore (used by projectStore internally)
+// Mock llmProfileMetaStore (used by projectStore internally)
 const { mockProviderMetaStore } = vi.hoisted(() => {
   const state = {
     providersByBackend: {},
@@ -26,8 +26,8 @@ const { mockProviderMetaStore } = vi.hoisted(() => {
   store.destroy = vi.fn();
   return { mockProviderMetaStore: store };
 });
-vi.mock('../../stores/providerMetaStore', () => ({
-  useProviderMetaStore: mockProviderMetaStore,
+vi.mock('../../stores/llmProfileMetaStore', () => ({
+  useLlmProfileMetaStore: mockProviderMetaStore,
 }));
 
 // Mock useIsMobile

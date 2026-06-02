@@ -105,7 +105,7 @@ const mockWindowClose = vi.fn(() => Promise.resolve());
 vi.mock('../../../services/api', () => ({
   getProjects: (...args: any[]) => mockGetProjects(...args),
   getSessions: (...args: any[]) => mockGetSessions(...args),
-  getProviders: (...args: any[]) => mockGetProviders(...args),
+  listLlmProfiles: (...args: any[]) => mockGetProviders(...args),
 }));
 
 vi.mock('../../../hooks/useSelectionCoordinator', () => ({

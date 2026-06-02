@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchApi, getProviders } from '../../services/api';
+import { fetchApi, listLlmProfiles } from '../../services/api';
 import type { LlmProfileConfig } from '@zclaudia/shared';
 import { ShortcutSettings } from './ShortcutSettings';
 import { isDesktopTauri } from '../../utils/platform';
@@ -32,7 +32,7 @@ export function AgentSettings() {
       await loadConfig();
       const [capsRes, providerList] = await Promise.all([
         fetchApi<AgentCapabilities>('/api/agent/capabilities'),
-        getProviders().catch(() => [] as LlmProfileConfig[]),
+        listLlmProfiles().catch(() => [] as LlmProfileConfig[]),
       ]);
       if (capsRes.success && capsRes.data) setCapabilities(capsRes.data);
       setProviders(providerList);

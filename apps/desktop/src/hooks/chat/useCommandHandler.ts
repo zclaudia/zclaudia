@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { activatePanel } from '../../utils/openPanel';
@@ -164,10 +164,10 @@ export function useCommandHandler({
         // Re-fetch commands from server (cache already cleared server-side)
         (llmProfileId
           ? api.getProviderCommands(llmProfileId, currentProject?.rootPath || undefined)
-          : api.getProviderTypeCommands('claude', currentProject?.rootPath || undefined)
+          : api.getProviderTypeCommands('zclaudia', currentProject?.rootPath || undefined)
         )
           .then(cmds => {
-            useProviderMetaStore.getState().setProviderCommands(commandsCacheKey, cmds);
+            useLlmProfileMetaStore.getState().setProviderCommands(commandsCacheKey, cmds);
             addMessage(sessionId, {
               id: crypto.randomUUID(),
               sessionId,
@@ -567,13 +567,15 @@ export function useCommandHandler({
     // Parse args into array
     const argsArray = args.trim() ? args.trim().split(/\s+/) : [];
 
-    // Build context for command execution
+    // Build context for command execution. `llmProfileId` is already resolved
+    // upstream via useProviderCapabilities (which itself goes through
+    // useAgentForSession). Fall back to the provider type `zclaudia` for the
+    // local default agent.
     const context = {
       projectPath: currentProject?.rootPath,
       projectName: currentProject?.name,
       sessionId,
-      // TODO(agent-profiles): resolve via session.agentProfileId → agent_profile.llm_profile_id once exposed.
-      provider: currentProject?.llmProfileId || 'claude',
+      provider: llmProfileId || 'zclaudia',
       model: modelOverride || 'default'
     };
 

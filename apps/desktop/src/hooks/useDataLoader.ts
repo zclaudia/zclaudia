@@ -26,7 +26,7 @@ export function useDataLoader() {
       const [projects, sessions, providers] = await Promise.all([
         api.getProjects({ signal }),
         api.getSessions(undefined, { signal }),
-        api.getProviders({ signal }),
+        api.listLlmProfiles({ signal }),
       ]);
       // Sync plugin state from server (non-blocking — don't fail data load if plugins API is unavailable)
       api.fetchAndSyncPlugins({ signal }).catch(() => {});

@@ -147,7 +147,7 @@ function SessionChatContent({ sessionId, projectId }: SessionChatContentProps) {
         const [projects, sessions, providers] = await Promise.all([
           api.getProjects(),
           api.getSessions(),
-          api.getProviders(),
+          api.listLlmProfiles(),
         ]);
 
         if (cancelled) return;

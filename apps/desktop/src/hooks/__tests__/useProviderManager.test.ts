@@ -5,9 +5,9 @@ import { useProviderManager } from '../useProviderManager.js';
 
 // Mock the api module
 vi.mock('../../services/api', () => ({
-  createProvider: vi.fn(),
-  updateProvider: vi.fn(),
-  deleteProvider: vi.fn(),
+  createLlmProfile: vi.fn(),
+  updateLlmProfile: vi.fn(),
+  deleteLlmProfile: vi.fn(),
 }));
 
 describe('hooks/useProviderManager', () => {
@@ -19,14 +19,14 @@ describe('hooks/useProviderManager', () => {
     vi.clearAllMocks();
 
     const api = vi.importMock('../../services/api') as {
-      createProvider: ReturnType<typeof vi.fn>;
-      updateProvider: ReturnType<typeof vi.fn>;
-      deleteProvider: ReturnType<typeof vi.fn>;
+      createLlmProfile: ReturnType<typeof vi.fn>;
+      updateLlmProfile: ReturnType<typeof vi.fn>;
+      deleteLlmProfile: ReturnType<typeof vi.fn>;
     };
 
-    mockCreateProvider = api.createProvider;
-    mockUpdateProvider = api.updateProvider;
-    mockDeleteProvider = api.deleteProvider;
+    mockCreateProvider = api.createLlmProfile;
+    mockUpdateProvider = api.updateLlmProfile;
+    mockDeleteProvider = api.deleteLlmProfile;
   });
 
   describe('return value', () => {
@@ -59,7 +59,7 @@ describe('hooks/useProviderManager', () => {
 
   describe('addProvider', () => {
     it('calls createProvider API with provider data', async () => {
-      const { createProvider } = await import('../../services/api.js');
+      const { createLlmProfile } = await import('../../services/api.js');
       const { result } = renderHook(() => useProviderManager());
 
       const providerData = {
@@ -70,14 +70,14 @@ describe('hooks/useProviderManager', () => {
 
       await result.current.addProvider(providerData);
 
-      expect(createProvider).toHaveBeenCalledWith(providerData);
-      expect(createProvider).toHaveBeenCalledTimes(1);
+      expect(createLlmProfile).toHaveBeenCalledWith(providerData);
+      expect(createLlmProfile).toHaveBeenCalledTimes(1);
     });
 
     it('propagates errors from createProvider', async () => {
-      const { createProvider } = await import('../../services/api.js');
+      const { createLlmProfile } = await import('../../services/api.js');
       const error = new Error('API error');
-      vi.mocked(createProvider).mockRejectedValueOnce(error);
+      vi.mocked(createLlmProfile).mockRejectedValueOnce(error);
 
       const { result } = renderHook(() => useProviderManager());
 
@@ -89,21 +89,21 @@ describe('hooks/useProviderManager', () => {
 
   describe('updateProvider', () => {
     it('calls updateProvider API with id and updates', async () => {
-      const { updateProvider } = await import('../../services/api.js');
+      const { updateLlmProfile } = await import('../../services/api.js');
       const { result } = renderHook(() => useProviderManager());
 
       const updates = { apiKey: 'new-key' };
 
       await result.current.updateProvider('provider-1', updates);
 
-      expect(updateProvider).toHaveBeenCalledWith('provider-1', updates);
-      expect(updateProvider).toHaveBeenCalledTimes(1);
+      expect(updateLlmProfile).toHaveBeenCalledWith('provider-1', updates);
+      expect(updateLlmProfile).toHaveBeenCalledTimes(1);
     });
 
     it('propagates errors from updateProvider', async () => {
-      const { updateProvider } = await import('../../services/api.js');
+      const { updateLlmProfile } = await import('../../services/api.js');
       const error = new Error('Update failed');
-      vi.mocked(updateProvider).mockRejectedValueOnce(error);
+      vi.mocked(updateLlmProfile).mockRejectedValueOnce(error);
 
       const { result } = renderHook(() => useProviderManager());
 
@@ -115,19 +115,19 @@ describe('hooks/useProviderManager', () => {
 
   describe('deleteProvider', () => {
     it('calls deleteProvider API with id', async () => {
-      const { deleteProvider } = await import('../../services/api.js');
+      const { deleteLlmProfile } = await import('../../services/api.js');
       const { result } = renderHook(() => useProviderManager());
 
       await result.current.deleteProvider('provider-1');
 
-      expect(deleteProvider).toHaveBeenCalledWith('provider-1');
-      expect(deleteProvider).toHaveBeenCalledTimes(1);
+      expect(deleteLlmProfile).toHaveBeenCalledWith('provider-1');
+      expect(deleteLlmProfile).toHaveBeenCalledTimes(1);
     });
 
     it('propagates errors from deleteProvider', async () => {
-      const { deleteProvider } = await import('../../services/api.js');
+      const { deleteLlmProfile } = await import('../../services/api.js');
       const error = new Error('Delete failed');
-      vi.mocked(deleteProvider).mockRejectedValueOnce(error);
+      vi.mocked(deleteLlmProfile).mockRejectedValueOnce(error);
 
       const { result } = renderHook(() => useProviderManager());
 
@@ -139,21 +139,21 @@ describe('hooks/useProviderManager', () => {
 
   describe('integration scenarios', () => {
     it('can perform CRUD operations in sequence', async () => {
-      const { createProvider, updateProvider, deleteProvider } = await import('../../services/api.js');
+      const { createLlmProfile, updateLlmProfile, deleteLlmProfile } = await import('../../services/api.js');
 
       const { result } = renderHook(() => useProviderManager());
 
       // Create
       await result.current.addProvider({ name: 'test', type: 'claude' });
-      expect(createProvider).toHaveBeenCalled();
+      expect(createLlmProfile).toHaveBeenCalled();
 
       // Update
       await result.current.updateProvider('test-id', { name: 'updated' });
-      expect(updateProvider).toHaveBeenCalled();
+      expect(updateLlmProfile).toHaveBeenCalled();
 
       // Delete
       await result.current.deleteProvider('test-id');
-      expect(deleteProvider).toHaveBeenCalled();
+      expect(deleteLlmProfile).toHaveBeenCalled();
     });
   });
 });

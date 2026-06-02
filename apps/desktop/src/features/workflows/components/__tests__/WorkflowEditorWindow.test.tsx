@@ -21,7 +21,7 @@ vi.stubGlobal('fetch', mockFetch);
 
 vi.mock('../../../../services/api', () => ({
   getProjects: vi.fn().mockResolvedValue([]),
-  getProviders: vi.fn().mockResolvedValue([]),
+  listLlmProfiles: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('../../../../utils/platform', async (importOriginal) => {
@@ -196,6 +196,6 @@ describe('WorkflowEditorWindow', () => {
     await Promise.resolve();
 
     expect(api.getProjects).not.toHaveBeenCalled();
-    expect(api.getProviders).not.toHaveBeenCalled();
+    expect(api.listLlmProfiles).not.toHaveBeenCalled();
   });
 });

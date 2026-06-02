@@ -3,7 +3,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import * as api from '../../../services/api';
 import { useProviderCapabilities } from '../useProviderCapabilities';
 import { useProjectStore } from '../../../stores/projectStore';
-import { useProviderMetaStore } from '../../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
+import { useAgentProfileMetaStore } from '../../../stores/agentProfileMetaStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useChatStore } from '../../../stores/chatStore';
 
@@ -12,6 +13,13 @@ vi.mock('../../../services/api', () => ({
   getProviderTypeCommands: vi.fn(),
   getProviderCapabilities: vi.fn(),
   getProviderTypeCapabilities: vi.fn(),
+}));
+
+// useAgentForSession imports listAgentProfiles directly from
+// '../services/api/agent-profiles' (not the barrel). Mock it to avoid making
+// real network requests inside the agent store's loadAll().
+vi.mock('../../../services/api/agent-profiles', () => ({
+  listAgentProfiles: vi.fn().mockResolvedValue([]),
 }));
 
 describe('useProviderCapabilities', () => {
@@ -25,10 +33,16 @@ describe('useProviderCapabilities', () => {
       },
     } as any);
 
-    useProviderMetaStore.setState({
+    useLlmProfileMetaStore.setState({
       providersByBackend: {},
       providerCommands: {},
       providerCapabilities: {},
+    } as any);
+
+    useAgentProfileMetaStore.setState({
+      profiles: {},
+      loaded: true,
+      loading: false,
     } as any);
 
     useProjectStore.setState({
@@ -70,35 +84,57 @@ describe('useProviderCapabilities', () => {
 
     await waitFor(() => {
       expect(api.getProviderTypeCommands).toHaveBeenCalledWith(
-        'claude',
+        'zclaudia',
         '/test',
         expect.any(Object)
       );
       expect(api.getProviderTypeCapabilities).toHaveBeenCalledWith(
-        'claude',
+        'zclaudia',
         expect.any(Object)
       );
     });
 
     expect(result.current.llmProfileId).toBeUndefined();
-    expect(useProviderMetaStore.getState().providerCommands['local:_default']).toEqual(
+    expect(useLlmProfileMetaStore.getState().providerCommands['local:_default']).toEqual(
       expect.arrayContaining([{ command: '/help', description: 'help', source: 'provider' }])
     );
-    expect(useProviderMetaStore.getState().providerCapabilities['local:_default']).toEqual(
+    expect(useLlmProfileMetaStore.getState().providerCapabilities['local:_default']).toEqual(
       expect.objectContaining({ defaultModeId: 'plan' })
     );
     expect(useChatStore.getState().setMode).toHaveBeenCalledWith('sess-1', 'plan');
   });
 
-  it('loads provider-specific metadata when project has llmProfileId', async () => {
-    // Sub-project B removed `session.llmProfileId`; the hook now resolves the
-    // profile via `project.llmProfileId` (see `useProviderCapabilities.ts`
-    // TODO(agent-profiles) — will be re-routed through agent_profile.llm_profile_id
-    // when sub-project C wires agent.llm_profile_id through the session payload).
+  it('loads provider-specific metadata when session resolves to agent → llm-profile', async () => {
+    // The session points at an agent profile; the agent profile points at an LLM
+    // profile. useProviderCapabilities resolves both via useAgentForSession.
     useProjectStore.setState({
-      projects: [{ id: 'proj-1', name: 'Project', rootPath: '/test', llmProfileId: 'prov-1' }],
-      sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Session' }],
-      providers: [{ id: 'prov-1', name: 'Claude', type: 'claude' }],
+      projects: [{ id: 'proj-1', name: 'Project', rootPath: '/test' }],
+      sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Session', agentProfileId: 'ap-1' }],
+      providers: [],
+    } as any);
+
+    useAgentProfileMetaStore.setState({
+      profiles: {
+        'ap-1': {
+          id: 'ap-1',
+          name: 'Coder',
+          llmProfileId: 'prov-1',
+          enabledTools: [],
+          isDefault: true,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      },
+      loaded: true,
+      loading: false,
+    } as any);
+
+    useLlmProfileMetaStore.setState({
+      providersByBackend: {
+        local: [{ id: 'prov-1', name: 'Claude', providerType: 'claude', createdAt: 0, updatedAt: 0 }],
+      },
+      providerCommands: {},
+      providerCapabilities: {},
     } as any);
 
     const { result } = renderHook(() =>
@@ -118,10 +154,10 @@ describe('useProviderCapabilities', () => {
     });
 
     expect(result.current.llmProfileId).toBe('prov-1');
-    expect(useProviderMetaStore.getState().providerCommands['local:prov-1']).toEqual(
+    expect(useLlmProfileMetaStore.getState().providerCommands['local:prov-1']).toEqual(
       expect.arrayContaining([{ command: '/provider', description: 'provider', source: 'provider' }])
     );
-    expect(useProviderMetaStore.getState().providerCapabilities['local:prov-1']).toEqual(
+    expect(useLlmProfileMetaStore.getState().providerCapabilities['local:prov-1']).toEqual(
       expect.objectContaining({ defaultModeId: 'code' })
     );
   });

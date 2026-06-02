@@ -3,7 +3,7 @@ import type { Project, LlmProfileConfig, UnifiedPermissionPolicy, PermissionCate
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useProviderMetaStore } from '../../stores/providerMetaStore';
+import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import * as api from '../../services/api';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
@@ -57,7 +57,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
   const removeAgent = useSupervisionStore((s) => s.removeAgent);
   const [projectWorkspaceLoading, setProjectWorkspaceLoading] = useState(false);
 
-  const scopedProviders = useProviderMetaStore((s) => s.getProviders(activeServerId));
+  const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const storeProviders = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
   const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
   const [saving, setSaving] = useState(false);
@@ -116,7 +116,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
     setName(project.name);
     setRootPath(project.rootPath || '');
-    setProviderId(project.llmProfileId || '');
+    setProviderId(project.defaultAgentProfileId || '');
     setReviewProviderId(project.reviewLlmProfileId || '');
     setPermissionWorkflowOverrideId(project.permissionWorkflowOverrideId || '');
     setSystemPrompt(project.systemPrompt || '');
@@ -131,7 +131,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
     project?.id,
     project?.name,
     project?.rootPath,
-    project?.llmProfileId,
+    project?.defaultAgentProfileId,
     project?.reviewLlmProfileId,
     project?.permissionWorkflowOverrideId,
     project?.systemPrompt,
@@ -166,14 +166,14 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
   }, [isOpen, project?.id, isConnected, setAgent, removeAgent, updateProject]);
 
   const loadProviders = async () => {
-    const current = useProviderMetaStore.getState().getProviders(activeServerId);
+    const current = useLlmProfileMetaStore.getState().getProviders(activeServerId);
     if (current.length > 0) {
       setProviders(current);
     }
     try {
-      const data = await api.getProviders();
+      const data = await api.listLlmProfiles();
       setProviders(data);
-      useProviderMetaStore.getState().setProviders(data, activeServerId);
+      useLlmProfileMetaStore.getState().setProviders(data, activeServerId);
     } catch (error) {
       console.error('Failed to load providers:', error);
     }
@@ -211,7 +211,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
       const updates: Partial<Project> = {
         name: name.trim(),
         rootPath: rootPath.trim() || undefined,
-        llmProfileId: llmProfileId || undefined,
+        defaultAgentProfileId: llmProfileId || undefined,
         reviewLlmProfileId: reviewLlmProfileId || undefined,
         permissionWorkflowOverrideId: permissionWorkflowOverrideId || undefined,
         systemPrompt: systemPrompt.trim() || undefined,
