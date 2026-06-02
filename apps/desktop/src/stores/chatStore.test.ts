@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatStore } from './chatStore';
 import type { Message } from '@zclaudia/shared';
+import type { UsageInfo } from '@zclaudia/shared/core/message';
+
+const u = (input: number, output: number): UsageInfo => ({
+  input, output, cacheRead: 0, cacheWrite: 0, totalTokens: input + output,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+});
 
 describe('chatStore', () => {
   beforeEach(() => {
@@ -257,7 +263,7 @@ describe('chatStore', () => {
 
   describe('sessionUsage', () => {
     it('addSessionUsage initializes usage for new session', () => {
-      useChatStore.getState().addSessionUsage('session-1', { inputTokens: 100, outputTokens: 50 });
+      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
 
       const usage = useChatStore.getState().sessionUsage['session-1'];
       expect(usage).toEqual({
@@ -269,8 +275,8 @@ describe('chatStore', () => {
     });
 
     it('addSessionUsage accumulates tokens across multiple calls', () => {
-      useChatStore.getState().addSessionUsage('session-1', { inputTokens: 100, outputTokens: 50 });
-      useChatStore.getState().addSessionUsage('session-1', { inputTokens: 200, outputTokens: 75 });
+      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
+      useChatStore.getState().addSessionUsage('session-1', u(200, 75));
 
       const usage = useChatStore.getState().sessionUsage['session-1'];
       expect(usage).toEqual({
@@ -282,8 +288,8 @@ describe('chatStore', () => {
     });
 
     it('addSessionUsage does not affect other sessions', () => {
-      useChatStore.getState().addSessionUsage('session-1', { inputTokens: 100, outputTokens: 50 });
-      useChatStore.getState().addSessionUsage('session-2', { inputTokens: 200, outputTokens: 75 });
+      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
+      useChatStore.getState().addSessionUsage('session-2', u(200, 75));
 
       expect(useChatStore.getState().sessionUsage['session-1']).toEqual({
         inputTokens: 100,
@@ -300,8 +306,8 @@ describe('chatStore', () => {
     });
 
     it('clearSessionUsage removes only the reset session usage', () => {
-      useChatStore.getState().addSessionUsage('session-1', { inputTokens: 100, outputTokens: 50 });
-      useChatStore.getState().addSessionUsage('session-2', { inputTokens: 200, outputTokens: 75 });
+      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
+      useChatStore.getState().addSessionUsage('session-2', u(200, 75));
 
       useChatStore.getState().clearSessionUsage('session-1');
 

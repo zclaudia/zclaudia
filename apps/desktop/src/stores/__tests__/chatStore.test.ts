@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatStore, type MessageWithToolCalls } from '../chatStore';
+import type { UsageInfo } from '@zclaudia/shared/core/message';
+
+const u = (input: number, output: number): UsageInfo => ({
+  input, output, cacheRead: 0, cacheWrite: 0, totalTokens: input + output,
+  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+});
 
 const makeMsg = (id: string, role: 'user' | 'assistant' = 'user', content = 'hello'): MessageWithToolCalls => ({
   id,
@@ -397,20 +403,20 @@ describe('chatStore', () => {
 
   describe('addSessionUsage', () => {
     it('accumulates usage', () => {
-      useChatStore.getState().addSessionUsage('sess-1', { inputTokens: 100, outputTokens: 50 });
-      useChatStore.getState().addSessionUsage('sess-1', { inputTokens: 200, outputTokens: 100, contextWindow: 100000 });
+      useChatStore.getState().addSessionUsage('sess-1', u(100, 50));
+      useChatStore.getState().addSessionUsage('sess-1', u(200, 100));
 
       const usage = useChatStore.getState().sessionUsage['sess-1'];
       expect(usage.inputTokens).toBe(300);
       expect(usage.outputTokens).toBe(150);
-      expect(usage.contextWindow).toBe(100000);
+      expect(usage.contextWindow).toBeUndefined();
       expect(usage.latestInputTokens).toBe(200);
       expect(usage.latestOutputTokens).toBe(100);
     });
 
     it('clears usage for the reset session only', () => {
-      useChatStore.getState().addSessionUsage('sess-1', { inputTokens: 100, outputTokens: 50 });
-      useChatStore.getState().addSessionUsage('sess-2', { inputTokens: 200, outputTokens: 100, contextWindow: 100000 });
+      useChatStore.getState().addSessionUsage('sess-1', u(100, 50));
+      useChatStore.getState().addSessionUsage('sess-2', u(200, 100));
 
       useChatStore.getState().clearSessionUsage('sess-1');
 
@@ -418,7 +424,6 @@ describe('chatStore', () => {
       expect(useChatStore.getState().sessionUsage['sess-2']).toEqual({
         inputTokens: 200,
         outputTokens: 100,
-        contextWindow: 100000,
         latestInputTokens: 200,
         latestOutputTokens: 100,
       });

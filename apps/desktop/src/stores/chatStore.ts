@@ -616,11 +616,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         sessionUsage: {
           ...state.sessionUsage,
           [sessionId]: {
-            inputTokens: existing.inputTokens + usage.inputTokens,
-            outputTokens: existing.outputTokens + usage.outputTokens,
-            contextWindow: usage.contextWindow || existing.contextWindow,
-            latestInputTokens: usage.inputTokens,
-            latestOutputTokens: usage.outputTokens,
+            inputTokens: existing.inputTokens + usage.input,
+            outputTokens: existing.outputTokens + usage.output,
+            contextWindow: existing.contextWindow,
+            latestInputTokens: usage.input,
+            latestOutputTokens: usage.output,
           },
         },
       };
