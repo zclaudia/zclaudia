@@ -144,6 +144,7 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
       'tool_activity',
       'mode_change',
       'system_info',
+      'message_appended',
     ],
     handle: handleRunMessage,
   },

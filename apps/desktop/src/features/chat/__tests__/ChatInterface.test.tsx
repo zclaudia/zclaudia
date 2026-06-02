@@ -1367,7 +1367,7 @@ describe('ChatInterface', () => {
     expect(input?.getAttribute('data-placeholder')).not.toContain('Plan Mode');
   });
 
-  it('shows queue placeholder when loading', () => {
+  it('shows steer placeholder when loading', () => {
     setDefaultStores({
       chatStore: {
         activeRuns: { 'run-1': 'sess-1' },
@@ -1377,7 +1377,7 @@ describe('ChatInterface', () => {
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const input = container.querySelector('[data-testid="message-input"]');
-    expect(input?.getAttribute('data-placeholder')).toContain('Type next message to queue');
+    expect(input?.getAttribute('data-placeholder')).toContain('steer');
   });
 
   it('restores session draft attachments into MessageInput', () => {

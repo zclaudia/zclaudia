@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { UnifiedPermissionPolicy, ClientMessage, MessageAttachment, MessageInput as MessageInputData } from '@zclaudia/shared';
 import type { Attachment } from '../../features/chat/MessageInput';
 import type { MessageWithToolCalls } from '../../stores/chatStore';
-import { useChatStore } from '../../stores/chatStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -90,7 +89,6 @@ export function useSendMessage({
   const [restoreMessage, setRestoreMessage] = useState<{ content: string; attachments?: Attachment[] } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [resendChecking, setResendChecking] = useState(false);
-  const [queuedMessage, setQueuedMessage] = useState<{ content: string; attachments?: Attachment[] } | null>(null);
 
   // ── Resend logic ──
   const resendTargetMessage = useMemo(() => {
@@ -137,34 +135,31 @@ export function useSendMessage({
     if (!content.trim() && !attachments?.length) return;
 
     if (!isConnected) {
-      setQueuedMessage({ content, attachments });
       useToastStore.getState().add({
-        type: 'info',
+        type: 'error',
         title: '后端未连接',
-        message: '消息已排队，正在尝试重新连接远程后端。',
+        message: '无法发送消息：远程后端未连接。请稍后重试。',
       });
       return;
     }
 
     if (isLoading) {
-      try {
-        const recovered = await reconcileStaleLoadingRun({
-          sessionId,
-          sessionRunId,
-          isLoading,
-          getSessionRunState: api.getSessionRunState,
-          clearLocalRun: (runId) => useChatStore.getState().endRun(runId),
-          clearSessionActive: (staleSessionId) => useProjectStore.getState().setSessionActive(staleSessionId, false),
-        });
-        if (!recovered) {
-          setQueuedMessage({ content, attachments });
-          return;
-        }
-      } catch (error) {
-        console.warn('[useSendMessage] Failed to reconcile local run state before queueing:', error);
-        setQueuedMessage({ content, attachments });
+      if (!sessionRunId) {
+        console.warn('[useSendMessage] isLoading but no sessionRunId — cannot steer');
         return;
       }
+      if (attachments?.length) {
+        setUploadError('Cannot send attachments while agent is running — cancel first or wait');
+        return;
+      }
+      const trimmed = content.trim();
+      if (!trimmed) return;
+      wsSendMessage({
+        type: 'run_steer',
+        runId: sessionRunId,
+        content: trimmed,
+      });
+      return;
     }
 
     setLastSentMessage({ content, attachments });
@@ -225,21 +220,7 @@ export function useSendMessage({
     useInteractionStore.getState().clearClientSynthPlanReviewsForSession(sessionId);
 
     setTimeout(() => scrollToBottom(), 100);
-  }, [sessionId, isConnected, isLoading, sessionRunId, mode, modelOverride, permissionOverride, currentSession, addMessage, startRun, scrollToBottom]);
-
-  // ── Auto-send queued message when the current run finishes ──
-  const queuedMessageRef = useRef(queuedMessage);
-  queuedMessageRef.current = queuedMessage;
-  const handleSendMessageRef = useRef(handleSendMessage);
-  handleSendMessageRef.current = handleSendMessage;
-
-  useEffect(() => {
-    if (!isLoading && isConnected && queuedMessageRef.current) {
-      const { content, attachments } = queuedMessageRef.current;
-      setQueuedMessage(null);
-      setTimeout(() => handleSendMessageRef.current?.(content, attachments), 0);
-    }
-  }, [isLoading, isConnected]);
+  }, [sessionId, isConnected, isLoading, sessionRunId, mode, modelOverride, permissionOverride, currentSession, addMessage, startRun, scrollToBottom, wsSendMessage]);
 
   // ── Resend last message ──
   const handleResendLastMessage = useCallback(async () => {
@@ -284,7 +265,7 @@ export function useSendMessage({
     }
   }, [resendText, sessionId, addMessage, startRun, mode, modelOverride, permissionOverride, currentSession, scrollToBottom]);
 
-  // ── Cancel / queue actions ──
+  // ── Cancel ──
   const handleCancelRun = useCallback(() => {
     if (lastSentMessage) {
       setRestoreMessage(lastSentMessage);
@@ -297,41 +278,23 @@ export function useSendMessage({
     wsSendMessage({ type: 'run_cancel', runId: sessionRunId });
   }, [lastSentMessage, sessionRunId, wsSendMessage]);
 
-  const handleSendNow = useCallback(() => {
-    if (!sessionRunId) return;
-    setLastSentMessage(null);
-    wsSendMessage({ type: 'run_cancel', runId: sessionRunId });
-  }, [sessionRunId, wsSendMessage]);
-
-  const handleDismissQueue = useCallback(() => {
-    const msg = queuedMessage;
-    setQueuedMessage(null);
-    if (msg) {
-      setRestoreMessage({ content: msg.content, attachments: msg.attachments });
-    }
-  }, [queuedMessage]);
-
   // ── Reset on session switch ──
   const resetSendState = useCallback(() => {
     setLastSentMessage(null);
     setRestoreMessage(null);
     setUploadError(null);
     setResendChecking(false);
-    setQueuedMessage(null);
   }, []);
 
   return {
     handleSendMessage,
     handleCancelRun,
-    handleSendNow,
-    handleDismissQueue,
     handleResendLastMessage,
     startRun,
     clearInterruptedStatus,
     // State
     restoreMessage,
     uploadError,
-    queuedMessage,
     resendTargetMessage,
     resendText,
     resendChecking,

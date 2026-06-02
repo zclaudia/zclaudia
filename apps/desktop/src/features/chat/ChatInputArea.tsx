@@ -47,7 +47,6 @@ interface ChatInputAreaProps {
   advancedInput: boolean;
   restoreMessage: { content: string; attachments?: Attachment[] } | null;
   initialDraft: SessionDraft | undefined;
-  queuedMessage: { content: string; attachments?: Attachment[] } | null;
   draftExists: boolean;
   onSetMode: (sessionId: string, modeId: string) => void;
   onSetModelOverride: (sessionId: string, model: string) => void;
@@ -79,7 +78,6 @@ export function ChatInputArea({
   advancedInput,
   restoreMessage,
   initialDraft,
-  queuedMessage,
   draftExists,
   onSetMode,
   onSetModelOverride,
@@ -514,10 +512,8 @@ export function ChatInputArea({
         placeholder={
           !isConnected
             ? 'Connecting...'
-            : isLoading && queuedMessage
-            ? 'Message queued — waiting for response...'
             : isLoading
-            ? 'Type next message to queue...'
+            ? 'Type to steer mid-run (delivered next turn)...'
             : mode === 'plan'
             ? 'Plan Mode: Analyze and plan (no code changes)...'
             : advancedInput

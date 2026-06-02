@@ -203,7 +203,6 @@ const baseProps = {
   advancedInput: false,
   restoreMessage: null,
   initialDraft: { content: '', attachments: [] },
-  queuedMessage: null,
   draftExists: false,
   onSetMode: vi.fn(),
   onSetModelOverride: vi.fn(),

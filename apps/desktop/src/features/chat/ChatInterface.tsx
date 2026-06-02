@@ -6,7 +6,6 @@ import { ChatMessagePane } from './ChatMessagePane';
 import { PoppedOutPlaceholder } from './PoppedOutPlaceholder';
 import { InterruptedBanner } from './InterruptedBanner';
 import { PlanStatusBar } from './PlanStatusBar';
-import { QueuedMessageBanner } from './QueuedMessageBanner';
 import { SessionHeader } from './SessionHeader';
 import { BackgroundTaskPanel } from '../../components/BackgroundTaskPanel';
 import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
@@ -104,9 +103,9 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
     mode: effectiveMode, modelOverride, permissionOverride, currentSession, addMessage, scrollToBottom, wsSendMessage,
   });
   const {
-    handleSendMessage, handleCancelRun, handleSendNow, handleDismissQueue, handleResendLastMessage,
+    handleSendMessage, handleCancelRun, handleResendLastMessage,
     startRun, clearInterruptedStatus,
-    restoreMessage, uploadError, queuedMessage, resendTargetMessage, resendText, resendChecking,
+    restoreMessage, uploadError, resendTargetMessage, resendText, resendChecking,
     resetSendState,
   } = send;
 
@@ -292,15 +291,6 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
       {beforeComposer}
 
-      {/* Queued message banner */}
-      {queuedMessage && (
-        <QueuedMessageBanner
-          content={queuedMessage.content}
-          onSendNow={handleSendNow}
-          onDismiss={handleDismissQueue}
-        />
-      )}
-
       {/* Upload error banner */}
       {uploadError && (
         <div className="mx-2 md:mx-4 mt-2 px-3 py-2 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
@@ -333,7 +323,6 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           advancedInput={advancedInput}
           restoreMessage={restoreMessage}
           initialDraft={initialDraft}
-          queuedMessage={queuedMessage}
           draftExists={draftExists}
           onSetMode={setMode}
           onSetModelOverride={setModelOverride}

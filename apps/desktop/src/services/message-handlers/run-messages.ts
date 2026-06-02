@@ -132,6 +132,11 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
           source: 'run_event',
           cleanupChatRuns: false,
         });
+        // Steer cancel path: server returns un-consumed steer drafts joined as restoreDraft
+        // so the input box reflows the steer text the user can edit + resend as a new run.
+        if (msg.restoreDraft && serverId === activeServerId) {
+          useChatStore.getState().setPendingPrefill(failedSession, msg.restoreDraft);
+        }
         void eagerSyncCurrentSession(serverId);
         void recoverCurrentSessionTail(serverId, failedSession);
       }
@@ -141,6 +146,25 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       serverRunsRef.get(serverId)?.delete(msg.runId);
       ctx.clearRunSeq(msg.runId);
       console.error(`[${logTag}] Run failed:`, msg.error);
+      return true;
+    }
+
+    case 'message_appended': {
+      // Mid-run steer broadcast: render the user message immediately in the stream
+      // so the user sees feedback before the agent's next turn picks it up.
+      const appendedSession = msg.sessionId;
+      if (!appendedSession) {
+        console.warn(`[${logTag}] message_appended missing sessionId, ignoring`);
+        return true;
+      }
+      const messageId = crypto.randomUUID();
+      useChatStore.getState().addMessage(appendedSession, {
+        id: messageId,
+        sessionId: appendedSession,
+        role: msg.role,
+        content: msg.content,
+        createdAt: msg.timestamp,
+      });
       return true;
     }
 
