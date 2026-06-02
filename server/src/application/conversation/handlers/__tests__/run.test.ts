@@ -130,4 +130,26 @@ describe('handleRunSteer', () => {
     expect(steerSpy).not.toHaveBeenCalled();
     expect(sent[0]).toMatchObject({ type: 'error', code: 'STEER_NO_ACTIVE_RUN' });
   });
+
+  it('returns STEER_FAILED when steerHandle.steer throws', async () => {
+    const { client, sent } = makeClient();
+    const throwingSteer = vi.fn().mockImplementation(() => { throw new Error('queue closed'); });
+    activeRuns.set('r1', {
+      runId: 'r1',
+      sessionId: 's1',
+      completed: false,
+      steerHandle: { steer: throwingSteer },
+      pendingSteers: [],
+    } as never);
+    await handleRunSteer(
+      client,
+      { type: 'run_steer', runId: 'r1', content: 'x' },
+      activeRuns,
+      broadcastMock,
+    );
+    expect(throwingSteer).toHaveBeenCalled();
+    expect(activeRuns.get('r1')!.pendingSteers).toHaveLength(0);   // not pushed
+    expect(broadcastMock).not.toHaveBeenCalled();                   // not broadcast
+    expect(sent[0]).toMatchObject({ type: 'error', code: 'STEER_FAILED' });
+  });
 });

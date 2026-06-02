@@ -242,14 +242,21 @@ export async function handleRunSteer(
     return;
   }
 
+  const now = Date.now();
   const agentMessage: AgentMessage = {
     role: 'user',
     content: [{ type: 'text', text: trimmed }],
-    timestamp: Date.now(),
+    timestamp: now,
   };
 
   // 1. Push into pi steering queue (drained at next turn boundary)
-  run.steerHandle.steer(agentMessage);
+  try {
+    run.steerHandle.steer(agentMessage);
+  } catch (err) {
+    console.error('[handleRunSteer] steer call threw:', err);
+    sendSteerError(client, 'STEER_FAILED', err instanceof Error ? err.message : 'Failed to inject steering message');
+    return;
+  }
 
   // 2. Track in memory so cancel can hand the text back as restoreDraft
   run.pendingSteers.push(agentMessage);
@@ -262,6 +269,6 @@ export async function handleRunSteer(
     role: 'user',
     content: trimmed,
     steered: true,
-    timestamp: Date.now(),
+    timestamp: now,
   } as MessageAppendedMessage);
 }
