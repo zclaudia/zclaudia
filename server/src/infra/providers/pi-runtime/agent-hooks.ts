@@ -39,6 +39,11 @@ function canonicalToolName(piName: string): string {
  */
 const HEAD_TRUNC_TOOLS = new Set<string>(['read', 'grep', 'find', 'ls']);
 
+/** Reserve bytes per block for the appended truncation marker. Conservative upper bound. */
+const TRUNC_MARKER_OVERHEAD_BYTES = 40;
+/** Floor so a tiny-share block still gets meaningful output. */
+const MIN_PER_BLOCK_BUDGET_BYTES = 64;
+
 function selectTruncDirection(toolName: string): 'head' | 'tail' {
   return HEAD_TRUNC_TOOLS.has(toolName.toLowerCase()) ? 'head' : 'tail';
 }
@@ -132,7 +137,10 @@ export function truncateContent(
   const truncated = content.map(block => {
     if (block.type !== 'text' || typeof block.text !== 'string') return block;
     const blockBytes = Buffer.byteLength(block.text, 'utf8');
-    const perBlockLimit = Math.max(64, Math.floor((limit * blockBytes) / totalSize) - 40);
+    const perBlockLimit = Math.max(
+      MIN_PER_BLOCK_BUDGET_BYTES,
+      Math.floor((limit * blockBytes) / totalSize) - TRUNC_MARKER_OVERHEAD_BYTES,
+    );
     const result: TruncationResult = truncFn(block.text, {
       maxBytes: perBlockLimit,
       maxLines: DEFAULT_MAX_LINES,

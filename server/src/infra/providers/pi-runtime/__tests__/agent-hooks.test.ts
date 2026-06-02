@@ -50,26 +50,35 @@ describe('truncateContent', () => {
     // 250 Chinese chars (3 bytes each in UTF-8) = 750 bytes
     const text = '中'.repeat(250);
     const content = [{ type: 'text', text }];
-    const result = truncateContent(content, 'read', 300);
+    const limit = 300;
+    const result = truncateContent(content, 'read', limit);
     expect(result.didTruncate).toBe(true);
     const truncatedText = (result.content[0] as { text: string }).text;
-    // Every character that survived must be a valid full codepoint (no replacement char)
+    // No replacement char ⇒ no mid-codepoint cut
     expect(truncatedText.includes('�')).toBe(false);
-    // Byte length is bounded — pi guarantees <= maxBytes plus marker
-    expect(Buffer.byteLength(truncatedText, 'utf8')).toBeLessThanOrEqual(500);
+    // Pi must respect maxBytes for the body; marker overhead is bounded by our constant.
+    // Single block ⇒ perBlockLimit = limit - TRUNC_MARKER_OVERHEAD_BYTES = 260.
+    // Final size = body (≤ 260) + marker (~30 bytes). Bound at limit + 60 to be safe.
+    expect(Buffer.byteLength(truncatedText, 'utf8')).toBeLessThanOrEqual(limit + 60);
   });
 
-  it('preserves order of multiple text blocks', () => {
-    const a = 'A'.repeat(500);
-    const b = 'B'.repeat(500);
+  it('preserves order of multiple text blocks (head — A first, B second)', () => {
+    const a = 'AAAAA\n'.repeat(100);  // 600 bytes, all A's
+    const b = 'BBBBB\n'.repeat(100);  // 600 bytes, all B's
     const content = [
       { type: 'text', text: a },
       { type: 'text', text: b },
     ];
-    const result = truncateContent(content, 'read', 200);
+    const result = truncateContent(content, 'read', 400);
     expect(result.didTruncate).toBe(true);
-    expect(result.content[0].type).toBe('text');
-    expect(result.content[1].type).toBe('text');
+    expect(result.content).toHaveLength(2);
+    // Order is preserved AND each block was independently truncated from its own source
+    const t0 = (result.content[0] as { text: string }).text;
+    const t1 = (result.content[1] as { text: string }).text;
+    expect(t0).toMatch(/^A+/);            // first block still A's
+    expect(t0.includes('B')).toBe(false); // no cross-contamination
+    expect(t1).toMatch(/^B+/);            // second block still B's
+    expect(t1.includes('A')).toBe(false);
   });
 
   it('preserves Read truncation across multiple line-aware boundaries', () => {
