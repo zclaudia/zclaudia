@@ -59,6 +59,8 @@ export interface MessageMetadata {
   usage?: UsageInfo;
   filePush?: FilePushMetadata;
   thinkingBlocks?: ThinkingBlock[];
+  /** True when this user message was injected mid-run via steering (vs. normal user send). */
+  steered?: boolean;
 }
 
 export interface FilePushMetadata {

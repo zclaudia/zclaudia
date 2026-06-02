@@ -157,13 +157,17 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         console.warn(`[${logTag}] message_appended missing sessionId, ignoring`);
         return true;
       }
-      const messageId = crypto.randomUUID();
+      // Stable id derived from runId + timestamp so any later history sync
+      // (e.g. recoverCurrentSessionTail after cancel) deduplicates correctly.
+      const stableId = `steer-${msg.runId}-${msg.timestamp}`;
       useChatStore.getState().addMessage(appendedSession, {
-        id: messageId,
+        id: stableId,
+        clientMessageId: stableId,
         sessionId: appendedSession,
         role: msg.role,
         content: msg.content,
         createdAt: msg.timestamp,
+        metadata: msg.steered ? { steered: true } : undefined,
       });
       return true;
     }
