@@ -34,6 +34,7 @@ const manifest: PCPProviderManifest = {
     { id: 'input.binary_file', supported: false, degradation: 'fallback_to_notice' },
     { id: 'permission.mode', supported: true, mode: 'emulated', reliability: 'display_only' },
     { id: 'session.abort', supported: true, mode: 'emulated', reliability: 'strict' },
+    { id: 'session.steer', supported: true, mode: 'native', reliability: 'strict' },
     { id: 'session.background_task', supported: false, degradation: 'fallback_to_text' },
   ],
 };

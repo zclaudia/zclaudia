@@ -28,6 +28,23 @@ export interface RunCancelMessage {
   runId: string;
 }
 
+export interface RunSteerMessage {
+  type: 'run_steer';
+  runId: string;
+  content: string;
+}
+
+export interface MessageAppendedMessage {
+  type: 'message_appended';
+  sessionId: string;
+  runId: string;
+  role: 'user';
+  content: string;
+  /** True when the message was injected mid-run via steer (vs normal send). UI may show a marker. */
+  steered?: boolean;
+  timestamp: number;
+}
+
 export interface RunStartedMessage {
   type: 'run_started';
   runId: string;
@@ -132,6 +149,8 @@ export interface RunFailedMessage {
   sessionId: string;
   error: string;
   seq?: number;
+  /** When cancel was triggered with un-consumed steer messages still queued, server returns them joined here for the client to repopulate the input. */
+  restoreDraft?: string;
 }
 
 export interface KillLeakedProcessesMessage {

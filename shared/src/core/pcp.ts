@@ -22,6 +22,7 @@ export type PCPCapabilityId =
   | 'permission.mode'
   // Session
   | 'session.abort'
+  | 'session.steer'
   | 'session.background_task';
 
 // === Capability Metadata ===

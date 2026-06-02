@@ -26,7 +26,7 @@ import type {
   AuthMessage, PingMessage,
 } from './core.js';
 import type {
-  RunStartMessage, RunCancelMessage, KillLeakedProcessesMessage,
+  RunStartMessage, RunCancelMessage, RunSteerMessage, KillLeakedProcessesMessage,
   StopBackgroundTaskMessage, AgentStartMessage, AgentCancelMessage,
 } from './run.js';
 import type {
@@ -72,6 +72,7 @@ export type ClientMessage =
   | AuthMessage
   | RunStartMessage
   | RunCancelMessage
+  | RunSteerMessage
   | KillLeakedProcessesMessage
   | StopBackgroundTaskMessage
   | PermissionDecisionMessage
@@ -147,6 +148,7 @@ import type {
   RunStartedMessage, SessionCreatedMessage,
   DeltaMessage, ToolUseMessage, ToolResultMessage, ToolActivityMessage,
   ModeChangeMessage, RunCompletedMessage, RunFailedMessage,
+  MessageAppendedMessage,
   BackgroundTaskUpdateMessage, BackgroundPermissionPendingMessage,
   TaskNotificationMessage, TaskProgressMessage, TaskStatusNotificationMessage,
   ProcessCleanupResultMessage,
@@ -218,6 +220,7 @@ export type ServerMessage =
   | ModeChangeMessage
   | RunCompletedMessage
   | RunFailedMessage
+  | MessageAppendedMessage
   | PermissionRequestMessage
   | AgentPermissionInterceptedMessage
   | BackgroundTaskUpdateMessage
