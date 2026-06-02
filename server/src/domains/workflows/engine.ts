@@ -267,6 +267,9 @@ export class WorkflowEngine implements ApprovalPort {
       this.runEventPayloads.set(run.id, triggerData.eventPayload);
     }
 
+    // TODO(sub-project-C-T2): project.defaultAgentProfileId is an agent id, but
+    // downstream code expects an llm profile id. Currently traced-only in run-handler
+    // so not load-bearing; T2 should route through resolveAgentForSession.
     this.executeGraph(agg, definition, project?.rootPath, project?.defaultAgentProfileId, triggerData)
       .catch((err) => {
         console.error(`[Workflow] Run ${run.id} failed:`, err);
