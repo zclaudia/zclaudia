@@ -4,6 +4,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
+import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import * as api from '../../services/api';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
@@ -60,6 +61,14 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
   const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const storeProviders = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
   const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
+
+  // Agent profiles for the Default Agent picker
+  const agentProfilesById = useAgentProfileMetaStore((s) => s.profiles);
+  const agentLoaded = useAgentProfileMetaStore((s) => s.loaded);
+  const agentLoading = useAgentProfileMetaStore((s) => s.loading);
+  const loadAllAgents = useAgentProfileMetaStore((s) => s.loadAll);
+  const agents = Object.values(agentProfilesById);
+
   const [saving, setSaving] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const closeTimeoutRef = useRef<number | null>(null);
@@ -67,7 +76,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
   // Form state
   const [name, setName] = useState('');
   const [rootPath, setRootPath] = useState('');
-  const [llmProfileId, setProviderId] = useState<string>('');
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [reviewLlmProfileId, setReviewProviderId] = useState<string>('');
   const [permissionWorkflowOverrideId, setPermissionWorkflowOverrideId] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState('');
@@ -100,8 +109,12 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
     if (isOpen && isConnected) {
       loadProviders();
+      // Lazily fetch agent profiles for the Default Agent picker.
+      if (!agentLoaded && !agentLoading) {
+        void loadAllAgents();
+      }
     }
-  }, [isOpen, isConnected]);
+  }, [isOpen, isConnected, agentLoaded, agentLoading, loadAllAgents]);
 
   useEffect(() => {
     return () => {
@@ -116,7 +129,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
     setName(project.name);
     setRootPath(project.rootPath || '');
-    setProviderId(project.defaultAgentProfileId || '');
+    setSelectedAgentId(project.defaultAgentProfileId || '');
     setReviewProviderId(project.reviewLlmProfileId || '');
     setPermissionWorkflowOverrideId(project.permissionWorkflowOverrideId || '');
     setSystemPrompt(project.systemPrompt || '');
@@ -211,7 +224,9 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
       const updates: Partial<Project> = {
         name: name.trim(),
         rootPath: rootPath.trim() || undefined,
-        defaultAgentProfileId: llmProfileId || undefined,
+        // Empty selection sends `null` so the backend clears any existing
+        // default (FK becomes NULL → falls back to global default).
+        defaultAgentProfileId: (selectedAgentId || null) as string | undefined,
         reviewLlmProfileId: reviewLlmProfileId || undefined,
         permissionWorkflowOverrideId: permissionWorkflowOverrideId || undefined,
         systemPrompt: systemPrompt.trim() || undefined,
@@ -316,26 +331,26 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
             </p>
           </div>
 
-          {/* Provider */}
+          {/* Default Agent */}
           <div>
             <label className="block text-sm font-medium text-muted-foreground mb-1">
-              Provider
+              Default Agent for this Project
             </label>
             <Select
-              value={llmProfileId}
-              onChange={setProviderId}
+              value={selectedAgentId}
+              onChange={setSelectedAgentId}
               block
               size="lg"
               options={[
-                { value: '', label: 'Default Provider' },
-                ...providers.map((provider) => ({
-                  value: provider.id,
-                  label: `${provider.name} (${provider.providerType})${provider.isDefault ? ' - Default' : ''}`,
+                { value: '', label: 'No default — use global default' },
+                ...agents.map((agent) => ({
+                  value: agent.id,
+                  label: `${agent.name}${agent.isDefault ? ' (global default)' : ''}`,
                 })),
               ]}
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Select which Claude configuration to use for this project
+              New sessions in this project will use this agent by default. Leave blank to use the global default agent.
             </p>
           </div>
 

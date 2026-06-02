@@ -4,6 +4,7 @@ import { ProjectSettings } from '../../features/settings/ProjectSettings';
 import { useServerStore } from '../../stores/serverStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
+import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
@@ -43,7 +44,7 @@ const mockProject = {
   id: 'proj-1',
   name: 'Test Project',
   rootPath: '/home/user/test',
-  llmProfileId: 'prov-1',
+  defaultAgentProfileId: 'agent-1',
   reviewLlmProfileId: '',
   permissionWorkflowOverrideId: '',
   systemPrompt: 'Be helpful',
@@ -101,6 +102,35 @@ describe('ProjectSettings', () => {
       providerCapabilities: {},
     } as any);
 
+    useAgentProfileMetaStore.setState({
+      profiles: {
+        'agent-1': {
+          id: 'agent-1',
+          name: 'Default Coding Agent',
+          llmProfileId: 'prov-1',
+          model: 'claude-sonnet-4-6',
+          systemPrompt: '',
+          enabledTools: ['Read'],
+          isDefault: true,
+          createdAt: 0,
+          updatedAt: 0,
+        },
+        'agent-2': {
+          id: 'agent-2',
+          name: 'Doc Writer',
+          llmProfileId: 'prov-1',
+          model: 'claude-sonnet-4-6',
+          systemPrompt: 'You are a doc writer',
+          enabledTools: ['Read', 'Write'],
+          createdAt: 0,
+          updatedAt: 0,
+        },
+      },
+      loaded: true,
+      loading: false,
+      loadAll: vi.fn().mockResolvedValue(undefined),
+    } as any);
+
     useProjectStore.setState({
       providers: [
         { id: 'prov-1', name: 'Claude', type: 'claude', isDefault: true },
@@ -145,11 +175,65 @@ describe('ProjectSettings', () => {
     await renderProjectSettings();
     expect(screen.getByText('Project Name *')).toBeTruthy();
     expect(screen.getByText('Working Directory')).toBeTruthy();
-    expect(screen.getByText('Provider')).toBeTruthy();
+    expect(screen.getByText('Default Agent for this Project')).toBeTruthy();
     expect(screen.getByText('Review Provider')).toBeTruthy();
     expect(screen.getByText('Permission Workflow Override')).toBeTruthy();
     expect(screen.getByText('System Prompt')).toBeTruthy();
     expect(screen.getByText('Agent Permission Override')).toBeTruthy();
+  });
+
+  it('lists agent profiles in the Default Agent picker', async () => {
+    await renderProjectSettings();
+    // Default Agent picker is a Select (button[aria-haspopup="listbox"]); open it
+    // by clicking the trigger that shows the currently-selected agent.
+    const triggers = screen.getAllByRole('button', { expanded: false }).filter((b) =>
+      b.getAttribute('aria-haspopup') === 'listbox'
+    );
+    const agentTrigger = triggers.find((b) => b.textContent?.includes('Default Coding Agent'));
+    expect(agentTrigger).toBeTruthy();
+    fireEvent.click(agentTrigger!);
+
+    expect(screen.getByRole('option', { name: 'No default — use global default' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Default Coding Agent (global default)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Doc Writer' })).toBeInTheDocument();
+  });
+
+  it('submits defaultAgentProfileId when an agent is selected', async () => {
+    const api = await import('../../services/api');
+
+    await renderProjectSettings();
+    const triggers = screen.getAllByRole('button', { expanded: false }).filter((b) =>
+      b.getAttribute('aria-haspopup') === 'listbox'
+    );
+    const agentTrigger = triggers.find((b) => b.textContent?.includes('Default Coding Agent'));
+    fireEvent.click(agentTrigger!);
+    fireEvent.click(screen.getByRole('option', { name: 'Doc Writer' }));
+
+    await clickAsync(screen.getByText('Save'));
+
+    expect(api.updateProject).toHaveBeenCalledWith(
+      'proj-1',
+      expect.objectContaining({ defaultAgentProfileId: 'agent-2' }),
+    );
+  });
+
+  it('submits null defaultAgentProfileId when "No default" is selected', async () => {
+    const api = await import('../../services/api');
+
+    await renderProjectSettings();
+    const triggers = screen.getAllByRole('button', { expanded: false }).filter((b) =>
+      b.getAttribute('aria-haspopup') === 'listbox'
+    );
+    const agentTrigger = triggers.find((b) => b.textContent?.includes('Default Coding Agent'));
+    fireEvent.click(agentTrigger!);
+    fireEvent.click(screen.getByRole('option', { name: 'No default — use global default' }));
+
+    await clickAsync(screen.getByText('Save'));
+
+    expect(api.updateProject).toHaveBeenCalledWith(
+      'proj-1',
+      expect.objectContaining({ defaultAgentProfileId: null }),
+    );
   });
 
   it('populates form with project values', async () => {

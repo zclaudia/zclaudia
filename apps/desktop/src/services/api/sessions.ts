@@ -34,7 +34,7 @@ export async function getSessionRunState(sessionId: string): Promise<{ sessionId
 export async function createSession(data: {
   projectId: string;
   name?: string;
-  llmProfileId?: string;
+  agentProfileId?: string;
   type?: import('@zclaudia/shared').SessionType;
   parentSessionId?: string;
   workingDirectory?: string;

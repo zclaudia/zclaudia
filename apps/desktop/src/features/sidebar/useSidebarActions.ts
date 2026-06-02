@@ -25,14 +25,14 @@ interface UseSidebarActionsOptions {
   setNewProjectRootPath: (v: string) => void;
   setShowNewProjectForm: (v: boolean) => void;
   setNewSessionName: (v: string) => void;
-  setNewSessionProviderId: (v: string) => void;
+  setNewSessionAgentProfileId: (v: string) => void;
   setCreatingSessionForProject: (v: string | null) => void;
   setCreatingProject: (v: boolean) => void;
   setContextMenuProject: (v: string | null) => void;
   newProjectName: string;
   newProjectRootPath: string;
   newSessionName: string;
-  newSessionProviderId: string;
+  newSessionAgentProfileId: string;
 }
 
 /**
@@ -53,14 +53,14 @@ export function useSidebarActions({
   setNewProjectRootPath,
   setShowNewProjectForm,
   setNewSessionName,
-  setNewSessionProviderId,
+  setNewSessionAgentProfileId,
   setCreatingSessionForProject,
   setCreatingProject,
   setContextMenuProject,
   newProjectName,
   newProjectRootPath,
   newSessionName,
-  newSessionProviderId,
+  newSessionAgentProfileId,
 }: UseSidebarActionsOptions) {
   const requestMessageJump = useUIStore((s) => s.requestMessageJump);
   const {
@@ -107,17 +107,17 @@ export function useSidebarActions({
       const session = await api.createSession({
         projectId,
         name: newSessionName.trim() || undefined,
-        llmProfileId: newSessionProviderId || undefined,
+        agentProfileId: newSessionAgentProfileId || undefined,
       });
       addSession(session);
       setNewSessionName('');
-      setNewSessionProviderId('');
+      setNewSessionAgentProfileId('');
       setCreatingSessionForProject(null);
       selectSession(session.id);
     } catch (error) {
       console.error('Failed to create session:', error);
     }
-  }, [isConnected, newSessionName, newSessionProviderId, addSession, selectSession, setNewSessionName, setNewSessionProviderId, setCreatingSessionForProject]);
+  }, [isConnected, newSessionName, newSessionAgentProfileId, addSession, selectSession, setNewSessionName, setNewSessionAgentProfileId, setCreatingSessionForProject]);
 
   const handleDeleteProject = useCallback(async (projectId: string) => {
     if (!isConnected) return;

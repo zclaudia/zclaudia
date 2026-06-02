@@ -1,13 +1,8 @@
-import type { Session, GitWorktree, Project } from '@zclaudia/shared';
+import type { Session, GitWorktree, Project, AgentProfileConfig } from '@zclaudia/shared';
 import type { SearchSidebarState } from './useSearchSidebar';
 
-/** Provider meta shape used within sidebar (subset of full provider type) */
-export interface SidebarProvider {
-  id: string;
-  name?: string;
-  providerType?: string;
-  isDefault?: boolean;
-}
+/** Agent profile meta shape used within sidebar (subset of full agent profile) */
+export type SidebarAgent = Pick<AgentProfileConfig, 'id' | 'name' | 'isDefault'>;
 
 /** Agent phase info from supervision store */
 export interface AgentPhaseInfo {
@@ -74,13 +69,13 @@ export interface ProjectListItemProps {
   isCreatingSession: boolean;
   newSessionName: string;
   onNewSessionNameChange: (name: string) => void;
-  newSessionProviderId: string;
-  onNewSessionProviderIdChange: (id: string) => void;
+  newSessionAgentProfileId: string;
+  onNewSessionAgentProfileIdChange: (id: string) => void;
   onStartCreatingSession: () => void;
   onCreateSession: () => void;
   onCancelCreateSession: () => void;
   isConnected: boolean;
-  providers: SidebarProvider[];
+  agents: SidebarAgent[];
   // Pop-out (desktop only)
   onPopOutSession?: (sessionId: string, projectId: string) => void;
 }

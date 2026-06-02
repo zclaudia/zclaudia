@@ -1437,15 +1437,17 @@ describe('ChatInterface', () => {
 
   // ─── Provider Badge ───────────────────────────────────────────────────
 
-  it('shows provider badge when provider is configured', () => {
-    // Seed the agent → llm resolution chain so the badge reflects a real provider
-    // name rather than the hardcoded 'Claude' fallback (Option A from code review).
+  it('shows agent badge with "Agent Name (model)" format', () => {
+    // Sub-project C T4: SessionHeader now displays `${agent.name} (${agent.model})`
+    // via useAgentForSession instead of resolving an LLM provider name.
     useAgentProfileMetaStore.setState({
       profiles: {
         'agent-1': {
           id: 'agent-1',
           name: 'Coder',
           llmProfileId: 'prov-1',
+          model: 'claude-sonnet-4-6',
+          systemPrompt: '',
           enabledTools: [],
           isDefault: true,
           createdAt: 0,
@@ -1455,7 +1457,6 @@ describe('ChatInterface', () => {
       loaded: true,
       loading: false,
     } as any);
-    // Make the llmProfileMetaStore mock return the matching LLM profile
     mockProviderMetaStore.getState().getProviders.mockReturnValue([
       { id: 'prov-1', name: 'TestProvider', providerType: 'zclaudia', createdAt: 0, updatedAt: 0 },
     ]);
@@ -1466,18 +1467,15 @@ describe('ChatInterface', () => {
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    // Badge must show the resolved provider name, not the hardcoded fallback
-    expect(container.textContent).toContain('TestProvider');
-    // Reset getProviders mock back to empty list for subsequent tests
+    // Badge shows "Coder (claude-sonnet-4-6)" — agent name + model, not the LLM provider name.
+    expect(container.textContent).toContain('Coder (claude-sonnet-4-6)');
     mockProviderMetaStore.getState().getProviders.mockReturnValue([]);
   });
 
-  it('does not show provider badge when no provider', () => {
+  it('falls back to "Default Coding Agent" before agent resolves', () => {
+    // No agent profile resolved → SessionHeader shows the fallback label.
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    // No providers configured, no badge rendered
-    const badges = container.querySelectorAll('span');
-    const provBadge = Array.from(badges).find(s => s.className.includes('bg-muted-foreground/10'));
-    expect(provBadge).toBeFalsy();
+    expect(container.textContent).toContain('Default Coding Agent');
   });
 
   // ─── Session with no session found ────────────────────────────────────

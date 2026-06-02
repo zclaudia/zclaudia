@@ -1,7 +1,9 @@
 import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff } from 'lucide-react';
-import type { Session, Project, LlmProfileConfig } from '@zclaudia/shared';
+import type { Session, Project } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
+
+const DEFAULT_AGENT_LABEL = 'Default Coding Agent';
 
 const isDesktopTauri = typeof window !== 'undefined'
   && '__TAURI_INTERNALS__' in window
@@ -13,7 +15,6 @@ const isStandaloneSessionWindow = typeof window !== 'undefined'
 interface SessionHeaderProps {
   currentSession: Session;
   currentProject: Project | null | undefined;
-  providers: LlmProfileConfig[];
   isMobile: boolean;
   isLoading: boolean;
   isRenamingSession: boolean;
@@ -35,7 +36,6 @@ interface SessionHeaderProps {
 export function SessionHeader({
   currentSession,
   currentProject,
-  providers,
   isMobile,
   isLoading,
   isRenamingSession,
@@ -57,7 +57,12 @@ export function SessionHeader({
   const connectionQuality = useServerStore(s =>
     activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined,
   );
-  const { llm } = useAgentForSession(currentSession?.id);
+  const { agent } = useAgentForSession(currentSession?.id);
+  // Show "Agent Name (model)" once the agent resolves; fall back to a generic
+  // placeholder during the brief first-render window before the store hydrates.
+  const agentLabel = agent
+    ? `${agent.name} (${agent.model})`
+    : DEFAULT_AGENT_LABEL;
 
   return (
     <div className="flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 border-b border-border bg-card safe-top-pad">
@@ -116,17 +121,12 @@ export function SessionHeader({
       )}
       <div className="hidden sm:flex min-w-0 shrink-0 items-center gap-1.5 text-[9px] leading-none text-muted-foreground">
         <span className="uppercase leading-none tracking-[0.16em] text-muted-foreground/70">Session</span>
-        {(() => {
-          const prov = llm
-            ? providers.find(p => p.id === llm.id) ?? llm
-            : undefined;
-          const name = prov?.name || prov?.providerType || 'Claude';
-          return (
-            <span className="inline-flex h-4 items-center rounded-full border border-border/70 bg-muted/45 px-1.5 text-[9px] font-medium leading-none text-muted-foreground">
-              {name}
-            </span>
-          );
-        })()}
+        <span
+          className="inline-flex h-4 items-center rounded-full border border-border/70 bg-muted/45 px-1.5 text-[9px] font-medium leading-none text-muted-foreground"
+          title={agentLabel}
+        >
+          {agentLabel}
+        </span>
       </div>
       {/* currentProject is retained on the props contract — T4 will use it to surface
           agent / project metadata in a richer header layout. */}

@@ -17,6 +17,7 @@ import { NewProjectForm } from './NewProjectForm';
 import { SidebarFooter } from './SidebarFooter';
 import { useSidebarData } from './useSidebarData';
 import { useSidebarActions } from './useSidebarActions';
+import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 
 import * as api from '../../services/api';
 import type { GitWorktree } from '@zclaudia/shared';
@@ -57,7 +58,6 @@ export function Sidebar({
     filteredProjects,
     selectedSessionId,
     isConnected,
-    providers,
     supervisorAgents,
     notificationUnreadCount,
     hasClaudiaUnread,
@@ -86,7 +86,7 @@ export function Sidebar({
   const [creatingProject, setCreatingProject] = useState(false);
   const [creatingSessionForProject, setCreatingSessionForProject] = useState<string | null>(null);
   const [newSessionName, setNewSessionName] = useState('');
-  const [newSessionProviderId, setNewSessionProviderId] = useState<string>('');
+  const [newSessionAgentProfileId, setNewSessionAgentProfileId] = useState<string>('');
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
@@ -105,6 +105,19 @@ export function Sidebar({
     }
   }, []);
 
+  // --- Agent profile dropdown source ---
+  // Lazily load agent profiles for the new-session dropdown.
+  const agentProfiles = useAgentProfileMetaStore((s) => s.profiles);
+  const agentLoaded = useAgentProfileMetaStore((s) => s.loaded);
+  const agentLoading = useAgentProfileMetaStore((s) => s.loading);
+  const loadAllAgents = useAgentProfileMetaStore((s) => s.loadAll);
+  useEffect(() => {
+    if (!agentLoaded && !agentLoading) {
+      void loadAllAgents();
+    }
+  }, [agentLoaded, agentLoading, loadAllAgents]);
+  const agents = Object.values(agentProfiles);
+
   // --- Actions ---
   const actions = useSidebarActions({
     isConnected,
@@ -121,14 +134,14 @@ export function Sidebar({
     setNewProjectRootPath,
     setShowNewProjectForm,
     setNewSessionName,
-    setNewSessionProviderId,
+    setNewSessionAgentProfileId,
     setCreatingSessionForProject,
     setCreatingProject,
     setContextMenuProject,
     newProjectName,
     newProjectRootPath,
     newSessionName,
-    newSessionProviderId,
+    newSessionAgentProfileId,
   });
 
   const settingsProject = settingsProjectId ? visibleProjects.find(p => p.id === settingsProjectId) || null : null;
@@ -290,17 +303,17 @@ export function Sidebar({
                 isCreatingSession={creatingSessionForProject === project.id}
                 newSessionName={newSessionName}
                 onNewSessionNameChange={setNewSessionName}
-                newSessionProviderId={newSessionProviderId}
-                onNewSessionProviderIdChange={setNewSessionProviderId}
+                newSessionAgentProfileId={newSessionAgentProfileId}
+                onNewSessionAgentProfileIdChange={setNewSessionAgentProfileId}
                 onStartCreatingSession={() => setCreatingSessionForProject(project.id)}
                 onCreateSession={() => actions.handleCreateSession(project.id)}
                 onCancelCreateSession={() => {
                   setCreatingSessionForProject(null);
                   setNewSessionName('');
-                  setNewSessionProviderId('');
+                  setNewSessionAgentProfileId('');
                 }}
                 isConnected={isConnected}
-                providers={providers}
+                agents={agents}
                 onPopOutSession={actions.handlePopOutSession}
               />
             </SortableItem>

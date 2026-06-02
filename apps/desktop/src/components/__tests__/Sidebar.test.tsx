@@ -68,6 +68,7 @@ vi.mock('../../services/api', async (importOriginal) => {
 import { Sidebar } from '../../features/sidebar/Sidebar';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
+import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -101,6 +102,14 @@ function setupStores(overrides: Record<string, any> = {}) {
     providersByBackend: {},
     providerCommands: {},
     providerCapabilities: {},
+  } as any);
+
+  useAgentProfileMetaStore.setState({
+    profiles: {},
+    loaded: true,
+    loading: false,
+    loadAll: vi.fn().mockResolvedValue(undefined),
+    ...overrides.agentProfileMetaStore,
   } as any);
 
   useProjectStore.setState({
@@ -767,7 +776,7 @@ describe('Sidebar', () => {
         expect(api.createSession).toHaveBeenCalledWith({
           projectId: 'proj-1',
           name: 'My Session',
-          llmProfileId: undefined,
+          agentProfileId: undefined,
         });
       }
     }
@@ -1340,40 +1349,88 @@ describe('Sidebar', () => {
     expect(container.textContent).toContain('Project Two');
   });
 
-  // ---- Session with providers select ----
+  // ---- New-session agent dropdown ----
 
-  it('shows provider select in new session form when providers exist', () => {
+  it('renders agent dropdown in new-session form and submits agentProfileId', async () => {
     setupStores({
-      projectStore: {
-        providers: [
-          { id: 'prov-1', name: 'Claude', type: 'claude', isDefault: true },
-          { id: 'prov-2', name: 'OpenAI', type: 'openai' },
-        ],
+      agentProfileMetaStore: {
+        profiles: {
+          'a1': {
+            id: 'a1',
+            name: 'Default Coding Agent',
+            llmProfileId: 'l1',
+            model: 'claude-sonnet-4-6',
+            systemPrompt: '',
+            enabledTools: ['Read'],
+            isDefault: true,
+            createdAt: 0,
+            updatedAt: 0,
+          },
+          'a2': {
+            id: 'a2',
+            name: 'Doc Writer',
+            llmProfileId: 'l1',
+            model: 'claude-sonnet-4-6',
+            systemPrompt: '',
+            enabledTools: ['Read', 'Write'],
+            createdAt: 0,
+            updatedAt: 0,
+          },
+        },
       },
     });
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     // Expand project
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
+    const projBtn = Array.from(container.querySelectorAll('button')).find(b =>
+      b.textContent?.includes('Project One')
+    )!;
     fireEvent.click(projBtn);
 
-    // Open context menu and create session
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
-      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
-    });
+    // Open context menu (dots button next to project)
+    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b =>
+      b.className.includes('flex-shrink-0') && b.textContent?.trim() === ''
+    );
 
+    // Mirrors the guard used by the existing context-menu tests; the supervisor
+    // / multi-button layout means the dots button isn't always present in jsdom.
     if (dotsButtons.length > 0) {
       fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session');
+      const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b =>
+        b.textContent?.trim() === 'New Session'
+      );
+
       if (newSessionBtn) {
         fireEvent.click(newSessionBtn);
-        // Should show provider select
-        const selects = container.querySelectorAll('select');
-        expect(selects.length).toBeGreaterThan(0);
-        // Should have options for providers
-        const options = container.querySelectorAll('option');
-        expect(Array.from(options).some(o => o.textContent?.includes('Claude'))).toBe(true);
+
+        // Agent Select trigger shows "Default (from project)" before any agent picked.
+        const agentTrigger = Array.from(container.querySelectorAll<HTMLButtonElement>(
+          'button[aria-haspopup="listbox"]'
+        )).find((b) => b.textContent?.includes('Default (from project)'));
+        expect(agentTrigger).toBeTruthy();
+        fireEvent.click(agentTrigger!);
+
+        // Both agents listed in dropdown, with the default-marker suffix.
+        const options = Array.from(document.querySelectorAll('[role="option"]'));
+        const defaultOpt = options.find(o => o.textContent?.includes('Default Coding Agent'));
+        const docOpt = options.find(o => o.textContent?.includes('Doc Writer'));
+        expect(defaultOpt?.textContent).toContain('*'); // default-marker
+        expect(docOpt).toBeTruthy();
+
+        // Pick Doc Writer, then submit.
+        fireEvent.click(docOpt as Element);
+        const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
+        fireEvent.change(sessionInput, { target: { value: 'My Session' } });
+        const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+        await act(async () => {
+          fireEvent.click(createBtn);
+        });
+
+        expect(api.createSession).toHaveBeenCalledWith({
+          projectId: 'proj-1',
+          name: 'My Session',
+          agentProfileId: 'a2',
+        });
       }
     }
   });

@@ -73,13 +73,13 @@ export function ProjectListItem({
   isCreatingSession,
   newSessionName,
   onNewSessionNameChange,
-  newSessionProviderId,
-  onNewSessionProviderIdChange,
+  newSessionAgentProfileId,
+  onNewSessionAgentProfileIdChange,
   onStartCreatingSession,
   onCreateSession,
   onCancelCreateSession,
   isConnected,
-  providers,
+  agents,
   onPopOutSession,
 }: ProjectListItemProps) {
   const menuWidthClass = isMobile ? 'w-44' : 'w-36';
@@ -326,18 +326,18 @@ export function ProjectListItem({
                 className={inputClass}
                 autoFocus
               />
-              {providers.length > 0 && (
+              {agents.length > 0 && (
                 <Select
-                  value={newSessionProviderId}
-                  onChange={onNewSessionProviderIdChange}
+                  value={newSessionAgentProfileId}
+                  onChange={onNewSessionAgentProfileIdChange}
                   block
                   size={isMobile ? 'lg' : 'md'}
                   className={isMobile ? 'mt-2' : 'mt-1'}
                   options={[
                     { value: '', label: 'Default (from project)' },
-                    ...providers.map((p) => ({
-                      value: p.id,
-                      label: `${p.name} (${p.providerType})${p.isDefault ? ' *' : ''}`,
+                    ...agents.map((a) => ({
+                      value: a.id,
+                      label: `${a.name}${a.isDefault ? ' *' : ''}`,
                     })),
                   ]}
                 />
