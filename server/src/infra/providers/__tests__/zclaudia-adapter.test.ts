@@ -94,6 +94,17 @@ function createTestDb(): Database.Database {
       offset INTEGER
     );
     CREATE INDEX idx_messages_session_offset ON messages(session_id, offset);
+    CREATE TABLE session_compactions (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL,
+      summary TEXT NOT NULL,
+      first_kept_message_id TEXT NOT NULL,
+      tokens_before INTEGER NOT NULL,
+      details TEXT,
+      source TEXT NOT NULL DEFAULT 'auto',
+      custom_instructions TEXT,
+      created_at INTEGER NOT NULL
+    );
   `);
   return db;
 }

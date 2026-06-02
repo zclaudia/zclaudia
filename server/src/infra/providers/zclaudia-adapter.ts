@@ -281,7 +281,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     let history: AgentMessage[] = [];
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history = rebuildHistory(options.db, options.claudiaSessionId) as any;
+      history = rebuildHistory(options.db, options.claudiaSessionId).messages as any;
     } catch (err) {
       console.error('[ZClaudiaAdapter] history load failed:', err);
       yield {

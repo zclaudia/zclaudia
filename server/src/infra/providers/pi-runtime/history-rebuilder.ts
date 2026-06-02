@@ -1,7 +1,12 @@
 import type Database from 'better-sqlite3';
 import type { Message, Usage } from '@earendil-works/pi-ai';
+import { SessionCompactionRepository } from '../../../domains/sessions/compaction-repository.js';
 
 export const HISTORY_LIMIT = 50;
+
+// Inlined from pi harness/messages — main barrel does not re-export these.
+const COMPACTION_SUMMARY_PREFIX = 'The conversation history before this point was compacted into the following summary:\n\n<summary>\n';
+const COMPACTION_SUMMARY_SUFFIX = '\n</summary>';
 
 interface StoredRow {
   id: string;
@@ -31,6 +36,12 @@ interface ParsedMetadata {
   usage?: Usage;
 }
 
+export interface RebuiltHistory {
+  messages: Message[];
+  /** Parallel array: dbIds[i] = DB messages.id for messages[i], or null for synthesized (summary). */
+  dbIds: (string | null)[];
+}
+
 function parseMetadata(metadata: string | null): ParsedMetadata | null {
   if (!metadata) return null;
   try {
@@ -57,26 +68,60 @@ function serializeToolOutput(output: unknown): Array<{ type: 'text'; text: strin
 /**
  * Rebuild pi `Message[]` history from ZClaudia's `messages` table.
  *
+ * Returns `RebuiltHistory { messages, dbIds }` — parallel arrays so callers can
+ * map rebuilt messages back to their DB row ids.
+ *
  * - User messages: role='user', content=string
  * - System messages: skipped (they live in pi systemPrompt, not in messages array)
  * - Assistant messages: content is an array of pi content blocks — thinking, text, toolCall — reconstructed from metadata
  * - Tool calls: each toolCall in metadata produces a following pi 'toolResult' Message
  * - Trailing user message popped (it's the current input being passed via `agent.prompt(input)` separately)
+ * - If a compaction exists, messages before the boundary are filtered out and a synthesized
+ *   summary user message is prepended (dbId = null).
  */
 export function rebuildHistory(
   db: Database.Database | undefined,
   sessionId: string | undefined,
-): Message[] {
-  if (!db || !sessionId) return [];
+): RebuiltHistory {
+  if (!db || !sessionId) return { messages: [], dbIds: [] };
 
-  // Mirrors `messages` table in server/src/infra/storage/migrations.
-  const rows = db.prepare<[string, number], StoredRow>(
-    `SELECT id, role, content, metadata, created_at AS createdAt
-     FROM messages
-     WHERE session_id = ?
-     ORDER BY created_at DESC
-     LIMIT ?`,
-  ).all(sessionId, HISTORY_LIMIT);
+  // Resolve compaction boundary if one exists
+  const compactionRepo = new SessionCompactionRepository(db);
+  const compaction = compactionRepo.getLatest(sessionId);
+
+  let boundaryOffset: number | null = null;
+  if (compaction) {
+    const boundaryRow = db.prepare<[string], { offset: number }>(
+      'SELECT offset FROM messages WHERE id = ?',
+    ).get(compaction.firstKeptMessageId);
+    if (!boundaryRow) {
+      console.warn(
+        `[rebuildHistory] compaction boundary message '${compaction.firstKeptMessageId}' not found — treating as no compaction`,
+      );
+    } else {
+      boundaryOffset = boundaryRow.offset;
+    }
+  }
+
+  // Build query — apply boundary filter if compaction is in effect
+  let rows: StoredRow[];
+  if (boundaryOffset !== null) {
+    rows = db.prepare<[string, number, number], StoredRow>(
+      `SELECT id, role, content, metadata, created_at AS createdAt
+       FROM messages
+       WHERE session_id = ? AND offset >= ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    ).all(sessionId, boundaryOffset, HISTORY_LIMIT);
+  } else {
+    rows = db.prepare<[string, number], StoredRow>(
+      `SELECT id, role, content, metadata, created_at AS createdAt
+       FROM messages
+       WHERE session_id = ?
+       ORDER BY created_at DESC
+       LIMIT ?`,
+    ).all(sessionId, HISTORY_LIMIT);
+  }
 
   const chronological = rows.reverse();
   if (chronological.length > 0 && chronological[chronological.length - 1].role === 'user') {
@@ -84,6 +129,17 @@ export function rebuildHistory(
   }
 
   const messages: Message[] = [];
+  const dbIds: (string | null)[] = [];
+
+  // Prepend synthesized summary if compaction is in effect (and boundary resolved)
+  if (compaction && boundaryOffset !== null) {
+    messages.push({
+      role: 'user',
+      content: COMPACTION_SUMMARY_PREFIX + compaction.summary + COMPACTION_SUMMARY_SUFFIX,
+      timestamp: compaction.createdAt,
+    });
+    dbIds.push(null);
+  }
 
   for (const row of chronological) {
     if (row.role === 'system') continue;
@@ -94,6 +150,7 @@ export function rebuildHistory(
         content: row.content,
         timestamp: row.createdAt,
       });
+      dbIds.push(row.id);
       continue;
     }
 
@@ -141,8 +198,9 @@ export function rebuildHistory(
       timestamp: row.createdAt,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any);
+    dbIds.push(row.id);
 
-    // Emit toolResult messages following the assistant
+    // Emit toolResult messages following the assistant (share the assistant row's id)
     for (const tc of toolCalls) {
       messages.push({
         role: 'toolResult',
@@ -152,8 +210,9 @@ export function rebuildHistory(
         isError: tc.isError ?? false,
         timestamp: row.createdAt,
       });
+      dbIds.push(row.id);
     }
   }
 
-  return messages;
+  return { messages, dbIds };
 }
