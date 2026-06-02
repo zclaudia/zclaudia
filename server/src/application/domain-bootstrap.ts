@@ -181,7 +181,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
         projectId: session?.project_id ?? null,
         sessionId: event.sessionId,
         type: 'run_completed',
-        summary: `Run completed (${event.usage?.outputTokens ?? 0} output tokens)`,
+        summary: `Run completed (${event.usage?.output ?? 0} output tokens)`,
         metadata: { runId: event.runId, usage: event.usage },
       });
     } catch {
