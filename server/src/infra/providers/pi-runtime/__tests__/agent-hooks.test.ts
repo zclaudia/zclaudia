@@ -2,26 +2,88 @@ import { describe, it, expect, vi } from 'vitest';
 import { buildAgentHooks, truncateContent, DEFAULT_OUTPUT_LIMIT_BYTES } from '../agent-hooks.js';
 
 describe('truncateContent', () => {
-  it('passes through when total bytes <= limit', () => {
-    const out = truncateContent([{ type: 'text', text: 'hello' }], 1000);
-    expect(out.didTruncate).toBe(false);
-    expect(out.content).toEqual([{ type: 'text', text: 'hello' }]);
-    expect(out.originalSize).toBe(5);
+  it('passes through when total size is under limit', () => {
+    const content = [{ type: 'text', text: 'small content' }];
+    const result = truncateContent(content, 'read', 1024);
+    expect(result.didTruncate).toBe(false);
+    expect(result.content).toEqual(content);
+    expect(result.originalSize).toBe(Buffer.byteLength('small content', 'utf8'));
   });
 
-  it('truncates when total bytes > limit and appends marker', () => {
-    const long = 'a'.repeat(200);
-    const out = truncateContent([{ type: 'text', text: long }], 100);
-    expect(out.didTruncate).toBe(true);
-    expect(out.originalSize).toBe(200);
-    expect(out.content[0].type).toBe('text');
-    expect(out.content[0].text!.length).toBeLessThan(long.length);
-    expect(out.content[0].text!).toMatch(/truncated/i);
+  it('non-text blocks pass through unchanged', () => {
+    const content = [{ type: 'image', source: { data: 'xxx' } }];
+    const result = truncateContent(content as any, 'read', 100);
+    expect(result.didTruncate).toBe(false);
+    expect(result.content).toEqual(content);
   });
 
-  it('does not crash on non-text blocks', () => {
-    const out = truncateContent([{ type: 'image' as any, data: 'base64...' } as any], 100);
-    expect(out.didTruncate).toBe(false);
+  it('Read tool: head truncation — keeps the BEGINNING', () => {
+    const longText = Array.from({ length: 500 }, (_, i) => `line ${i}`).join('\n');
+    const content = [{ type: 'text', text: longText }];
+    const result = truncateContent(content, 'read', 1024);
+    expect(result.didTruncate).toBe(true);
+    const truncatedText = (result.content[0] as { text: string }).text;
+    expect(truncatedText.startsWith('line 0')).toBe(true);   // head kept
+    expect(truncatedText.includes('line 499')).toBe(false);  // tail dropped
+  });
+
+  it('Bash tool: tail truncation — keeps the END', () => {
+    const longText = Array.from({ length: 500 }, (_, i) => `line ${i}`).join('\n');
+    const content = [{ type: 'text', text: longText }];
+    const result = truncateContent(content, 'bash', 1024);
+    expect(result.didTruncate).toBe(true);
+    const truncatedText = (result.content[0] as { text: string }).text;
+    expect(truncatedText.includes('line 499')).toBe(true);   // tail kept
+    expect(truncatedText.startsWith('line 0')).toBe(false);  // head dropped
+  });
+
+  it('unknown tool: defaults to tail (matches bash behavior)', () => {
+    const longText = Array.from({ length: 500 }, (_, i) => `line ${i}`).join('\n');
+    const content = [{ type: 'text', text: longText }];
+    const result = truncateContent(content, 'someUnknownTool', 1024);
+    expect(result.didTruncate).toBe(true);
+    const truncatedText = (result.content[0] as { text: string }).text;
+    expect(truncatedText.includes('line 499')).toBe(true);
+  });
+
+  it('UTF-8 multibyte content is not cut mid-codepoint', () => {
+    // 250 Chinese chars (3 bytes each in UTF-8) = 750 bytes
+    const text = '中'.repeat(250);
+    const content = [{ type: 'text', text }];
+    const result = truncateContent(content, 'read', 300);
+    expect(result.didTruncate).toBe(true);
+    const truncatedText = (result.content[0] as { text: string }).text;
+    // Every character that survived must be a valid full codepoint (no replacement char)
+    expect(truncatedText.includes('�')).toBe(false);
+    // Byte length is bounded — pi guarantees <= maxBytes plus marker
+    expect(Buffer.byteLength(truncatedText, 'utf8')).toBeLessThanOrEqual(500);
+  });
+
+  it('preserves order of multiple text blocks', () => {
+    const a = 'A'.repeat(500);
+    const b = 'B'.repeat(500);
+    const content = [
+      { type: 'text', text: a },
+      { type: 'text', text: b },
+    ];
+    const result = truncateContent(content, 'read', 200);
+    expect(result.didTruncate).toBe(true);
+    expect(result.content[0].type).toBe('text');
+    expect(result.content[1].type).toBe('text');
+  });
+
+  it('preserves Read truncation across multiple line-aware boundaries', () => {
+    // Use lines with known boundaries — head keeps complete lines
+    const longText = Array.from({ length: 200 }, (_, i) => `line ${i.toString().padStart(3, '0')}`).join('\n');
+    const content = [{ type: 'text', text: longText }];
+    const result = truncateContent(content, 'read', 500);
+    expect(result.didTruncate).toBe(true);
+    const truncatedText = (result.content[0] as { text: string }).text;
+    // pi truncateHead guarantees no mid-line cut (line-aware)
+    const lines = truncatedText.split('\n').filter(l => l.startsWith('line '));
+    for (const line of lines) {
+      expect(line).toMatch(/^line \d{3}$/);  // exactly 8 chars, no truncation mid-line
+    }
   });
 });
 

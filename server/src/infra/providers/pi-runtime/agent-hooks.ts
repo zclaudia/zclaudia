@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { AgentLoopConfig, StreamFn } from '@earendil-works/pi-agent-core';
+import { truncateHead, truncateTail, DEFAULT_MAX_LINES, type TruncationResult } from '@earendil-works/pi-agent-core';
 import type { PermissionCallback } from '../types.js';
 
 export const DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
@@ -30,6 +31,16 @@ const PI_TO_CANONICAL_TOOL: Record<string, string> = {
 
 function canonicalToolName(piName: string): string {
   return PI_TO_CANONICAL_TOOL[piName] ?? piName;
+}
+
+/**
+ * Tools whose output is more useful from the head (file reads, listings, search hits).
+ * Bash and unknown tools default to tail (errors/results usually at the end).
+ */
+const HEAD_TRUNC_TOOLS = new Set<string>(['read', 'grep', 'find', 'ls']);
+
+function selectTruncDirection(toolName: string): 'head' | 'tail' {
+  return HEAD_TRUNC_TOOLS.has(toolName.toLowerCase()) ? 'head' : 'tail';
 }
 
 /**
@@ -91,10 +102,15 @@ export interface TruncateResult {
 
 /**
  * Truncate a tool result's text content to a byte limit. Non-text blocks pass through.
+ *
+ * Delegates per-block to pi-agent-core `truncateHead` / `truncateTail` (line-aware,
+ * UTF-8 surrogate safe). Direction chosen by tool: file-read tools keep the head,
+ * bash and unknowns keep the tail.
  */
 export function truncateContent(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   content: Array<{ type: string; text?: string; [k: string]: any }>,
+  toolName: string,
   limit: number,
 ): TruncateResult {
   let totalSize = 0;
@@ -108,13 +124,23 @@ export function truncateContent(
     return { content, didTruncate: false, originalSize: totalSize };
   }
 
-  const factor = limit / totalSize;
+  const direction = selectTruncDirection(toolName);
+  const truncFn = direction === 'head' ? truncateHead : truncateTail;
+
+  // Per-block budget proportional to its share of total bytes (subtract small
+  // overhead per block for the truncation marker we append on truncated blocks).
   const truncated = content.map(block => {
     if (block.type !== 'text' || typeof block.text !== 'string') return block;
-    const targetLen = Math.floor(block.text.length * factor);
-    const head = block.text.slice(0, Math.max(0, targetLen - 40));
-    const marker = `\n... [truncated, ${block.text.length - head.length} bytes omitted]`;
-    return { ...block, text: head + marker };
+    const blockBytes = Buffer.byteLength(block.text, 'utf8');
+    const perBlockLimit = Math.max(64, Math.floor((limit * blockBytes) / totalSize) - 40);
+    const result: TruncationResult = truncFn(block.text, {
+      maxBytes: perBlockLimit,
+      maxLines: DEFAULT_MAX_LINES,
+    });
+    if (!result.truncated) return { ...block, text: result.content };
+    const omittedBytes = result.totalBytes - result.outputBytes;
+    const marker = `\n... [truncated ${direction}, ${omittedBytes} bytes omitted]`;
+    return { ...block, text: result.content + marker };
   });
 
   return { content: truncated, didTruncate: true, originalSize: totalSize };
@@ -147,9 +173,10 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     afterToolCall: async (ctx: any) => {
-      const { result } = ctx;
+      const { result, toolCall } = ctx;
       if (!result?.content) return undefined;
-      const truncated = truncateContent(result.content, limit);
+      const toolName: string = toolCall?.name ?? '';
+      const truncated = truncateContent(result.content, toolName, limit);
       if (!truncated.didTruncate) return undefined;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
