@@ -57,6 +57,7 @@ describe('ws/run-provider-launch', () => {
     };
     const activeRun = {
       assistantMessageId: 'assistant-1',
+      pendingSteers: [],
     } as any;
     const permissionCallback = vi.fn();
     const adapter = {
@@ -147,12 +148,31 @@ describe('ws/run-provider-launch', () => {
         providerType: 'claude',
       }),
     }));
-    expect(adapter.run).toHaveBeenCalledWith('processed hello', { cwd: '/tmp/project', mode: 'default' }, permissionCallback);
+    expect(adapter.run).toHaveBeenCalledWith(
+      'processed hello',
+      expect.objectContaining({
+        cwd: '/tmp/project',
+        mode: 'default',
+        onAgentReady: expect.any(Function),
+        onSteerConsumed: expect.any(Function),
+      }),
+      permissionCallback,
+    );
     expect(activeRun.providerType).toBe('claude');
     expect(activeRun.providerSessionId).toBe('sdk-1');
     expect(activeRun.providerCwd).toBe('/tmp/project');
     expect(trace.setMeta).toHaveBeenCalledWith({ provider: 'claude', cwd: '/tmp/project' });
     expect(result.providerRunner).toBeTruthy();
+
+    // onAgentReady mutates activeRun.steerHandle; onSteerConsumed clears
+    // pendingSteers — verify both wirings work end-to-end through the closure.
+    const runOptionsArg = (adapter.run as unknown as { mock: { calls: [string, { onAgentReady: (h: { steer: () => void }) => void; onSteerConsumed: () => void }, unknown][] } }).mock.calls[0][1];
+    const fakeHandle = { steer: () => {} };
+    runOptionsArg.onAgentReady(fakeHandle);
+    expect(activeRun.steerHandle).toBe(fakeHandle);
+    activeRun.pendingSteers.push({ role: 'user', content: [{ type: 'text', text: 'x' }], timestamp: 0 } as never);
+    runOptionsArg.onSteerConsumed();
+    expect(activeRun.pendingSteers).toEqual([]);
 
     vi.advanceTimersByTime(5000);
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun);

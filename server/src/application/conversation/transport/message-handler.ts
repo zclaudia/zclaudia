@@ -28,8 +28,9 @@ import {
   handlePermission, handlePromptAnswerMessage, handleInteractionResponse, handlePluginPermissionResponse,
 } from '../../../application/conversation/interactions/ws-handlers.js';
 import {
-  handleKillLeakedProcesses, handleStopBackgroundTask, handleAgentCancel,
+  handleKillLeakedProcesses, handleStopBackgroundTask, handleAgentCancel, handleRunSteer,
 } from '../handlers/run.js';
+import { broadcastRunMessage } from './broadcast.js';
 import {
   handleClaudiaMessage, handleClaudiaTaskSubmit, handleClaudiaTaskContinue, handleClaudiaTaskCancel,
 } from '../handlers/claudia.js';
@@ -99,6 +100,10 @@ export async function handleClientMessage(
 
     case 'run_cancel':
       ctx.cancelRun(message.runId);
+      break;
+
+    case 'run_steer':
+      await handleRunSteer(client, message, ctx.activeRuns, broadcastRunMessage);
       break;
 
     case 'agent_cancel':

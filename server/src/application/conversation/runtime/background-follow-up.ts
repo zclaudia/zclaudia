@@ -198,6 +198,7 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
     allowedOutsideWorkspaceRoots: loadProjectAllowedOutsideWorkspaceRoots(ctx.db, ctx.projectId),
     eventSeq: 0,
     providerType: ctx.providerType,
+    pendingSteers: [],
   };
 
   // Wire broadcast

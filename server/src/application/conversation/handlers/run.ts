@@ -1,5 +1,9 @@
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type {
   ErrorMessage,
+  MessageAppendedMessage,
+  RunSteerMessage,
+  ServerMessage,
   StopBackgroundTaskMessage,
   TaskNotificationMessage,
 } from '@zclaudia/shared/wire/messages';
@@ -12,6 +16,14 @@ import type { ProviderRegistryPort } from '../../../infra/providers/registry.js'
 import { sendMessage } from '../transport/broadcast.js';
 import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
+
+function sendSteerError(client: ConnectedClient, code: string, message: string): void {
+  sendMessage(client.ws, {
+    type: 'error',
+    code,
+    message,
+  } as ErrorMessage);
+}
 
 export async function handleKillLeakedProcesses(
   client: ConnectedClient,
@@ -196,4 +208,60 @@ export async function handleAgentCancel(
       }
     }
   }
+}
+
+/**
+ * Inject a user message into the live pi agent's steering queue for the named
+ * run, so it gets processed at the next turn boundary without cancelling.
+ *
+ * Validates (in order): non-empty content; active run exists and isn't
+ * completed; SteerHandle has been registered by the adapter (onAgentReady).
+ * On accept: forwards to handle.steer, tracks in pendingSteers for cancel-time
+ * draft recovery, and broadcasts MessageAppendedMessage so every connected
+ * client renders the user message immediately.
+ */
+export async function handleRunSteer(
+  client: ConnectedClient,
+  msg: RunSteerMessage,
+  activeRuns: Map<string, ActiveRun>,
+  broadcastRunMessage: (run: ActiveRun, payload: ServerMessage) => void,
+): Promise<void> {
+  const trimmed = msg.content?.trim() ?? '';
+  if (!trimmed) {
+    sendSteerError(client, 'STEER_EMPTY', 'Steering message cannot be empty');
+    return;
+  }
+
+  const run = activeRuns.get(msg.runId);
+  if (!run || run.completed) {
+    sendSteerError(client, 'STEER_NO_ACTIVE_RUN', 'No active run to steer');
+    return;
+  }
+  if (!run.steerHandle) {
+    sendSteerError(client, 'STEER_NOT_READY', 'Agent not yet ready for steering');
+    return;
+  }
+
+  const agentMessage: AgentMessage = {
+    role: 'user',
+    content: [{ type: 'text', text: trimmed }],
+    timestamp: Date.now(),
+  };
+
+  // 1. Push into pi steering queue (drained at next turn boundary)
+  run.steerHandle.steer(agentMessage);
+
+  // 2. Track in memory so cancel can hand the text back as restoreDraft
+  run.pendingSteers.push(agentMessage);
+
+  // 3. Broadcast to all session clients so UI shows the user message immediately
+  broadcastRunMessage(run, {
+    type: 'message_appended',
+    sessionId: run.sessionId,
+    runId: msg.runId,
+    role: 'user',
+    content: trimmed,
+    steered: true,
+    timestamp: Date.now(),
+  } as MessageAppendedMessage);
 }

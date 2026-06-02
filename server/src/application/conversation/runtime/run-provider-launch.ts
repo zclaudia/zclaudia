@@ -132,6 +132,17 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     sessionType,
   });
 
+  // Wire mid-run steering callbacks. The closure captures `activeRun` directly
+  // (not via activeRuns map) so registration is robust even if the run is
+  // removed from the map mid-flight; the mutations are idempotent on a stale
+  // reference and cancelRun's clears still win deterministically.
+  runOptions.onAgentReady = (handle) => {
+    activeRun.steerHandle = handle;
+  };
+  runOptions.onSteerConsumed = () => {
+    activeRun.pendingSteers = [];
+  };
+
   console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${providerType} mode=${modeValue} model=${message.model || 'default'} cwd=${cwd} baseUrl=${providerConfig?.baseUrl || 'default'}`);
   trace.setMeta({ provider: providerType, cwd });
   trace.log('server_norm', 'provider_runner_created', {

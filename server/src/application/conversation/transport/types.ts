@@ -1,9 +1,10 @@
 import { WebSocket } from 'ws';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { ToolCall, ContentBlock, ThinkingBlock } from '@zclaudia/shared/core/message';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { PCPEffectiveProfile } from '@zclaudia/shared/core/pcp';
 import type { AskUserQuestionItem } from '@zclaudia/shared/interaction/forms';
-import type { PermissionDecision, SystemInfo } from '../../../infra/providers/types.js';
+import type { PermissionDecision, SteerHandle, SystemInfo } from '../../../infra/providers/types.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
@@ -86,6 +87,16 @@ export interface ActiveRun {
    * Set up in run-bootstrap.ts. Falls back to run.client.ws if not wired (e.g. supervision).
    */
   broadcast?: (message: ServerMessage) => void;
+  /**
+   * Steer handle exposed by the provider adapter (registered via RunOptions.onAgentReady).
+   * Present only when the underlying agent supports mid-run steering. Cleared on cancel.
+   */
+  steerHandle?: SteerHandle;
+  /**
+   * AgentMessages sent via run_steer but not yet drained by pi turn_start.
+   * Cleared on turn_start (onSteerConsumed) or cancel.
+   */
+  pendingSteers: AgentMessage[];
 }
 
 // Message sender interface for abstraction

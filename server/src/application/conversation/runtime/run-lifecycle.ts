@@ -1,6 +1,7 @@
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { Request as CorrelatedRequest } from '@zclaudia/shared/wire/correlation';
 import { isRequest } from '@zclaudia/shared/wire/correlation';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
@@ -8,6 +9,27 @@ import { interactionDispatcher } from '../interactions/interaction-dispatcher.js
 import { extractAndIndexMetadata, removeIndexedMetadata } from '../../../infra/storage/metadata-extractor.js';
 import { broadcastRunMessage, sendMessage } from '../transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
+
+/**
+ * Extract a plain-text string from an AgentMessage's content field, handling
+ * both string and ContentBlock[] shapes (UserMessage). Returns undefined when
+ * no text content can be recovered (non-user variants, image-only blocks, etc).
+ */
+function extractTextContent(message: AgentMessage): string | undefined {
+  // Only user messages carry steerable text. AgentMessage is a discriminated
+  // union — narrow defensively so we don't accidentally read .content off
+  // variants where it has a different shape.
+  if (!('role' in message) || message.role !== 'user') return undefined;
+  const content = (message as { content?: unknown }).content;
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    const texts = content
+      .filter((c): c is { type: 'text'; text: string } => !!c && typeof c === 'object' && (c as { type?: unknown }).type === 'text' && typeof (c as { text?: unknown }).text === 'string')
+      .map((c) => c.text);
+    return texts.length > 0 ? texts.join('') : undefined;
+  }
+  return undefined;
+}
 
 const execFileAsync = promisify(execFile);
 
@@ -127,6 +149,20 @@ export function cancelRun(
       console.error(`[Cancel] Failed to save partial message for run ${runId}:`, err);
     }
 
+    // If the user queued any mid-run steers that pi hadn't yet drained, hand
+    // them back as a single restorable draft so the client can repopulate the
+    // input box. join('\n\n') matches what a user typing the same text across
+    // multiple sends would visually look like.
+    const restoreDraft = run.pendingSteers && run.pendingSteers.length > 0
+      ? (() => {
+          const joined = run.pendingSteers
+            .map((m) => extractTextContent(m))
+            .filter((t): t is string => Boolean(t))
+            .join('\n\n');
+          return joined.length > 0 ? joined : undefined;
+        })()
+      : undefined;
+
     // Broadcast run_failed to ALL connected clients so every device updates its UI.
     run.eventSeq += 1;
     broadcastRunMessage(run, {
@@ -135,7 +171,13 @@ export function cancelRun(
       sessionId: run.sessionId,
       error: options.clientError ?? 'Run cancelled by user',
       seq: run.eventSeq,
+      ...(restoreDraft ? { restoreDraft } : {}),
     });
+
+    // Clear steer state — handle.steer on an aborted agent is no longer safe,
+    // and pendingSteers is now the client's responsibility (via restoreDraft).
+    run.pendingSteers = [];
+    run.steerHandle = undefined;
 
     interactionDispatcher.cancelBySession(run.sessionId);
     ctx.activeRuns.delete(runId);

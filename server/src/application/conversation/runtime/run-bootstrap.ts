@@ -202,6 +202,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     allowedOutsideWorkspaceRoots: loadProjectAllowedOutsideWorkspaceRoots(db, projectId),
     aiInitiatedPlanMode: false,
     eventSeq: 0,
+    pendingSteers: [],
   };
   activeRuns.set(runId, activeRun);
 
