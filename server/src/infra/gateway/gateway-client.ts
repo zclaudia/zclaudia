@@ -11,6 +11,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
+import { newId } from '../../utils/uuid.js';
 import type {
   PeerHelloMessage,
   PeerReadyMessage,
@@ -69,7 +70,7 @@ function getOrCreateDeviceId(): string {
       return config.deviceId;
     } catch { /* fall through */ }
   }
-  const deviceId = crypto.randomUUID();
+  const deviceId = newId();
   fs.writeFileSync(DEVICE_CONFIG_PATH, JSON.stringify({ deviceId, createdAt: Date.now() }, null, 2));
   console.log(`[Gateway] Generated new device ID: ${deviceId}`);
   return deviceId;

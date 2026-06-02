@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { GatewayClient } from '../gateway-client.js';
 import WebSocket from 'ws';
 import * as fs from 'fs';
-import * as crypto from 'crypto';
+import * as uuidModule from '../../../utils/uuid.js';
 
 // Mock WebSocket
 vi.mock('ws', () => {
@@ -28,15 +28,10 @@ vi.mock('fs', () => ({
   readFileSync: vi.fn()
 }));
 
-// Mock crypto
-vi.mock('crypto', async (importOriginal) => {
-  const actual = await importOriginal() as any;
-  return {
-    ...actual,
-    randomUUID: vi.fn().mockReturnValue('test-uuid-123'),
-    createHash: actual.createHash,
-  };
-});
+// Mock uuid
+vi.mock('../../../utils/uuid.js', () => ({
+  newId: vi.fn().mockReturnValue('test-uuid-123'),
+}));
 
 // Mock run-state utility
 vi.mock('../../../utils/run-state.js', () => ({
@@ -75,8 +70,8 @@ describe('GatewayClient', () => {
         createdAt: Date.now()
       }));
 
-    // Mock crypto.randomUUID
-    vi.mocked(crypto.randomUUID).mockReturnValue('new-device-uuid');
+    // Mock newId
+    vi.mocked(uuidModule.newId).mockReturnValue('new-device-uuid');
   });
 
   afterEach(() => {
@@ -97,7 +92,7 @@ describe('GatewayClient', () => {
 
       client = new GatewayClient(mockConfig);
 
-      expect(crypto.randomUUID).toHaveBeenCalled();
+      expect(uuidModule.newId).toHaveBeenCalled();
       expect(fs.writeFileSync).toHaveBeenCalled();
     });
 
@@ -119,7 +114,7 @@ describe('GatewayClient', () => {
 
       client = new GatewayClient(mockConfig);
 
-      expect(crypto.randomUUID).toHaveBeenCalled();
+      expect(uuidModule.newId).toHaveBeenCalled();
     });
 
     it('accepts optional db and activeRuns', () => {

@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { newId } from '../../../utils/uuid.js';
 
 import type { AgentLoopConfig, StreamFn } from '@earendil-works/pi-agent-core';
 import { truncateHead, truncateTail, DEFAULT_MAX_LINES, type TruncationResult } from '@earendil-works/pi-agent-core';
@@ -163,7 +163,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       const { toolCall, args } = ctx;
       const piName: string = toolCall.name;
       const decision = await input.permissionCallback({
-        requestId: randomUUID(),
+        requestId: newId(),
         toolName: canonicalToolName(piName),
         toolInput: args,
         detail: buildToolDetail(piName, args),

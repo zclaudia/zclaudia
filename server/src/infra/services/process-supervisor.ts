@@ -1,6 +1,6 @@
 import { execFile, spawn as nodeSpawn, type ChildProcess, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'child_process';
 import { promisify } from 'util';
-import { randomUUID } from 'crypto';
+import { newId } from '../../utils/uuid.js';
 import type Database from 'better-sqlite3';
 import { isProcessAlive, listAllProcesses, listDescendantProcesses } from '../../utils/process-tree.js';
 
@@ -357,7 +357,7 @@ export class ProcessSupervisor {
   }
 
   private prepareRecord(spec: Omit<SpawnSpec, 'stdio' | 'env'> | SpawnSpec): string {
-    const processId = randomUUID();
+    const processId = newId();
     this.insertRecord({
       processId,
       source: spec.source,

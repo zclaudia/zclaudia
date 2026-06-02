@@ -1,5 +1,5 @@
 import type Database from 'better-sqlite3';
-import { randomUUID } from 'crypto';
+import { newId } from '../../utils/uuid.js';
 import { systemTaskRegistry } from '../../application/services/system-task-registry.js';
 
 let tempFileCleanupTimer: ReturnType<typeof setInterval> | null = null;
@@ -12,7 +12,7 @@ export function autoDetectProviders(db: Database.Database): void {
   db.prepare(`
     INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, env, is_default, created_at, updated_at)
     VALUES (?, ?, 'anthropic', NULL, NULL, NULL, NULL, 1, ?, ?)
-  `).run(randomUUID(), 'ZClaudia Agent', now, now);
+  `).run(newId(), 'ZClaudia Agent', now, now);
 
   console.log('   Registered default ZClaudia agent runtime');
 }

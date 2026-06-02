@@ -5,6 +5,7 @@
  * service creation, state recovery, checkpoint engine, route mounting, and polling.
  */
 
+import { newId } from '../../utils/uuid.js';
 import type { Express, RequestHandler } from 'express';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { initDatabase } from '../../infra/storage/db.js';
@@ -79,7 +80,7 @@ export function registerSupervisionDomain(deps: SupervisionDomainDeps): Supervis
     },
     broadcast,
     (projectId, event, detail, taskIdArg) => {
-      const id = crypto.randomUUID();
+      const id = newId();
       try {
         db.prepare(
           `INSERT INTO supervision_logs (id, project_id, task_id, event, detail, created_at) VALUES (?, ?, ?, ?, ?, ?)`

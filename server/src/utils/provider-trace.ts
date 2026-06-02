@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'fs';
 import path from 'path';
-import { randomUUID } from 'crypto';
+import { newId } from './uuid.js';
 
 export type ProviderTraceLayer = 'provider_raw' | 'server_provider' | 'server_norm' | 'script_ws';
 
@@ -84,7 +84,7 @@ function ensureTraceDir(): void {
 function buildTracePath(meta: TraceMeta): string {
   const day = new Date().toISOString().slice(0, 10);
   const provider = meta.provider || 'unknown';
-  const id = meta.traceId || randomUUID().slice(0, 8);
+  const id = meta.traceId || newId().slice(0, 8);
   return path.join(TRACE_DIR, day, `${provider}-${id}.jsonl`);
 }
 
@@ -99,7 +99,7 @@ export interface TraceRecorder {
 export function createTraceRecorder(initialMeta: TraceMeta = {}): TraceRecorder {
   const meta: TraceMeta = {
     ...initialMeta,
-    traceId: initialMeta.traceId || randomUUID().slice(0, 8),
+    traceId: initialMeta.traceId || newId().slice(0, 8),
   };
   const filePath = TRACE_ENABLED ? buildTracePath(meta) : null;
   let seq = 0;
