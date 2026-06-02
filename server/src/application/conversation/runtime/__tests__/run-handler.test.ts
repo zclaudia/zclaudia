@@ -247,7 +247,7 @@ describe('ws/run-handler', () => {
     toolRegistryGetAllMock.mockReturnValue([]);
     getDiscoveredSkillsMock.mockReturnValue([]);
     selectSkillsMock.mockReturnValue([]);
-    loadSkillContentMock.mockImplementation((dirPath: string) => `loaded:${dirPath}`);
+    loadSkillContentMock.mockImplementation(async (_env: unknown, dirPath: string) => `loaded:${dirPath}`);
   });
 
   it('injects selected skill content into agent session prompts', async () => {

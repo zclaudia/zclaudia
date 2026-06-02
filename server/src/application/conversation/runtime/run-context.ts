@@ -11,6 +11,7 @@ import {
   selectSkills,
   toolRegistry as pluginToolRegistry,
 } from '../../../application/plugins/index.js';
+import { createExecutionEnv } from '../../../infra/execution-env.js';
 import {
   providerSupportsNativePlanMode,
   buildNonNativePlanPrompt,
@@ -128,10 +129,11 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       const allSkills = getDiscoveredSkills();
       const matched = selectSkills(allSkills, { userInput: message.input, os: process.platform });
       if (matched.length > 0) {
-        activeSkillsContent = matched
-          .map((skill) => loadSkillContent(skill.dirPath))
-          .filter(Boolean)
-          .join('\n\n---\n\n');
+        const skillEnv = createExecutionEnv(session.root_path || process.cwd());
+        const loadedContents = await Promise.all(
+          matched.map((skill) => loadSkillContent(skillEnv, skill.dirPath))
+        );
+        activeSkillsContent = loadedContents.filter(Boolean).join('\n\n---\n\n');
       }
     } catch {
       // Skill selection is best-effort and should not block run startup.

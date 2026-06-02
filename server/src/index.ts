@@ -114,8 +114,10 @@ async function main() {
 
     // Register workspace + external skills as MCP bridge tools
     const { setDatabase: setSkillDb, registerSkillTools } = await import('./application/plugins/skill-tools.js');
+    const { createExecutionEnv } = await import('./infra/execution-env.js');
     setSkillDb(serverContext.db);
-    const skillCount = await registerSkillTools();
+    const skillEnv = createExecutionEnv(process.cwd());
+    const skillCount = await registerSkillTools(skillEnv);
     if (skillCount > 0) {
       console.log(`   Registered ${skillCount} skill tool(s)`);
     }

@@ -9,12 +9,12 @@
  * AI providers call these tools on demand to load full skill content (lazy loading).
  */
 
-import * as fs from 'fs';
 import * as path from 'path';
 import type Database from 'better-sqlite3';
 import matter from 'gray-matter';
 import { workspaceService } from '../services/workspace.js';
 import { toolRegistry } from './tool-registry.js';
+import { unwrapResult, type ExecutionEnv } from '../../infra/execution-env.js';
 
 interface SkillTriggers {
   keywords?: string[];
@@ -115,10 +115,10 @@ export function parseSkillFile(content: string): ParsedSkillFile {
       const requires: SkillRequires = {};
       const os = toStringArray(requiresData.os);
       const binaries = toStringArray(requiresData.binaries);
-      const env = toStringArray(requiresData.env);
+      const envField = toStringArray(requiresData.env);
       if (os) requires.os = os;
       if (binaries) requires.binaries = binaries;
-      if (env) requires.env = env;
+      if (envField) requires.env = envField;
       if (requires.os || requires.binaries || requires.env) {
         frontmatter.requires = requires;
       }
@@ -136,11 +136,12 @@ export function parseSkillFile(content: string): ParsedSkillFile {
   }
 }
 
-function discoverSkillsInDir(
+export async function discoverSkillsInDir(
+  env: ExecutionEnv,
   dir: string,
   source: 'workspace' | 'external',
   maxDepth: number = MAX_RECURSION_DEPTH,
-): SkillMeta[] {
+): Promise<SkillMeta[]> {
   const skills: SkillMeta[] = [];
 
   if (maxDepth <= 0) {
@@ -148,28 +149,28 @@ function discoverSkillsInDir(
     return skills;
   }
 
-  if (!fs.existsSync(dir)) {
+  const existsResult = await env.exists(dir);
+  if (!existsResult.ok || !existsResult.value) {
     return skills;
   }
 
-  let entries: fs.Dirent[];
-  try {
-    entries = fs.readdirSync(dir, { withFileTypes: true });
-  } catch {
+  const listResult = await env.listDir(dir);
+  if (!listResult.ok) {
     return skills;
   }
 
-  for (const entry of entries) {
-    if (!entry.isDirectory()) {
+  for (const entry of listResult.value) {
+    if (entry.kind !== 'directory') {
       continue;
     }
 
     const subdir = path.join(dir, entry.name);
     const skillMdPath = path.join(subdir, 'SKILL.md');
 
-    if (fs.existsSync(skillMdPath)) {
+    const skillExists = await env.exists(skillMdPath);
+    if (skillExists.ok && skillExists.value) {
       try {
-        const content = fs.readFileSync(skillMdPath, 'utf-8');
+        const content = unwrapResult(await env.readTextFile(skillMdPath));
         const parsed = parseSkillFile(content);
         const frontmatter = parsed.frontmatter;
         const lines = parsed.body.split('\n').filter((line) => line.trim());
@@ -190,40 +191,38 @@ function discoverSkillsInDir(
         // Skip unreadable skills.
       }
     } else {
-      skills.push(...discoverSkillsInDir(subdir, source, maxDepth - 1));
+      const nested = await discoverSkillsInDir(env, subdir, source, maxDepth - 1);
+      skills.push(...nested);
     }
   }
 
   return skills;
 }
 
-export function loadSkillContent(dirPath: string): string {
+export async function loadSkillContent(env: ExecutionEnv, dirPath: string): Promise<string> {
   const parts: string[] = [];
   const skillMdPath = path.join(dirPath, 'SKILL.md');
 
-  try {
-    parts.push(fs.readFileSync(skillMdPath, 'utf-8'));
-  } catch {
+  const skillRead = await env.readTextFile(skillMdPath);
+  if (!skillRead.ok) {
     return `Skill file not found: ${skillMdPath}`;
   }
+  parts.push(skillRead.value);
 
   const referencesDir = path.join(dirPath, 'references');
-  if (fs.existsSync(referencesDir)) {
-    try {
-      const referenceEntries = fs.readdirSync(referencesDir, { withFileTypes: true });
-      for (const reference of referenceEntries) {
-        if (!reference.isFile() || !reference.name.endsWith('.md')) {
+  const refsExist = await env.exists(referencesDir);
+  if (refsExist.ok && refsExist.value) {
+    const refList = await env.listDir(referencesDir);
+    if (refList.ok) {
+      for (const reference of refList.value) {
+        if (reference.kind !== 'file' || !reference.name.endsWith('.md')) {
           continue;
         }
-        try {
-          const referenceContent = fs.readFileSync(path.join(referencesDir, reference.name), 'utf-8');
-          parts.push(`\n---\n## Reference: ${reference.name}\n\n${referenceContent}`);
-        } catch {
-          // Skip unreadable reference files.
+        const refRead = await env.readTextFile(path.join(referencesDir, reference.name));
+        if (refRead.ok) {
+          parts.push(`\n---\n## Reference: ${reference.name}\n\n${refRead.value}`);
         }
       }
-    } catch {
-      // Ignore unreadable references dir.
     }
   }
 
@@ -273,12 +272,12 @@ function getWellKnownSkillDirs(): string[] {
   ];
 }
 
-export async function registerSkillTools(): Promise<number> {
+export async function registerSkillTools(env: ExecutionEnv): Promise<number> {
   const allSkills: SkillMeta[] = [];
   const seenIds = new Set<string>();
 
   const workspaceSkillsDir = path.join(workspaceService.getWorkspaceDir(), 'skills');
-  for (const skill of discoverSkillsInDir(workspaceSkillsDir, 'workspace')) {
+  for (const skill of await discoverSkillsInDir(env, workspaceSkillsDir, 'workspace')) {
     if (!seenIds.has(skill.id)) {
       seenIds.add(skill.id);
       allSkills.push(skill);
@@ -286,7 +285,7 @@ export async function registerSkillTools(): Promise<number> {
   }
 
   for (const dir of [...getWellKnownSkillDirs(), ...getExternalSkillDirs()]) {
-    for (const skill of discoverSkillsInDir(dir, 'external')) {
+    for (const skill of await discoverSkillsInDir(env, dir, 'external')) {
       if (!seenIds.has(skill.id)) {
         seenIds.add(skill.id);
         allSkills.push(skill);
@@ -315,7 +314,7 @@ export async function registerSkillTools(): Promise<number> {
         },
       },
       source: 'skill',
-      handler: async () => loadSkillContent(skill.dirPath),
+      handler: async () => loadSkillContent(env, skill.dirPath),
     });
   }
 
@@ -328,9 +327,9 @@ export async function registerSkillTools(): Promise<number> {
   return allSkills.length;
 }
 
-export async function refreshSkillTools(): Promise<number> {
+export async function refreshSkillTools(env: ExecutionEnv): Promise<number> {
   toolRegistry.removeBySource('skill');
-  return registerSkillTools();
+  return registerSkillTools(env);
 }
 
 export function buildSkillDirectoryHint(): string {
