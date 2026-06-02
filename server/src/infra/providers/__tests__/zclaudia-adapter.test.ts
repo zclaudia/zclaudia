@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
-import type { AgentEvent } from '@earendil-works/pi-agent-core';
+import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
 import { __testables, ZClaudiaAdapter } from '../zclaudia-adapter.js';
-import type { RunOptions, ClaudeMessage } from '../types.js';
+import type { RunOptions, ClaudeMessage, SteerHandle } from '../types.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
@@ -23,6 +23,8 @@ const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructorOpts: any;
     promptCalls: Array<{ input: string }>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    steerCalls: any[];
   }>,
   scriptQueue: [] as Array<{ events: AgentEvent[]; rejectWith?: Error }>,
 }));
@@ -33,21 +35,24 @@ vi.mock('@earendil-works/pi-agent-core', () => {
     initialState: any;
     private listener?: (event: AgentEvent) => void;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    private slot: any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructor(opts: { initialState: any; [k: string]: any }) {
       this.initialState = opts.initialState;
-      mockAgentInstances.push({
+      this.slot = {
         initialState: opts.initialState,
         constructorOpts: opts,
         promptCalls: [],
-      });
+        steerCalls: [],
+      };
+      mockAgentInstances.push(this.slot);
     }
     subscribe(listener: (event: AgentEvent) => void): () => void {
       this.listener = listener;
       return () => { this.listener = undefined; };
     }
     async prompt(input: string): Promise<void> {
-      const slot = mockAgentInstances[mockAgentInstances.length - 1];
-      slot.promptCalls.push({ input });
+      this.slot.promptCalls.push({ input });
       const script = scriptQueue.shift() ?? { events: [] };
       // Yield once so the adapter's for-await loop has started consuming.
       await Promise.resolve();
@@ -57,6 +62,10 @@ vi.mock('@earendil-works/pi-agent-core', () => {
         await Promise.resolve();
       }
       if (script.rejectWith) throw script.rejectWith;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    steer(message: any): void {
+      this.slot.steerCalls.push(message);
     }
     abort(): void {
       // No-op for tests: pi documents abort() as safe to call on an idle agent.
@@ -648,5 +657,69 @@ describe('buildModel — profile overrides', () => {
     const { model, getApiKey } = buildModel(profile);
     expect(model.baseUrl).toBe('http://127.0.0.1:4000/v1');
     expect(await getApiKey!('openai-custom')).toBe('profile-key');
+  });
+});
+
+describe('ZClaudiaAdapter.run — steering wiring', () => {
+  const originalEnv = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+  afterEach(() => { process.env = { ...originalEnv }; });
+
+  it('constructs Agent with steeringMode: "all"', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {});
+    expect(mockAgentInstances[0].constructorOpts.steeringMode).toBe('all');
+  });
+
+  it('invokes options.onAgentReady once synchronously after Agent construction with a SteerHandle', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+    const adapter = new ZClaudiaAdapter();
+    const handles: SteerHandle[] = [];
+    await collect(adapter, 'hi', { onAgentReady: (h) => handles.push(h) });
+    expect(handles).toHaveLength(1);
+    expect(typeof handles[0].steer).toBe('function');
+  });
+
+  it('handle.steer forwards to the live pi Agent.steer', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+    const adapter = new ZClaudiaAdapter();
+    let handle: SteerHandle | undefined;
+    await collect(adapter, 'hi', { onAgentReady: (h) => { handle = h; } });
+    const msg: AgentMessage = { role: 'user', content: [{ type: 'text', text: 'also fix typo' }] } as AgentMessage;
+    handle!.steer(msg);
+    expect(mockAgentInstances[0].steerCalls).toContainEqual(msg);
+  });
+
+  it('bridges turn_start event to options.onSteerConsumed', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'turn_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+    const adapter = new ZClaudiaAdapter();
+    const consumedCalls: number[] = [];
+    await collect(adapter, 'hi', { onSteerConsumed: () => consumedCalls.push(Date.now()) });
+    expect(consumedCalls).toHaveLength(1);
+  });
+
+  it('declares session.steer capability', () => {
+    const adapter = new ZClaudiaAdapter();
+    const cap = adapter.manifest.capabilities.find((c) => c.id === 'session.steer');
+    expect(cap).toBeDefined();
+    expect(cap?.supported).toBe(true);
   });
 });

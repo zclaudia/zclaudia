@@ -298,6 +298,10 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         tools,
         ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
       },
+      // Drain the entire steering queue between turns (pi default is
+      // 'one-at-a-time'). With 'all', every `turn_start` is the application's
+      // signal that pendingSteers tracking can be cleared atomically.
+      steeringMode: 'all',
       beforeToolCall: hooks.beforeToolCall,
       afterToolCall: hooks.afterToolCall,
       shouldStopAfterTurn: hooks.shouldStopAfterTurn,
@@ -308,6 +312,12 @@ export class ZClaudiaAdapter implements ProviderAdapter {
 
     const agent = new Agent(agentOpts);
 
+    // Expose mid-run steer entry point synchronously so application has a
+    // handle BEFORE pi can emit any event. The callback is invoked once per run.
+    options.onAgentReady?.({
+      steer: (msg: AgentMessage) => agent.steer(msg),
+    });
+
     // 5. Subscribe → translate → queue
     // `agent_start` is intentionally not translated by translateEvent; init is
     // emitted manually above as a run-bootstrap concern.
@@ -316,6 +326,17 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // before `agent.prompt(input).then(close)` settles. Making this async would
     // break the init → ... → result → close ordering guarantee.
     const unsubscribe = agent.subscribe(event => {
+      // Bridge turn_start → onSteerConsumed BEFORE any downstream forwarding.
+      // With steeringMode:'all', turn_start fires after the steering queue is
+      // drained, so this is the atomic point to clear pendingSteers tracking.
+      if (event.type === 'turn_start') {
+        try {
+          options.onSteerConsumed?.();
+        } catch (err) {
+          console.warn('[ZClaudiaAdapter] onSteerConsumed callback threw:', err);
+        }
+      }
+
       // 1. Text / thinking / result path
       if (event.type === 'agent_end') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

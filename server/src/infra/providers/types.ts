@@ -1,3 +1,4 @@
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
@@ -6,6 +7,12 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { ClaudeMessage, PermissionCallback } from './message-types.js';
+
+/** Handle exposed to the application after pi Agent construction, for mid-run steering. */
+export interface SteerHandle {
+  /** Push a user AgentMessage into the live pi Agent's steering queue. */
+  steer: (message: AgentMessage) => void;
+}
 
 // Re-export core provider message types (shared across all providers)
 export type { ClaudeMessage, SystemInfo, PermissionDecision, PermissionCallback } from './message-types.js';
@@ -31,6 +38,10 @@ export interface RunOptions {
   enabledTools?: ToolName[];
   /** Pi thinking budget; undefined = pi default. */
   thinkingLevel?: ThinkingLevel;
+  /** Called once synchronously after the pi Agent is instantiated. Application registers handle for mid-run steer. */
+  onAgentReady?: (handle: SteerHandle) => void;
+  /** Called when pi emits `turn_start` (after the steering queue is drained with steeringMode:'all'). Application clears pendingSteers. */
+  onSteerConsumed?: () => void;
 }
 
 /** Agent runtime adapter interface. */
