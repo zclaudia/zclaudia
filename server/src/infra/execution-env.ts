@@ -14,7 +14,7 @@ import type { ExecutionEnv, Result } from '@earendil-works/pi-agent-core';
  * FS-only usage, so leaking an instance does not leak resources, but
  * cleanup() should be called when the env is known to be done.
  */
-export function createExecutionEnv(cwd: string): NodeExecutionEnv {
+export function createExecutionEnv(cwd: string): ExecutionEnv {
   return new NodeExecutionEnv({ cwd });
 }
 
