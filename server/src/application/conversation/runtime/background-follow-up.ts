@@ -199,6 +199,11 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
     eventSeq: 0,
     providerType: ctx.providerType,
     pendingSteers: [],
+    // agentProfile / llmProfile intentionally omitted: background follow-up runs
+    // do not eagerly load these (they're not always available here), and as a
+    // result auto-compaction is skipped for follow-up turns. The user-driven
+    // /compact path can still compact the session on demand once the regular
+    // session run loads the profiles.
   };
 
   // Wire broadcast

@@ -6,6 +6,9 @@
 const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'claude-opus-4-7': 200_000,
   'claude-sonnet-4-6': 200_000,
+  // Bare and date-suffixed forms; agent_profiles.model defaults to bare ids elsewhere
+  // in the codebase, so listing both forms avoids silent fallback to 100k.
+  'claude-haiku-4-5': 200_000,
   'claude-haiku-4-5-20251001': 200_000,
   'gpt-5': 400_000,
 };
