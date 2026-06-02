@@ -61,7 +61,9 @@ export class SessionCompactionRepository {
 
   getLatest(sessionId: string): SessionCompaction | null {
     const row = this.db.prepare(
-      `SELECT * FROM session_compactions WHERE session_id = ? ORDER BY created_at DESC LIMIT 1`,
+      // Secondary sort on id (uuidv7 — lexicographically time-ordered) breaks
+      // same-millisecond ties deterministically.
+      `SELECT * FROM session_compactions WHERE session_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`,
     ).get(sessionId);
     return row ? this.mapRow(row) : null;
   }

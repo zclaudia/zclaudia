@@ -96,7 +96,7 @@ export function rebuildHistory(
     ).get(compaction.firstKeptMessageId);
     if (!boundaryRow) {
       console.warn(
-        `[rebuildHistory] compaction boundary message '${compaction.firstKeptMessageId}' not found — treating as no compaction`,
+        `[rebuildHistory] compaction '${compaction.id}' boundary message '${compaction.firstKeptMessageId}' not found — treating as no compaction`,
       );
     } else {
       boundaryOffset = boundaryRow.offset;
