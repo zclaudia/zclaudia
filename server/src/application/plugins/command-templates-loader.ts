@@ -52,7 +52,10 @@ function extractFrontmatterDescription(filePath: string): string | undefined {
       return data.description.trim();
     }
     return undefined;
-  } catch {
+  } catch (err) {
+    // Malformed frontmatter (bad YAML, file unreadable). Template still loads
+    // with pi-derived description; warn so the operator can fix it.
+    console.warn(`[command-templates-loader] Failed to parse frontmatter for ${filePath}:`, err);
     return undefined;
   }
 }

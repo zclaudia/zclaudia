@@ -73,10 +73,6 @@ describe('loadAllCommandTemplates', () => {
   it('attributes templates correctly when multiple plugin inputs share a basename', async () => {
     const pluginADir = path.join(tmpRoot, 'plugin-a-cmds');
     const pluginBDir = path.join(tmpRoot, 'plugin-b-cmds');
-    function writeCmd(dir: string, name: string, body: string) {
-      mkdirSync(dir, { recursive: true });
-      writeFileSync(path.join(dir, `${name}.md`), body);
-    }
     writeCmd(pluginADir, 'foo', '# A foo');
     writeCmd(pluginBDir, 'foo', '# B foo');
     const env = createExecutionEnv(tmpRoot);
