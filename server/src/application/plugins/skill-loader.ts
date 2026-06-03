@@ -52,7 +52,10 @@ function extractRequirements(filePath: string): SkillRequirements | undefined {
     if (binaries) out.binaries = binaries;
     if (env) out.env = env;
     return Object.keys(out).length ? out : undefined;
-  } catch {
+  } catch (err) {
+    // Malformed frontmatter (bad YAML, file unreadable). Skill still loads with
+    // no requirements; warn so the operator can fix it.
+    console.warn(`[skill-loader] Failed to parse frontmatter for ${filePath}:`, err);
     return undefined;
   }
 }
