@@ -61,47 +61,49 @@ function extractFrontmatterDescription(filePath: string): string | undefined {
  * Discover command templates across source-tagged paths via pi
  * `loadSourcedPromptTemplates`, then enrich each with frontmatter
  * `description:` override and (for plugin source) plugin provenance.
+ *
+ * Calls pi once per input so each result is unambiguously attributable to
+ * its source dir. This avoids the multi-plugin attribution bug where all
+ * results sharing source='plugin' would be attributed to the first plugin.
  */
 export async function loadAllCommandTemplates(
   env: ExecutionEnv,
   inputs: CommandTemplateLoadInput[],
 ): Promise<CommandTemplateLoadResult> {
-  const piInputs = inputs.map(({ path: p, source }) => ({ path: p, source }));
-  const result = await loadSourcedPromptTemplates<CommandSource>(env, piInputs);
+  const templates: SourcedPromptTemplate[] = [];
+  const diagnostics: CommandTemplateDiagnostic[] = [];
 
-  const templates: SourcedPromptTemplate[] = result.promptTemplates.map(
-    ({ promptTemplate, source }) => {
-      // Reconstruct file path. Pi names templates by filename basename without
-      // extension; we walk inputs of matching source and pick the first whose
-      // input.path + name.md is the expected location. For plugin sources
-      // (multiple inputs may share `source: 'plugin'`), this uses the first
-      // matching plugin input — acceptable since each plugin's path is unique.
-      const candidatePaths = inputs
-        .filter((i) => i.source === source)
-        .map((i) => path.join(i.path, `${promptTemplate.name}.md`));
-      const filePath = candidatePaths[0] ?? '';
-      const matchingInput = inputs
-        .filter((i) => i.source === source)
-        .find((i) => candidatePaths.includes(path.join(i.path, `${promptTemplate.name}.md`)));
+  // Call pi once per input so each result is unambiguously attributable.
+  // loadSourcedPromptTemplates handles missing dirs (returns empty + no
+  // diagnostics for them).
+  for (const input of inputs) {
+    const result = await loadSourcedPromptTemplates<CommandSource>(env, [
+      { path: input.path, source: input.source },
+    ]);
+
+    for (const { promptTemplate, source } of result.promptTemplates) {
+      const filePath = path.join(input.path, `${promptTemplate.name}.md`);
       const fmDescription = extractFrontmatterDescription(filePath);
-      return {
+      templates.push({
         template: fmDescription
           ? { ...promptTemplate, description: fmDescription }
           : promptTemplate,
         source,
         filePath,
-        plugin: matchingInput?.plugin,
-      };
-    },
-  );
+        plugin: input.plugin,
+      });
+    }
 
-  const diagnostics: CommandTemplateDiagnostic[] = result.diagnostics.map((d) => ({
-    type: d.type,
-    code: d.code,
-    message: d.message,
-    path: d.path,
-    source: d.source,
-  }));
+    for (const d of result.diagnostics) {
+      diagnostics.push({
+        type: d.type,
+        code: d.code,
+        message: d.message,
+        path: d.path,
+        source: d.source,
+      });
+    }
+  }
 
   return { templates, diagnostics };
 }

@@ -69,4 +69,30 @@ describe('loadAllCommandTemplates', () => {
     ]);
     expect(result.templates[0].plugin?.pluginName).toBe('plugin-x');
   });
+
+  it('attributes templates correctly when multiple plugin inputs share a basename', async () => {
+    const pluginADir = path.join(tmpRoot, 'plugin-a-cmds');
+    const pluginBDir = path.join(tmpRoot, 'plugin-b-cmds');
+    function writeCmd(dir: string, name: string, body: string) {
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(path.join(dir, `${name}.md`), body);
+    }
+    writeCmd(pluginADir, 'foo', '# A foo');
+    writeCmd(pluginBDir, 'foo', '# B foo');
+    const env = createExecutionEnv(tmpRoot);
+    const result = await loadAllCommandTemplates(env, [
+      { path: pluginADir, source: 'plugin', plugin: { pluginName: 'plugin-a' } },
+      { path: pluginBDir, source: 'plugin', plugin: { pluginName: 'plugin-b' } },
+    ]);
+    expect(result.templates).toHaveLength(2);
+
+    const pluginNames = result.templates.map((t) => t.plugin?.pluginName).sort();
+    expect(pluginNames).toEqual(['plugin-a', 'plugin-b']);
+
+    // Each template's filePath points at its own plugin dir
+    const a = result.templates.find((t) => t.plugin?.pluginName === 'plugin-a')!;
+    const b = result.templates.find((t) => t.plugin?.pluginName === 'plugin-b')!;
+    expect(a.filePath).toBe(path.join(pluginADir, 'foo.md'));
+    expect(b.filePath).toBe(path.join(pluginBDir, 'foo.md'));
+  });
 });
