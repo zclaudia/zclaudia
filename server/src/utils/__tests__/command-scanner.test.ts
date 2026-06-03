@@ -289,5 +289,35 @@ describe('command-scanner', () => {
       expect(names).not.toContain('/README');
       expect(names).not.toContain('/doc-plugin:README');
     });
+
+    it('dedups intra-plugin double emission when same basename in /commands and root', async () => {
+      // discoverPluginCommandInputs adds BOTH <install>/commands and <install>
+      // as candidate inputs. If a plugin happens to have the same basename in
+      // both, classifyTemplates must not emit /<plugin>:<name> twice.
+      const pluginInstallPath = path.join(tmpHome, 'plugins', 'dup-plugin');
+      const pluginCommandsDir = path.join(pluginInstallPath, 'commands');
+      mkdirSync(pluginCommandsDir, { recursive: true });
+      writeFileSync(path.join(pluginCommandsDir, 'foo.md'), '# foo in commands');
+      writeFileSync(path.join(pluginInstallPath, 'foo.md'), '# foo at root');
+      const pluginsRegistryDir = path.join(tmpHome, '.claude', 'plugins');
+      mkdirSync(pluginsRegistryDir, { recursive: true });
+      writeFileSync(
+        path.join(pluginsRegistryDir, 'installed_plugins.json'),
+        JSON.stringify({
+          version: 1,
+          plugins: {
+            'dup-plugin@market': [
+              { scope: 'user', installPath: pluginInstallPath, version: '1.0.0', installedAt: 't', lastUpdated: 't' },
+            ],
+          },
+        }),
+      );
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
+      const prefixed = result.filter(r => r.command === '/dup-plugin:foo');
+      const bare = result.filter(r => r.command === '/foo');
+      expect(prefixed).toHaveLength(1);
+      expect(bare).toHaveLength(1);
+    });
   });
 });

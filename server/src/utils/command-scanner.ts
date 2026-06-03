@@ -138,6 +138,10 @@ function classifyTemplates(
     const hasCollision = group.length > 1;
 
     // Prefixed forms: emit for plugins always; for user/project only on collision.
+    // Dedup by command name within the group — a single plugin can have the
+    // same basename in both <install>/commands and <install>/ (we add both as
+    // candidate inputs), which would otherwise emit the prefixed form twice.
+    const prefixedEmitted = new Set<string>();
     for (const t of group) {
       const isPlugin = t.source === 'plugin';
       const shouldEmitPrefixed = hasCollision || isPlugin;
@@ -150,6 +154,9 @@ function classifyTemplates(
       const prefixedName = isPlugin && t.plugin
         ? `/${t.plugin.pluginName}:${base}`
         : `/${t.source}:${base}`;
+
+      if (prefixedEmitted.has(prefixedName)) continue;
+      prefixedEmitted.add(prefixedName);
 
       result.push({
         command: prefixedName,
