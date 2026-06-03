@@ -28,6 +28,7 @@ export function PlanModeToggle({ value, onChange, disabled, locked, lockReason }
       disabled={disabled || locked}
       title={title}
       aria-label={isOn ? 'Plan mode on' : 'Plan mode off'}
+      aria-pressed={!!isOn}
       className={[
         'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium h-7 transition-colors',
         isOn
