@@ -94,7 +94,6 @@ export async function handleClientMessage(
         sessionId: message.sessionId,
         input: message.input,
         llmProfileId: message.llmProfileId,
-        model: message.model,
       }, db, {}, clients);
       break;
 

@@ -71,7 +71,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
 
   if (adapter.manifest) {
     activeRun.effectiveProfile = negotiateProfile(adapter.manifest, {
-      model: message.model,
+      model: agentProfile.model,
       mode: modeValue,
       hasMcpBridge: !!serverPort,
       serverPort,
@@ -143,13 +143,13 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     activeRun.pendingSteers = [];
   };
 
-  console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${providerType} mode=${modeValue} model=${message.model || 'default'} cwd=${cwd} baseUrl=${providerConfig?.baseUrl || 'default'}`);
+  console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${providerType} mode=${modeValue} model=${agentProfile.model || 'default'} cwd=${cwd} baseUrl=${providerConfig?.baseUrl || 'default'}`);
   trace.setMeta({ provider: providerType, cwd });
   trace.log('server_norm', 'provider_runner_created', {
     providerType,
     sdkSessionId,
     modeValue,
-    model: message.model,
+    model: agentProfile.model,
     cwd,
   }, `provider runner ${providerType}`);
 

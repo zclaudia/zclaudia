@@ -103,8 +103,7 @@ export class PluginProviderAPI implements ProviderAPI {
       cwd: process.cwd(),
       cliPath: providerRow.cli_path || undefined,
       env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
-      model: modelOverride,
-      mode: 'plan',
+      planMode: true,
       systemPrompt,
     };
 
@@ -160,7 +159,7 @@ export class PluginProviderAPI implements ProviderAPI {
   }
 
   async *callStream(options: ProviderCallOptions): AsyncGenerator<ProviderStreamChunk> {
-    const { providerId, modelOverride, messages, systemPrompt } = options;
+    const { providerId, messages, systemPrompt } = options;
 
     const providerRow = this.db
       .prepare(`
@@ -192,8 +191,7 @@ export class PluginProviderAPI implements ProviderAPI {
       cwd: process.cwd(),
       cliPath: providerRow.cli_path || undefined,
       env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
-      model: modelOverride,
-      mode: 'plan',
+      planMode: true,
       systemPrompt,
     };
 

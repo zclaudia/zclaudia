@@ -1,7 +1,16 @@
 import type { PCPProviderManifest, PCPPermissionMode } from '@zclaudia/shared/core/pcp';
-import type { PermissionMode } from '@zclaudia/shared/core/runtime-capabilities';
 
-const LEGACY_TO_PCP_MODE: Record<PermissionMode, PCPPermissionMode> = {
+/**
+ * Legacy mode-string vocabulary still used internally by adapters and the
+ * mode_change event stream ('default' | 'plan'), plus the historical
+ * 'acceptEdits' / 'bypassPermissions' values that some adapters / fixtures
+ * may still emit. PermissionMode was dropped from shared types when the UI
+ * selectors moved to `planMode` + `permissionOverride`; this local alias
+ * keeps the mapping table strict.
+ */
+type LegacyPermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+
+const LEGACY_TO_PCP_MODE: Record<LegacyPermissionMode, PCPPermissionMode> = {
   default: 'supervised',
   acceptEdits: 'auto_edit',
   bypassPermissions: 'autonomous',
@@ -15,7 +24,7 @@ function isPcpPermissionMode(mode: string): mode is PCPPermissionMode {
 export function normalizePermissionMode(mode?: string): PCPPermissionMode | undefined {
   if (!mode) return undefined;
   if (isPcpPermissionMode(mode)) return mode;
-  return LEGACY_TO_PCP_MODE[mode as PermissionMode];
+  return LEGACY_TO_PCP_MODE[mode as LegacyPermissionMode];
 }
 
 /**

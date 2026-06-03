@@ -65,10 +65,9 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
   }
 
   const forcedPlanBySession = session.project_role === 'task' && session.plan_status === 'planning';
-  const modeValue = forcedPlanBySession
-    ? 'plan'
-    : (message.mode || message.permissionMode || 'default');
-  if (forcedPlanBySession && modeValue !== (message.mode || message.permissionMode || 'default')) {
+  const requestedMode = message.planMode ? 'plan' : 'default';
+  const modeValue = forcedPlanBySession ? 'plan' : requestedMode;
+  if (forcedPlanBySession && modeValue !== requestedMode) {
     console.log(`[Mode] Forced plan mode for task planning session ${message.sessionId}`);
   }
 

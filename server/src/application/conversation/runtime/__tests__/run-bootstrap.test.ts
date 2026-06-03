@@ -167,7 +167,7 @@ function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOption
       clientRequestId: 'req-1',
       sessionId: 'session-1',
       input: 'hello',
-      mode,
+      planMode: mode === 'plan',
     },
     runId: 'run-1',
     trace: {

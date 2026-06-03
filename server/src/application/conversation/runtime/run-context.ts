@@ -45,11 +45,9 @@ export interface BuildRunContextInput {
   forcedPlanBySession: boolean;
   message: {
     input: string;
-    model?: string;
     sessionId: string;
     systemContext?: string;
-    mode?: string;
-    permissionMode?: 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
+    planMode?: boolean;
   } & Record<string, unknown>;
   modeValue: string;
   providerConfig?: LlmProfileConfig;
@@ -144,8 +142,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       cwd,
       sessionId: sdkSessionId,
       env: { ...(providerConfig?.env || {}), ...filePushEnv },
-      mode: nativeMode,
-      model: agentProfile.model,
+      planMode: message.planMode ?? false,
       systemPrompt: agentProfile.systemPrompt,
       sessionTitle: session.name || undefined,
       serverPort: serverPort || undefined,

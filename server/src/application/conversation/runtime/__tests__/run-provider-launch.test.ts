@@ -39,7 +39,7 @@ describe('ws/run-provider-launch', () => {
       nativeMode: 'default',
       runOptions: {
         cwd: '/tmp/project',
-        mode: 'default',
+        planMode: false,
       },
     });
     negotiateProfileMock.mockReturnValue({
@@ -71,17 +71,24 @@ describe('ws/run-provider-launch', () => {
     const result = await launchProviderRun({
       activeRun,
       adapter,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Test Agent',
+        model: 'sonnet',
+        systemPrompt: 'agent system prompt',
+        enabledTools: [],
+      } as any,
       broadcastSessionCatalogUpdate: broadcastSessionCatalogUpdateMock,
       client: { ws: {} as any } as any,
       cwd: '/tmp/project',
       db: {} as any,
+      enabledTools: [],
       forcedPlanBySession: false,
       message: {
         type: 'run_start',
         sessionId: 'session-1',
         clientRequestId: 'req-1',
         input: 'hello',
-        model: 'sonnet',
       },
       modeValue: 'default',
       permissionCallback,
@@ -152,7 +159,7 @@ describe('ws/run-provider-launch', () => {
       'processed hello',
       expect.objectContaining({
         cwd: '/tmp/project',
-        mode: 'default',
+        planMode: false,
         onAgentReady: expect.any(Function),
         onSteerConsumed: expect.any(Function),
       }),

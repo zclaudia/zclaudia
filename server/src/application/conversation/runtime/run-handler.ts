@@ -54,8 +54,7 @@ export async function handleRunStart(
     clientRequestId: message.clientRequestId,
     sessionId: message.sessionId,
     llmProfileId: message.llmProfileId,
-    mode: message.mode,
-    model: message.model,
+    planMode: message.planMode,
     workingDirectory: message.workingDirectory,
     resend: message.resend,
   }, 'run_start requested');
