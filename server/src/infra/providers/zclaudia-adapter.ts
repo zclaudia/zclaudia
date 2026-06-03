@@ -96,6 +96,29 @@ function zeroUsage(): Usage {
 }
 
 /**
+ * Find the LLM-level error swallowed by pi-agent-core's run loop.
+ *
+ * Pi-agent-core treats `done` and `error` stream stop reasons identically:
+ * both go through the same `message_end` path, dropping the error detail and
+ * leaving only an empty assistant message with `stopReason: 'error'`. Without
+ * surfacing this, the run looks like "completed in 120ms with zero output"
+ * instead of "the provider returned HTTP 503 model_not_found".
+ *
+ * Returns the provider's error message when the final assistant message
+ * stopped with an error, otherwise undefined.
+ */
+function extractErrorStop(messages: AgentMessage[]): string | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i] as { role?: string; stopReason?: string; errorMessage?: string };
+    if (m.role !== 'assistant') continue;
+    return m.stopReason === 'error'
+      ? (m.errorMessage || 'LLM provider returned an error stop reason')
+      : undefined;
+  }
+  return undefined;
+}
+
+/**
  * Sum usage across all assistant messages in an `agent_end` payload.
  *
  * A tool-using turn yields multiple assistant messages (one per LLM call); each carries
@@ -180,7 +203,7 @@ export function translateEvent(
   }
 }
 
-export const __testables = { AsyncQueue, buildModel, translateEvent };
+export const __testables = { AsyncQueue, buildModel, translateEvent, extractErrorStop };
 
 export class ZClaudiaAdapter implements ProviderAdapter {
   readonly type = 'zclaudia';
@@ -197,27 +220,27 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       sessionId,
       model: process.env.PI_MODEL || DEFAULT_MODEL,
       cwd: options.cwd,
-      permissionMode: options.mode,
+      permissionMode: options.planMode ? 'plan' : 'default',
     };
 
-    // 1. Always yield init first
-    yield {
-      type: 'init',
-      sessionId,
-      systemInfo: {
-        model: ctx.model,
-        cwd: options.cwd,
-        permissionMode: ctx.permissionMode || 'default',
-        tools: [],
-        agents: ['zclaudia'],
-      },
-    };
-
-    // 2. Build the model (config errors stop here)
+    // 1. Build the model first (config errors stop here, before any init event).
+    //    Init carries contextWindow which requires a built model.
     let modelInfo: BuiltModel;
     try {
       modelInfo = buildModel(options.llmProfileConfig, options.agentProfile?.model);
     } catch (err) {
+      // Emit a minimal init so the client has a sessionId, then the error.
+      yield {
+        type: 'init',
+        sessionId,
+        systemInfo: {
+          model: ctx.model,
+          cwd: options.cwd,
+          permissionMode: ctx.permissionMode || 'default',
+          tools: [],
+          agents: ['zclaudia'],
+        },
+      };
       yield {
         type: 'error',
         error: `model configuration failed: ${err instanceof Error ? err.message : String(err)}. Check PI_PROVIDER / PI_MODEL / provider API key env vars or LLM Profile config.`,
@@ -225,6 +248,29 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       };
       return;
     }
+
+    // 2. Resolve effective context window: explicit agent profile override wins,
+    //    otherwise fall back to the pi-ai model registry value carried on the
+    //    built model. Undefined only if both are missing.
+    const explicitCtx = options.agentProfile?.contextWindow;
+    const effectiveContextWindow =
+      typeof explicitCtx === 'number' && explicitCtx > 0
+        ? explicitCtx
+        : (modelInfo.model.contextWindow > 0 ? modelInfo.model.contextWindow : undefined);
+
+    // 3. Yield init now (after we know the contextWindow).
+    yield {
+      type: 'init',
+      sessionId,
+      systemInfo: {
+        model: ctx.model,
+        contextWindow: effectiveContextWindow,
+        cwd: options.cwd,
+        permissionMode: ctx.permissionMode || 'default',
+        tools: [],
+        agents: ['zclaudia'],
+      },
+    };
 
     // 3. Load history (non-fatal failure)
     let history: AgentMessage[] = [];
@@ -297,7 +343,27 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       // 1. Text / thinking / result path
       if (event.type === 'agent_end') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const usage = extractUsage((event as any).messages);
+        const messages = (event as any).messages as AgentMessage[];
+        const usage = extractUsage(messages);
+
+        // Surface LLM-level errors that pi-agent-core's loop quietly absorbs
+        // (it routes `error` and `done` stop reasons through the same
+        // `message_end` path). Without this, a 503 / bad model id / auth
+        // failure looks like "session ran for 120ms and produced nothing".
+        const errorReason = extractErrorStop(messages);
+        if (errorReason) {
+          queue.push({
+            type: 'error',
+            error: `LLM call failed: ${errorReason}. Check agent profile model id, LLM profile baseUrl/apiKey, or provider availability.`,
+            isComplete: true,
+          });
+          // Skip the `result` translation: run-events treats `error` as a
+          // terminal event (sets activeRun.completed and emits run_failed).
+          // Emitting result on top would double-fire run_completed and persist
+          // an empty assistant message.
+          return;
+        }
+
         const result = translateEvent(event as AgentEvent, ctx, usage);
         if (result) queue.push(result);
       } else {

@@ -23,8 +23,8 @@ export interface RunOptions {
   sessionId?: string;
   cliPath?: string;
   env?: Record<string, string>;
-  mode?: string;
-  model?: string;
+  /** Plan mode toggle (from UI). Adapter derives PCP `permissionMode` from this. */
+  planMode?: boolean;
   systemPrompt?: string;  // Full system prompt sourced from agentProfile.systemPrompt by run-context (§4.6 full replacement)
   sessionTitle?: string;  // Optional session title for providers that support it
   serverPort?: number;    // Main server port for MCP bridge

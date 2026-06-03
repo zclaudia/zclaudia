@@ -79,7 +79,7 @@ function scriptNextAgent(events: AgentEvent[], options?: { rejectWith?: Error })
   scriptQueue.push({ events, rejectWith: options?.rejectWith });
 }
 
-const { AsyncQueue, buildModel, translateEvent } = __testables;
+const { AsyncQueue, buildModel, translateEvent, extractErrorStop } = __testables;
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -161,6 +161,44 @@ describe('AsyncQueue', () => {
     q.close();
     await consumer;
     expect(collected).toEqual([]);
+  });
+});
+
+describe('extractErrorStop', () => {
+  it('returns errorMessage when final assistant message stopReason is error', () => {
+    const out = extractErrorStop([
+      { role: 'user', content: 'hi', timestamp: 0 } as any,
+      { role: 'assistant', content: [], stopReason: 'error', errorMessage: 'HTTP 503 model_not_found', timestamp: 0 } as any,
+    ]);
+    expect(out).toBe('HTTP 503 model_not_found');
+  });
+
+  it('returns undefined when final assistant message stopped normally', () => {
+    const out = extractErrorStop([
+      { role: 'assistant', content: [{ type: 'text', text: 'ok' }], stopReason: 'stop', timestamp: 0 } as any,
+    ]);
+    expect(out).toBeUndefined();
+  });
+
+  it('only inspects the LAST assistant message (mid-turn tool errors stay invisible)', () => {
+    const out = extractErrorStop([
+      { role: 'assistant', content: [], stopReason: 'error', errorMessage: 'first call failed', timestamp: 0 } as any,
+      { role: 'tool', content: [], timestamp: 0 } as any,
+      { role: 'assistant', content: [{ type: 'text', text: 'recovered' }], stopReason: 'stop', timestamp: 0 } as any,
+    ]);
+    expect(out).toBeUndefined();
+  });
+
+  it('returns fallback message when stopReason=error but errorMessage missing', () => {
+    const out = extractErrorStop([
+      { role: 'assistant', content: [], stopReason: 'error', timestamp: 0 } as any,
+    ]);
+    expect(out).toBe('LLM provider returned an error stop reason');
+  });
+
+  it('returns undefined for empty / no-assistant message list', () => {
+    expect(extractErrorStop([])).toBeUndefined();
+    expect(extractErrorStop([{ role: 'user', content: 'hi', timestamp: 0 } as any])).toBeUndefined();
   });
 });
 
@@ -403,6 +441,30 @@ describe('ZClaudiaAdapter.run', () => {
     expect(mockAgentInstances[0].initialState.messages).toEqual([]);
   });
 
+  it('swallowed LLM error (stopReason=error in agent_end): yields error and skips result', async () => {
+    // pi-agent-core treats stream `error` and `done` reasons identically and
+    // emits message_end for both — the only signal left is stopReason=error on
+    // the final assistant message. Adapter must surface that as an explicit
+    // error event so the run shows "LLM call failed: …" instead of "completed
+    // empty in 120ms".
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        { role: 'assistant', content: [], stopReason: 'error', errorMessage: 'HTTP 503 model_not_found', usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }, timestamp: 0 } as any,
+      ] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+
+    expect(out.map(m => m.type)).toEqual(['init', 'error']);
+    const err = out[1];
+    expect(err.error).toContain('LLM call failed');
+    expect(err.error).toContain('HTTP 503 model_not_found');
+    expect(err.isComplete).toBe(true);
+  });
+
   it('unknown pi event types do not break stream', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
@@ -415,6 +477,73 @@ describe('ZClaudiaAdapter.run', () => {
     const out = await collect(adapter, 'hi', {});
 
     expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'result']);
+  });
+
+  it('translates planMode boolean to systemInfo.permissionMode', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', { planMode: true });
+
+    const init = out.find(m => m.type === 'init');
+    expect(init?.systemInfo?.permissionMode).toBe('plan');
+  });
+
+  it('defaults permissionMode to "default" when planMode is false/undefined', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {});
+
+    const init = out.find(m => m.type === 'init');
+    expect(init?.systemInfo?.permissionMode).toBe('default');
+  });
+
+  it('emits contextWindow in init systemInfo when agentProfile.contextWindow is set', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      agentProfile: {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: '',
+        enabledTools: [],
+        contextWindow: 150_000,
+      } as any,
+    });
+
+    const init = out.find(m => m.type === 'init');
+    expect(init?.systemInfo?.contextWindow).toBe(150_000);
+  });
+
+  it('falls back to model registry context window when agentProfile.contextWindow is null', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      agentProfile: {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: '',
+        enabledTools: [],
+        contextWindow: null,
+      } as any,
+    });
+
+    const init = out.find(m => m.type === 'init');
+    // Mocked getModel returns contextWindow: 200000
+    expect(init?.systemInfo?.contextWindow).toBe(200_000);
   });
 });
 
