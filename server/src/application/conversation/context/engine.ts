@@ -41,7 +41,6 @@ function assembleAgentTemplate(input: AssemblyInput): string {
     input.systemContext,
     input.workspacePrompt,
     input.skillDirectoryHint,
-    input.activeSkillsContent,
     input.memoryContext,
     input.filePushContext,
     input.interactionToolPrompt,
@@ -69,6 +68,7 @@ function assembleSupervisionTemplate(input: AssemblyInput): string {
     SUPERVISION_SYSTEM_PROMPT,
     input.systemContext,
     input.workspacePrompt,
+    input.skillDirectoryHint,
     input.memoryContext,
     input.sessionSystemPrompt,
   ].filter(Boolean).join('\n\n');
@@ -97,7 +97,7 @@ function assembleReviewTemplate(input: AssemblyInput): string {
     REVIEW_SYSTEM_PROMPT,
     input.systemContext,
     input.workspacePrompt,
-    input.activeSkillsContent,
+    input.skillDirectoryHint,
     input.memoryContext,
     input.sessionSystemPrompt,
   ].filter(Boolean).join('\n\n');
@@ -108,7 +108,7 @@ function assembleDebugTemplate(input: AssemblyInput): string {
     DEBUG_SYSTEM_PROMPT,
     input.systemContext,
     input.workspacePrompt,
-    input.activeSkillsContent,
+    input.skillDirectoryHint,
     input.memoryContext,
     input.sessionSystemPrompt,
   ].filter(Boolean).join('\n\n');
