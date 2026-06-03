@@ -3,7 +3,6 @@
  * completion/failure, background tasks, agent assistant, and process cleanup.
  */
 
-import type { PermissionMode } from '../../core/runtime-capabilities.js';
 import type { SessionType } from '../../core/session.js';
 import type { ToolEffect, UsageInfo } from '../../core/message.js';
 import type { UnifiedPermissionPolicy } from '../../interaction/permissions.js';
@@ -14,13 +13,13 @@ export interface RunStartMessage {
   sessionId: string;
   input: string;
   llmProfileId?: string;
-  permissionMode?: PermissionMode;  // Kept for backwards compat
-  mode?: string;  // Generic mode/agent ID (new unified field)
-  model?: string;  // Optional: override model (e.g. 'zclaudia-1')
-  permissionOverride?: Partial<UnifiedPermissionPolicy>;  // Optional: session-level permission override
-  systemContext?: string;  // Dynamic context prepended to system prompt (e.g. backend list for global agent)
-  workingDirectory?: string;  // Optional: override working directory (e.g., for git worktree)
-  resend?: boolean;  // True when resending the last user message — server skips inserting a duplicate user message
+  /** Plan mode toggle: when true, the adapter runs the turn in plan-only mode
+   *  (read-only tool subset). Replaces the legacy `mode: 'plan'` enum value. */
+  planMode?: boolean;
+  permissionOverride?: Partial<UnifiedPermissionPolicy>;
+  systemContext?: string;
+  workingDirectory?: string;
+  resend?: boolean;
 }
 
 export interface RunCancelMessage {
@@ -188,7 +187,6 @@ export interface AgentStartMessage {
   sessionId: string;
   input: string;
   llmProfileId?: string;
-  model?: string;
   tools?: string[];
 }
 

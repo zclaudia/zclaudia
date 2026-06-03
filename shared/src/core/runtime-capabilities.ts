@@ -1,31 +1,23 @@
-// Runtime capabilities and permission modes (drive the UI selectors).
-// These types describe what the runtime adapter exposes to the client; they
-// are intentionally decoupled from the LLM connection profile shape.
-
-/** Runtime permission modes supported by the initial zclaudia shell. */
-export type PermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
-
-/** A selectable option in the Mode dropdown (permission mode, agent, etc.) */
-export interface ModeOption {
-  id: string;           // Value sent to server (e.g. 'default', 'plan', 'build')
-  label: string;        // Display text (e.g. 'Default', 'Plan')
-  description?: string; // Tooltip / subtitle
-  icon?: string;        // Emoji or icon identifier
-}
+// Runtime capabilities (drives the UI selectors).
+//
+// PermissionMode was removed; the UI selectors now are:
+//   - planMode: boolean (replaces user-facing `plan` mode value)
+//   - permissionOverride: UnifiedPermissionPolicy (replaces acceptEdits / bypassPermissions)
+//
+// Internal runtime "mode_change" events still carry string values
+// ('plan' | 'default') to signal phase transitions, but those are not
+// user-selectable modes.
 
 /** A selectable option in the Model dropdown */
 export interface ModelOption {
   id: string;           // Value sent to server (e.g. 'zclaudia-stub')
-  label: string;        // Display text (e.g. 'ZClaudia Stub')
+  label: string;        // Display text
   group?: string;       // Optional grouping
 }
 
 /** What the runtime supports — drives the UI selectors */
 export interface ProviderCapabilities {
-  modes: ModeOption[];    // Empty array → hide mode selector entirely
-  models: ModelOption[];  // Empty array → hide model selector entirely
-  modeLabel?: string;     // Custom label, e.g. "Mode"
-  modelLabel?: string;    // Custom label: "Model" for all
-  defaultModeId?: string; // Which mode is selected by default
-  supportsAIReview?: boolean; // Whether this provider can be used for AI review tasks
+  models: ModelOption[];      // Empty array → hide model selector entirely
+  modelLabel?: string;
+  supportsAIReview?: boolean;
 }

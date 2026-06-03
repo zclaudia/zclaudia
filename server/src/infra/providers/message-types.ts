@@ -35,6 +35,8 @@ export type ToolInteractionKind = 'todo_update';
 
 export interface SystemInfo {
   model?: string;
+  /** Effective context window in tokens, derived from agent / LLM profile. */
+  contextWindow?: number;
   claudeCodeVersion?: string;
   cwd?: string;
   tools?: string[];

@@ -43,12 +43,15 @@ export type RunHealthStatus = 'healthy' | 'idle' | 'loop';
 // Provider system info from runtime init message
 export interface SystemInfo {
   model?: string;
+  /** Effective context window in tokens, resolved from agent profile / LLM
+   *  profile / pi-ai registry. UI uses this for the X/Y display. */
+  contextWindow?: number;
   claudeCodeVersion?: string;
   cwd?: string;
-  permissionMode?: string;
-  apiKeySource?: string;
   tools?: string[];
   mcpServers?: { name: string; status: string }[];
+  permissionMode?: string;
+  apiKeySource?: string;
   slashCommands?: string[];
   agents?: string[];
 }

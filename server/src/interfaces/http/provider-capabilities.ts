@@ -4,16 +4,8 @@ import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 
 const ZCLAUDIA_CAPABILITIES: ProviderCapabilities = {
-  modeLabel: 'Mode',
   modelLabel: 'Runtime',
-  defaultModeId: 'default',
-  modes: [
-    { id: 'default', label: 'Default', description: 'Stub runtime mode for normal zclaudia turns' },
-    { id: 'plan', label: 'Plan', description: 'Stub runtime mode for planning-oriented turns' },
-  ],
-  models: [
-    { id: 'zclaudia-stub', label: 'ZClaudia Stub' },
-  ],
+  models: [],
   supportsAIReview: false,
 };
 
