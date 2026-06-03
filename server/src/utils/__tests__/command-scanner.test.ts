@@ -62,11 +62,12 @@ describe('command-scanner', () => {
       expect(names).toEqual(['/fix', '/review']);
       const review = result.find(r => r.command === '/review');
       expect(review).toMatchObject({
-        description: 'Review code',
         source: 'custom',
         scope: 'global',
         filePath: path.join(globalDir, 'review.md'),
       });
+      // pi extracts the first non-empty line as the description fallback when no frontmatter.
+      expect(review?.description).toContain('Review code');
     });
 
     it('scans project commands when projectRoot is provided', async () => {
@@ -80,27 +81,30 @@ describe('command-scanner', () => {
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
         command: '/deploy',
-        description: 'Deploy project',
         source: 'custom',
         scope: 'project',
         filePath: path.join(projectDir, 'deploy.md'),
       });
+      expect(result[0].description).toContain('Deploy project');
     });
 
-    it('project commands take precedence over global with same name', async () => {
+    it('project commands take precedence over global with same name (bare /name resolves to project)', async () => {
       const globalDir = path.join(tmpHome, '.claude', 'commands');
       const projectDir = path.join(tmpProject, '.claude', 'commands');
       mkdirSync(globalDir, { recursive: true });
       mkdirSync(projectDir, { recursive: true });
-      writeFileSync(path.join(globalDir, 'shared.md'), '# Global version');
-      writeFileSync(path.join(projectDir, 'shared.md'), '# Project version');
+      writeFileSync(path.join(globalDir, 'shared.md'), '---\ndescription: Global version\n---\nbody');
+      writeFileSync(path.join(projectDir, 'shared.md'), '---\ndescription: Project version\n---\nbody');
 
       const env = createExecutionEnv(tmpProject);
       const result = await scanCustomCommands(env, { projectRoot: tmpProject });
 
-      expect(result).toHaveLength(1);
-      expect(result[0].description).toBe('Project version');
-      expect(result[0].scope).toBe('project');
+      // Collision: emits /user:shared, /project:shared, AND bare /shared (resolves to project).
+      const names = result.map(r => r.command).sort();
+      expect(names).toEqual(['/project:shared', '/shared', '/user:shared']);
+      const bare = result.find(r => r.command === '/shared')!;
+      expect(bare.description).toBe('Project version');
+      expect(bare.scope).toBe('project');
     });
 
     it('extracts description from YAML frontmatter when present', async () => {
@@ -184,6 +188,8 @@ describe('command-scanner', () => {
       expect(pluginCmd).toBeDefined();
       expect(pluginCmd?.source).toBe('plugin');
       expect(pluginCmd?.description).toContain('Do a thing');
+      // Plugin always also publishes /<plugin>:<name> AND the bare /<name>.
+      expect(result.map(r => r.command)).toContain('/do-thing');
     });
 
     it('skips plugin scan when includePlugins is false', async () => {
@@ -198,6 +204,90 @@ describe('command-scanner', () => {
       const result = await scanCustomCommands(env, { includePlugins: false });
 
       expect(result).toEqual([]);
+    });
+  });
+
+  describe('command-scanner — prefix logic (pi-backed)', () => {
+    function writeCmd(dir: string, name: string, body: string, frontmatter = '') {
+      mkdirSync(dir, { recursive: true });
+      const content = frontmatter ? `---\n${frontmatter}\n---\n\n${body}` : body;
+      writeFileSync(path.join(dir, `${name}.md`), content);
+    }
+
+    it('publishes bare /name only when a single source has it', async () => {
+      const userDir = path.join(tmpHome, '.claude', 'commands');
+      writeCmd(userDir, 'onlymine', '# Solo command');
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
+      const names = result.map(r => r.command);
+      expect(names).toContain('/onlymine');
+      expect(names).not.toContain('/user:onlymine');
+    });
+
+    it('publishes /user:, /project:, and bare (project wins) when user+project collide', async () => {
+      const userDir = path.join(tmpHome, '.claude', 'commands');
+      const projectDir = path.join(tmpProject, '.claude', 'commands');
+      writeCmd(userDir, 'shared', '# user-shared');
+      writeCmd(projectDir, 'shared', '# project-shared');
+      const env = createExecutionEnv(tmpProject);
+      const result = await scanCustomCommands(env, { projectRoot: tmpProject });
+      const names = result.map(r => r.command).sort();
+      expect(names).toEqual(['/project:shared', '/shared', '/user:shared']);
+      const bare = result.find(r => r.command === '/shared')!;
+      expect(bare.scope).toBe('project');
+    });
+
+    it('plugin always also publishes /<plugin>:<name> even without collision', async () => {
+      const pluginInstallPath = path.join(tmpHome, 'plugins', 'my-plugin');
+      const pluginCommandsDir = path.join(pluginInstallPath, 'commands');
+      mkdirSync(pluginCommandsDir, { recursive: true });
+      writeFileSync(path.join(pluginCommandsDir, 'pluginonly.md'), '# Plugin only');
+      const pluginsRegistryDir = path.join(tmpHome, '.claude', 'plugins');
+      mkdirSync(pluginsRegistryDir, { recursive: true });
+      writeFileSync(
+        path.join(pluginsRegistryDir, 'installed_plugins.json'),
+        JSON.stringify({
+          version: 1,
+          plugins: {
+            'my-plugin@market': [
+              { scope: 'user', installPath: pluginInstallPath, version: '1.0.0', installedAt: 't', lastUpdated: 't' },
+            ],
+          },
+        }),
+      );
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
+      const names = result.map(r => r.command);
+      expect(names).toContain('/pluginonly');
+      expect(names).toContain('/my-plugin:pluginonly');
+    });
+
+    it('skips excluded plugin doc files (README.md etc)', async () => {
+      const pluginInstallPath = path.join(tmpHome, 'plugins', 'doc-plugin');
+      const pluginCommandsDir = path.join(pluginInstallPath, 'commands');
+      mkdirSync(pluginCommandsDir, { recursive: true });
+      writeFileSync(path.join(pluginCommandsDir, 'real.md'), '# Real command');
+      writeFileSync(path.join(pluginCommandsDir, 'README.md'), '# Docs not a command');
+      const pluginsRegistryDir = path.join(tmpHome, '.claude', 'plugins');
+      mkdirSync(pluginsRegistryDir, { recursive: true });
+      writeFileSync(
+        path.join(pluginsRegistryDir, 'installed_plugins.json'),
+        JSON.stringify({
+          version: 1,
+          plugins: {
+            'doc-plugin@market': [
+              { scope: 'user', installPath: pluginInstallPath, version: '1.0.0', installedAt: 't', lastUpdated: 't' },
+            ],
+          },
+        }),
+      );
+      const env = createExecutionEnv(tmpHome);
+      const result = await scanCustomCommands(env, {});
+      const names = result.map(r => r.command);
+      expect(names).toContain('/real');
+      expect(names).toContain('/doc-plugin:real');
+      expect(names).not.toContain('/README');
+      expect(names).not.toContain('/doc-plugin:README');
     });
   });
 });

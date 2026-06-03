@@ -2,23 +2,27 @@ import * as path from 'path';
 import * as os from 'os';
 import type { SlashCommand } from '@zclaudia/shared/features/commands';
 import { type ExecutionEnv } from '../infra/execution-env.js';
+import {
+  loadAllCommandTemplates,
+  type CommandTemplateLoadInput,
+  type SourcedPromptTemplate,
+} from '../application/plugins/command-templates-loader.js';
 
 /**
- * Scans for custom slash commands in .claude/commands directories
- * and plugin commands from installed plugin directories
+ * Scans for slash command templates across three sources:
  *
- * Custom commands are stored as markdown files:
- * - Global: ~/.claude/commands/*.md
- * - Project: <projectRoot>/.claude/commands/*.md
+ *   user:    ~/.claude/commands/*.md
+ *   project: <projectRoot>/.claude/commands/*.md
+ *   plugin:  <pluginInstallPath>/commands/*.md and <pluginInstallPath>/*.md
  *
- * Plugin commands are stored in:
- * - ~/.claude/plugins/installed_plugins.json (plugin registry)
- * - Each plugin's installPath/commands/*.md or installPath/*.md
+ * Templates are loaded via pi `loadSourcedPromptTemplates`. Naming rules:
  *
- * The command name is derived from the filename:
- * - Global: review.md -> /review
- * - Project: fix-issue.md -> /fix-issue
- * - Plugin: code-review.md from plugin "code-review" -> /code-review:code-review
+ *   - Single source for a basename → only bare `/<basename>` is published
+ *   - Multiple sources for a basename → publishes prefixed forms
+ *     (`/user:<base>`, `/project:<base>`, `/<plugin>:<base>`) PLUS bare
+ *     `/<base>` resolving to project > user > plugin
+ *   - Plugin templates ALWAYS additionally publish `/<plugin>:<base>`
+ *     (preserves existing autocomplete UX)
  */
 
 interface ScanOptions {
@@ -42,224 +46,200 @@ interface PluginInstallation {
 interface PluginManifest {
   name: string;
   description: string;
-  author?: {
-    name: string;
-    email?: string;
-  };
+  author?: { name: string; email?: string };
 }
 
-function extractDescription(content: string): string {
-  if (content.startsWith('---')) {
-    const endIndex = content.indexOf('---', 3);
-    if (endIndex !== -1) {
-      const frontmatter = content.substring(3, endIndex);
-      const descMatch = frontmatter.match(/^description:\s*(.+)$/m);
-      if (descMatch) {
-        const desc = descMatch[1].trim();
-        return desc.length > 80 ? desc.substring(0, 77) + '...' : desc;
-      }
-    }
-  }
+const EXCLUDED_PLUGIN_FILES = new Set([
+  'readme.md',
+  'contributing.md',
+  'code_of_conduct.md',
+  'changelog.md',
+  'license.md',
+  'security.md',
+]);
 
-  const lines = content.split('\n');
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    if (trimmed.startsWith('#')) {
-      return trimmed.replace(/^#+\s*/, '').trim();
-    }
-
-    if (!trimmed.startsWith('---')) {
-      return trimmed.length > 80 ? trimmed.substring(0, 77) + '...' : trimmed;
-    }
-  }
-
-  return 'Custom command';
-}
-
-async function scanDirectory(
-  env: ExecutionEnv,
-  dir: string,
-  scope: 'global' | 'project',
-): Promise<SlashCommand[]> {
-  const commands: SlashCommand[] = [];
-
-  const dirExists = await env.exists(dir);
-  if (!dirExists.ok || !dirExists.value) {
-    return commands;
-  }
-
-  const listResult = await env.listDir(dir);
-  if (!listResult.ok) {
-    console.error(`Error scanning directory ${dir}:`, listResult.error);
-    return commands;
-  }
-
-  for (const entry of listResult.value) {
-    if (!entry.name.endsWith('.md')) continue;
-
-    const filePath = path.join(dir, entry.name);
-    // lstat semantics (via pi ExecutionEnv): symlinks to .md files have kind 'symlink'
-    // and are skipped here. This differs from the original fs.statSync (follow-symlinks).
-    const info = await env.fileInfo(filePath);
-    if (!info.ok || info.value.kind !== 'file') continue;
-
-    const baseName = path.basename(entry.name, '.md');
-    const commandName = `/${baseName}`;
-
-    let description = 'Custom command';
-    const read = await env.readTextFile(filePath);
-    if (read.ok) {
-      description = extractDescription(read.value);
-    }
-
-    commands.push({
-      command: commandName,
-      description,
-      source: 'custom',
-      scope,
-      filePath,
-    });
-  }
-
-  return commands;
-}
-
-async function scanPluginCommands(env: ExecutionEnv): Promise<SlashCommand[]> {
-  const commands: SlashCommand[] = [];
+/**
+ * Read installed_plugins.json + each plugin's installPath. Returns the loader
+ * inputs (each pointing at a candidate commands dir). Does NOT read command
+ * content — that's delegated to command-templates-loader / pi.
+ */
+async function discoverPluginCommandInputs(env: ExecutionEnv): Promise<CommandTemplateLoadInput[]> {
+  const inputs: CommandTemplateLoadInput[] = [];
   const pluginsFile = path.join(os.homedir(), '.claude', 'plugins', 'installed_plugins.json');
 
-  const pluginsFileExists = await env.exists(pluginsFile);
-  if (!pluginsFileExists.ok || !pluginsFileExists.value) {
-    return commands;
+  const exists = await env.exists(pluginsFile);
+  if (!exists.ok || !exists.value) return inputs;
+
+  const read = await env.readTextFile(pluginsFile);
+  if (!read.ok) {
+    console.error('[command-scanner] reading installed_plugins.json failed:', read.error);
+    return inputs;
   }
 
-  const pluginsRead = await env.readTextFile(pluginsFile);
-  if (!pluginsRead.ok) {
-    console.error('Error reading installed plugins:', pluginsRead.error);
-    return commands;
-  }
-
-  let pluginsData: InstalledPluginsFile;
+  let parsed: InstalledPluginsFile;
   try {
-    pluginsData = JSON.parse(pluginsRead.value);
-  } catch (error) {
-    console.error('Error parsing installed plugins:', error);
-    return commands;
+    parsed = JSON.parse(read.value);
+  } catch (err) {
+    console.error('[command-scanner] parsing installed_plugins.json failed:', err);
+    return inputs;
   }
 
-  for (const [pluginKey, installations] of Object.entries(pluginsData.plugins)) {
+  for (const [pluginKey, installations] of Object.entries(parsed.plugins)) {
     const pluginName = pluginKey.split('@')[0];
-    const installation = installations[0];
-    if (!installation?.installPath) continue;
+    const install = installations[0];
+    if (!install?.installPath) continue;
 
-    const installPath = installation.installPath;
-    const installExists = await env.exists(installPath);
+    const installExists = await env.exists(install.installPath);
     if (!installExists.ok || !installExists.value) continue;
 
-    const commandsDir = path.join(installPath, 'commands');
-    const commandsDirExists = await env.exists(commandsDir);
+    // Two candidate locations per plugin (pi skips missing dirs).
+    for (const sub of ['commands', '.']) {
+      const dir = sub === '.' ? install.installPath : path.join(install.installPath, sub);
+      inputs.push({ path: dir, source: 'plugin', plugin: { pluginName } });
+    }
+  }
+  return inputs;
+}
 
-    const locations: Array<{ dir: string; exists: boolean }> = [
-      { dir: commandsDir, exists: commandsDirExists.ok && commandsDirExists.value },
-      { dir: installPath, exists: true },
-    ];
+/** Read a plugin's author name (for display suffix), or fall back to bare. */
+async function readPluginAuthor(env: ExecutionEnv, installPath: string, pluginName: string): Promise<string> {
+  const manifestPath = path.join(installPath, '.claude-plugin', 'plugin.json');
+  const exists = await env.exists(manifestPath);
+  if (!exists.ok || !exists.value) return ` (plugin:${pluginName})`;
+  const read = await env.readTextFile(manifestPath);
+  if (!read.ok) return ` (plugin:${pluginName})`;
+  try {
+    const m: PluginManifest = JSON.parse(read.value);
+    return ` (plugin:${pluginName}@${m.author?.name ?? 'unknown'})`;
+  } catch {
+    return ` (plugin:${pluginName})`;
+  }
+}
 
-    for (const { dir, exists } of locations) {
-      if (!exists) continue;
+/**
+ * Group templates by basename and emit SlashCommand[] entries per the naming
+ * rules at the top of this file.
+ */
+function classifyTemplates(
+  templates: SourcedPromptTemplate[],
+  pluginDescriptionByName: Map<string, string>,
+): SlashCommand[] {
+  const byBase = new Map<string, SourcedPromptTemplate[]>();
+  for (const t of templates) {
+    const base = path.basename(t.filePath, '.md');
+    const arr = byBase.get(base) ?? [];
+    arr.push(t);
+    byBase.set(base, arr);
+  }
 
-      const listResult = await env.listDir(dir);
-      if (!listResult.ok) {
-        console.error(`Error scanning plugin directory ${dir}:`, listResult.error);
-        continue;
-      }
+  const result: SlashCommand[] = [];
 
-      for (const entry of listResult.value) {
-        const lowerFile = entry.name.toLowerCase();
-        const excludedFiles = [
-          'readme.md',
-          'contributing.md',
-          'code_of_conduct.md',
-          'changelog.md',
-          'license.md',
-          'security.md',
-        ];
-        if (!entry.name.endsWith('.md') || excludedFiles.includes(lowerFile)) continue;
+  for (const [base, group] of byBase) {
+    const hasCollision = group.length > 1;
 
-        const filePath = path.join(dir, entry.name);
-        // lstat semantics — symlinks to .md files have kind 'symlink' and are skipped.
-        const info = await env.fileInfo(filePath);
-        if (!info.ok || info.value.kind !== 'file') continue;
+    // Prefixed forms: emit for plugins always; for user/project only on collision.
+    for (const t of group) {
+      const isPlugin = t.source === 'plugin';
+      const shouldEmitPrefixed = hasCollision || isPlugin;
+      if (!shouldEmitPrefixed) continue;
 
-        const baseName = path.basename(entry.name, '.md');
-        const commandName = `/${pluginName}:${baseName}`;
+      const description = t.template.description ?? 'Custom command';
+      const pluginSuffix = isPlugin && t.plugin
+        ? pluginDescriptionByName.get(t.plugin.pluginName) ?? ` (plugin:${t.plugin.pluginName})`
+        : '';
+      const prefixedName = isPlugin && t.plugin
+        ? `/${t.plugin.pluginName}:${base}`
+        : `/${t.source}:${base}`;
 
-        let description = 'Plugin command';
-        const read = await env.readTextFile(filePath);
-        if (read.ok) {
-          description = extractDescription(read.value);
-        }
+      result.push({
+        command: prefixedName,
+        description: description + (isPlugin ? pluginSuffix : ''),
+        source: isPlugin ? 'plugin' : 'custom',
+        scope: t.source === 'project' ? 'project' : 'global',
+        filePath: t.filePath,
+      });
+    }
 
-        let pluginDescription = '';
-        const manifestPath = path.join(installPath, '.claude-plugin', 'plugin.json');
-        const manifestExists = await env.exists(manifestPath);
-        if (manifestExists.ok && manifestExists.value) {
-          const manifestRead = await env.readTextFile(manifestPath);
-          if (manifestRead.ok) {
-            try {
-              const manifest: PluginManifest = JSON.parse(manifestRead.value);
-              pluginDescription = ` (plugin:${pluginName}@${manifest.author?.name || 'unknown'})`;
-            } catch {
-              pluginDescription = ` (plugin:${pluginName})`;
-            }
-          } else {
-            pluginDescription = ` (plugin:${pluginName})`;
-          }
-        } else {
-          pluginDescription = ` (plugin:${pluginName})`;
-        }
-
-        commands.push({
-          command: commandName,
-          description: description + pluginDescription,
-          source: 'plugin',
-          scope: 'global',
-          filePath,
-        });
-      }
+    // Bare name: priority project > user > plugin.
+    const winner =
+      group.find((t) => t.source === 'project')
+      ?? group.find((t) => t.source === 'user')
+      ?? group.find((t) => t.source === 'plugin');
+    if (winner) {
+      const description = winner.template.description ?? 'Custom command';
+      const isPlugin = winner.source === 'plugin';
+      const pluginSuffix = isPlugin && winner.plugin
+        ? pluginDescriptionByName.get(winner.plugin.pluginName) ?? ` (plugin:${winner.plugin.pluginName})`
+        : '';
+      result.push({
+        command: `/${base}`,
+        description: description + (isPlugin ? pluginSuffix : ''),
+        source: isPlugin ? 'plugin' : 'custom',
+        scope: winner.source === 'project' ? 'project' : 'global',
+        filePath: winner.filePath,
+      });
     }
   }
 
-  return commands;
+  return result;
 }
 
 export async function scanCustomCommands(
   env: ExecutionEnv,
   options: ScanOptions = {},
 ): Promise<SlashCommand[]> {
-  const commands: SlashCommand[] = [];
   const includePlugins = options.includePlugins !== false;
 
-  const globalDir = path.join(os.homedir(), '.claude', 'commands');
-  const globalCommands = await scanDirectory(env, globalDir, 'global');
+  const inputs: CommandTemplateLoadInput[] = [];
 
+  // user (global) source — always
+  inputs.push({ path: path.join(os.homedir(), '.claude', 'commands'), source: 'user' });
+
+  // project source — when projectRoot provided
   if (options.projectRoot) {
-    const projectDir = path.join(options.projectRoot, '.claude', 'commands');
-    const projectCommands = await scanDirectory(env, projectDir, 'project');
-    const projectNames = new Set(projectCommands.map((c) => c.command));
-    commands.push(...projectCommands);
-    commands.push(...globalCommands.filter((c) => !projectNames.has(c.command)));
-  } else {
-    commands.push(...globalCommands);
+    inputs.push({ path: path.join(options.projectRoot, '.claude', 'commands'), source: 'project' });
   }
 
+  // plugin sources
+  const pluginDescriptionByName = new Map<string, string>();
   if (includePlugins) {
-    commands.push(...(await scanPluginCommands(env)));
+    const pluginInputs = await discoverPluginCommandInputs(env);
+    inputs.push(...pluginInputs);
+
+    const uniquePlugins = new Map<string, string>(); // pluginName → installPath
+    for (const inp of pluginInputs) {
+      if (inp.plugin && !uniquePlugins.has(inp.plugin.pluginName)) {
+        // Recover installPath: strip `/commands` suffix if present
+        const commandsSuffix = path.sep + 'commands';
+        const installPath = inp.path.endsWith(commandsSuffix)
+          ? inp.path.slice(0, -commandsSuffix.length)
+          : inp.path;
+        uniquePlugins.set(inp.plugin.pluginName, installPath);
+      }
+    }
+    for (const [pluginName, installPath] of uniquePlugins) {
+      pluginDescriptionByName.set(
+        pluginName,
+        await readPluginAuthor(env, installPath, pluginName),
+      );
+    }
   }
 
-  return commands;
+  const { templates, diagnostics } = await loadAllCommandTemplates(env, inputs);
+
+  for (const d of diagnostics) {
+    console.warn(`[command-scanner] ${d.code} (${d.source}): ${d.message} — ${d.path}`);
+  }
+
+  // Drop excluded plugin doc files (README.md etc) — pi loads them as
+  // templates, but we don't want them showing as commands.
+  const filtered = templates.filter((t) => {
+    if (t.source !== 'plugin') return true;
+    const base = path.basename(t.filePath).toLowerCase();
+    return !EXCLUDED_PLUGIN_FILES.has(base);
+  });
+
+  return classifyTemplates(filtered, pluginDescriptionByName);
 }
 
 export function getGlobalCommandsDir(): string {
