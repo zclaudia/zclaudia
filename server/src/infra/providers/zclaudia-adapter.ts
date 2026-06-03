@@ -272,7 +272,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       },
     };
 
-    // 3. Load history (non-fatal failure)
+    // 4. Load history (non-fatal failure)
     let history: AgentMessage[] = [];
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -286,7 +286,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       };
     }
 
-    // 4. Construct Agent — wire tools + hooks from pi-runtime
+    // 5. Construct Agent — wire tools + hooks from pi-runtime
     const tools = buildTools(options.cwd, options.enabledTools ? { enabled: options.enabledTools } : undefined);
     const hooks = buildAgentHooks({
       permissionCallback: onPermission ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
@@ -321,7 +321,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       steer: (msg: AgentMessage) => agent.steer(msg),
     });
 
-    // 5. Subscribe → translate → queue
+    // 6. Subscribe → translate → queue
     // `agent_start` is intentionally not translated by translateEvent; init is
     // emitted manually above as a run-bootstrap concern.
     const queue = new AsyncQueue<ClaudeMessage>();
@@ -380,7 +380,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       }
     });
 
-    // 6. Run prompt; close queue on completion or push error on rejection
+    // 7. Run prompt; close queue on completion or push error on rejection
     agent.prompt(input)
       .then(() => { queue.close(); })
       .catch(err => {
@@ -392,7 +392,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         queue.close();
       });
 
-    // 7. Yield translated events
+    // 8. Yield translated events
     try {
       for await (const m of queue) {
         yield m;
