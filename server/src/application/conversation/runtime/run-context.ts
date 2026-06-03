@@ -6,12 +6,8 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import {
   buildSkillDirectoryHint,
-  getDiscoveredSkills,
-  loadSkillContent,
-  selectSkills,
   toolRegistry as pluginToolRegistry,
 } from '../../../application/plugins/index.js';
-import { createExecutionEnv } from '../../../infra/execution-env.js';
 import {
   providerSupportsNativePlanMode,
   buildNonNativePlanPrompt,
@@ -123,29 +119,12 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     ? mapPermissionMode(adapter.manifest as never, modeValue)
     : modeValue;
 
-  let activeSkillsContent: string | undefined;
-  if (sessionType === 'agent') {
-    try {
-      const allSkills = getDiscoveredSkills();
-      const matched = selectSkills(allSkills, { userInput: message.input, os: process.platform });
-      if (matched.length > 0) {
-        const skillEnv = createExecutionEnv(session.root_path || process.cwd());
-        const loadedContents = await Promise.all(
-          matched.map((skill) => loadSkillContent(skillEnv, skill.dirPath))
-        );
-        activeSkillsContent = loadedContents.filter(Boolean).join('\n\n---\n\n');
-      }
-    } catch {
-      // Skill selection is best-effort and should not block run startup.
-    }
-  }
-
   const template = ((message as Record<string, unknown>)._contextTemplate || (sessionType === 'agent' ? 'agent' : 'coding')) as ContextTemplate;
-  // Call assemble() for side effects: skill-discovery (getDiscoveredSkills / selectSkills
-  // run inside the engine) and workspace tracing hooks that downstream tooling may consume.
-  // Return value is intentionally discarded — systemPrompt now comes from
-  // agentProfile.systemPrompt per §4.6 (full replacement). When a merge transform is
-  // added (e.g. AGENTS.md injection) this call becomes load-bearing.
+  // Call assemble() for side effects: skill-discovery hint emission and workspace
+  // tracing hooks that downstream tooling may consume. Return value is intentionally
+  // discarded — systemPrompt now comes from agentProfile.systemPrompt per §4.6
+  // (full replacement). When a merge transform is added (e.g. AGENTS.md injection)
+  // this call becomes load-bearing.
   createContextEngine().assemble(template, {
     sessionId: message.sessionId,
     projectId: session.project_id,
@@ -153,7 +132,6 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     workspacePrompt,
     skillDirectoryHint,
     systemContext: message.systemContext,
-    activeSkillsContent,
     nonNativePlanPrompt,
     planDocumentPrompt,
     filePushContext,

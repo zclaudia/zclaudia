@@ -177,12 +177,22 @@ export function createAgentRoutes(db: Database.Database): Router {
           scope: t.scope || [],
         }));
 
-      let skills: Array<{ id: string; name: string; description: string }> = [];
+      let skills: Array<{
+        id: string;
+        name: string;
+        description: string;
+        source: string;
+        filePath: string;
+        dirPath: string;
+      }> = [];
       try {
         skills = getDiscoveredSkills().map(s => ({
           id: s.id,
           name: s.name,
           description: s.description || '',
+          source: s.source,
+          filePath: s.filePath,
+          dirPath: s.dirPath,
         }));
       } catch { /* skills may not be initialized yet */ }
 

@@ -9,9 +9,6 @@ const getNextOffsetMock = vi.fn(() => 0);
 const upsertAssistantMessageMock = vi.fn();
 const findProcessPidsByTaskCommandMock = vi.fn();
 const cleanupPendingPermissionsMock = vi.fn();
-const selectSkillsMock = vi.fn();
-const getDiscoveredSkillsMock = vi.fn();
-const loadSkillContentMock = vi.fn();
 const buildSkillDirectoryHintMock = vi.fn(() => 'skill directory');
 const assembleSystemPromptMock = vi.fn(async () => 'workspace prompt');
 const assembleContextMock = vi.fn(() => 'assembled system prompt');
@@ -35,13 +32,7 @@ vi.mock('../run-lifecycle.js', () => ({
 }));
 
 vi.mock('../../../../application/plugins/skill-tools.js', () => ({
-  getDiscoveredSkills: getDiscoveredSkillsMock,
-  loadSkillContent: loadSkillContentMock,
   buildSkillDirectoryHint: buildSkillDirectoryHintMock,
-}));
-
-vi.mock('../../../../application/plugins/skill-selector.js', () => ({
-  selectSkills: selectSkillsMock,
 }));
 
 const mockProviderRegistry = {
@@ -245,21 +236,11 @@ describe('ws/run-handler', () => {
     assembleSystemPromptMock.mockResolvedValue('workspace prompt');
     buildSkillDirectoryHintMock.mockReturnValue('skill directory');
     toolRegistryGetAllMock.mockReturnValue([]);
-    getDiscoveredSkillsMock.mockReturnValue([]);
-    selectSkillsMock.mockReturnValue([]);
-    loadSkillContentMock.mockImplementation(async (_env: unknown, dirPath: string) => `loaded:${dirPath}`);
   });
 
-  it('injects selected skill content into agent session prompts', async () => {
+  it('exposes skill directory hint and resolved agent profile to agent sessions', async () => {
     const db = createDb();
     insertSession(db, { id: 'session-agent', type: 'agent' });
-
-    const matchedSkill = {
-      id: 'review-skill',
-      dirPath: '/skills/review',
-    };
-    getDiscoveredSkillsMock.mockReturnValue([matchedSkill]);
-    selectSkillsMock.mockReturnValue([matchedSkill]);
 
     const { handleRunStart } = await import('../run-handler.js');
 
@@ -290,26 +271,20 @@ describe('ws/run-handler', () => {
       },
     );
 
-    expect(selectSkillsMock).toHaveBeenCalledWith(
-      [matchedSkill],
-      expect.objectContaining({
-        userInput: 'please review this change',
-        os: process.platform,
-      }),
-    );
+    // Skill content is no longer pre-loaded — the agent reads SKILL.md on demand
+    // via the Read tool. The directory hint still flows into the context engine.
     expect(assembleContextMock).toHaveBeenCalledWith(
       'agent',
       expect.objectContaining({
         workspacePrompt: 'workspace prompt',
         skillDirectoryHint: 'skill directory',
-        activeSkillsContent: 'loaded:/skills/review',
       }),
     );
+    const [, ctxArgs] = assembleContextMock.mock.calls[0] as [string, Record<string, unknown>];
+    expect(ctxArgs.activeSkillsContent).toBeUndefined();
     // RunOptions.systemPrompt is now sourced solely from agentProfile.systemPrompt
     // (full replacement per agent-profiles spec §4.6); the context-engine output is
-    // intentionally not used as systemPrompt anymore. We still verify that the
-    // skill discovery chain ran (via assembleContextMock above) and that the
-    // resolved agent fields flow through into RunOptions.
+    // intentionally not used as systemPrompt anymore.
     expect(providerRunMock).toHaveBeenCalledWith(
       'please review this change',
       expect.objectContaining({
@@ -358,9 +333,11 @@ describe('ws/run-handler', () => {
     expect(assembleContextMock).toHaveBeenCalledWith(
       'review',
       expect.objectContaining({
-        activeSkillsContent: undefined,
+        skillDirectoryHint: 'skill directory',
       }),
     );
+    const [, ctxArgs] = assembleContextMock.mock.calls[0] as [string, Record<string, unknown>];
+    expect(ctxArgs.activeSkillsContent).toBeUndefined();
   });
 
   it('broadcasts session catalog updates when a run starts and finishes', async () => {

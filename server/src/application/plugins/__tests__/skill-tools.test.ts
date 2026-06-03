@@ -1,173 +1,157 @@
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { parseSkillFile, discoverSkillsInDir, loadSkillContent } from '../skill-tools.js';
+import Database from 'better-sqlite3';
+import {
+  loadAndCacheSkills,
+  refreshSkillCache,
+  buildSkillDirectoryHint,
+  getDiscoveredSkills,
+  addPluginSkills,
+  setDatabase,
+} from '../skill-tools.js';
 import { createExecutionEnv } from '../../../infra/execution-env.js';
+import { workspaceService } from '../../services/workspace.js';
 
-describe('plugins/skill-tools', () => {
-  describe('parseSkillFile', () => {
-    it('parses frontmatter with CRLF newlines and typed nested fields', () => {
-      const content = [
-        '---',
-        'name: review-helper',
-        'description: Review pull requests',
-        'priority: -1',
-        'triggers:',
-        '  keywords:',
-        '    - review',
-        '    - pr',
-        '  projectType:',
-        '    - code',
-        'requires:',
-        '  binaries:',
-        '    - git',
-        '  env:',
-        '    - GITHUB_TOKEN',
-        'metadata:',
-        '  short-description: ignored',
-        '---',
-        '',
-        '# Review Helper',
-        '',
-        '> Uses review workflow',
-      ].join('\r\n');
+/**
+ * `workspaceService.getWorkspaceDir()` is cached at module-init from
+ * `ZCLAUDIA_DATA_DIR`, so we can't redirect it per-test via env override.
+ * Instead, write fixtures into whatever path the service already returned
+ * and clean those directories after each test.
+ */
+const WORKSPACE_SKILLS_DIR = path.join(workspaceService.getWorkspaceDir(), 'skills');
 
-      const parsed = parseSkillFile(content);
+function writeSkill(dir: string, name: string, frontmatter = '', body = `# ${name}\n`) {
+  const skillDir = path.join(dir, name);
+  mkdirSync(skillDir, { recursive: true });
+  const content = frontmatter ? `---\n${frontmatter}\n---\n\n${body}` : body;
+  writeFileSync(path.join(skillDir, 'SKILL.md'), content);
+}
 
-      expect(parsed.frontmatter).toEqual({
-        name: 'review-helper',
-        description: 'Review pull requests',
-        priority: -1,
-        triggers: {
-          keywords: ['review', 'pr'],
-          projectType: ['code'],
-        },
-        requires: {
-          binaries: ['git'],
-          env: ['GITHUB_TOKEN'],
-        },
-      });
-      expect(parsed.body).toContain('# Review Helper');
-      expect(parsed.body).toContain('> Uses review workflow');
-    });
+function db() {
+  return new Database(':memory:');
+}
 
-    it('does not confuse body separators with frontmatter boundaries', () => {
-      const content = [
-        '---',
-        'name: separator-safe',
-        'description: Keeps body separators intact',
-        '---',
-        '',
-        '# Heading',
-        '',
-        '---',
-        '',
-        'Body content',
-      ].join('\n');
+function ensureAppConfigTable(database: Database.Database) {
+  database.exec(`
+    CREATE TABLE IF NOT EXISTS app_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+}
 
-      const parsed = parseSkillFile(content);
-
-      expect(parsed.frontmatter.name).toBe('separator-safe');
-      expect(parsed.body).toContain('\n---\n');
-      expect(parsed.body).toContain('Body content');
-    });
-
-    it('falls back gracefully when frontmatter YAML is invalid', () => {
-      const content = [
-        '---',
-        'name: [oops',
-        'description: broken yaml',
-        '---',
-        '',
-        '# Fallback Name',
-      ].join('\n');
-
-      const parsed = parseSkillFile(content);
-
-      expect(parsed.frontmatter).toEqual({});
-      expect(parsed.body).toBe(content);
-    });
-  });
-});
-
-describe('plugins/skill-tools — fs-backed', () => {
+describe('skill-tools (pi-backed)', () => {
   let tmpRoot: string;
-  beforeEach(() => { tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-skill-')); });
-  afterEach(() => { rmSync(tmpRoot, { recursive: true, force: true }); });
+  let originalHome: string | undefined;
 
-  describe('discoverSkillsInDir', () => {
-    it('returns [] when dir does not exist', async () => {
-      const env = createExecutionEnv(tmpRoot);
-      const result = await discoverSkillsInDir(env, path.join(tmpRoot, 'missing'), 'workspace');
-      expect(result).toEqual([]);
-    });
-
-    it('discovers a top-level skill with SKILL.md', async () => {
-      const skillDir = path.join(tmpRoot, 'my-skill');
-      mkdirSync(skillDir);
-      writeFileSync(path.join(skillDir, 'SKILL.md'), '---\nname: my-skill\ndescription: A skill\n---\n\n# My Skill\n');
-      const env = createExecutionEnv(tmpRoot);
-      const result = await discoverSkillsInDir(env, tmpRoot, 'workspace');
-      expect(result).toHaveLength(1);
-      expect(result[0]).toMatchObject({
-        id: 'my-skill',
-        name: 'my-skill',
-        description: 'A skill',
-        source: 'workspace',
-      });
-    });
-
-    it('recurses into subdirectories without SKILL.md', async () => {
-      const nestedDir = path.join(tmpRoot, 'group', 'nested-skill');
-      mkdirSync(nestedDir, { recursive: true });
-      writeFileSync(path.join(nestedDir, 'SKILL.md'), '---\nname: nested\ndescription: nested skill\n---\n');
-      const env = createExecutionEnv(tmpRoot);
-      const result = await discoverSkillsInDir(env, tmpRoot, 'external');
-      expect(result).toHaveLength(1);
-      expect(result[0].id).toBe('nested-skill');
-    });
-
-    it('respects MAX_RECURSION_DEPTH', async () => {
-      let dir = tmpRoot;
-      for (let i = 0; i < 6; i++) {
-        dir = path.join(dir, `level${i}`);
-        mkdirSync(dir);
-      }
-      writeFileSync(path.join(dir, 'SKILL.md'), '---\nname: deep\ndescription: too deep\n---\n');
-      const env = createExecutionEnv(tmpRoot);
-      const result = await discoverSkillsInDir(env, tmpRoot, 'workspace');
-      expect(result).toHaveLength(0);
-    });
+  beforeEach(async () => {
+    tmpRoot = mkdtempSync(path.join(tmpdir(), 'zc-st-'));
+    originalHome = process.env.HOME;
+    // Point HOME at an empty dir so well-known external dirs (~/.zclaudia/skills,
+    // ~/.agents/skills) are absent and don't leak from the developer machine.
+    process.env.HOME = path.join(tmpRoot, 'home-no-skills');
+    mkdirSync(process.env.HOME, { recursive: true });
+    // Reset the workspace skills dir between tests.
+    rmSync(WORKSPACE_SKILLS_DIR, { recursive: true, force: true });
+    mkdirSync(WORKSPACE_SKILLS_DIR, { recursive: true });
+    const memDb = db();
+    ensureAppConfigTable(memDb);
+    setDatabase(memDb);
+    // Module-level skill cache persists across tests; reset it by loading
+    // from the now-empty workspace dir.
+    await refreshSkillCache(createExecutionEnv(tmpRoot));
   });
 
-  describe('loadSkillContent', () => {
-    it('returns SKILL.md content for an existing skill', async () => {
-      const skillDir = path.join(tmpRoot, 's');
-      mkdirSync(skillDir);
-      writeFileSync(path.join(skillDir, 'SKILL.md'), 'hello world');
-      const env = createExecutionEnv(tmpRoot);
-      const content = await loadSkillContent(env, skillDir);
-      expect(content).toBe('hello world');
-    });
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.HOME;
+    else process.env.HOME = originalHome;
+    rmSync(WORKSPACE_SKILLS_DIR, { recursive: true, force: true });
+    rmSync(tmpRoot, { recursive: true, force: true });
+  });
 
-    it('appends references/*.md when references dir exists', async () => {
-      const skillDir = path.join(tmpRoot, 's');
-      const refsDir = path.join(skillDir, 'references');
-      mkdirSync(refsDir, { recursive: true });
-      writeFileSync(path.join(skillDir, 'SKILL.md'), 'main');
-      writeFileSync(path.join(refsDir, 'a.md'), 'ref-a');
-      const env = createExecutionEnv(tmpRoot);
-      const content = await loadSkillContent(env, skillDir);
-      expect(content).toContain('main');
-      expect(content).toContain('## Reference: a.md');
-      expect(content).toContain('ref-a');
-    });
+  it('loadAndCacheSkills loads workspace skills', async () => {
+    writeSkill(WORKSPACE_SKILLS_DIR, 'a', 'name: a\ndescription: skill a');
+    const env = createExecutionEnv(tmpRoot);
+    const count = await loadAndCacheSkills(env);
+    expect(count).toBe(1);
+    expect(getDiscoveredSkills()).toHaveLength(1);
+    expect(getDiscoveredSkills()[0].source).toBe('workspace');
+  });
 
-    it('returns sentinel string when SKILL.md missing', async () => {
-      const env = createExecutionEnv(tmpRoot);
-      const content = await loadSkillContent(env, path.join(tmpRoot, 'nope'));
-      expect(content).toContain('Skill file not found');
-    });
+  it('dedups same-id skills, workspace winning over external', async () => {
+    writeSkill(WORKSPACE_SKILLS_DIR, 'shared', 'name: workspace-shared\ndescription: ws');
+    const extDir = path.join(process.env.HOME!, '.zclaudia', 'skills');
+    mkdirSync(extDir, { recursive: true });
+    writeSkill(extDir, 'shared', 'name: external-shared\ndescription: ext');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+    const discovered = getDiscoveredSkills();
+    expect(discovered).toHaveLength(1);
+    expect(discovered[0].name).toBe('workspace-shared');
+  });
+
+  it('buildSkillDirectoryHint outputs pi XML containing each skill name + description', async () => {
+    writeSkill(WORKSPACE_SKILLS_DIR, 'alpha', 'name: alpha\ndescription: first');
+    writeSkill(WORKSPACE_SKILLS_DIR, 'beta', 'name: beta\ndescription: second');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+    const hint = buildSkillDirectoryHint();
+    expect(hint).toContain('<available_skills>');
+    expect(hint).toContain('alpha');
+    expect(hint).toContain('first');
+    expect(hint).toContain('beta');
+    expect(hint).toContain('second');
+  });
+
+  it('buildSkillDirectoryHint returns empty string when no eligible skills', () => {
+    expect(buildSkillDirectoryHint()).toBe('');
+  });
+
+  it('buildSkillDirectoryHint filters out skills whose requirements fail', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'win-only',
+      'name: win-only\ndescription: gated\nrequires:\n  os:\n    - win32',
+    );
+    writeSkill(WORKSPACE_SKILLS_DIR, 'ok', 'name: ok\ndescription: no gate');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+    const hint = buildSkillDirectoryHint();
+    if (process.platform !== 'win32') {
+      expect(hint).not.toContain('win-only');
+    }
+    expect(hint).toContain('ok');
+  });
+
+  it('refreshSkillCache resets and reloads', async () => {
+    writeSkill(WORKSPACE_SKILLS_DIR, 'first', 'name: first\ndescription: one');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+    expect(getDiscoveredSkills()).toHaveLength(1);
+    writeSkill(WORKSPACE_SKILLS_DIR, 'second', 'name: second\ndescription: two');
+    await refreshSkillCache(env);
+    expect(getDiscoveredSkills()).toHaveLength(2);
+  });
+
+  it('addPluginSkills appends and dedups against existing cache', async () => {
+    writeSkill(WORKSPACE_SKILLS_DIR, 'shared', 'name: ws-shared\ndescription: ws');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+    addPluginSkills([
+      {
+        skill: { name: 'shared', description: 'plugin attempt', content: '', filePath: '/plugin/shared/SKILL.md' },
+        source: 'plugin',
+      },
+      {
+        skill: { name: 'plugin-only', description: 'unique', content: '', filePath: '/plugin/plugin-only/SKILL.md' },
+        source: 'plugin',
+      },
+    ]);
+    const discovered = getDiscoveredSkills();
+    expect(discovered).toHaveLength(2);
+    expect(discovered.find((s) => s.source === 'workspace')?.name).toBe('ws-shared');
+    expect(discovered.find((s) => s.source === 'plugin')?.name).toBe('plugin-only');
   });
 });

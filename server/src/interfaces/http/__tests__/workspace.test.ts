@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { createWorkspaceRoutes } from '../workspace.js';
 import { workspaceService } from '../../../application/services/workspace.js';
-import { getExternalSkillDirs, refreshSkillTools, saveExternalSkillDirs } from '../../../application/plugins/skill-tools.js';
+import { getExternalSkillDirs, refreshSkillCache, saveExternalSkillDirs } from '../../../application/plugins/skill-tools.js';
 
 vi.mock('../../../application/services/workspace.js', () => ({
   workspaceService: {
@@ -19,7 +19,7 @@ vi.mock('../../../application/services/workspace.js', () => ({
 }));
 
 vi.mock('../../../application/plugins/skill-tools.js', () => ({
-  refreshSkillTools: vi.fn(),
+  refreshSkillCache: vi.fn(),
   getExternalSkillDirs: vi.fn(),
   saveExternalSkillDirs: vi.fn(),
 }));
@@ -43,7 +43,7 @@ describe('workspace routes', () => {
     });
     vi.mocked(workspaceService.loadSkill).mockResolvedValue('# Skill');
     vi.mocked(getExternalSkillDirs).mockReturnValue([]);
-    vi.mocked(refreshSkillTools).mockResolvedValue(0);
+    vi.mocked(refreshSkillCache).mockResolvedValue(0);
   });
 
   it('returns structured 400 when config update body is empty', async () => {

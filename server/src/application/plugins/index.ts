@@ -14,20 +14,18 @@ export {
   type ToolSource,
 } from './tool-registry.js';
 export {
-  buildSkillDirectoryHint,
+  setDatabase,
   getDiscoveredSkills,
   getExternalSkillDirs,
-  loadSkillContent,
-  parseSkillFile,
-  refreshSkillTools,
-  registerSkillTools,
   saveExternalSkillDirs,
-  setDatabase,
-  type SkillMeta,
+  loadAndCacheSkills,
+  refreshSkillCache,
+  buildSkillDirectoryHint,
+  addPluginSkills,
+  type DiscoveredSkill,
 } from './skill-tools.js';
 export { workflowStepRegistry, type WorkflowStepMeta } from './workflow-step-registry.js';
 export { workflowTriggerRegistry } from './workflow-trigger-registry.js';
-export { selectSkills } from './skill-selector.js';
 export { PluginSchedulerService, pluginScheduler } from './scheduler.js';
 export { PluginStorage, PluginStorageManager, pluginStorageManager, type StorageAPI } from './storage.js';
 export {
