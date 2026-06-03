@@ -13,8 +13,7 @@ interface UseCommandHandlerParams {
   currentSession: Session | undefined;
   currentProject: Project | null | undefined;
   isForcedPlanSession: boolean;
-  mode: string | null;
-  modelOverride: string | null;
+  planMode: boolean;
   addMessage: (sessionId: string, message: { id: string; clientMessageId?: string; sessionId: string; role: MessageRole; content: string; createdAt: number }) => void;
   clearMessages: (sessionId: string) => void;
   scrollToBottom: () => void;
@@ -24,8 +23,7 @@ interface UseCommandHandlerParams {
     sessionId: string;
     input: string;
     resend?: boolean;
-    mode?: string;
-    model?: string;
+    planMode?: boolean;
     workingDirectory?: string;
   }) => Promise<void>;
   llmProfileId: string | undefined;
@@ -39,8 +37,7 @@ export function useCommandHandler({
   currentSession,
   currentProject,
   isForcedPlanSession,
-  mode,
-  modelOverride,
+  planMode,
   addMessage,
   clearMessages,
   scrollToBottom,
@@ -557,8 +554,7 @@ export function useCommandHandler({
         clientRequestId: clientMessageId,
         sessionId,
         input: commandText,
-        mode: mode || undefined,
-        model: modelOverride || undefined,
+        planMode: planMode || undefined,
         workingDirectory: currentSession?.workingDirectory || undefined,
       });
       return;
@@ -576,7 +572,7 @@ export function useCommandHandler({
       projectName: currentProject?.name,
       sessionId,
       provider: llmProfileId || 'zclaudia',
-      model: modelOverride || 'default'
+      model: 'default',
     };
 
     try {
@@ -608,8 +604,7 @@ export function useCommandHandler({
           clientRequestId: clientMessageId,
           sessionId,
           input: result.content,
-          mode: mode || undefined,
-          model: modelOverride || undefined,
+          planMode: planMode || undefined,
           workingDirectory: currentSession?.workingDirectory || undefined,
         });
       }
@@ -625,7 +620,7 @@ export function useCommandHandler({
         createdAt: Date.now(),
       });
     }
-  }, [sessionId, addMessage, commands, currentSession, currentProject, handleBuiltInCommand, handleWorktreeChange, scrollToBottom, mode, modelOverride, isForcedPlanSession, startRun]);
+  }, [sessionId, addMessage, commands, currentSession, currentProject, handleBuiltInCommand, handleWorktreeChange, scrollToBottom, planMode, isForcedPlanSession, startRun, llmProfileId]);
 
   return {
     handleCommand,

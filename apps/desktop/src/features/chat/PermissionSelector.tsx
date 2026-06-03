@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Shield, Scale, Rocket, LockOpen, Settings, Lightbulb, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import { Shield, Scale, Rocket, LockOpen, Settings, Lightbulb, ChevronDown, SlidersHorizontal, AlertTriangle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UnifiedPermissionPolicy, CategoryAction, PermissionCategory, CategoryProfile } from '@zclaudia/shared';
 
@@ -38,6 +38,13 @@ const PRESETS: { id: string; label: string; icon: LucideIcon; description: strin
     icon: LockOpen,
     description: '+ Network ops auto-approved',
     profile: { fileRead: 'auto-approve', fileWrite: 'auto-approve', shellSafe: 'auto-approve', networkOps: 'auto-approve', destructiveOps: 'block', userQuestions: 'ask' },
+  },
+  {
+    id: 'bypass-all',
+    label: 'Bypass All',
+    icon: AlertTriangle,
+    description: '⚠ Auto-approves EVERYTHING including destructive operations',
+    profile: { fileRead: 'auto-approve', fileWrite: 'auto-approve', shellSafe: 'auto-approve', networkOps: 'auto-approve', destructiveOps: 'auto-approve', userQuestions: 'auto-approve' },
   },
 ];
 
@@ -163,6 +170,7 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
             <>
               {PRESETS.map((preset) => {
                 const isActive = value?.profile && profilesEqual(preset.profile, value.profile as CategoryProfile);
+                const isBypassAll = preset.id === 'bypass-all';
                 return (
                   <button
                     key={preset.id}
@@ -170,13 +178,13 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
                     className={`
                       w-full text-left px-3 py-1.5 transition-colors
                       ${isActive
-                        ? 'bg-primary/10 text-primary font-medium'
-                        : 'text-foreground hover:bg-muted active:bg-muted'
+                        ? (isBypassAll ? 'bg-orange-500/15 text-orange-300 font-medium' : 'bg-primary/10 text-primary font-medium')
+                        : (isBypassAll ? 'text-orange-400 hover:bg-orange-500/10 active:bg-orange-500/15' : 'text-foreground hover:bg-muted active:bg-muted')
                       }
                     `}
                   >
                     <div className="flex items-center gap-1.5 text-[13px]"><preset.icon size={13} strokeWidth={1.75} /> {preset.label}</div>
-                    <div className="text-[10px] text-muted-foreground mt-0.5">
+                    <div className={`text-[10px] mt-0.5 ${isBypassAll ? 'text-orange-400/80' : 'text-muted-foreground'}`}>
                       {preset.description}
                     </div>
                   </button>

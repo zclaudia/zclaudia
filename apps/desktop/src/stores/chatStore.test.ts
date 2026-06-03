@@ -18,7 +18,7 @@ describe('chatStore', () => {
       activeToolCalls: {},
       toolCallsHistory: {},
       sessionUsage: {},
-      modelOverrides: {},
+      planModeBySession: {},
       permissionOverrides: {},
     });
   });
@@ -321,24 +321,18 @@ describe('chatStore', () => {
     });
   });
 
-  describe('modelOverride (per-session)', () => {
-    it('setModelOverride sets model for a specific session', () => {
-      useChatStore.getState().setModelOverride('session-1', 'claude-opus-4-6');
-      expect(useChatStore.getState().getModelOverride('session-1')).toBe('claude-opus-4-6');
-      expect(useChatStore.getState().getModelOverride('session-2')).toBe('');
+  describe('planMode (per-session)', () => {
+    it('setPlanMode sets plan mode for a specific session', () => {
+      useChatStore.getState().setPlanMode('session-1', true);
+      expect(useChatStore.getState().getPlanMode('session-1')).toBe(true);
+      expect(useChatStore.getState().getPlanMode('session-2')).toBe(false);
     });
 
-    it('setModelOverride with empty string clears to default', () => {
-      useChatStore.getState().setModelOverride('session-1', 'claude-opus-4-6');
-      useChatStore.getState().setModelOverride('session-1', '');
-      expect(useChatStore.getState().getModelOverride('session-1')).toBe('');
-    });
-
-    it('different sessions have independent model overrides', () => {
-      useChatStore.getState().setModelOverride('session-1', 'claude-opus-4-6');
-      useChatStore.getState().setModelOverride('session-2', 'local/glm-4.6v');
-      expect(useChatStore.getState().getModelOverride('session-1')).toBe('claude-opus-4-6');
-      expect(useChatStore.getState().getModelOverride('session-2')).toBe('local/glm-4.6v');
+    it('different sessions have independent plan-mode toggles', () => {
+      useChatStore.getState().setPlanMode('session-1', true);
+      useChatStore.getState().setPlanMode('session-2', false);
+      expect(useChatStore.getState().getPlanMode('session-1')).toBe(true);
+      expect(useChatStore.getState().getPlanMode('session-2')).toBe(false);
     });
   });
 

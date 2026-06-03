@@ -75,9 +75,9 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
     sessionToolCalls, sessionContentBlocks, sessionToolCallHistory, useStreamingSegmented,
     lastStreamingBlock, streamingContentSignature,
     currentSession, currentProject, isForcedPlanSession, fileReferenceRoot, fileReferenceBackendId,
-    llmProfileId, capabilities, commands, commandsCacheKey,
-    effectiveMode, modelOverride, permissionOverride, currentUsage, currentSystemInfo,
-    addMessage, clearMessages, setMode, setModelOverride, setPermissionOverride,
+    llmProfileId, commands, commandsCacheKey,
+    effectivePlanMode, permissionOverride, currentUsage, currentSystemInfo,
+    addMessage, clearMessages, setPlanMode, setPermissionOverride,
   } = session;
 
   // Mobile viewport management
@@ -100,7 +100,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   // Message sending
   const send = useSendMessage({
     sessionId, isConnected, isLoading, sessionRunId, isSessionRunning, lastSessionMessage,
-    mode: effectiveMode, modelOverride, permissionOverride, currentSession, addMessage, scrollToBottom, wsSendMessage,
+    planMode: effectivePlanMode, permissionOverride, currentSession, addMessage, scrollToBottom, wsSendMessage,
   });
   const {
     handleSendMessage, handleCancelRun, handleResendLastMessage,
@@ -111,7 +111,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   const chatActionsValue = useMemo<ChatActionsContextValue>(() => ({
     handleSendMessage,
-    setMode: useChatStore.getState().setMode,
+    setPlanMode: useChatStore.getState().setPlanMode,
   }), [handleSendMessage]);
 
   // UI state
@@ -131,15 +131,15 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   // Task planning sessions are hard-locked to Plan mode.
   useEffect(() => {
-    if (isForcedPlanSession && effectiveMode !== 'plan') {
-      setMode(sessionId, 'plan');
+    if (isForcedPlanSession && !effectivePlanMode) {
+      setPlanMode(sessionId, true);
     }
-  }, [isForcedPlanSession, effectiveMode, sessionId, setMode]);
+  }, [isForcedPlanSession, effectivePlanMode, sessionId, setPlanMode]);
 
   // Command handler
   const { handleCommand, handleResetProviderSession, handleWorktreeChange } = useCommandHandler({
     sessionId, commands, currentSession, currentProject, isForcedPlanSession,
-    mode: effectiveMode, modelOverride, addMessage, clearMessages, scrollToBottom, startRun,
+    planMode: effectivePlanMode, addMessage, clearMessages, scrollToBottom, startRun,
     llmProfileId, commandsCacheKey, setDrawerOpen,
   });
 
@@ -190,7 +190,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
               clientRequestId: crypto.randomUUID(),
               sessionId,
               input: 'continue',
-              mode: effectiveMode || undefined,
+              planMode: effectivePlanMode || undefined,
               workingDirectory: currentSession?.workingDirectory || undefined,
             });
           }}
@@ -310,10 +310,8 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           isLoading={isLoading}
           isConnected={isConnected}
           isForcedPlanSession={isForcedPlanSession}
-          mode={effectiveMode}
-          modelOverride={modelOverride}
+          planMode={effectivePlanMode}
           permissionOverride={permissionOverride}
-          capabilities={capabilities}
           commands={commands}
           fileReferenceRoot={fileReferenceRoot}
           fileReferenceBackendId={fileReferenceBackendId}
@@ -324,8 +322,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           restoreMessage={restoreMessage}
           initialDraft={initialDraft}
           draftExists={draftExists}
-          onSetMode={setMode}
-          onSetModelOverride={setModelOverride}
+          onSetPlanMode={setPlanMode}
           onSetPermissionOverride={setPermissionOverride}
           onWorktreeChange={handleWorktreeChange}
           onSendMessage={handleSendMessage}

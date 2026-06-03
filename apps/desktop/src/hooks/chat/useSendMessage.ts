@@ -16,8 +16,7 @@ interface RunStartMessage {
   sessionId: string;
   input: string;
   resend?: boolean;
-  mode?: string;
-  model?: string;
+  planMode?: boolean;
   permissionOverride?: Partial<UnifiedPermissionPolicy>;
   workingDirectory?: string;
 }
@@ -29,8 +28,7 @@ interface UseSendMessageParams {
   sessionRunId: string | null;
   isSessionRunning: boolean;
   lastSessionMessage: MessageWithToolCalls | null;
-  mode: string;
-  modelOverride: string;
+  planMode: boolean;
   permissionOverride: Partial<UnifiedPermissionPolicy> | null;
   currentSession: { workingDirectory?: string; lastRunStatus?: string | null } | undefined;
   addMessage: (sessionId: string, message: MessageWithToolCalls) => void;
@@ -76,8 +74,7 @@ export function useSendMessage({
   sessionRunId,
   isSessionRunning,
   lastSessionMessage,
-  mode,
-  modelOverride,
+  planMode,
   permissionOverride,
   currentSession,
   addMessage,
@@ -131,7 +128,7 @@ export function useSendMessage({
   }, [clearInterruptedStatus, wsSendMessage]);
 
   // ── Send message ──
-  const handleSendMessage = useCallback(async (content: string, attachments?: Attachment[], overrideMode?: string) => {
+  const handleSendMessage = useCallback(async (content: string, attachments?: Attachment[], overridePlanMode?: boolean) => {
     if (!content.trim() && !attachments?.length) return;
 
     if (!isConnected) {
@@ -205,22 +202,22 @@ export function useSendMessage({
       createdAt: Date.now(),
     });
 
+    const effectivePlanMode = overridePlanMode ?? planMode;
     const runStartMsg: RunStartMessage = {
       type: 'run_start',
       clientRequestId: clientMessageId,
       sessionId,
       input: fullContent,
-      mode: (overrideMode ?? mode) || undefined,
-      model: modelOverride || undefined,
+      planMode: effectivePlanMode || undefined,
       permissionOverride: permissionOverride || undefined,
       workingDirectory: currentSession?.workingDirectory || undefined,
     };
-    console.log('[useSendMessage] run_start:', { sessionId, mode: runStartMsg.mode, model: runStartMsg.model, workingDirectory: runStartMsg.workingDirectory });
+    console.log('[useSendMessage] run_start:', { sessionId, planMode: runStartMsg.planMode, workingDirectory: runStartMsg.workingDirectory });
     await startRun(runStartMsg);
     useInteractionStore.getState().clearClientSynthPlanReviewsForSession(sessionId);
 
     setTimeout(() => scrollToBottom(), 100);
-  }, [sessionId, isConnected, isLoading, sessionRunId, mode, modelOverride, permissionOverride, currentSession, addMessage, startRun, scrollToBottom, wsSendMessage]);
+  }, [sessionId, isConnected, isLoading, sessionRunId, planMode, permissionOverride, currentSession, addMessage, startRun, scrollToBottom, wsSendMessage]);
 
   // ── Resend last message ──
   const handleResendLastMessage = useCallback(async () => {
@@ -245,8 +242,7 @@ export function useSendMessage({
         sessionId,
         input: JSON.stringify(messageInput),
         resend: true,
-        mode: mode || undefined,
-        model: modelOverride || undefined,
+        planMode: planMode || undefined,
         permissionOverride: permissionOverride || undefined,
         workingDirectory: currentSession?.workingDirectory || undefined,
       });
@@ -263,7 +259,7 @@ export function useSendMessage({
     } finally {
       setResendChecking(false);
     }
-  }, [resendText, sessionId, addMessage, startRun, mode, modelOverride, permissionOverride, currentSession, scrollToBottom]);
+  }, [resendText, sessionId, addMessage, startRun, planMode, permissionOverride, currentSession, scrollToBottom]);
 
   // ── Cancel ──
   const handleCancelRun = useCallback(() => {

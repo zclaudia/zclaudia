@@ -212,11 +212,11 @@ describe('PlanReviewRenderer — todos rendering', () => {
 });
 
 const handleSendMessage = vi.fn();
-const setMode = vi.fn();
+const setPlanMode = vi.fn();
 
 function renderWithActions(ui: React.ReactNode) {
   return render(
-    <ChatActionsProvider value={{ handleSendMessage, setMode }}>
+    <ChatActionsProvider value={{ handleSendMessage, setPlanMode }}>
       {ui}
     </ChatActionsProvider>,
   );
@@ -230,19 +230,19 @@ const synthInteraction: PlanReviewInteractionMessage = {
 beforeEach(() => {
   handleSendMessage.mockReset();
   handleSendMessage.mockResolvedValue(undefined);
-  setMode.mockReset();
+  setPlanMode.mockReset();
 });
 
 describe('PlanReviewRenderer — client_synth', () => {
-  it('on Approve: sets mode to default and sends "Proceed with the plan above."', async () => {
+  it('on Approve: turns plan mode off and sends "Proceed with the plan above."', async () => {
     renderWithActions(<InteractionItem interaction={synthInteraction} />);
     fireEvent.click(screen.getByRole('button', { name: /approve/i }));
     await waitFor(() => {
-      expect(setMode).toHaveBeenCalledWith('session-1', 'default');
+      expect(setPlanMode).toHaveBeenCalledWith('session-1', false);
       expect(handleSendMessage).toHaveBeenCalledWith(
         'Proceed with the plan above.',
         undefined,
-        'default',
+        false,
       );
     });
     // does NOT send interaction_response
@@ -255,7 +255,7 @@ describe('PlanReviewRenderer — client_synth', () => {
     await waitFor(() => {
       expect(handleSendMessage).toHaveBeenCalledWith('Please revise the plan.');
     });
-    expect(setMode).not.toHaveBeenCalled();
+    expect(setPlanMode).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
   });
 
@@ -306,16 +306,16 @@ describe('PlanReviewRenderer — client_synth', () => {
     useInteractionStore.setState({ interactions: {} } as any);
   });
 
-  it('on Approve when handleSendMessage rejects: reverts to captured prior mode and decision state', async () => {
-    // Seed the chat store with the prior mode so the rollback uses the captured value
-    useChatStore.setState({ modeOverrides: { 'session-1': 'plan' } } as any);
+  it('on Approve when handleSendMessage rejects: reverts to captured prior plan mode and decision state', async () => {
+    // Seed the chat store with the prior plan mode so the rollback uses the captured value
+    useChatStore.setState({ planModeBySession: { 'session-1': true } } as any);
     handleSendMessage.mockRejectedValueOnce(new Error('network down'));
     renderWithActions(<InteractionItem interaction={synthInteraction} />);
     fireEvent.click(screen.getByRole('button', { name: /approve/i }));
     await waitFor(() => {
-      // mode was switched to 'default' then back to the captured prior mode ('plan')
-      expect(setMode).toHaveBeenNthCalledWith(1, 'session-1', 'default');
-      expect(setMode).toHaveBeenNthCalledWith(2, 'session-1', 'plan');
+      // planMode was switched to false then back to the captured prior value (true)
+      expect(setPlanMode).toHaveBeenNthCalledWith(1, 'session-1', false);
+      expect(setPlanMode).toHaveBeenNthCalledWith(2, 'session-1', true);
     });
     // decision card reverts — Approve button visible again
     expect(screen.getByRole('button', { name: /approve/i })).toBeInTheDocument();

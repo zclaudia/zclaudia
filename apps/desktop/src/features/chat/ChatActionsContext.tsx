@@ -5,9 +5,9 @@ export interface ChatActionsContextValue {
   handleSendMessage: (
     content: string,
     attachments?: Attachment[],
-    overrideMode?: string,
+    overridePlanMode?: boolean,
   ) => Promise<void>;
-  setMode: (sessionId: string, mode: string) => void;
+  setPlanMode: (sessionId: string, planMode: boolean) => void;
 }
 
 const ChatActionsContext = createContext<ChatActionsContextValue | null>(null);

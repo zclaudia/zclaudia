@@ -27,10 +27,9 @@ describe('chatStore', () => {
       toolCallsHistory: {},
       runContentBlocks: {},
       systemInfoBySession: {},
-      modeOverrides: {},
+      planModeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
-      modelOverrides: {},
       permissionOverrides: {},
       worktreeOverrides: {},
       drafts: {},
@@ -372,30 +371,63 @@ describe('chatStore', () => {
     });
   });
 
-  // ── Mode overrides ─────────────────────────────────
+  // ── Plan mode ──────────────────────────────────────
 
-  describe('mode overrides', () => {
-    it('sets and gets mode', () => {
-      useChatStore.getState().setMode('sess-1', 'yolo');
-      expect(useChatStore.getState().getMode('sess-1')).toBe('yolo');
+  describe('plan mode', () => {
+    it('setPlanMode + getPlanMode round-trip', () => {
+      useChatStore.getState().setPlanMode('s1', true);
+      expect(useChatStore.getState().getPlanMode('s1')).toBe(true);
+      useChatStore.getState().setPlanMode('s1', false);
+      expect(useChatStore.getState().getPlanMode('s1')).toBe(false);
     });
 
-    it('returns empty string for unknown session', () => {
-      expect(useChatStore.getState().getMode('unknown')).toBe('');
+    it('getPlanMode defaults to false for unknown session', () => {
+      expect(useChatStore.getState().getPlanMode('unknown')).toBe(false);
     });
 
     it('tracks runtime mode separately and clears it when a run ends', () => {
-      useChatStore.getState().setMode('sess-1', 'default');
+      useChatStore.getState().setPlanMode('sess-1', false);
       useChatStore.getState().setRuntimeMode('sess-1', 'plan');
       useChatStore.getState().startRun('run-1', 'sess-1');
 
-      expect(useChatStore.getState().getMode('sess-1')).toBe('default');
+      expect(useChatStore.getState().getPlanMode('sess-1')).toBe(false);
       expect(useChatStore.getState().getRuntimeMode('sess-1')).toBe('plan');
 
       useChatStore.getState().endRun('run-1');
 
-      expect(useChatStore.getState().getMode('sess-1')).toBe('default');
+      expect(useChatStore.getState().getPlanMode('sess-1')).toBe(false);
       expect(useChatStore.getState().getRuntimeMode('sess-1')).toBe('');
+    });
+  });
+
+  // ── System info → usage contextWindow wiring ───────
+
+  describe('system info contextWindow', () => {
+    it('setSystemInfo copies contextWindow into the session usage record (no prior usage)', () => {
+      useChatStore.getState().setSystemInfo('s2', {
+        model: 'kimi-k2.6',
+        contextWindow: 128_000,
+      });
+      const usage = useChatStore.getState().sessionUsage['s2'];
+      expect(usage.contextWindow).toBe(128_000);
+      expect(usage.inputTokens).toBe(0);
+      expect(usage.outputTokens).toBe(0);
+    });
+
+    it('setSystemInfo updates existing usage record with contextWindow', () => {
+      useChatStore.getState().addSessionUsage('s3', u(100, 50));
+      useChatStore.getState().setSystemInfo('s3', { contextWindow: 64_000 });
+      const usage = useChatStore.getState().sessionUsage['s3'];
+      expect(usage.contextWindow).toBe(64_000);
+      expect(usage.inputTokens).toBe(100);
+      expect(usage.outputTokens).toBe(50);
+    });
+
+    it('setSystemInfo without contextWindow leaves usage untouched', () => {
+      useChatStore.getState().addSessionUsage('s4', u(20, 10));
+      useChatStore.getState().setSystemInfo('s4', { model: 'foo' });
+      const usage = useChatStore.getState().sessionUsage['s4'];
+      expect(usage.contextWindow).toBeUndefined();
     });
   });
 
@@ -427,19 +459,6 @@ describe('chatStore', () => {
         latestInputTokens: 200,
         latestOutputTokens: 100,
       });
-    });
-  });
-
-  // ── Model overrides ─────────────────────────────────
-
-  describe('model overrides', () => {
-    it('sets and gets model', () => {
-      useChatStore.getState().setModelOverride('sess-1', 'claude-sonnet');
-      expect(useChatStore.getState().getModelOverride('sess-1')).toBe('claude-sonnet');
-    });
-
-    it('returns empty string for unknown session', () => {
-      expect(useChatStore.getState().getModelOverride('unknown')).toBe('');
     });
   });
 

@@ -2,7 +2,6 @@ import { useEffect, useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
-import { useChatStore } from '../../stores/chatStore';
 import * as api from '../../services/api';
 import type { ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
@@ -81,16 +80,13 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
     fetchCaps
       .then(caps => {
         setProviderCapabilities(capsCacheKey, caps);
-        if (caps.defaultModeId && !useChatStore.getState().getMode(sessionId)) {
-          useChatStore.getState().setMode(sessionId, caps.defaultModeId);
-        }
       })
       .catch(err => {
         if (err instanceof Error && err.name === 'AbortError') return;
         console.error('Failed to load provider capabilities:', err);
       });
     return () => controller.abort();
-  }, [capsCacheKey, llmProfileId, isConnected, isBackendDataReady, providerCapabilities, setProviderCapabilities, sessionId]);
+  }, [capsCacheKey, llmProfileId, isConnected, isBackendDataReady, providerCapabilities, setProviderCapabilities]);
 
   const capabilities: ProviderCapabilities | null = providerCapabilities[capsCacheKey] || null;
 

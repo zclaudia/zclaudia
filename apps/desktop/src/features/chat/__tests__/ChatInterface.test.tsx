@@ -111,22 +111,19 @@ vi.mock('../InlinePermissionRequest', () => ({
     <div data-testid="permission-request" data-request-id={props.request?.requestId} />
   ),
 }));
-vi.mock('../ModeSelector', () => ({
-  ModeSelector: (props: any) => (
-    <div data-testid="mode-selector" data-value={props.value || ''} data-disabled={props.disabled} data-locked={props.locked}>
-      <button data-testid="mode-change" onClick={() => props.onChange?.('plan')}>change mode</button>
-    </div>
+vi.mock('../PlanModeToggle', () => ({
+  PlanModeToggle: (props: any) => (
+    <button
+      data-testid="plan-mode-toggle"
+      data-value={String(props.value)}
+      data-disabled={String(Boolean(props.disabled))}
+      data-locked={String(Boolean(props.locked))}
+      onClick={() => props.onChange?.(!props.value)}
+    >toggle plan</button>
   ),
 }));
 vi.mock('../SystemInfoButton', () => ({
   SystemInfoButton: () => <div data-testid="system-info-button" />,
-}));
-vi.mock('../ModelSelector', () => ({
-  ModelSelector: (props: any) => (
-    <div data-testid="model-selector" data-value={props.value || ''} data-disabled={props.disabled}>
-      <button data-testid="model-change" onClick={() => props.onChange?.('gpt-4')}>change model</button>
-    </div>
-  ),
 }));
 vi.mock('../PermissionSelector', () => ({
   PermissionSelector: (props: any) => (
@@ -347,7 +344,7 @@ function setDefaultStores(overrides?: {
     pagination: {},
     activeRuns: {},
     backgroundRunIds: new Set(),
-    modeOverrides: {},
+    planModeBySession: {},
     runtimeModes: {},
     runHealth: {},
     activeToolCalls: {},
@@ -361,11 +358,9 @@ function setDefaultStores(overrides?: {
     appendMessages: vi.fn(),
     clearMessages: vi.fn(),
     setLoadingMore: vi.fn(),
-    setMode: vi.fn(),
-    getMode: vi.fn(() => null),
+    setPlanMode: vi.fn(),
+    getPlanMode: vi.fn(() => false),
     getSystemInfo: vi.fn(() => null),
-    setModelOverride: vi.fn(),
-    getModelOverride: vi.fn(() => null),
     getPermissionOverride: vi.fn(() => null),
     setPermissionOverride: vi.fn(),
     startRun: vi.fn(),
@@ -516,10 +511,9 @@ describe('ChatInterface', () => {
     expect(container.querySelector('[data-testid="bg-task-panel"]')).toBeTruthy();
   });
 
-  it('renders toolbar selectors (mode, model, permission, system info)', () => {
+  it('renders toolbar selectors (plan-mode toggle, permission, system info)', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    expect(container.querySelector('[data-testid="mode-selector"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="model-selector"]')).toBeTruthy();
+    expect(container.querySelector('[data-testid="plan-mode-toggle"]')).toBeTruthy();
     expect(container.querySelector('[data-testid="permission-selector"]')).toBeTruthy();
     expect(container.querySelector('[data-testid="system-info-button"]')).toBeTruthy();
   });
@@ -823,12 +817,12 @@ describe('ChatInterface', () => {
     expect(mockSendToServer).not.toHaveBeenCalled();
   });
 
-  it('includes mode in run_start message when mode is set', async () => {
+  it('includes planMode=true in run_start message when plan mode is on', async () => {
     setDefaultStores({
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
-        modeOverrides: { 'sess-1': 'plan' },
+        planModeBySession: { 'sess-1': true },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -838,29 +832,26 @@ describe('ChatInterface', () => {
       'local',
       expect.objectContaining({
         type: 'run_start',
-        mode: 'plan',
+        planMode: true,
       })
     );
   });
 
-  it('includes model override in run_start message', async () => {
+  it('omits planMode when plan mode is off (server defaults to false)', async () => {
     setDefaultStores({
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
-        modelOverrides: { 'sess-1': 'gpt-4' },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const sendBtn = container.querySelector('[data-testid="send-btn"]');
     await clickAsync(sendBtn!);
-    expect(mockSendToServer).toHaveBeenCalledWith(
-      'local',
-      expect.objectContaining({
-        type: 'run_start',
-        model: 'gpt-4',
-      })
-    );
+    const call = mockSendToServer.mock.calls[0];
+    expect(call?.[0]).toBe('local');
+    expect(call?.[1]).not.toHaveProperty('mode');
+    expect(call?.[1]).not.toHaveProperty('model');
+    expect((call?.[1] as any).planMode).toBeUndefined();
   });
 
   // ─── Cancel Run ───────────────────────────────────────────────────────
@@ -1243,17 +1234,17 @@ describe('ChatInterface', () => {
     expect(container.textContent).not.toContain('Planning mode');
   });
 
-  // ─── Toolbar: Mode, Model, Permission ─────────────────────────────────
+  // ─── Toolbar: PlanMode + Permission ───────────────────────────────────
 
-  it('shows mode selector with current mode value', () => {
+  it('shows plan-mode toggle value=true when planModeBySession is set', () => {
     setDefaultStores({
       chatStore: {
-        modeOverrides: { 'sess-1': 'code' },
+        planModeBySession: { 'sess-1': true },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    const modeSelector = container.querySelector('[data-testid="mode-selector"]');
-    expect(modeSelector?.getAttribute('data-value')).toBe('code');
+    const toggle = container.querySelector('[data-testid="plan-mode-toggle"]');
+    expect(toggle?.getAttribute('data-value')).toBe('true');
   });
 
   it('disables toolbar selectors while loading', () => {
@@ -1264,23 +1255,22 @@ describe('ChatInterface', () => {
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    const modeSelector = container.querySelector('[data-testid="mode-selector"]');
-    const modelSelector = container.querySelector('[data-testid="model-selector"]');
+    const toggle = container.querySelector('[data-testid="plan-mode-toggle"]');
     const permSelector = container.querySelector('[data-testid="permission-selector"]');
-    expect(modeSelector?.getAttribute('data-disabled')).toBe('true');
-    expect(modelSelector?.getAttribute('data-disabled')).toBe('true');
+    expect(toggle?.getAttribute('data-disabled')).toBe('true');
     expect(permSelector?.getAttribute('data-disabled')).toBe('true');
   });
 
-  it('locks mode selector in forced plan session', () => {
+  it('locks plan-mode toggle in forced plan session', () => {
     setDefaultStores({
       projectStore: {
         sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Task', projectRole: 'task', planStatus: 'planning' }],
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
-    const modeSelector = container.querySelector('[data-testid="mode-selector"]');
-    expect(modeSelector?.getAttribute('data-locked')).toBe('true');
+    const toggle = container.querySelector('[data-testid="plan-mode-toggle"]');
+    expect(toggle?.getAttribute('data-locked')).toBe('true');
+    expect(toggle?.getAttribute('data-value')).toBe('true');
   });
 
   it('shows worktree selector when project has rootPath', () => {
@@ -1339,12 +1329,12 @@ describe('ChatInterface', () => {
     expect(input?.getAttribute('data-placeholder')).toContain('Type a message');
   });
 
-  it('shows plan mode placeholder when mode is plan', () => {
+  it('shows plan mode placeholder when planMode is true', () => {
     setDefaultStores({
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
-        modeOverrides: { 'sess-1': 'plan' },
+        planModeBySession: { 'sess-1': true },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
@@ -1357,7 +1347,7 @@ describe('ChatInterface', () => {
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
-        modeOverrides: { 'sess-1': 'default' },
+        planModeBySession: {},
         runtimeModes: { 'sess-1': 'plan' },
       },
     });

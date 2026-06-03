@@ -75,9 +75,12 @@ interface ChatState {
   runContentBlocks: Record<string, ContentBlock[]>;
   // Provider system info from runtime init message, keyed by session ID
   systemInfoBySession: Record<string, SystemInfo>;
-  // Mode per session (generic — permission mode for Claude, agent for OpenCode, etc.)
-  modeOverrides: Record<string, string>;
-  // Runtime mode per session (provider-driven transient state, e.g. AI-entered plan mode)
+  // Plan-mode toggle per session (true = plan-only read-only turn).
+  // Replaces the legacy generic `modeOverrides` string map after the
+  // selector-cleanup sub-project.
+  planModeBySession: Record<string, boolean>;
+  // Runtime mode per session (provider-driven transient state, e.g. AI-entered plan mode).
+  // Still a string because the wire `mode_change` event remains a string ('plan'/'default').
   runtimeModes: Record<string, string>;
   // Token usage per session (accumulated + latest run snapshot)
   sessionUsage: Record<string, {
@@ -87,8 +90,6 @@ interface ChatState {
     latestInputTokens?: number;
     latestOutputTokens?: number;
   }>;
-  // Model override per session (user-selected model, empty = use default)
-  modelOverrides: Record<string, string>;
   // Permission policy override per session (user-selected policy, null = use project default)
   permissionOverrides: Record<string, Partial<UnifiedPermissionPolicy> | null>;
   // Worktree override per session (user-selected working directory, empty = use project root)
@@ -133,9 +134,9 @@ interface ChatState {
   clearSystemInfo: (sessionId: string) => void;
   getSystemInfo: (sessionId: string) => SystemInfo | null;
 
-  // Mode actions (per session)
-  setMode: (sessionId: string, mode: string) => void;
-  getMode: (sessionId: string) => string;
+  // Plan-mode actions (per session)
+  setPlanMode: (sessionId: string, planMode: boolean) => void;
+  getPlanMode: (sessionId: string) => boolean;
   setRuntimeMode: (sessionId: string, mode: string) => void;
   getRuntimeMode: (sessionId: string) => string;
   clearRuntimeMode: (sessionId: string) => void;
@@ -143,10 +144,6 @@ interface ChatState {
   // Usage tracking
   addSessionUsage: (sessionId: string, usage: UsageInfo) => void;
   clearSessionUsage: (sessionId: string) => void;
-
-  // Model override (per session)
-  setModelOverride: (sessionId: string, model: string) => void;
-  getModelOverride: (sessionId: string) => string;
 
   // Permission override (per session)
   setPermissionOverride: (sessionId: string, policy: Partial<UnifiedPermissionPolicy> | null) => void;
@@ -198,10 +195,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   toolCallsHistory: {},
   runContentBlocks: {},
   systemInfoBySession: {},
-  modeOverrides: {},
+  planModeBySession: {},
   runtimeModes: {},
   sessionUsage: {},
-  modelOverrides: {},
   permissionOverrides: {},
   worktreeOverrides: {},
   drafts: {},
@@ -578,12 +574,25 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   // System info actions
   setSystemInfo: (sessionId, info) =>
-    set((state) => ({
-      systemInfoBySession: {
-        ...state.systemInfoBySession,
-        [sessionId]: info,
-      },
-    })),
+    set((state) => {
+      const usageNext = { ...state.sessionUsage };
+      if (typeof info.contextWindow === 'number' && info.contextWindow > 0) {
+        const existing = usageNext[sessionId];
+        if (existing) {
+          usageNext[sessionId] = { ...existing, contextWindow: info.contextWindow };
+        } else {
+          usageNext[sessionId] = {
+            inputTokens: 0,
+            outputTokens: 0,
+            contextWindow: info.contextWindow,
+          };
+        }
+      }
+      return {
+        systemInfoBySession: { ...state.systemInfoBySession, [sessionId]: info },
+        sessionUsage: usageNext,
+      };
+    }),
   clearSystemInfo: (sessionId) =>
     set((state) => {
       const { [sessionId]: _, ...rest } = state.systemInfoBySession;
@@ -591,12 +600,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
   getSystemInfo: (sessionId) => get().systemInfoBySession[sessionId] || null,
 
-  // Mode actions (per session)
-  setMode: (sessionId, mode) =>
+  // Plan-mode actions (per session)
+  setPlanMode: (sessionId, planMode) =>
     set((state) => ({
-      modeOverrides: { ...state.modeOverrides, [sessionId]: mode },
+      planModeBySession: { ...state.planModeBySession, [sessionId]: planMode },
     })),
-  getMode: (sessionId) => get().modeOverrides[sessionId] || '',
+  getPlanMode: (sessionId) => get().planModeBySession[sessionId] ?? false,
   setRuntimeMode: (sessionId, mode) =>
     set((state) => ({
       runtimeModes: { ...state.runtimeModes, [sessionId]: mode },
@@ -630,13 +639,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const { [sessionId]: _, ...rest } = state.sessionUsage;
       return { sessionUsage: rest };
     }),
-
-  // Model override (per session)
-  setModelOverride: (sessionId, model) =>
-    set((state) => ({
-      modelOverrides: { ...state.modelOverrides, [sessionId]: model },
-    })),
-  getModelOverride: (sessionId) => get().modelOverrides[sessionId] || '',
 
   // Permission override (per session)
   setPermissionOverride: (sessionId, policy) =>

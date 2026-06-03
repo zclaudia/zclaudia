@@ -3,7 +3,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ChatInputArea } from '../ChatInputArea';
-import type { ProviderCapabilities } from '@zclaudia/shared';
 import type { ReactNode } from 'react';
 
 vi.mock('../MessageInput', () => ({
@@ -14,6 +13,12 @@ vi.mock('../MessageInput', () => ({
 
 vi.mock('../PermissionSelector', () => ({
   PermissionSelector: () => <div data-testid="permission-selector" />,
+}));
+
+vi.mock('../PlanModeToggle', () => ({
+  PlanModeToggle: (props: { value: boolean; locked?: boolean }) => (
+    <div data-testid="plan-mode-toggle" data-value={String(props.value)} data-locked={String(Boolean(props.locked))} />
+  ),
 }));
 
 vi.mock('../WorktreeSelector', () => ({
@@ -160,16 +165,6 @@ vi.mock('../../../stores/projectStore', () => ({
   },
 }));
 
-const capabilities: ProviderCapabilities = {
-  models: [
-    { id: 'sonnet', label: 'Claude Sonnet' },
-  ],
-  modes: [
-    { id: 'default', label: 'Agent', description: 'Default agent mode' },
-  ],
-  tools: [],
-};
-
 const baseProps = {
   sessionId: 'sess-1',
   currentSession: {
@@ -188,12 +183,11 @@ const baseProps = {
   isLoading: false,
   isConnected: true,
   isForcedPlanSession: false,
-  mode: 'default',
-  modelOverride: 'sonnet',
+  planMode: false,
   permissionOverride: null,
-  capabilities,
   commands: [],
   fileReferenceRoot: '/repo',
+  fileReferenceBackendId: null,
   sessionRunId: null,
   currentUsage: {
     inputTokens: 0,
@@ -204,8 +198,7 @@ const baseProps = {
   restoreMessage: null,
   initialDraft: { content: '', attachments: [] },
   draftExists: false,
-  onSetMode: vi.fn(),
-  onSetModelOverride: vi.fn(),
+  onSetPlanMode: vi.fn(),
   onSetPermissionOverride: vi.fn(),
   onWorktreeChange: vi.fn(async () => {}),
   onSendMessage: vi.fn(),
@@ -226,27 +219,35 @@ describe('ChatInputArea mobile selectors', () => {
     cleanup();
   });
 
-  it('shows mode/model selectors and terminal tool on mobile when capabilities and remote terminal are available', () => {
+  it('shows plan-mode toggle + permission selector + worktree + terminal tool on mobile', () => {
     serverStoreState.activeServerSupports.mockImplementation((feature: string) => feature === 'remoteTerminal');
 
     render(<ChatInputArea {...baseProps} />);
 
-    expect(screen.getByLabelText('Mode: Agent')).toBeTruthy();
-    expect(screen.getByTitle('Claude Sonnet')).toBeTruthy();
+    expect(screen.getByTestId('plan-mode-toggle')).toBeTruthy();
+    expect(screen.getByTestId('permission-selector')).toBeTruthy();
     expect(screen.getByTestId('worktree-selector')).toBeTruthy();
 
     fireEvent.click(screen.getByTitle('More tools'));
     expect(screen.getByText('Terminal')).toBeTruthy();
   });
 
-  it('hides selectors and terminal tool when capabilities/features are unavailable', () => {
+  it('locks plan-mode toggle when isForcedPlanSession is true', () => {
+    serverStoreState.activeServerSupports.mockReturnValue(false);
+
+    render(<ChatInputArea {...baseProps} isForcedPlanSession />);
+
+    const toggle = screen.getByTestId('plan-mode-toggle');
+    expect(toggle.getAttribute('data-locked')).toBe('true');
+    expect(toggle.getAttribute('data-value')).toBe('true');
+  });
+
+  it('hides terminal tool button when remote terminal is unavailable and other panels are disabled', () => {
     serverStoreState.activeServerSupports.mockReturnValue(false);
     pluginStoreState.disabledBuiltinPanels = ['draft', 'file-viewer', 'session-changes'];
 
-    render(<ChatInputArea {...baseProps} capabilities={null} modelOverride={null} />);
+    render(<ChatInputArea {...baseProps} />);
 
-    expect(screen.queryByLabelText('Mode: Agent')).toBeNull();
-    expect(screen.queryByTitle('Claude Sonnet')).toBeNull();
     expect(screen.queryByTitle('More tools')).toBeNull();
   });
 });

@@ -211,7 +211,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       useChatStore.getState().setRuntimeMode(msg.sessionId, msg.mode);
-      useChatStore.getState().setMode(msg.sessionId, msg.mode);
+      // Backend `mode_change` events still carry the legacy 'plan' / 'default'
+      // strings (see runtime-capabilities.ts). Translate to the boolean planMode
+      // so the UI selector stays consistent with the backend's actual mode.
+      useChatStore.getState().setPlanMode(msg.sessionId, msg.mode === 'plan');
       return true;
 
     case 'system_info':

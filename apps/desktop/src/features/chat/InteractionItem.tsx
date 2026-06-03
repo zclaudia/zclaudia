@@ -401,15 +401,15 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
     if (isClientSynth && chatActions && interaction.sessionId) {
       const trimmed = feedback.trim();
       const text = trimmed ? `${ALLOW_MESSAGE}\n\n${trimmed}` : ALLOW_MESSAGE;
-      const priorMode = useChatStore.getState().getMode(interaction.sessionId);
-      chatActions.setMode(interaction.sessionId, 'default');
+      const priorPlanMode = useChatStore.getState().getPlanMode(interaction.sessionId);
+      chatActions.setPlanMode(interaction.sessionId, false);
       setDecision({ kind: 'approved' });
       try {
-        await chatActions.handleSendMessage(text, undefined, 'default');
+        await chatActions.handleSendMessage(text, undefined, false);
         useInteractionStore.getState().resolveInteraction(interaction.interactionId);
       } catch (err) {
         setDecision(null);
-        chatActions.setMode(interaction.sessionId, priorMode);
+        chatActions.setPlanMode(interaction.sessionId, priorPlanMode);
         console.error('[PlanReviewRenderer] Approve send failed', err);
       }
       return;
