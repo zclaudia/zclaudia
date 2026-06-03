@@ -82,7 +82,14 @@ async function scanCommandsDirectory(dir: string, namespace: 'project' | 'user')
  */
 function resolveArgs(body: CommandExecuteRequest): string[] {
   if (typeof body.rawArgs === 'string' && body.rawArgs.length > 0) {
-    return parseCommandArgs(body.rawArgs);
+    try {
+      return parseCommandArgs(body.rawArgs);
+    } catch (err) {
+      // Malformed shell quoting → degrade gracefully to legacy args[] instead
+      // of bubbling to a 500. Spec §5.5 risk #7.
+      console.warn('[commands.execute] parseCommandArgs failed; falling back to args[]:', err);
+      return body.args ?? [];
+    }
   }
   return body.args ?? [];
 }
