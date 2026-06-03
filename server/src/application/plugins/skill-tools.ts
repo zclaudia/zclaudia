@@ -31,6 +31,15 @@ export interface DiscoveredSkill {
   dirPath: string;
 }
 
+/**
+ * Implemented by `skill-bootstrap.pluginSkillReloader`. Declared here (not
+ * imported from skill-bootstrap) to break the circular import between
+ * skill-tools and skill-bootstrap.
+ */
+export interface PluginSkillReloader {
+  reload(env: ExecutionEnv): Promise<number>;
+}
+
 let dbInstance: Database.Database | null = null;
 let cached: SourcedSkill[] = [];
 
@@ -128,9 +137,14 @@ export async function loadAndCacheSkills(env: ExecutionEnv): Promise<number> {
   return cached.length;
 }
 
-export async function refreshSkillCache(env: ExecutionEnv): Promise<number> {
+export async function refreshSkillCache(
+  env: ExecutionEnv,
+  pluginReloader?: PluginSkillReloader,
+): Promise<number> {
   cached = [];
-  return loadAndCacheSkills(env);
+  const wsCount = await loadAndCacheSkills(env);
+  const pluginCount = pluginReloader ? await pluginReloader.reload(env) : 0;
+  return wsCount + pluginCount;
 }
 
 /**

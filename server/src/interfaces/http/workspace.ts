@@ -11,6 +11,8 @@
 import { Router, type Request, type Response } from 'express';
 import { workspaceService } from '../../application/services/workspace.js';
 import { refreshSkillCache, getExternalSkillDirs, saveExternalSkillDirs } from '../../application/plugins/skill-tools.js';
+import { pluginSkillReloader } from '../../application/plugins/skill-bootstrap.js';
+import { pluginLoader } from '../../application/plugins/loader.js';
 import { createExecutionEnv } from '../../infra/execution-env.js';
 import path from 'path';
 import fs from 'fs/promises';
@@ -157,7 +159,7 @@ router.post('/skills/:skillId', async (req: Request, res: Response) => {
 
     // Clear cache for this skill and refresh tool registry
     workspaceService.clearCache();
-    await refreshSkillCache(createExecutionEnv(process.cwd()));
+    await refreshSkillCache(createExecutionEnv(process.cwd()), pluginSkillReloader(pluginLoader));
 
     res.json({
       success: true,
@@ -202,7 +204,7 @@ router.delete('/skills/:skillId', async (req: Request, res: Response) => {
 
     // Clear cache and refresh tool registry
     workspaceService.clearCache();
-    await refreshSkillCache(createExecutionEnv(process.cwd()));
+    await refreshSkillCache(createExecutionEnv(process.cwd()), pluginSkillReloader(pluginLoader));
 
     res.json({
       success: true,
@@ -252,7 +254,7 @@ router.put('/skill-dirs', async (req: Request, res: Response) => {
     }
 
     saveExternalSkillDirs(dirs);
-    const count = await refreshSkillCache(createExecutionEnv(process.cwd()));
+    const count = await refreshSkillCache(createExecutionEnv(process.cwd()), pluginSkillReloader(pluginLoader));
 
     res.json({
       success: true,

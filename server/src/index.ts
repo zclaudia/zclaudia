@@ -124,14 +124,22 @@ async function main() {
       console.log('   No plugins found');
     }
 
-    // Register workspace + external skills as MCP bridge tools
+    // Load workspace + external skills into the shared skill cache.
     const { setDatabase: setSkillDb, loadAndCacheSkills } = await import('./application/plugins/skill-tools.js');
     const { createExecutionEnv } = await import('./infra/execution-env.js');
     setSkillDb(serverContext.db);
     const skillEnv = createExecutionEnv(process.cwd());
     const skillCount = await loadAndCacheSkills(skillEnv);
     if (skillCount > 0) {
-      console.log(`   Registered ${skillCount} skill tool(s)`);
+      console.log(`   Registered ${skillCount} skill(s)`);
+    }
+
+    // Merge plugin-bundled skills into the same cache (must run AFTER
+    // loadAndCacheSkills so dedup priority workspace > external > plugin holds).
+    const { loadAndCachePluginSkills } = await import('./application/plugins/skill-bootstrap.js');
+    const pluginSkillCount = await loadAndCachePluginSkills(skillEnv, pluginLoader);
+    if (pluginSkillCount > 0) {
+      console.log(`   Registered ${pluginSkillCount} plugin skill(s)`);
     }
 
     server.listen(PORT, HOST, async () => {

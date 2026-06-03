@@ -64,7 +64,14 @@ export class PluginLoader {
   private db: import('better-sqlite3').Database | null = null;
   private pluginAPIs = new Map<string, unknown>();
   private broadcastFn: ((msg: any) => void) | null = null;
-  private skillContentCache = new Map<string, { content: string; mtime: number }>();
+  // Plugin-bundled skill directories collected during contribution registration.
+  // Loaded into the shared skill cache by skill-bootstrap.loadAndCachePluginSkills,
+  // which calls pi loadSourcedSkills. NOT registered as MCP tools anymore — the
+  // agent reads SKILL.md via the Read tool, discovered through the
+  // <available_skills> XML block in the system prompt.
+  //
+  // Tagged with pluginId so deactivate/remove can drop the entries.
+  private pluginSkillDirs: Array<{ pluginId: string; path: string; source: 'plugin' }> = [];
 
   constructor(options: PluginLoaderOptions = {}) {
     // Default plugin directory: $ZCLAUDIA_DATA_DIR/plugins (same base as database).
@@ -155,6 +162,15 @@ export class PluginLoader {
    */
   hasPlugin(pluginId: string): boolean {
     return this.plugins.has(pluginId);
+  }
+
+  /**
+   * Plugin-bundled skill directories collected during contribution registration.
+   * Consumed by skill-bootstrap.loadAndCachePluginSkills to load skill content
+   * via pi loadSourcedSkills and merge into the shared skill cache.
+   */
+  public getPluginSkillDirs(): Array<{ path: string; source: 'plugin' }> {
+    return this.pluginSkillDirs.map((d) => ({ path: d.path, source: d.source }));
   }
 
   /**
@@ -720,72 +736,24 @@ export class PluginLoader {
       this.broadcastFn?.({ type: 'workflow_trigger_sources_changed' });
     }
 
-    // Register plugin-contributed skills
+    // Collect plugin skill directories. Actual content loading happens via
+    // skill-bootstrap.loadAndCachePluginSkills (which calls pi loadSourcedSkills)
+    // and is wired up at server startup + on workspace HTTP refresh. No more
+    // skill__<id> MCP tool registration — the model reads SKILL.md on demand
+    // via the Read tool, surfaced through the <available_skills> XML block.
     if (contributes.skills) {
       const pluginInfo = this.plugins.get(manifest.id);
       if (pluginInfo) {
+        const resolvedPluginDir = path.resolve(pluginInfo.path);
         for (const skill of contributes.skills) {
-          const skillDir = path.resolve(pluginInfo.path, path.dirname(skill.path));
           const skillMdPath = path.resolve(pluginInfo.path, skill.path);
           // Validate path stays within plugin directory (prevent path traversal)
-          const resolvedPluginDir = path.resolve(pluginInfo.path);
           if (!skillMdPath.startsWith(resolvedPluginDir + path.sep) && skillMdPath !== resolvedPluginDir) {
             console.warn(`[PluginLoader] Skill path escapes plugin directory: ${skill.path} in plugin "${manifest.id}"`);
             continue;
           }
-          if (fs.existsSync(skillMdPath)) {
-            try {
-              // Verify real path at load time (reject symlinks pointing outside plugin dir)
-              const realSkillPath = fs.realpathSync(skillMdPath);
-              if (!realSkillPath.startsWith(resolvedPluginDir + path.sep)) {
-                console.warn(`[PluginLoader] Skill symlink escapes plugin directory: ${skillMdPath} → ${realSkillPath}`);
-                continue;
-              }
-              const content = fs.readFileSync(realSkillPath, 'utf-8');
-              const mtime = fs.statSync(realSkillPath).mtimeMs;
-              // Extract name from first heading or filename
-              const nameMatch = content.replace(/^---[\s\S]*?---\s*\n?/, '').match(/^#\s*(.+)/m);
-              const skillId = `${manifest.id}_${path.basename(skillDir)}`;
-              const skillName = nameMatch?.[1] || path.basename(skillDir);
-
-              // Cache skill content with mtime for cache invalidation
-              this.skillContentCache.set(skillMdPath, { content, mtime });
-
-              // Capture pluginDir for handler-time re-validation
-              const boundPluginDir = resolvedPluginDir;
-              toolRegistry.register({
-                id: `skill__${skillId}`,
-                definition: {
-                  type: 'function',
-                  function: {
-                    name: `skill__${skillId}`,
-                    description: `[Skill] ${skillName} (from plugin: ${manifest.name})`,
-                    parameters: { type: 'object', properties: {} },
-                  },
-                },
-                source: 'skill',
-                handler: async () => {
-                  // Check cache and revalidate with mtime
-                  const cached = this.skillContentCache.get(skillMdPath);
-                  // Re-verify realpath on every read to prevent TOCTOU symlink swap
-                  const currentRealPath = fs.realpathSync(skillMdPath);
-                  if (!currentRealPath.startsWith(boundPluginDir + path.sep)) {
-                    return '[Error] Skill file path has been tampered with';
-                  }
-                  const currentMtime = fs.statSync(currentRealPath).mtimeMs;
-                  if (cached && cached.mtime === currentMtime) {
-                    return cached.content;
-                  }
-                  const freshContent = fs.readFileSync(currentRealPath, 'utf-8');
-                  this.skillContentCache.set(skillMdPath, { content: freshContent, mtime: currentMtime });
-                  return freshContent;
-                },
-              });
-              console.log(`[PluginLoader] Registered skill "${skillId}" from plugin "${manifest.id}"`);
-            } catch (err) {
-              console.warn(`[PluginLoader] Failed to load skill from ${skillMdPath}:`, err);
-            }
-          }
+          const skillDir = path.dirname(skillMdPath);
+          this.pluginSkillDirs.push({ pluginId: manifest.id, path: skillDir, source: 'plugin' });
         }
       }
     }
@@ -836,6 +804,13 @@ export class PluginLoader {
 
     // Clear scheduled tasks
     pluginScheduler.clearByPlugin(pluginId);
+
+    // Drop plugin skill dirs collected during registerContributions. The
+    // shared skill cache (skill-tools.cached) is NOT eagerly cleared here —
+    // it's an in-memory snapshot that gets rebuilt on the next refresh /
+    // server restart. A future enhancement could call refreshSkillCache
+    // synchronously, but for now we accept the staleness window.
+    this.pluginSkillDirs = this.pluginSkillDirs.filter((d) => d.pluginId !== pluginId);
 
     // Notify frontend to unregister panels
     this.broadcastFn?.({ type: 'plugin_panel_unregistered', pluginId });
