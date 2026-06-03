@@ -1,6 +1,8 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { createCommandsRoutes } from '../commands.js';
 
 // Mock the fs module
@@ -20,6 +22,11 @@ vi.mock('os', async (importOriginal) => {
 });
 
 import * as fs from 'fs';
+import * as os from 'os';
+
+// Actual (un-mocked) fs, retrieved once via importActual so the new describe
+// block can use real tmp-dir operations without require().
+const realFs = await vi.importActual<typeof import('fs')>('fs');
 
 function createTestApp() {
   const app = express();
@@ -454,5 +461,158 @@ describe('commands routes', () => {
         errorSpy.mockRestore();
       });
     });
+  });
+});
+
+describe('POST /api/commands/execute — args + substitution', () => {
+  let tmpRoot: string;
+  let originalHome: string | undefined;
+  let tmpHome: string;
+  let app: ReturnType<typeof express>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    tmpRoot = realFs.mkdtempSync(path.join(tmpdir(), 'zc-cmd-'));
+    tmpHome = path.join(tmpRoot, 'home');
+    realFs.mkdirSync(tmpHome);
+    originalHome = process.env.HOME;
+    process.env.HOME = tmpHome;
+
+    // Also update the os.homedir mock to point at our tmpHome so the route's
+    // path validation allows files under tmpHome/.claude/commands.
+    vi.mocked(os.homedir).mockReturnValue(tmpHome);
+
+    // Bypass the file-level vi.mock('fs') for these tests: route real fs calls
+    // through to node:fs so the commands.ts handler can readFileSync our
+    // fixture files.
+    vi.mocked(fs.existsSync).mockImplementation((p) => realFs.existsSync(p as never));
+    vi.mocked(fs.readFileSync).mockImplementation((p, enc) =>
+      realFs.readFileSync(p as never, enc as never),
+    );
+
+    app = express();
+    app.use(express.json());
+    app.use('/api/commands', createCommandsRoutes());
+  });
+
+  afterEach(() => {
+    if (originalHome === undefined) delete process.env.HOME; else process.env.HOME = originalHome;
+    realFs.rmSync(tmpRoot, { recursive: true, force: true });
+  });
+
+  function writeCustomCmd(name: string, body: string): string {
+    const userCmds = path.join(tmpHome, '.claude', 'commands');
+    realFs.mkdirSync(userCmds, { recursive: true });
+    const filePath = path.join(userCmds, `${name}.md`);
+    realFs.writeFileSync(filePath, body);
+    return filePath;
+  }
+
+  it('rawArgs tokenizes with shell-style quotes via pi parseCommandArgs', async () => {
+    const cmdPath = writeCustomCmd('echo', 'Args: $@');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/echo',
+        commandPath: cmdPath,
+        rawArgs: 'foo "bar baz" qux',
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.content).toBe('Args: foo bar baz qux');
+  });
+
+  it('falls back to args[] when rawArgs is absent', async () => {
+    const cmdPath = writeCustomCmd('echo2', 'Hello $1');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/echo2',
+        commandPath: cmdPath,
+        args: ['world'],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.content).toBe('Hello world');
+  });
+
+  it('falls back to args[] when rawArgs is an empty string', async () => {
+    const cmdPath = writeCustomCmd('echo3', 'Hello $1');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/echo3',
+        commandPath: cmdPath,
+        rawArgs: '',
+        args: ['fallback'],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.content).toBe('Hello fallback');
+  });
+
+  it('substituteArgs handles $ARGUMENTS placeholder', async () => {
+    const cmdPath = writeCustomCmd('argscmd', 'Hello $ARGUMENTS');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/argscmd',
+        commandPath: cmdPath,
+        args: ['world', 'x'],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.content).toBe('Hello world x');
+  });
+
+  it('substituteArgs handles $1 $2 positional placeholders', async () => {
+    const cmdPath = writeCustomCmd('poscmd', 'First $1 then $2');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/poscmd',
+        commandPath: cmdPath,
+        args: ['a', 'b'],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.content).toBe('First a then b');
+  });
+
+  it('substituteArgs handles bash-slice ${@:N:L} placeholder', async () => {
+    const cmdPath = writeCustomCmd('slicecmd', 'Two: ${@:1:2}');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/slicecmd',
+        commandPath: cmdPath,
+        args: ['a', 'b', 'c', 'd'],
+      });
+    expect(res.status).toBe(200);
+    // pi substituteArgs joins sliced args with spaces; the body must contain a and b but not c
+    expect(res.body.data.content).toContain('a');
+    expect(res.body.data.content).toContain('b');
+    expect(res.body.data.content).not.toContain('c');
+  });
+
+  it('path traversal guard still rejects out-of-base commandPath', async () => {
+    const outsidePath = path.join(tmpRoot, 'outside.md');
+    realFs.writeFileSync(outsidePath, '# Not allowed');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/evil',
+        commandPath: outsidePath,
+        args: [],
+      });
+    expect(res.status).toBe(403);
+  });
+
+  it('legacy: args path still works when no rawArgs provided (regression check)', async () => {
+    const cmdPath = writeCustomCmd('legacy', '$ARGUMENTS done');
+    const res = await request(app)
+      .post('/api/commands/execute')
+      .send({
+        commandName: '/legacy',
+        commandPath: cmdPath,
+        args: ['hello', 'world'],
+      });
+    expect(res.status).toBe(200);
+    expect(res.body.data.content).toBe('hello world done');
   });
 });

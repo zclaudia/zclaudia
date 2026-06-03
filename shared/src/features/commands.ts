@@ -37,6 +37,15 @@ export interface CommandExecuteRequest {
   commandName: string;
   commandPath?: string;   // For custom commands: path to .md file
   args?: string[];
+  /**
+   * Raw unparsed args string (e.g. `"focus on 'auth refactor'"`). When
+   * present, the server tokenizes via pi `parseCommandArgs` (shell-style
+   * single + double quotes). When absent or empty, falls back to `args`.
+   *
+   * Clients should send `rawArgs` for new code; `args` remains accepted
+   * for older desktop builds.
+   */
+  rawArgs?: string;
   context?: {
     projectPath?: string;
     projectName?: string;

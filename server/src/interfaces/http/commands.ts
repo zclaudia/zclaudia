@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type Database from 'better-sqlite3';
+import { parseCommandArgs, substituteArgs } from '@earendil-works/pi-agent-core';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { CommandExecuteRequest, CommandExecuteResponse, SlashCommand } from '@zclaudia/shared/features/commands';
@@ -74,6 +75,18 @@ async function scanCommandsDirectory(dir: string, namespace: 'project' | 'user')
   return commands;
 }
 
+/**
+ * Resolve effective args[] from the request body. Prefer rawArgs (parsed
+ * with pi's shell-style quote handling) over the legacy pre-tokenized args[].
+ * Empty rawArgs / undefined → fall back to args[] ?? [].
+ */
+function resolveArgs(body: CommandExecuteRequest): string[] {
+  if (typeof body.rawArgs === 'string' && body.rawArgs.length > 0) {
+    return parseCommandArgs(body.rawArgs);
+  }
+  return body.args ?? [];
+}
+
 export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
   const router = Router();
   const sessionRepo = deps?.db ? new SessionRepository(deps.db) : null;
@@ -119,7 +132,9 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
   // POST /api/commands/execute - Execute a command
   router.post('/execute', async (req: Request, res: Response) => {
     try {
-      const { commandName, commandPath, args = [], context = {} } = req.body as CommandExecuteRequest;
+      const body = req.body as CommandExecuteRequest;
+      const { commandName, commandPath, context = {} } = body;
+      const args = resolveArgs(body);
 
       if (!commandName) {
         res.status(400).json({
@@ -202,18 +217,7 @@ export function createCommandsRoutes(deps?: CommandsRoutesDeps): Router {
 
       const content = fs.readFileSync(commandPath, 'utf-8');
 
-      // Basic argument replacement
-      let processedContent = content;
-
-      // Replace $ARGUMENTS with all arguments joined
-      const argsString = args.join(' ');
-      processedContent = processedContent.replace(/\$ARGUMENTS/g, argsString);
-
-      // Replace $1, $2, etc. with positional arguments
-      args.forEach((arg, index) => {
-        const placeholder = `$${index + 1}`;
-        processedContent = processedContent.replace(new RegExp(`\\${placeholder}\\b`, 'g'), arg);
-      });
+      const processedContent = substituteArgs(content, args);
 
       const result: CommandExecuteResponse = {
         type: 'custom',
