@@ -150,7 +150,7 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
   return db;
 }
 
-function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOptions = {}) {
+function bootstrap(providerType: string, planMode: boolean, dbOptions: CreateDbOptions = {}) {
   const activeRuns = new Map();
   return initializeRunBootstrap({
     activeRuns,
@@ -167,7 +167,7 @@ function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOption
       clientRequestId: 'req-1',
       sessionId: 'session-1',
       input: 'hello',
-      planMode: mode === 'plan',
+      planMode,
     },
     runId: 'run-1',
     trace: {
@@ -179,14 +179,14 @@ function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOption
 
 describe('initializeRunBootstrap mode/session policy', () => {
   it('preserves zclaudia sdk_session_id across mode switches (preserve policy)', () => {
-    const result = bootstrap('zclaudia', 'plan');
+    const result = bootstrap('zclaudia', true);
 
     expect(result?.providerConfig?.providerType).toBe('zclaudia');
     expect(result?.providerEventState.sdkSessionId).toBe('sdk-existing');
   });
 
   it('preserves sdk_session_id when staying in the default mode', () => {
-    const result = bootstrap('zclaudia', 'default');
+    const result = bootstrap('zclaudia', false);
 
     expect(result?.providerConfig?.providerType).toBe('zclaudia');
     expect(result?.providerEventState.sdkSessionId).toBe('sdk-existing');
@@ -195,7 +195,7 @@ describe('initializeRunBootstrap mode/session policy', () => {
 
 describe('initializeRunBootstrap LLM profile resolution', () => {
   it('resolves agent.llm_profile_id into a full LlmProfileConfig (id, providerType, baseUrl, apiKey)', () => {
-    const result = bootstrap('anthropic', 'default', {
+    const result = bootstrap('anthropic', false, {
       apiKey: 'sk-test',
       baseUrl: 'https://example.com/v1',
     });
@@ -209,7 +209,7 @@ describe('initializeRunBootstrap LLM profile resolution', () => {
   });
 
   it('falls back to the default profile when agent.llm_profile_id is NULL', () => {
-    const result = bootstrap('anthropic', 'default', {
+    const result = bootstrap('anthropic', false, {
       agentLlmProfileId: null,
       profileIsDefault: true,
       apiKey: 'sk-default',
@@ -222,7 +222,7 @@ describe('initializeRunBootstrap LLM profile resolution', () => {
   });
 
   it('leaves providerConfig undefined when no default and agent has no llm_profile_id', () => {
-    const result = bootstrap('anthropic', 'default', {
+    const result = bootstrap('anthropic', false, {
       insertProfile: false,
       agentLlmProfileId: null,
     });
@@ -234,7 +234,7 @@ describe('initializeRunBootstrap LLM profile resolution', () => {
 
 describe('initializeRunBootstrap Agent profile resolution', () => {
   it('resolves session.agent_profile_id and expands fields into bootstrap result', () => {
-    const result = bootstrap('anthropic', 'default', {
+    const result = bootstrap('anthropic', false, {
       apiKey: 'sk-test',
       agentSystemPrompt: 'You are a coder.',
       agentEnabledTools: ['read', 'bash'],
@@ -256,7 +256,7 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
   it('falls back to default agent when session.agent_profile_id is stale (warn log)', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const result = bootstrap('anthropic', 'default', {
+    const result = bootstrap('anthropic', false, {
       sessionAgentProfileId: 'nonexistent-agent-id',
       apiKey: 'sk-test',
     });
@@ -271,7 +271,7 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
   it('falls back to default llm when agent.llm_profile_id is stale (warn log)', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-    const result = bootstrap('anthropic', 'default', {
+    const result = bootstrap('anthropic', false, {
       agentLlmProfileId: 'nonexistent-llm-id',
       profileIsDefault: true,
       apiKey: 'sk-default',
