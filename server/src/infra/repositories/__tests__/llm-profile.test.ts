@@ -114,8 +114,10 @@ describe('LlmProfileRepository', () => {
       expect(params[2]).toBe('anthropic');
       // base_url, api_key, compat are nullable and come before request_headers
       expect(params[6]).toBe('{"X-Api-Key":"test"}');
-      // is_default is the 8th param (index 7)
-      expect(params[7]).toBe(1);
+      // models is the 8th param (index 7) — null when omitted
+      expect(params[7]).toBeNull();
+      // is_default is the 9th param (index 8)
+      expect(params[8]).toBe(1);
     });
 
     it('uses default provider type when not specified', () => {
@@ -135,8 +137,8 @@ describe('LlmProfileRepository', () => {
       const { params: paramsTrue } = repository.createQuery(dataTrue);
       const { params: paramsFalse } = repository.createQuery(dataFalse);
 
-      expect(paramsTrue[7]).toBe(1);
-      expect(paramsFalse[7]).toBe(0);
+      expect(paramsTrue[8]).toBe(1);
+      expect(paramsFalse[8]).toBe(0);
     });
 
     it('generates UUID for id', () => {
@@ -152,9 +154,9 @@ describe('LlmProfileRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      expect(params[8]).toBeGreaterThanOrEqual(before);
-      expect(params[8]).toBeLessThanOrEqual(after);
-      expect(params[9]).toBe(params[8]);
+      expect(params[9]).toBeGreaterThanOrEqual(before);
+      expect(params[9]).toBeLessThanOrEqual(after);
+      expect(params[10]).toBe(params[9]);
     });
   });
 

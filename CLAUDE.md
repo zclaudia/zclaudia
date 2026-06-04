@@ -40,6 +40,7 @@ zclaudia/
 - Express HTTP + WebSocket on same port
 - Runs through the internal zclaudia agent runtime boundary; the initial runtime is a stub until pi-agent is integrated
 - SQLite database: `~/.zclaudia/data.db` (or `$ZCLAUDIA_DATA_DIR/data.db`)
+  - Upgrading across schema migration 003 (LLM profile models): `rm ~/.zclaudia/data.db` once before next start — the `agent_profiles.context_window` column is dropped and the override moves to `llm_profile.models[*].contextWindow`.
 - File storage: `~/.zclaudia/files/`
 - Gateway client (`server/src/gateway-client.ts`): connects to gateway, registers as backend, infinite reconnect with exponential backoff (5s base, 60s cap)
 - `PORT=0` support: outputs `SERVER_READY:<port>` to stdout for parent process discovery

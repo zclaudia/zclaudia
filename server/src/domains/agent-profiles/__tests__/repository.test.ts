@@ -118,41 +118,4 @@ describe('AgentProfileRepository', () => {
     expect(updated!.systemPrompt).toBe('');
   });
 
-  it('persists contextWindow when provided', () => {
-    const created = repo.create({
-      name: 'with-window',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-      contextWindow: 150_000,
-    });
-    const got = repo.findById(created.id)!;
-    expect(got.contextWindow).toBe(150_000);
-  });
-
-  it('leaves contextWindow null when omitted', () => {
-    const created = repo.create({
-      name: 'no-window',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-    });
-    const got = repo.findById(created.id)!;
-    expect(got.contextWindow).toBeNull();
-  });
-
-  it('updates contextWindow', () => {
-    const created = repo.create({
-      name: 'u',
-      llmProfileId,
-      model: 'm',
-      systemPrompt: '',
-      enabledTools: ['read'],
-    });
-    repo.update(created.id, { contextWindow: 80_000 });
-    const got = repo.findById(created.id)!;
-    expect(got.contextWindow).toBe(80_000);
-  });
 });

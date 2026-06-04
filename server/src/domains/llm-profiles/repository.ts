@@ -1,6 +1,6 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared/core/llm-profile';
+import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
 import { newId } from '../../utils/uuid.js';
 
 export class LlmProfileRepository extends BaseRepository<
@@ -21,6 +21,7 @@ export class LlmProfileRepository extends BaseRepository<
       apiKey: row.api_key ?? undefined,
       compat: row.compat ? this.parseCompat(row.compat) : undefined,
       requestHeaders: row.request_headers ? JSON.parse(row.request_headers) : undefined,
+      models: row.models != null ? this.parseModels(row.models) : undefined,
       isDefault: row.is_default === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -36,14 +37,28 @@ export class LlmProfileRepository extends BaseRepository<
     }
   }
 
+  private parseModels(raw: string): LlmProfileModelEntry[] | undefined {
+    try {
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) {
+        console.warn('[LlmProfileRepository] models is not an array, ignoring');
+        return undefined;
+      }
+      return parsed as LlmProfileModelEntry[];
+    } catch (err) {
+      console.warn('[LlmProfileRepository] invalid models JSON, ignoring:', err);
+      return undefined;
+    }
+  }
+
   createQuery(data: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
     const id = newId();
     const now = Date.now();
 
     return {
       sql: `
-        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, is_default, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, models, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -53,6 +68,7 @@ export class LlmProfileRepository extends BaseRepository<
         data.apiKey || null,
         data.compat ? JSON.stringify(data.compat) : null,
         data.requestHeaders ? JSON.stringify(data.requestHeaders) : null,
+        data.models !== undefined ? JSON.stringify(data.models) : null,
         data.isDefault ? 1 : 0,
         now,
         now,
@@ -87,6 +103,10 @@ export class LlmProfileRepository extends BaseRepository<
     if (data.requestHeaders !== undefined) {
       updates.push('request_headers = ?');
       params.push(data.requestHeaders ? JSON.stringify(data.requestHeaders) : null);
+    }
+    if (data.models !== undefined) {
+      updates.push('models = ?');
+      params.push(data.models !== null ? JSON.stringify(data.models) : null);
     }
     if (data.isDefault !== undefined) {
       updates.push('is_default = ?');

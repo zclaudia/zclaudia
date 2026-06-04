@@ -515,7 +515,7 @@ describe('ZClaudiaAdapter.run', () => {
     expect(init?.systemInfo?.permissionMode).toBe('default');
   });
 
-  it('emits contextWindow in init systemInfo when agentProfile.contextWindow is set', async () => {
+  it('emits the model registry context window in init systemInfo', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },
@@ -527,27 +527,6 @@ describe('ZClaudiaAdapter.run', () => {
         model: 'claude-sonnet-4-6',
         systemPrompt: '',
         enabledTools: [],
-        contextWindow: 150_000,
-      } as any,
-    });
-
-    const init = out.find(m => m.type === 'init');
-    expect(init?.systemInfo?.contextWindow).toBe(150_000);
-  });
-
-  it('falls back to model registry context window when agentProfile.contextWindow is null', async () => {
-    scriptNextAgent([
-      { type: 'agent_start' },
-      { type: 'agent_end', messages: [] },
-    ]);
-
-    const adapter = new ZClaudiaAdapter();
-    const out = await collect(adapter, 'hi', {
-      agentProfile: {
-        model: 'claude-sonnet-4-6',
-        systemPrompt: '',
-        enabledTools: [],
-        contextWindow: null,
       } as any,
     });
 

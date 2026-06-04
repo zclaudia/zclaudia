@@ -11,7 +11,6 @@ describe('AgentProfileConfig type shape', () => {
       model: 'claude-sonnet-4-6',
       systemPrompt: 'You are a coder.',
       enabledTools: ['read', 'write'],
-      contextWindow: null,
       createdAt: 0,
       updatedAt: 0,
     };
@@ -30,7 +29,6 @@ describe('AgentProfileConfig type shape', () => {
       enabledTools: ['read', 'grep', 'find', 'ls'],
       thinkingLevel: lvl,
       isDefault: true,
-      contextWindow: 200_000,
       createdAt: 0,
       updatedAt: 0,
     };

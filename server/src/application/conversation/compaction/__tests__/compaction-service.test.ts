@@ -54,7 +54,7 @@ function seedSession(db: Database.Database, messageCount: number): SeedResult {
   return {
     agentProfile: {
       id: 'ap1', name: 'a', llmProfileId: 'lp1', model: 'claude-sonnet-4-6',
-      systemPrompt: '', enabledTools: [], contextWindow: null,
+      systemPrompt: '', enabledTools: [],
       createdAt: 0, updatedAt: 0,
     },
     llmProfile: {
@@ -134,7 +134,7 @@ describe('compaction-service', () => {
       .run('s1', 'p1', 'ap1', 0, 0);
     const ap: AgentProfileConfig = {
       id: 'ap1', name: 'a', llmProfileId: 'lp1', model: 'm', systemPrompt: '',
-      enabledTools: [], contextWindow: null, createdAt: 0, updatedAt: 0,
+      enabledTools: [], createdAt: 0, updatedAt: 0,
     };
     const lp: LlmProfileConfig = {
       id: 'lp1', name: 'p', providerType: 'anthropic',

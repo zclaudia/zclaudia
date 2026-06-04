@@ -255,14 +255,11 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       return;
     }
 
-    // 2. Resolve effective context window: explicit agent profile override wins,
-    //    otherwise fall back to the pi-ai model registry value carried on the
-    //    built model. Undefined only if both are missing.
-    const explicitCtx = options.agentProfile?.contextWindow;
+    // 2. Resolve effective context window from the built model (pi-ai registry
+    //    or LLM profile per-model override applied by buildModel in T3).
+    //    Undefined only if the model carries no context window value at all.
     const effectiveContextWindow =
-      typeof explicitCtx === 'number' && explicitCtx > 0
-        ? explicitCtx
-        : (modelInfo.model.contextWindow > 0 ? modelInfo.model.contextWindow : undefined);
+      modelInfo.model.contextWindow > 0 ? modelInfo.model.contextWindow : undefined;
 
     // 3. Resolve effective tool set. Plan mode collapses the agent's
     //    enabledTools to only the read-only subset (read/grep/find/ls).

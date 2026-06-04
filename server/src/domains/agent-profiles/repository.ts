@@ -27,7 +27,6 @@ export class AgentProfileRepository extends BaseRepository<
       enabledTools: this.parseEnabledTools(row.enabled_tools),
       thinkingLevel: this.parseThinkingLevel(row.thinking_level),
       isDefault: row.is_default === 1,
-      contextWindow: row.context_window ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -60,8 +59,8 @@ export class AgentProfileRepository extends BaseRepository<
     const now = Date.now();
     return {
       sql: `
-        INSERT INTO agent_profiles (id, name, description, llm_profile_id, model, system_prompt, enabled_tools, thinking_level, is_default, context_window, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_profiles (id, name, description, llm_profile_id, model, system_prompt, enabled_tools, thinking_level, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -73,7 +72,6 @@ export class AgentProfileRepository extends BaseRepository<
         JSON.stringify(data.enabledTools),
         data.thinkingLevel ?? null,
         data.isDefault ? 1 : 0,
-        data.contextWindow ?? null,
         now,
         now,
       ],
@@ -118,10 +116,6 @@ export class AgentProfileRepository extends BaseRepository<
     if (data.isDefault !== undefined) {
       updates.push('is_default = ?');
       params.push(data.isDefault ? 1 : 0);
-    }
-    if (data.contextWindow !== undefined) {
-      updates.push('context_window = ?');
-      params.push(data.contextWindow ?? null);
     }
 
     updates.push('updated_at = ?');
