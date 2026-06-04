@@ -21,7 +21,12 @@ export interface LlmProfileConfig {
   baseUrl?: string;
   apiKey?: string;
   compat?: LlmProfileCompat;
-  env?: Record<string, string>;
+  /**
+   * Extra HTTP headers added to LLM API requests. Server-side validation
+   * rejects Authorization / Content-Type / Host (case-insensitive) since
+   * those are managed by pi-ai and the apiKey field.
+   */
+  requestHeaders?: Record<string, string>;
   isDefault?: boolean;
   createdAt: number;
   updatedAt: number;

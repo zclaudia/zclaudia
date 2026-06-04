@@ -20,7 +20,7 @@ export class LlmProfileRepository extends BaseRepository<
       baseUrl: row.base_url ?? undefined,
       apiKey: row.api_key ?? undefined,
       compat: row.compat ? this.parseCompat(row.compat) : undefined,
-      env: row.env ? JSON.parse(row.env) : undefined,
+      requestHeaders: row.request_headers ? JSON.parse(row.request_headers) : undefined,
       isDefault: row.is_default === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -42,7 +42,7 @@ export class LlmProfileRepository extends BaseRepository<
 
     return {
       sql: `
-        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, env, is_default, created_at, updated_at)
+        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, is_default, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
@@ -52,7 +52,7 @@ export class LlmProfileRepository extends BaseRepository<
         data.baseUrl || null,
         data.apiKey || null,
         data.compat ? JSON.stringify(data.compat) : null,
-        data.env ? JSON.stringify(data.env) : null,
+        data.requestHeaders ? JSON.stringify(data.requestHeaders) : null,
         data.isDefault ? 1 : 0,
         now,
         now,
@@ -84,9 +84,9 @@ export class LlmProfileRepository extends BaseRepository<
       updates.push('compat = ?');
       params.push(data.compat ? JSON.stringify(data.compat) : null);
     }
-    if (data.env !== undefined) {
-      updates.push('env = ?');
-      params.push(data.env ? JSON.stringify(data.env) : null);
+    if (data.requestHeaders !== undefined) {
+      updates.push('request_headers = ?');
+      params.push(data.requestHeaders ? JSON.stringify(data.requestHeaders) : null);
     }
     if (data.isDefault !== undefined) {
       updates.push('is_default = ?');

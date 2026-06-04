@@ -1,11 +1,13 @@
 import type { Migration } from './types.js';
 
 import { migration as m_001_initial_schema } from './001_initial_schema.js';
+import { migration as m_002_request_headers } from './002_request_headers.js';
 
 export type { Migration };
 
 export const migrations: Migration[] = [
   m_001_initial_schema,
+  m_002_request_headers,
 ];
 
 /**

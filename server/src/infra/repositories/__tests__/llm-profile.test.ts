@@ -30,7 +30,7 @@ describe('LlmProfileRepository', () => {
         base_url: null,
         api_key: null,
         compat: null,
-        env: '{"ANTHROPIC_API_KEY":"test-key"}',
+        request_headers: '{"X-Test-Header":"test-value"}',
         is_default: 1,
         created_at: 1000,
         updated_at: 2000
@@ -45,7 +45,7 @@ describe('LlmProfileRepository', () => {
         baseUrl: undefined,
         apiKey: undefined,
         compat: undefined,
-        env: { ANTHROPIC_API_KEY: 'test-key' },
+        requestHeaders: { 'X-Test-Header': 'test-value' },
         isDefault: true,
         createdAt: 1000,
         updatedAt: 2000
@@ -60,7 +60,7 @@ describe('LlmProfileRepository', () => {
         base_url: null,
         api_key: null,
         compat: null,
-        env: null,
+        request_headers: null,
         is_default: 0,
         created_at: 1000,
         updated_at: 2000
@@ -71,11 +71,11 @@ describe('LlmProfileRepository', () => {
       expect(result.baseUrl).toBeUndefined();
       expect(result.apiKey).toBeUndefined();
       expect(result.compat).toBeUndefined();
-      expect(result.env).toBeUndefined();
+      expect(result.requestHeaders).toBeUndefined();
       expect(result.isDefault).toBe(false);
     });
 
-    it('parses env JSON correctly', () => {
+    it('parses requestHeaders JSON correctly', () => {
       const row = {
         id: 'prov-123',
         name: 'Provider',
@@ -83,7 +83,7 @@ describe('LlmProfileRepository', () => {
         base_url: null,
         api_key: null,
         compat: null,
-        env: '{"KEY1":"value1","KEY2":"value2"}',
+        request_headers: '{"X-Header-1":"value1","X-Header-2":"value2"}',
         is_default: 0,
         created_at: 1000,
         updated_at: 2000
@@ -91,9 +91,9 @@ describe('LlmProfileRepository', () => {
 
       const result = repository.mapRow(row);
 
-      expect(result.env).toEqual({
-        KEY1: 'value1',
-        KEY2: 'value2'
+      expect(result.requestHeaders).toEqual({
+        'X-Header-1': 'value1',
+        'X-Header-2': 'value2'
       });
     });
   });
@@ -103,7 +103,7 @@ describe('LlmProfileRepository', () => {
       const data = {
         name: 'New Provider',
         providerType: 'anthropic',
-        env: { API_KEY: 'test' },
+        requestHeaders: { 'X-Api-Key': 'test' },
         isDefault: true
       };
 
@@ -112,8 +112,8 @@ describe('LlmProfileRepository', () => {
       expect(sql).toContain('INSERT INTO llm_profiles');
       expect(params[1]).toBe('New Provider');
       expect(params[2]).toBe('anthropic');
-      // base_url, api_key, compat are nullable and come before env
-      expect(params[6]).toBe('{"API_KEY":"test"}');
+      // base_url, api_key, compat are nullable and come before request_headers
+      expect(params[6]).toBe('{"X-Api-Key":"test"}');
       // is_default is the 8th param (index 7)
       expect(params[7]).toBe(1);
     });
@@ -181,18 +181,18 @@ describe('LlmProfileRepository', () => {
       expect(params).toContain('openai');
     });
 
-    it('handles env JSON serialization', () => {
+    it('handles requestHeaders JSON serialization', () => {
       const { sql, params } = repository.updateQuery('prov-123', {
-        env: { NEW_KEY: 'new-value' }
+        requestHeaders: { 'X-New-Header': 'new-value' }
       });
 
-      expect(sql).toContain('env = ?');
-      expect(params).toContain('{"NEW_KEY":"new-value"}');
+      expect(sql).toContain('request_headers = ?');
+      expect(params).toContain('{"X-New-Header":"new-value"}');
     });
 
-    it('handles null env', () => {
+    it('handles null requestHeaders', () => {
       const { params } = repository.updateQuery('prov-123', {
-        env: null as any,
+        requestHeaders: null as any,
       });
 
       expect(params).toContain(null);
@@ -368,5 +368,29 @@ describe('LlmProfileRepository — new fields (baseUrl / apiKey / compat)', () =
     repo.setDefault(b.id);
     expect(repo.findById(a.id)!.isDefault).toBe(false);
     expect(repo.findById(b.id)!.isDefault).toBe(true);
+  });
+
+  it('round-trips requestHeaders through create + findById', () => {
+    const created = repo.create({
+      name: 'with-headers',
+      providerType: 'openai',
+      baseUrl: 'https://api.example.com/v1',
+      apiKey: 'sk-test',
+      requestHeaders: { 'X-Org-Id': 'abc', 'X-Trace': 'xyz' },
+    });
+    const found = repo.findById(created.id);
+    expect(found?.requestHeaders).toEqual({ 'X-Org-Id': 'abc', 'X-Trace': 'xyz' });
+  });
+
+  it('update can clear requestHeaders by passing null', () => {
+    const created = repo.create({
+      name: 'h2',
+      providerType: 'openai',
+      requestHeaders: { 'X-Foo': 'bar' },
+    });
+    repo.update(created.id, { requestHeaders: undefined });  // undefined = no change
+    repo.update(created.id, { requestHeaders: null as any });  // null = clear
+    const found = repo.findById(created.id);
+    expect(found?.requestHeaders).toBeUndefined();
   });
 });
