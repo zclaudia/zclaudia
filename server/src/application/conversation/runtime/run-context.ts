@@ -141,7 +141,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     runOptions: {
       cwd,
       sessionId: sdkSessionId,
-      env: { ...(providerConfig?.env || {}), ...filePushEnv },
+      env: filePushEnv,
       mode: message.mode || 'default',
       systemPrompt: agentProfile.systemPrompt,
       sessionTitle: session.name || undefined,

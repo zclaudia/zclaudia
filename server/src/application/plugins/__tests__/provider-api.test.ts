@@ -20,7 +20,6 @@ function createTestDb(): Database.Database {
       base_url TEXT,
       api_key TEXT,
       compat TEXT,
-      env TEXT,
       is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
@@ -37,11 +36,11 @@ describe('PluginProviderAPI', () => {
     vi.clearAllMocks();
     db = createTestDb();
     const now = Date.now();
-    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, env, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-      'prov-1', 'Primary ZClaudia', 'zclaudia', '/usr/bin/pi-agent', null, 1, now, now
+    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      'prov-1', 'Primary ZClaudia', 'zclaudia', '/usr/bin/pi-agent', 1, now, now
     );
-    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, env, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-      'prov-2', 'Secondary ZClaudia', 'zclaudia', null, '{"KEY":"val"}', 0, now, now
+    db.prepare('INSERT INTO llm_profiles (id, name, provider_type, base_url, is_default, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)').run(
+      'prov-2', 'Secondary ZClaudia', 'zclaudia', null, 0, now, now
     );
     api = new PluginProviderAPI(db, 'test-plugin');
   });
@@ -149,23 +148,6 @@ describe('PluginProviderAPI', () => {
       const prompt = mockAdapter.run.mock.calls[0][0];
       expect(prompt).toContain('[System Instructions]');
       expect(prompt).toContain('Be helpful');
-    });
-
-    it('parses env from provider row', async () => {
-      const mockAdapter = {
-        run: vi.fn().mockImplementation(async function* () {
-          yield { type: 'assistant', content: 'ok' };
-        }),
-      };
-      vi.mocked(providerRegistry.get).mockReturnValue(mockAdapter as any);
-
-      await api.call({
-        providerId: 'prov-2',
-        messages: [{ role: 'user', content: 'test' }],
-      });
-
-      const runOptions = mockAdapter.run.mock.calls[0][1];
-      expect(runOptions.env).toEqual({ KEY: 'val' });
     });
 
     it('uses modelOverride', async () => {

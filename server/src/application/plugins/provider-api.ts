@@ -77,7 +77,7 @@ export class PluginProviderAPI implements ProviderAPI {
 
     const providerRow = this.db
       .prepare(`
-        SELECT id, name, provider_type AS type, base_url AS cli_path, env
+        SELECT id, name, provider_type AS type, base_url AS cli_path
         FROM llm_profiles
         WHERE id = ?
       `)
@@ -86,7 +86,6 @@ export class PluginProviderAPI implements ProviderAPI {
         name: string;
         type: string;
         cli_path: string | null;
-        env: string | null;
       } | undefined;
 
     if (!providerRow) {
@@ -102,7 +101,6 @@ export class PluginProviderAPI implements ProviderAPI {
     const runOptions: RunOptions = {
       cwd: process.cwd(),
       cliPath: providerRow.cli_path || undefined,
-      env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
       mode: 'plan',
       systemPrompt,
     };
@@ -163,7 +161,7 @@ export class PluginProviderAPI implements ProviderAPI {
 
     const providerRow = this.db
       .prepare(`
-        SELECT id, name, provider_type AS type, base_url AS cli_path, env
+        SELECT id, name, provider_type AS type, base_url AS cli_path
         FROM llm_profiles
         WHERE id = ?
       `)
@@ -172,7 +170,6 @@ export class PluginProviderAPI implements ProviderAPI {
         name: string;
         type: string;
         cli_path: string | null;
-        env: string | null;
       } | undefined;
 
     if (!providerRow) {
@@ -190,7 +187,6 @@ export class PluginProviderAPI implements ProviderAPI {
     const runOptions: RunOptions = {
       cwd: process.cwd(),
       cliPath: providerRow.cli_path || undefined,
-      env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
       mode: 'plan',
       systemPrompt,
     };
