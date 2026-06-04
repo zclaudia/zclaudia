@@ -8,6 +8,7 @@ import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useServerStore } from '../../stores/serverStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
 import { getSessionCompaction } from '../api/sessions';
+import { scheduleDelta, flushDeltaForRun } from './delta-buffer';
 
 export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext): boolean {
   const { serverId, backendId, serverRunsRef, logTag } = ctx;
@@ -19,8 +20,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       const deltaSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
       if (deltaSession) {
-        useChatStore.getState().appendToLastMessage(deltaSession, msg.content);
-        useChatStore.getState().appendTextBlock(msg.runId, msg.content);
+        scheduleDelta(deltaSession, msg.runId, msg.content);
       } else if (msg.runId) {
         console.warn(`[${logTag}] Delta for untracked run ${msg.runId}`);
       }
@@ -85,6 +85,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'run_completed': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
+      flushDeltaForRun(msg.runId);
       const completedSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
       console.log(`[${logTag}] run_completed runId=${msg.runId} sessionId=${completedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`);
       if (completedSession) {
@@ -116,6 +117,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'run_failed': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
+      flushDeltaForRun(msg.runId);
       const failedSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
       console.log(`[${logTag}] run_failed runId=${msg.runId} sessionId=${failedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`);
       if (failedSession) {

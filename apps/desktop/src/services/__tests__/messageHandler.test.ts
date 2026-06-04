@@ -168,6 +168,7 @@ import { downloadPushedFile } from '../fileDownload';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useToastStore } from '../../stores/toastStore';
+import { __resetDeltaBufferForTests } from '../message-handlers/delta-buffer';
 
 function makeCtx(overrides?: Partial<MessageHandlerContext>): MessageHandlerContext {
   return {
@@ -194,6 +195,15 @@ describe('handleServerMessage', () => {
     mockPermissionStore.aiReviewResults = {};
     useNotificationFeedStore.setState({ items: [], unreadCount: 0, hasMore: false, loading: false, hydrated: false });
     useToastStore.setState({ toasts: [] });
+    // Delta buffer flushes on rAF in production; make rAF synchronous in tests
+    // so the existing assertions on appendToLastMessage/appendTextBlock stay
+    // observable in the same tick.
+    (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+      cb(0);
+      return 1;
+    };
+    (globalThis as { cancelAnimationFrame?: (handle: number) => void }).cancelAnimationFrame = () => {};
+    __resetDeltaBufferForTests();
   });
 
   it('handles pong (no-op)', () => {
@@ -219,6 +229,31 @@ describe('handleServerMessage', () => {
       handleServerMessage({ type: 'delta', runId: 'r1', content: 'text' }, makeCtx());
       expect(warn).toHaveBeenCalled();
       warn.mockRestore();
+    });
+
+    it('coalesces multiple deltas for the same run into one chatStore commit per rAF', () => {
+      // Queue mode: capture rAF callback so we can flush manually after batching.
+      let pendingCb: FrameRequestCallback | null = null;
+      (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+        pendingCb = cb;
+        return 1;
+      };
+
+      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'a' }, makeCtx());
+      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'b' }, makeCtx());
+      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'c' }, makeCtx());
+
+      // Nothing committed yet — the rAF callback hasn't fired.
+      expect(mockChatStore.appendToLastMessage).not.toHaveBeenCalled();
+      expect(mockChatStore.appendTextBlock).not.toHaveBeenCalled();
+
+      pendingCb?.(0);
+
+      // Three deltas → one combined chatStore commit.
+      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledTimes(1);
+      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith('s1', 'abc');
+      expect(mockChatStore.appendTextBlock).toHaveBeenCalledTimes(1);
+      expect(mockChatStore.appendTextBlock).toHaveBeenCalledWith('r1', 'abc');
     });
   });
 
@@ -324,6 +359,32 @@ describe('handleServerMessage', () => {
       expect(mockSessionsStore.setSessionActiveById).toHaveBeenCalledWith('b1', 's1', false);
     });
 
+    it('flushes pending buffered deltas before finalizing the run', () => {
+      // Queue mode: hold rAF callback so deltas stay buffered until terminal event.
+      let pendingCb: FrameRequestCallback | null = null;
+      (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+        pendingCb = cb;
+        return 1;
+      };
+      mockChatStore.activeRuns = { r1: 's1' };
+
+      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'partial' }, makeCtx());
+      // run_completed arrives before the rAF tick — handler must still flush
+      // the buffered text so the rendered message matches what the user saw.
+      handleServerMessage({ type: 'run_completed', runId: 'r1', sessionId: 's1' }, makeCtx());
+
+      // Order matters: append the buffered delta first, then finalize.
+      const appendOrder = mockChatStore.appendToLastMessage.mock.invocationCallOrder[0];
+      const finalizeOrder = mockChatStore.finalizeRunToMessage.mock.invocationCallOrder[0];
+      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledWith('s1', 'partial');
+      expect(appendOrder).toBeLessThan(finalizeOrder);
+
+      // Flushing the lingering rAF should be a no-op now.
+      mockChatStore.appendToLastMessage.mockClear();
+      pendingCb?.(0);
+      expect(mockChatStore.appendToLastMessage).not.toHaveBeenCalled();
+    });
+
     it('completes a run normally after a temporary reconnect gap', () => {
       const ctx = makeCtx({ backendId: 'remote-1' });
       ctx.serverRunsRef.set('server-1', new Set(['r1']));
@@ -355,6 +416,28 @@ describe('handleServerMessage', () => {
       expect(mockChatStore.endRun).toHaveBeenCalledWith('r1');
       expect(mockEagerSyncCurrentSession).toHaveBeenCalledWith('server-1');
       expect(mockRecoverCurrentSessionTail).toHaveBeenCalledWith('server-1', 's1');
+      errSpy.mockRestore();
+    });
+
+    it('flushes pending buffered deltas before appending error and finalizing', () => {
+      let pendingCb: FrameRequestCallback | null = null;
+      (globalThis as { requestAnimationFrame?: (cb: FrameRequestCallback) => number }).requestAnimationFrame = (cb: FrameRequestCallback) => {
+        pendingCb = cb;
+        return 1;
+      };
+      mockChatStore.activeRuns = { r1: 's1' };
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'before-fail' }, makeCtx());
+      handleServerMessage({ type: 'run_failed', runId: 'r1', sessionId: 's1', error: 'boom' }, makeCtx());
+
+      // First append = buffered delta; second append = error suffix.
+      expect(mockChatStore.appendToLastMessage).toHaveBeenNthCalledWith(1, 's1', 'before-fail');
+      expect(mockChatStore.appendToLastMessage).toHaveBeenNthCalledWith(2, 's1', expect.stringContaining('boom'));
+
+      pendingCb?.(0);
+      // No duplicate delta committed after rAF tick.
+      expect(mockChatStore.appendToLastMessage).toHaveBeenCalledTimes(2);
       errSpy.mockRestore();
     });
   });
