@@ -545,6 +545,93 @@ describe('ZClaudiaAdapter.run', () => {
     // Mocked getModel returns contextWindow: 200000
     expect(init?.systemInfo?.contextWindow).toBe(200_000);
   });
+
+  it('plan mode filters enabledTools to read-only subset', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      mode: 'plan',
+      enabledTools: ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls'] as ToolName[],
+    });
+
+    const init = out.find(m => m.type === 'init');
+    expect(init?.systemInfo?.tools).toEqual(['read', 'grep', 'find', 'ls']);
+
+    // Agent should have been constructed with only the RO tools too.
+    const constructed = mockAgentInstances[0]?.initialState?.tools as Array<{ name: string }> | undefined;
+    const toolNames = (constructed ?? []).map((t) => t.name);
+    expect(toolNames).toEqual(['read', 'grep', 'find', 'ls']);
+  });
+
+  it('non-plan mode passes enabledTools through unfiltered', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      enabledTools: ['read', 'write', 'bash'] as ToolName[],
+    });
+
+    const init = out.find(m => m.type === 'init');
+    expect(init?.systemInfo?.tools).toEqual(['read', 'write', 'bash']);
+  });
+
+  it('plan mode preserves intersection with restrictive agent profile (read-only ∩ enabled)', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      mode: 'plan',
+      enabledTools: ['read', 'write'] as ToolName[],  // agent only allows read + write
+    });
+
+    const init = out.find(m => m.type === 'init');
+    // write filtered out; read kept
+    expect(init?.systemInfo?.tools).toEqual(['read']);
+  });
+
+  it('plan mode appends PLAN mode suffix to systemPrompt', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      mode: 'plan',
+      systemPrompt: 'You are a coding assistant.',
+    });
+
+    const prompt = mockAgentInstances[0]?.initialState?.systemPrompt as string;
+    expect(prompt).toContain('You are a coding assistant.');
+    expect(prompt).toContain('PLAN mode');
+    expect(prompt).toContain('read-only');
+  });
+
+  it('non-plan mode leaves systemPrompt untouched', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      systemPrompt: 'You are a coding assistant.',
+    });
+
+    const prompt = mockAgentInstances[0]?.initialState?.systemPrompt as string;
+    expect(prompt).toBe('You are a coding assistant.');
+    expect(prompt).not.toContain('PLAN mode');
+  });
 });
 
 describe('ZClaudiaAdapter.run — thinking', () => {

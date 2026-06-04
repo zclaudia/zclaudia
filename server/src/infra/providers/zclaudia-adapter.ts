@@ -4,6 +4,12 @@ import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
 import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory, buildModel, type BuiltModel } from './pi-runtime/index.js';
+import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
+
+const PLAN_MODE_SYSTEM_PROMPT_SUFFIX =
+  '\n\nYou are in PLAN mode. Produce a concrete plan for the user to review and approve. ' +
+  'Do not modify files or execute side-effecting commands; only read-only tools (read, grep, find, ls) are available. ' +
+  'Once the plan is ready, end your turn and wait for the user to confirm before executing anything.';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
@@ -258,7 +264,16 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         ? explicitCtx
         : (modelInfo.model.contextWindow > 0 ? modelInfo.model.contextWindow : undefined);
 
-    // 3. Yield init now (after we know the contextWindow).
+    // 3. Resolve effective tool set. Plan mode collapses the agent's
+    //    enabledTools to only the read-only subset (read/grep/find/ls).
+    //    Non-plan modes pass through whatever the agent profile requested.
+    const isPlanMode = options.mode === 'plan';
+    const requestedTools: ToolName[] = options.enabledTools ?? [...ALL_TOOL_NAMES];
+    const effectiveTools: ToolName[] = isPlanMode
+      ? requestedTools.filter((t) => READ_ONLY_TOOL_NAMES.includes(t))
+      : requestedTools;
+
+    // 4. Yield init now (after we know contextWindow + effective tools).
     yield {
       type: 'init',
       sessionId,
@@ -267,12 +282,12 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         contextWindow: effectiveContextWindow,
         cwd: options.cwd,
         permissionMode: ctx.permissionMode || 'default',
-        tools: [],
+        tools: effectiveTools,
         agents: ['zclaudia'],
       },
     };
 
-    // 4. Load history (non-fatal failure)
+    // 5. Load history (non-fatal failure)
     let history: AgentMessage[] = [];
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -286,16 +301,20 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       };
     }
 
-    // 5. Construct Agent — wire tools + hooks from pi-runtime
-    const tools = buildTools(options.cwd, options.enabledTools ? { enabled: options.enabledTools } : undefined);
+    // 6. Construct Agent — wire tools + hooks from pi-runtime
+    const tools = buildTools(options.cwd, { enabled: effectiveTools });
     const hooks = buildAgentHooks({
       permissionCallback: onPermission ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
     });
 
+    const effectiveSystemPrompt = isPlanMode
+      ? (options.systemPrompt ?? '') + PLAN_MODE_SYSTEM_PROMPT_SUFFIX
+      : (options.systemPrompt ?? '');
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const agentOpts: any = {
       initialState: {
-        systemPrompt: options.systemPrompt ?? '',
+        systemPrompt: effectiveSystemPrompt,
         model: modelInfo.model,
         messages: history,
         tools,
@@ -321,7 +340,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       steer: (msg: AgentMessage) => agent.steer(msg),
     });
 
-    // 6. Subscribe → translate → queue
+    // 7. Subscribe → translate → queue
     // `agent_start` is intentionally not translated by translateEvent; init is
     // emitted manually above as a run-bootstrap concern.
     const queue = new AsyncQueue<ClaudeMessage>();
@@ -380,7 +399,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       }
     });
 
-    // 7. Run prompt; close queue on completion or push error on rejection
+    // 8. Run prompt; close queue on completion or push error on rejection
     agent.prompt(input)
       .then(() => { queue.close(); })
       .catch(err => {
@@ -392,7 +411,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         queue.close();
       });
 
-    // 8. Yield translated events
+    // 9. Yield translated events
     try {
       for await (const m of queue) {
         yield m;
