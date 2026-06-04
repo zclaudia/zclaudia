@@ -117,7 +117,7 @@ describe('handleRunSteer', () => {
     activeRuns.set('r1', {
       runId: 'r1',
       sessionId: 's1',
-      completed: true,
+      phase: 'completed',
       steerHandle: { steer: steerSpy },
       pendingSteers: [],
     } as never);

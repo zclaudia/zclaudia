@@ -10,6 +10,7 @@ import type { PermissionDecision, SteerHandle, SystemInfo } from '../../../infra
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
+import type { RunPhase, PhaseEmitter as PhaseEmitterType } from '../runtime/active-run-phase.js';
 
 export interface ConnectedClient {
   id: string;
@@ -59,7 +60,15 @@ export interface ActiveRun {
    */
   thinkingBlocks: ThinkingBlock[];
   saveInterval?: NodeJS.Timeout;
-  completed?: boolean;  // True after run_completed/run_failed sent; hides from heartbeat while for-await drains
+  /**
+   * Lifecycle phase. Hub-and-spoke state machine driven by `setPhase` /
+   * `recomputePhase` (see active-run-phase.ts). Replaces the previous
+   * `completed: boolean`. Heartbeat treats `isTerminalPhase(phase)` as
+   * "hide while for-await drains".
+   */
+  phase: RunPhase;
+  /** Observable phase changes; consumed by waitForIdle and future hooks. */
+  phaseEmitter: PhaseEmitterType;
   sessionType: 'regular' | 'background' | 'agent';  // Session type for this run
   workspaceRoot: string;
   /** Session-scoped remembered permission decisions, hydrated into each run from DB.

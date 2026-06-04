@@ -6,6 +6,7 @@ import { pluginLoader } from '../../../application/plugins/index.js';
 import { permissionManager as pluginPermissionManager, toolRegistry as pluginToolRegistry } from '../../../application/plugins/index.js';
 import { commandRegistry as pluginCommandRegistry } from '../../commands/registry.js';
 import type { ConnectedClient, ActiveRun } from './types.js';
+import { isTerminalPhase } from '../runtime/active-run-phase.js';
 
 // ---------------------------------------------------------------------------
 // Application-layer entity version counters (monotonic, in-memory).
@@ -66,7 +67,7 @@ export function buildStateHeartbeat(activeRuns: Map<string, ActiveRun>): StateHe
   const questions: StateHeartbeatMessage['pendingQuestions'] = [];
 
   for (const [runId, run] of activeRuns) {
-    if (run.completed) continue;
+    if (isTerminalPhase(run.phase)) continue;
     const idleSec = (Date.now() - run.lastActivityAt) / 1000;
     const loop = detectLoop(run.recentToolCalls);
     if (loop.detected) {

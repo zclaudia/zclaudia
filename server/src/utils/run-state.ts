@@ -1,17 +1,19 @@
+import { isTerminalPhase, type RunPhase } from '../application/conversation/runtime/active-run-phase.js';
+
 type RunLike = {
   sessionId?: string;
-  completed?: boolean;
+  phase: RunPhase;
   sessionType?: string;
 };
 
 /**
  * Foreground active run means:
- * - not completed
+ * - phase is non-terminal (still in flight)
  * - not background session
  */
 export function isForegroundActiveRun(run: RunLike | undefined): boolean {
   if (!run) return false;
-  return !run.completed && run.sessionType !== 'background';
+  return !isTerminalPhase(run.phase) && run.sessionType !== 'background';
 }
 
 export function hasForegroundActiveRunForSession(
@@ -38,12 +40,15 @@ export function findForegroundActiveRunIdForSession(
   return null;
 }
 
+/**
+ * Any non-terminal run (foreground or background) for the given session.
+ */
 export function hasAnyActiveRunForSession(
   activeRuns: Map<string, RunLike>,
   sessionId: string
 ): boolean {
   for (const run of activeRuns.values()) {
-    if (run.sessionId === sessionId && !run.completed) {
+    if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
       return true;
     }
   }

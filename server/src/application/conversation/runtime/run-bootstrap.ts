@@ -17,6 +17,7 @@ import { providerRegistry } from '../../../infra/providers/registry.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
+import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -111,7 +112,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
 
   const existingRunId = (() => {
     for (const [id, run] of activeRuns.entries()) {
-      if (run.sessionId === message.sessionId && !run.completed) return id;
+      if (run.sessionId === message.sessionId && !isTerminalPhase(run.phase)) return id;
     }
     return null;
   })();
@@ -202,6 +203,8 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     aiInitiatedPlanMode: false,
     eventSeq: 0,
     pendingSteers: [],
+    phase: 'running',
+    phaseEmitter: new PhaseEmitter(),
     // Attach the resolved profiles so downstream consumers (compaction-service
     // on agent_end, future /compact handler) can run without re-querying the
     // DB. providerConfig may be undefined if resolution fell back — that's OK,

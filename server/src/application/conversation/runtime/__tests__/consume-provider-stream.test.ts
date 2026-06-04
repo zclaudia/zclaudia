@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { PhaseEmitter } from '../active-run-phase.js';
 
 const handleProviderEventMock = vi.fn();
 const postRunCompletedNotificationMock = vi.fn();
@@ -30,14 +31,15 @@ describe('consumeProviderStream', () => {
       },
     };
 
-    handleProviderEventMock.mockImplementation(({ activeRun }: { activeRun: { completed?: boolean } }) => {
-      activeRun.completed = true;
+    handleProviderEventMock.mockImplementation(({ activeRun }: { activeRun: { phase: string } }) => {
+      activeRun.phase = 'completed';
     });
 
     const { consumeProviderStream } = await import('../consume-provider-stream.js');
 
     const activeRun = {
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
       lastActivityAt: 0,
       db: {},
     } as any;
@@ -70,7 +72,7 @@ describe('consumeProviderStream', () => {
     ]);
 
     expect(handleProviderEventMock).toHaveBeenCalledTimes(1);
-    expect(activeRun.completed).toBe(true);
+    expect(['completed', 'failed', 'cancelled']).toContain(activeRun.phase);
     expect(nextCallCount).toBe(1);
     expect(postRunCompletedNotificationMock).not.toHaveBeenCalled();
   });

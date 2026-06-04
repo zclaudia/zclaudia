@@ -16,6 +16,7 @@ import { initializeRunBootstrap, type RunStartMessage } from './run-bootstrap.js
 import { launchProviderRun } from './run-provider-launch.js';
 import { prepareProviderRun } from './run-provider-setup.js';
 import { finalizeRun, handleRunException } from './run-recovery.js';
+import { setPhase } from './active-run-phase.js';
 
 export interface RunHandlerContext {
   activeRuns: Map<string, ActiveRun>;
@@ -111,7 +112,7 @@ export async function handleRunStart(
         sessionId: activeRun.sessionId,
         error: `Project path does not exist: ${cwd}`
       });
-      activeRun.completed = true;
+      setPhase(activeRun, 'failed');
       broadcastHeartbeat();
       cleanupPendingPermissions(activeRun, 'Project path does not exist');
       activeRuns.delete(runId);

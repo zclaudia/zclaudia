@@ -8,8 +8,9 @@ import { findForegroundActiveRunIdForSession } from '../../utils/run-state.js';
 import { parsePersistedMessageMetadata } from '../../utils/persisted-message.js';
 import { SessionMessageRepository } from './message-repository.js';
 import { SessionCompactionRepository, type SessionCompaction } from './compaction-repository.js';
+import type { RunPhase } from '../../application/conversation/runtime/active-run-phase.js';
 /** Minimal shape — avoids depending on application/conversation types */
-type ActiveRunsMap = Map<string, { sessionId?: string; completed?: boolean; sessionType?: string }>;
+type ActiveRunsMap = Map<string, { sessionId?: string; phase: RunPhase; sessionType?: string }>;
 
 /**
  * Wrap a stored compaction row as a synthetic system-role Message whose

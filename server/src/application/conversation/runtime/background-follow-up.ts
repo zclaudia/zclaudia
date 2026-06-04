@@ -24,6 +24,7 @@ import {
   loadSessionRememberedDecisions,
   loadProjectAllowedOutsideWorkspaceRoots,
 } from '../agent/permission-evaluator.js';
+import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
 
 export interface BackgroundFollowUpContext {
   activeRuns: Map<string, ActiveRun>;
@@ -142,7 +143,7 @@ async function consumeBackgroundStream(
           toolUseIdToName,
         });
 
-        if (followUpRun.completed) {
+        if (isTerminalPhase(followUpRun.phase)) {
           finalizeFollowUpRun(followUpRun, ctx);
           followUpRun = null;
           followUpSendRunEvent = null;
@@ -187,6 +188,8 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
     collectedToolCalls: [],
     contentBlocks: [],
     thinkingBlocks: [],
+    phase: 'running',
+    phaseEmitter: new PhaseEmitter(),
     startedAt: Date.now(),
     lastActivityAt: Date.now(),
     recentToolCalls: [],
@@ -242,7 +245,7 @@ function finalizeFollowUpRun(run: ActiveRun, ctx: BackgroundFollowUpContext): vo
     console.error(`[BackgroundFollowUp] Failed to save message for run ${run.runId}:`, err);
   }
 
-  if (!run.completed) {
+  if (!isTerminalPhase(run.phase)) {
     run.broadcast!({
       type: 'run_completed',
       runId: run.runId,

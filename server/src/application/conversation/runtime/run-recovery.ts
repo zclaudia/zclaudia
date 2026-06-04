@@ -10,6 +10,7 @@ import { MAX_SESSION_RESET_RETRIES } from '../transport/types.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import { postRunFailedNotification } from './run-terminal-notifications.js';
+import { setPhase, isTerminalPhase } from './active-run-phase.js';
 
 interface HandleRunExceptionInput {
   activeRun: ActiveRun;
@@ -116,7 +117,7 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
     sessionId: activeRun.sessionId,
     error: formattedErrMsg,
   });
-  activeRun.completed = true;
+  setPhase(activeRun, 'failed');
   broadcastHeartbeat();
   postRunFailedNotification({
     db: input.db,
@@ -166,7 +167,7 @@ export function finalizeRun(input: FinalizeRunInput): void {
   trace.log('server_norm', 'run_finalized', {
     runId,
     sessionId: message.sessionId,
-    completed: activeRun.completed === true,
+    completed: isTerminalPhase(activeRun.phase),
     providerType: activeRun.providerType,
     contentChars: activeRun.fullContent.length,
     collectedToolCalls: activeRun.collectedToolCalls.length,

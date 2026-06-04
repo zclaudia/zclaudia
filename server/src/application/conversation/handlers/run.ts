@@ -16,6 +16,7 @@ import type { ProviderRegistryPort } from '../../../infra/providers/registry.js'
 import { sendMessage } from '../transport/broadcast.js';
 import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
+import { isTerminalPhase } from '../runtime/active-run-phase.js';
 
 function sendSteerError(client: ConnectedClient, code: string, message: string): void {
   sendMessage(client.ws, {
@@ -180,7 +181,7 @@ export async function handleAgentCancel(
   let cancelled = false;
 
   for (const [runId, run] of activeRuns.entries()) {
-    if (run.sessionId === sessionId && !run.completed) {
+    if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
       cancelRun(runId);
       cancelled = true;
       break;
@@ -233,7 +234,7 @@ export async function handleRunSteer(
   }
 
   const run = activeRuns.get(msg.runId);
-  if (!run || run.completed) {
+  if (!run || isTerminalPhase(run.phase)) {
     sendSteerError(client, 'STEER_NO_ACTIVE_RUN', 'No active run to steer');
     return;
   }

@@ -1,4 +1,5 @@
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
+import { isTerminalPhase } from '../../application/conversation/runtime/active-run-phase.js';
 
 /**
  * When a gateway channel closes (remote/mobile client disconnects),
@@ -14,7 +15,7 @@ export function handleChannelClosed(
 ): void {
   const orphanedRunIds: string[] = [];
   for (const [runId, run] of activeRuns) {
-    if (run.clientId === channelId && !run.completed) {
+    if (run.clientId === channelId && !isTerminalPhase(run.phase)) {
       orphanedRunIds.push(runId);
     }
   }

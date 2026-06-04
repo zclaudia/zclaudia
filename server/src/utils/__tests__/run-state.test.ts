@@ -7,19 +7,22 @@ import {
 } from '../run-state.js';
 
 describe('run-state helpers', () => {
-  it('treats only non-completed non-background as foreground active', () => {
+  it('treats only non-terminal non-background as foreground active', () => {
     expect(isForegroundActiveRun(undefined)).toBe(false);
-    expect(isForegroundActiveRun({ completed: false, sessionType: 'regular' })).toBe(true);
-    expect(isForegroundActiveRun({ completed: true, sessionType: 'regular' })).toBe(false);
-    expect(isForegroundActiveRun({ completed: false, sessionType: 'background' })).toBe(false);
-    expect(isForegroundActiveRun({ completed: false })).toBe(true);
+    expect(isForegroundActiveRun({ phase: 'running', sessionType: 'regular' })).toBe(true);
+    expect(isForegroundActiveRun({ phase: 'completed', sessionType: 'regular' })).toBe(false);
+    expect(isForegroundActiveRun({ phase: 'cancelled', sessionType: 'regular' })).toBe(false);
+    expect(isForegroundActiveRun({ phase: 'failed', sessionType: 'regular' })).toBe(false);
+    expect(isForegroundActiveRun({ phase: 'awaiting_permission', sessionType: 'regular' })).toBe(true);
+    expect(isForegroundActiveRun({ phase: 'running', sessionType: 'background' })).toBe(false);
+    expect(isForegroundActiveRun({ phase: 'running' })).toBe(true);
   });
 
   it('detects active session with unified logic', () => {
     const runs = new Map<string, any>([
-      ['r1', { sessionId: 's1', completed: true, sessionType: 'regular' }],
-      ['r2', { sessionId: 's1', completed: false, sessionType: 'background' }],
-      ['r3', { sessionId: 's2', completed: false, sessionType: 'regular' }],
+      ['r1', { sessionId: 's1', phase: 'completed', sessionType: 'regular' }],
+      ['r2', { sessionId: 's1', phase: 'running', sessionType: 'background' }],
+      ['r3', { sessionId: 's2', phase: 'running', sessionType: 'regular' }],
     ]);
 
     expect(hasForegroundActiveRunForSession(runs, 's1')).toBe(false);
@@ -28,8 +31,8 @@ describe('run-state helpers', () => {
 
   it('finds run id only for foreground active run', () => {
     const runs = new Map<string, any>([
-      ['r1', { sessionId: 's1', completed: true, sessionType: 'regular' }],
-      ['r2', { sessionId: 's1', completed: false, sessionType: 'regular' }],
+      ['r1', { sessionId: 's1', phase: 'completed', sessionType: 'regular' }],
+      ['r2', { sessionId: 's1', phase: 'running', sessionType: 'regular' }],
     ]);
 
     expect(findForegroundActiveRunIdForSession(runs, 's1')).toBe('r2');
@@ -38,8 +41,8 @@ describe('run-state helpers', () => {
 
   it('hasAnyActiveRunForSession includes background runs', () => {
     const runs = new Map<string, any>([
-      ['r1', { sessionId: 's1', completed: false, sessionType: 'background' }],
-      ['r2', { sessionId: 's2', completed: true, sessionType: 'regular' }],
+      ['r1', { sessionId: 's1', phase: 'running', sessionType: 'background' }],
+      ['r2', { sessionId: 's2', phase: 'completed', sessionType: 'regular' }],
     ]);
 
     expect(hasAnyActiveRunForSession(runs, 's1')).toBe(true);

@@ -8,6 +8,7 @@ import { sendMessage, bumpPluginsVersion } from '../../application/conversation/
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 import { pluginEvents } from '../../infra/events/index.js';
 import { permissionManager as pluginPermissionManager } from './permissions.js';
+import { isTerminalPhase } from '../conversation/runtime/active-run-phase.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
 
@@ -28,7 +29,7 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
   app.use('/api/plugins', localOnlyMiddleware, createPluginToolsRoutes({
     getActiveProfile: (sessionId) => {
       for (const run of activeRuns.values()) {
-        if (run.sessionId === sessionId && !run.completed) {
+        if (run.sessionId === sessionId && !isTerminalPhase(run.phase)) {
           return run.effectiveProfile;
         }
       }
@@ -40,7 +41,7 @@ export function registerPluginsDomain(deps: PluginsDomainDeps): void {
     },
     resolveActiveSessionId: () => {
       for (const run of activeRuns.values()) {
-        if (!run.completed) {
+        if (!isTerminalPhase(run.phase)) {
           return run.sessionId;
         }
       }

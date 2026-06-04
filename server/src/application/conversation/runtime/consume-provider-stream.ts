@@ -7,6 +7,7 @@ import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import { handleProviderEvent, type ProviderEventState } from './run-events.js';
 import { postRunCompletedNotification } from './run-terminal-notifications.js';
 import { spawnBackgroundFollowUpConsumer } from './background-follow-up.js';
+import { setPhase, isTerminalPhase } from './active-run-phase.js';
 
 interface ConsumeProviderStreamInput {
   activeRun: ActiveRun;
@@ -109,7 +110,7 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
       });
 
       // Once the run is marked completed, decide whether to stop or hand off.
-      if (activeRun.completed) {
+      if (isTerminalPhase(activeRun.phase)) {
         if (activeRun.pendingBackgroundTasks > 0) {
           // Hand off the iterator to a detached background consumer.
           // The main run ends normally (finalizeRun will clean it up).
@@ -159,14 +160,14 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
   // the frontend never receives run_completed/run_failed and gets stuck in
   // a permanent loading state.  Emit a synthetic run_completed so the client
   // can move on.
-  if (!activeRun.completed) {
+  if (!isTerminalPhase(activeRun.phase)) {
     trace.log('server_norm', 'stream_ended_without_result', { runId, providerType }, 'provider stream ended without result event');
     sendRunEvent({
       type: 'run_completed',
       runId,
       sessionId,
     });
-    activeRun.completed = true;
+    setPhase(activeRun, 'failed');
     broadcastHeartbeat();
     postRunCompletedNotification({
       db,
