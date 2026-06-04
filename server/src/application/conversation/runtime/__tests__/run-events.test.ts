@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { PhaseEmitter } from '../active-run-phase.js';
 
 const findProcessPidsByTaskCommandMock = vi.fn();
 const cleanupPendingPermissionsMock = vi.fn();
@@ -133,7 +134,9 @@ describe('ws/run-events', () => {
       fullContent: '',
       pendingPermissions: new Map(),
       recentToolCalls: [],
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     } as any;
 
     const { handleProviderEvent } = await import('../run-events.js');
@@ -165,7 +168,7 @@ describe('ws/run-events', () => {
     });
 
     expect(activeRun.fullContent).toBe('done');
-    expect(activeRun.completed).toBe(true);
+    expect(activeRun.phase).toBe('completed');
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, {
       usage: { inputTokens: 1, outputTokens: 2 },
       indexMetadata: true,
@@ -206,7 +209,9 @@ describe('ws/run-events', () => {
     const activeRun = {
       sessionId: 'session-1',
       providerType: 'claude',
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
       collectedToolCalls: [],
       contentBlocks: [],
       fullContent: '',
@@ -257,7 +262,9 @@ describe('ws/run-events', () => {
       fullContent: '',
       pendingPermissions: new Map(),
       recentToolCalls: [],
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     } as any;
 
     const { handleProviderEvent } = await import('../run-events.js');
@@ -307,7 +314,9 @@ describe('ws/run-events', () => {
       fullContent: '',
       pendingPermissions: new Map(),
       recentToolCalls: [],
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     } as any;
 
     const { handleProviderEvent } = await import('../run-events.js');
@@ -354,7 +363,9 @@ describe('ws/run-events', () => {
       fullContent: 'partial',
       pendingPermissions: new Map(),
       recentToolCalls: [],
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     } as any;
     const activeRuns = new Map([['run-1', activeRun]]);
 
@@ -391,7 +402,7 @@ describe('ws/run-events', () => {
       runId: 'run-1',
       sessionId: 'session-1',
     }));
-    expect(activeRun.completed).toBe(true);
+    expect(activeRun.phase).toBe('failed');
     expect(pluginEventsEmitMock).toHaveBeenCalledWith('run.error', expect.objectContaining({
       runId: 'run-1',
       sessionId: 'session-1',
@@ -632,6 +643,9 @@ describe('ws/run-events', () => {
       pendingPermissions: new Map(),
       recentToolCalls: [],
       pendingBackgroundTasks: 0,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     } as any;
     const state: any = {};
 
@@ -681,6 +695,9 @@ describe('ws/run-events', () => {
       pendingPermissions: new Map(),
       recentToolCalls: [],
       pendingBackgroundTasks: 0,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     } as any;
     const state: any = {};
 
@@ -1000,6 +1017,9 @@ describe('ws/run-events', () => {
         fullContent: '',
         pendingPermissions: new Map(),
         recentToolCalls: [],
+        phase: 'running',
+        phaseEmitter: new PhaseEmitter(),
+        runId: 'run-1',
       } as any,
       activeRuns: new Map(),
       broadcastHeartbeat: vi.fn(),
@@ -1033,6 +1053,120 @@ describe('ws/run-events', () => {
     );
     warnSpy.mockRestore();
   });
+
+  // A1: ActiveRun phase state machine — these tests prove that the run-events
+  // dispatcher drives `activeRun.phase` correctly on the terminal `result` /
+  // `error` events plus the `task_notification` background-task path. They
+  // complement the unit tests in active-run-phase.test.ts by exercising the
+  // actual integration with handleProviderEvent.
+  describe('phase transitions (A1)', () => {
+    function buildBaseActiveRun(overrides: Record<string, unknown> = {}): any {
+      return {
+        sessionId: 'session-1',
+        assistantMessageId: 'assistant-1',
+        sessionType: 'regular',
+        providerType: 'claude',
+        collectedToolCalls: [],
+        contentBlocks: [],
+        fullContent: '',
+        pendingPermissions: new Map(),
+        recentToolCalls: [],
+        pendingBackgroundTasks: 0,
+        phase: 'running',
+        phaseEmitter: new PhaseEmitter(),
+        runId: 'run-1',
+        ...overrides,
+      };
+    }
+
+    function commonParams(activeRun: any, msg: any, extras: Record<string, unknown> = {}) {
+      return {
+        activeRun,
+        activeRuns: new Map([['run-1', activeRun]]),
+        broadcastHeartbeat: vi.fn(),
+        client: { ws: {} as any } as any,
+        db: {} as any,
+        input: 'hello',
+        modeValue: 'default',
+        msg,
+        notificationService: { notify: vi.fn() } as any,
+        notificationsService: { postItem: vi.fn() } as any,
+        persistSessionWorkingDirectory: vi.fn(),
+        providerType: 'claude',
+        runId: 'run-1',
+        sendRunEvent: vi.fn(),
+        sessionId: 'session-1',
+        sessionType: 'regular' as const,
+        state: {},
+        toolUseIdToName: new Map(),
+        providerRegistry: mockProviderRegistry as any,
+        ...extras,
+      };
+    }
+
+    it('result event transitions phase to "completed"', async () => {
+      const activeRun = buildBaseActiveRun();
+      const { handleProviderEvent } = await import('../run-events.js');
+
+      handleProviderEvent(commonParams(activeRun, {
+        type: 'result',
+        content: 'done',
+        usage: { inputTokens: 1, outputTokens: 2 },
+      } as any));
+
+      expect(activeRun.phase).toBe('completed');
+    });
+
+    it('error event transitions phase to "failed"', async () => {
+      const activeRun = buildBaseActiveRun();
+      const { handleProviderEvent } = await import('../run-events.js');
+
+      handleProviderEvent(commonParams(activeRun, {
+        type: 'error',
+        error: 'provider exploded',
+      } as any));
+
+      expect(activeRun.phase).toBe('failed');
+    });
+
+    it('background task started transitions phase to "awaiting_followup"', async () => {
+      const activeRun = buildBaseActiveRun();
+      const { handleProviderEvent } = await import('../run-events.js');
+
+      handleProviderEvent(commonParams(activeRun, {
+        type: 'task_notification',
+        taskId: 'task-A',
+        taskStatus: 'started',
+        taskMessage: 'started',
+      } as any));
+
+      expect(activeRun.pendingBackgroundTasks).toBe(1);
+      expect(activeRun.phase).toBe('awaiting_followup');
+    });
+
+    it('background task end transitions phase back to "running"', async () => {
+      const activeRun = buildBaseActiveRun();
+      const { handleProviderEvent } = await import('../run-events.js');
+
+      handleProviderEvent(commonParams(activeRun, {
+        type: 'task_notification',
+        taskId: 'task-B',
+        taskStatus: 'started',
+        taskMessage: 'started',
+      } as any));
+      expect(activeRun.phase).toBe('awaiting_followup');
+
+      handleProviderEvent(commonParams(activeRun, {
+        type: 'task_notification',
+        taskId: 'task-B',
+        taskStatus: 'completed',
+        taskMessage: 'done',
+      } as any));
+
+      expect(activeRun.pendingBackgroundTasks).toBe(0);
+      expect(activeRun.phase).toBe('running');
+    });
+  });
 });
 
 describe('run-events agent_end -> maybeCompact', () => {
@@ -1055,7 +1189,9 @@ describe('run-events agent_end -> maybeCompact', () => {
       fullContent: '',
       pendingPermissions: new Map(),
       recentToolCalls: [],
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
       agentProfile,
       llmProfile,
     } as any;
@@ -1117,7 +1253,9 @@ describe('run-events agent_end -> maybeCompact', () => {
       fullContent: '',
       pendingPermissions: new Map(),
       recentToolCalls: [],
-      completed: false,
+      phase: 'running',
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
       agentProfile,
       llmProfile,
     } as any;

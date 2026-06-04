@@ -16,6 +16,7 @@ import type { ClaudeMessage, SystemInfo } from '../../../infra/providers/types.j
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import { postRunCompletedNotification, postRunFailedNotification } from './run-terminal-notifications.js';
+import { setPhase, recomputePhase, isTerminalPhase, type PhaseBlockers } from './active-run-phase.js';
 
 export interface ProviderEventState {
   sdkSessionId?: string;
@@ -45,24 +46,40 @@ interface HandleProviderEventParams {
   providerRegistry: ProviderRegistryPort;
 }
 
+/**
+ * Capture the active blockers that influence phase. Called wherever a
+ * counter or set mutation might change which "waiting state" the run is in.
+ */
+function computeBlockers(run: ActiveRun): PhaseBlockers {
+  return {
+    isCancelling: !!run.abortController?.signal.aborted,
+    hasPendingPermissions: run.pendingPermissions.size > 0,
+    hasPendingFollowups: (run.pendingBackgroundTasks ?? 0) > 0,
+  };
+}
+
 function markBackgroundTaskStarted(activeRun: ActiveRun, state: ProviderEventState, key?: string): void {
   if (!key) {
     activeRun.pendingBackgroundTasks = (activeRun.pendingBackgroundTasks || 0) + 1;
+    recomputePhase(activeRun, computeBlockers(activeRun));
     return;
   }
   state.backgroundTaskKeys ??= new Set();
   if (state.backgroundTaskKeys.has(key)) return;
   state.backgroundTaskKeys.add(key);
   activeRun.pendingBackgroundTasks = (activeRun.pendingBackgroundTasks || 0) + 1;
+  recomputePhase(activeRun, computeBlockers(activeRun));
 }
 
 function markBackgroundTaskFinished(activeRun: ActiveRun, state: ProviderEventState, key?: string): void {
   if (key && state.backgroundTaskKeys?.has(key)) {
     state.backgroundTaskKeys.delete(key);
     activeRun.pendingBackgroundTasks = Math.max(0, (activeRun.pendingBackgroundTasks || 0) - 1);
+    recomputePhase(activeRun, computeBlockers(activeRun));
     return;
   }
   activeRun.pendingBackgroundTasks = Math.max(0, (activeRun.pendingBackgroundTasks || 0) - 1);
+  recomputePhase(activeRun, computeBlockers(activeRun));
 }
 
 function getTaskNotificationKey(msg: ClaudeMessage): string | undefined {
@@ -460,19 +477,20 @@ export function handleProviderEvent({
       // Critical ordering: `compaction_completed` MUST precede `run_completed`
       // on the wire so the client can swap session history before showing the
       // "ready" state. We achieve that by deferring the run_completed emission
-      // until the compaction promise settles. `activeRun.completed` is still
-      // set synchronously below so the consume-provider-stream loop terminates.
-      const shouldRunCompaction = !activeRun.completed
+      // until the compaction promise settles. `activeRun.phase` is still
+      // set to a terminal state synchronously below so the
+      // consume-provider-stream loop terminates.
+      const shouldRunCompaction = !isTerminalPhase(activeRun.phase)
         && Boolean(msg.usage)
         && Boolean(activeRun.agentProfile)
         && Boolean(activeRun.llmProfile);
 
       // Track whether the side-effects below (heartbeat / pluginEvents /
-      // notification) should fire. `activeRun.completed` is the canonical "was
-      // this run already terminated" flag — we capture it once before any
-      // pre-emit bookkeeping so the deferred-compaction path still runs the
-      // side-effects exactly once.
-      const wasAlreadyCompleted = activeRun.completed;
+      // notification) should fire. `isTerminalPhase(activeRun.phase)` is the
+      // canonical "was this run already terminated" flag — we capture it once
+      // before any pre-emit bookkeeping so the deferred-compaction path still
+      // runs the side-effects exactly once.
+      const wasAlreadyCompleted = isTerminalPhase(activeRun.phase);
       const emitRunCompleted = () => {
         if (wasAlreadyCompleted) {
           if (msg.usage) {
@@ -491,7 +509,7 @@ export function handleProviderEvent({
           sessionId: activeRun.sessionId,
           usage: msg.usage,
         });
-        activeRun.completed = true;
+        setPhase(activeRun, 'completed');
         pluginEvents.emit('run.completed', {
           runId,
           sessionId: activeRun.sessionId,
@@ -521,7 +539,7 @@ export function handleProviderEvent({
       if (shouldRunCompaction) {
         // Mark completed synchronously so consume-provider-stream stops looping.
         // Wire-level run_completed is deferred until after compaction resolves.
-        activeRun.completed = true;
+        setPhase(activeRun, 'completed');
         maybeCompact({
           db,
           sessionId: activeRun.sessionId,
@@ -565,7 +583,7 @@ export function handleProviderEvent({
       const errorMessage = formatProviderErrorMessage(rawProviderError, activeRun.providerType, authHint);
       console.error(`[Provider Error] runId=${runId} provider=${activeRun.providerType}: ${rawProviderError}`);
 
-      if (!activeRun.completed) {
+      if (!isTerminalPhase(activeRun.phase)) {
         try {
           upsertAssistantMessage(activeRun, { indexMetadata: true });
         } catch (saveErr) {
@@ -577,7 +595,7 @@ export function handleProviderEvent({
           sessionId: activeRun.sessionId,
           error: errorMessage,
         });
-        activeRun.completed = true;
+        setPhase(activeRun, 'failed');
         pluginEvents.emit('run.error', {
           runId,
           sessionId: activeRun.sessionId,
