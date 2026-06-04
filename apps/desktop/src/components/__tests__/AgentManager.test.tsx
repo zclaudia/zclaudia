@@ -239,6 +239,86 @@ describe('AgentManager', () => {
     consoleSpy.mockRestore();
   });
 
+  describe('Model declaration soft warning', () => {
+    it('does not warn when the bound LLM profile declares no models list', async () => {
+      // mockLlmProfiles[0] has no `models` field — undefined; user types any id.
+      await renderAgentManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Agent'));
+
+      fireEvent.change(screen.getByPlaceholderText(/Default Coding Agent/), {
+        target: { value: 'X' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/claude-sonnet-4-5/), {
+        target: { value: 'totally-unknown-model' },
+      });
+
+      expect(screen.queryByText(/not declared on the selected LLM profile/i)).toBeNull();
+    });
+
+    it('warns when model is not in the bound LLM profile models list', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          ...mockLlmProfiles[0],
+          models: [{ modelId: 'claude-opus-4-7' }],
+        },
+        mockLlmProfiles[1],
+      ]);
+
+      await renderAgentManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Agent'));
+
+      fireEvent.change(screen.getByPlaceholderText(/Default Coding Agent/), {
+        target: { value: 'Doc Writer' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/claude-sonnet-4-5/), {
+        target: { value: 'claude-haiku-4-5' },
+      });
+
+      await waitForFast(() => {
+        expect(
+          screen.getByText(/not declared on the selected LLM profile/i)
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('does not warn when model is present in the bound LLM profile models list', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          ...mockLlmProfiles[0],
+          models: [{ modelId: 'claude-opus-4-7' }],
+        },
+        mockLlmProfiles[1],
+      ]);
+
+      await renderAgentManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Agent'));
+
+      fireEvent.change(screen.getByPlaceholderText(/Default Coding Agent/), {
+        target: { value: 'Doc Writer' },
+      });
+      fireEvent.change(screen.getByPlaceholderText(/claude-sonnet-4-5/), {
+        target: { value: 'claude-opus-4-7' },
+      });
+
+      expect(screen.queryByText(/not declared on the selected LLM profile/i)).toBeNull();
+    });
+  });
+
   it('calls setDefaultAgentProfile when non-default agent gets "Set as default" click', async () => {
     vi.mocked(api.listAgentProfiles).mockResolvedValue([
       mockAgents[0],

@@ -940,17 +940,29 @@ describe('ProviderManager', () => {
     });
 
     it('renders a probed ok status with latency on a successful probe', async () => {
+      // Probe requires profileSaved && !formDirty — load a fixture that already
+      // has a model row so we can click Test without touching the form (which
+      // would mark it dirty and disable Test per the T5 follow-up).
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'With Saved Model',
+          providerType: 'anthropic' as const,
+          isDefault: false,
+          models: [{ modelId: 'opus' }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ]);
       vi.mocked(api.probeLlmProfileModel).mockResolvedValueOnce({ ok: true, latencyMs: 423 });
 
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
-        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+        expect(screen.getByText('With Saved Model')).toBeInTheDocument();
       });
 
-      await clickAsync(screen.getAllByTitle('Edit')[0]);
-      await clickAsync(screen.getByText('+ Add model'));
-      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'opus' } });
+      await clickAsync(screen.getByTitle('Edit'));
 
       await clickAsync(screen.getByText('Test'));
 
@@ -1011,6 +1023,76 @@ describe('ProviderManager', () => {
       await waitFor(() => {
         expect(screen.getByText(/Upstream returned 403 Forbidden/)).toBeInTheDocument();
       });
+    });
+
+    it('disables Test + Fetch when the form is dirty (unsaved changes), with a save-first tooltip', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      // Edit an existing saved profile → profileSaved=true, formDirty=false.
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'opus' },
+      });
+
+      // Adding a row mutates the model draft list — formDirty is now true.
+      const testBtn = screen.getByText('Test');
+      expect(testBtn).toBeDisabled();
+      expect(testBtn).toHaveAttribute(
+        'title',
+        'Save the profile first to test models with the latest config'
+      );
+
+      const fetchBtn = screen.getByText('Fetch from /models');
+      expect(fetchBtn).toBeDisabled();
+      expect(fetchBtn).toHaveAttribute(
+        'title',
+        'Save the profile first to fetch models with the latest config'
+      );
+    });
+
+    it('surfaces a save-time row-level error inline (no window.alert) when a model row is duplicate on save', async () => {
+      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'With Models',
+          providerType: 'anthropic' as const,
+          isDefault: false,
+          models: [{ modelId: 'opus' }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('With Models')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+      await clickAsync(screen.getByText('+ Add model'));
+      const idInputs = screen.getAllByPlaceholderText(/model id \(e\.g\./);
+      fireEvent.change(idInputs[1], { target: { value: 'opus' } });
+
+      await clickAsync(screen.getByText('Update'));
+
+      // No alert, but an inline banner pointing at the offending row. The
+      // validator scans rows in order and breaks at the first one with a
+      // duplicate marker — row 0 sees row 1 as the dup, so it reports row 1.
+      await waitFor(() => {
+        expect(
+          screen.getByText(/Fix model row 1 before saving/i)
+        ).toBeInTheDocument();
+      });
+      expect(alertSpy).not.toHaveBeenCalled();
+      expect(api.updateLlmProfile).not.toHaveBeenCalled();
+      alertSpy.mockRestore();
     });
   });
 });

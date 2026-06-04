@@ -181,6 +181,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const [formRequestHeadersError, setFormRequestHeadersError] = useState<string | null>(null);
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [formModels, setFormModels] = useState<ModelRowDraft[]>([]);
+  const [formModelsSaveError, setFormModelsSaveError] = useState<string | null>(null);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [fetchModelsError, setFetchModelsError] = useState<string | null>(null);
   const [fetchPicker, setFetchPicker] = useState<{ candidates: string[]; selected: Set<string> } | null>(null);
@@ -268,6 +269,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormRequestHeadersError(null);
     setFormIsDefault(false);
     setFormModels([]);
+    setFormModelsSaveError(null);
     setFetchModelsError(null);
     setFetchPicker(null);
     setEditingProfile(null);
@@ -289,11 +291,63 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormRequestHeadersError(null);
     setFormIsDefault(profile.isDefault || false);
     setFormModels(profile.models ? profile.models.map(entryToDraft) : []);
+    setFormModelsSaveError(null);
     setFetchModelsError(null);
     setFetchPicker(null);
     setEditingProfile(profile);
     setShowAddForm(true);
   };
+
+  /**
+   * Snapshot of the form state in the same wire shape as the editing profile,
+   * used to derive `formDirty` for gating Test / Fetch buttons. We compare
+   * against this rather than tracking each input individually so any future
+   * field added below the form picks up dirty detection for free.
+   */
+  const editingProfileSnapshot = (() => {
+    if (!editingProfile) return null;
+    const headersStr = editingProfile.requestHeaders
+      ? JSON.stringify(editingProfile.requestHeaders, null, 2)
+      : '';
+    const compatStr =
+      editingProfile.compat && Object.keys(editingProfile.compat).length > 0
+        ? JSON.stringify(editingProfile.compat, null, 2)
+        : '';
+    return {
+      name: editingProfile.name,
+      providerType: editingProfile.providerType,
+      baseUrl: editingProfile.baseUrl ?? '',
+      apiKey: editingProfile.apiKey ?? '',
+      requestHeaders: headersStr,
+      compat: compatStr,
+      isDefault: editingProfile.isDefault ?? false,
+      models: editingProfile.models ?? [],
+    };
+  })();
+
+  /**
+   * Whether the form has unsaved changes vs the persisted editingProfile.
+   * `false` for a brand-new (unsaved) profile because `profileSaved` already
+   * gates the buttons in that case; the dirty signal is only meaningful when
+   * we have a saved baseline to diff against.
+   */
+  const formDirty = (() => {
+    if (!editingProfileSnapshot) return false;
+    if (formName !== editingProfileSnapshot.name) return true;
+    if (formProviderType !== editingProfileSnapshot.providerType) return true;
+    if (formBaseUrl !== editingProfileSnapshot.baseUrl) return true;
+    if (formApiKey !== editingProfileSnapshot.apiKey) return true;
+    if (formRequestHeaders !== editingProfileSnapshot.requestHeaders) return true;
+    if (formCompat !== editingProfileSnapshot.compat) return true;
+    if (formIsDefault !== editingProfileSnapshot.isDefault) return true;
+    // Compare models — serialize current drafts and compare to baseline. Done
+    // by JSON shape rather than entry-by-entry so order changes count as dirty.
+    const currentEntries = draftsToEntries(formModels);
+    if (JSON.stringify(currentEntries) !== JSON.stringify(editingProfileSnapshot.models)) {
+      return true;
+    }
+    return false;
+  })();
 
   const handleSubmit = async () => {
     if (!formName.trim()) return;
@@ -356,6 +410,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
       // Models — block save if any row has an inline error (duplicate / empty
       // id / non-positive-integer override). Empty rows are silently dropped.
+      // Row-level errors already surface inline; this banner just points the
+      // user at the offending row so they don't have to scan a long list.
+      let modelsSaveError: string | null = null;
       for (let i = 0; i < formModels.length; i += 1) {
         const row = formModels[i];
         if (!row.modelId.trim() && !row.displayName.trim() && !row.contextWindowStr.trim() && !row.maxTokensStr.trim()) {
@@ -363,11 +420,16 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         }
         const errs = validateModelDraftRow(row, formModels, i);
         if (errs.modelId || errs.contextWindow || errs.maxTokens) {
-          alert(`Fix the model row ${i + 1} before saving (${errs.modelId ?? errs.contextWindow ?? errs.maxTokens}).`);
-          setSaving(false);
-          return;
+          modelsSaveError = `Fix model row ${i + 1} before saving (${errs.modelId ?? errs.contextWindow ?? errs.maxTokens}).`;
+          break;
         }
       }
+      if (modelsSaveError) {
+        setFormModelsSaveError(modelsSaveError);
+        setSaving(false);
+        return;
+      }
+      setFormModelsSaveError(null);
       const modelsArr = draftsToEntries(formModels);
 
       const data = {
@@ -399,6 +461,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   const addEmptyModelRow = () => {
+    if (formModelsSaveError) setFormModelsSaveError(null);
     setFormModels((rows) => [
       ...rows,
       { rowUid: generateRowUid(), modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '' },
@@ -406,6 +469,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   const updateModelRow = (index: number, patch: Partial<ModelRowDraft>) => {
+    if (formModelsSaveError) setFormModelsSaveError(null);
     setFormModels((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
@@ -414,6 +478,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   const removeModelRow = (index: number) => {
+    if (formModelsSaveError) setFormModelsSaveError(null);
     const row = formModels[index];
     if (row) {
       const t = testStatusTimersRef.current.get(row.rowUid);
@@ -616,8 +681,10 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       <ModelsSection
         models={formModels}
         profileSaved={Boolean(editingProfile?.id)}
+        formDirty={formDirty}
         fetching={fetchingModels}
         fetchError={fetchModelsError}
+        saveError={formModelsSaveError}
         onAdd={addEmptyModelRow}
         onUpdate={updateModelRow}
         onRemove={removeModelRow}
@@ -860,8 +927,10 @@ const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_T
 interface ModelsSectionProps {
   models: ModelRowDraft[];
   profileSaved: boolean;
+  formDirty: boolean;
   fetching: boolean;
   fetchError: string | null;
+  saveError: string | null;
   onAdd: () => void;
   onUpdate: (index: number, patch: Partial<ModelRowDraft>) => void;
   onRemove: (index: number) => void;
@@ -872,15 +941,22 @@ interface ModelsSectionProps {
 function ModelsSection({
   models,
   profileSaved,
+  formDirty,
   fetching,
   fetchError,
+  saveError,
   onAdd,
   onUpdate,
   onRemove,
   onFetch,
   onProbe,
 }: ModelsSectionProps) {
-  const fetchDisabledReason = !profileSaved ? 'Save the profile first to fetch models' : undefined;
+  const fetchDisabledReason = !profileSaved
+    ? 'Save the profile first to fetch models'
+    : formDirty
+      ? 'Save the profile first to fetch models with the latest config'
+      : undefined;
+  const fetchDisabled = !profileSaved || formDirty || fetching;
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -889,7 +965,7 @@ function ModelsSection({
           <button
             type="button"
             onClick={onFetch}
-            disabled={!profileSaved || fetching}
+            disabled={fetchDisabled}
             title={fetchDisabledReason}
             className="px-2.5 py-1 text-xs rounded-md border border-border bg-secondary hover:bg-secondary/80 text-foreground disabled:opacity-50"
           >
@@ -907,6 +983,9 @@ function ModelsSection({
       {fetchError && (
         <p className="text-xs text-destructive mb-2">{fetchError}</p>
       )}
+      {saveError && (
+        <p className="text-xs text-destructive mb-2">{saveError}</p>
+      )}
       {models.length === 0 ? (
         <p className="text-xs text-muted-foreground">
           No models declared. Agent profiles bound to this LLM profile will fall back to pi-ai registry defaults for whatever model id they request.
@@ -920,6 +999,7 @@ function ModelsSection({
               row={row}
               allRows={models}
               profileSaved={profileSaved}
+              formDirty={formDirty}
               onChange={(patch) => onUpdate(idx, patch)}
               onRemove={() => onRemove(idx)}
               onProbe={() => onProbe(idx)}
@@ -936,22 +1016,26 @@ interface ModelRowProps {
   row: ModelRowDraft;
   allRows: ModelRowDraft[];
   profileSaved: boolean;
+  formDirty: boolean;
   onChange: (patch: Partial<ModelRowDraft>) => void;
   onRemove: () => void;
   onProbe: () => void;
 }
 
-function ModelRow({ index, row, allRows, profileSaved, onChange, onRemove, onProbe }: ModelRowProps) {
+function ModelRow({ index, row, allRows, profileSaved, formDirty, onChange, onRemove, onProbe }: ModelRowProps) {
   const errs = validateModelDraftRow(row, allRows, index);
   const isRunning = row.testStatus?.kind === 'running';
-  const testDisabled = !profileSaved || isRunning || !row.modelId.trim() || !!errs.modelId;
+  const testDisabled =
+    !profileSaved || formDirty || isRunning || !row.modelId.trim() || !!errs.modelId;
   const testDisabledReason = !profileSaved
     ? 'Save the profile first to test models'
-    : !row.modelId.trim()
-      ? 'Enter a model id first'
-      : errs.modelId
-        ? `Fix model id (${errs.modelId}) first`
-        : undefined;
+    : formDirty
+      ? 'Save the profile first to test models with the latest config'
+      : !row.modelId.trim()
+        ? 'Enter a model id first'
+        : errs.modelId
+          ? `Fix model id (${errs.modelId}) first`
+          : undefined;
 
   return (
     <div className="p-3 bg-secondary/40 border border-border rounded-lg space-y-2">

@@ -276,6 +276,10 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
           placeholder="e.g., claude-sonnet-4-5"
           className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
         />
+        <ModelDeclarationWarning
+          formModel={formModel}
+          llmProfile={llmProfiles.find((p) => p.id === formLlmProfileId)}
+        />
       </div>
 
       <div>
@@ -481,6 +485,33 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
         <div className="flex-1 overflow-y-auto p-4">{content}</div>
       </div>
     </>
+  );
+}
+
+/**
+ * Soft warning shown beneath the model input when the agent profile's selected
+ * model id is not declared on the bound LLM profile's `models` list. We skip
+ * the warning when the LLM profile is missing, its `models` list is undefined
+ * or empty (backwards-compat / undeclared profile), or the model input is
+ * blank.
+ */
+function ModelDeclarationWarning({
+  formModel,
+  llmProfile,
+}: {
+  formModel: string;
+  llmProfile: LlmProfileConfig | undefined;
+}) {
+  const trimmed = formModel.trim();
+  if (!trimmed) return null;
+  const models = llmProfile?.models;
+  if (!models || models.length === 0) return null;
+  const known = models.some((m) => m.modelId === trimmed);
+  if (known) return null;
+  return (
+    <p className="text-xs text-amber-600 mt-1">
+      This model is not declared on the selected LLM profile. The agent will work but will fall back to pi-ai registry defaults for context window / max tokens.
+    </p>
   );
 }
 
