@@ -47,7 +47,7 @@ export interface BuildRunContextInput {
     input: string;
     sessionId: string;
     systemContext?: string;
-    planMode?: boolean;
+    mode?: string;
   } & Record<string, unknown>;
   modeValue: string;
   providerConfig?: LlmProfileConfig;
@@ -142,7 +142,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       cwd,
       sessionId: sdkSessionId,
       env: { ...(providerConfig?.env || {}), ...filePushEnv },
-      planMode: message.planMode ?? false,
+      mode: message.mode || 'default',
       systemPrompt: agentProfile.systemPrompt,
       sessionTitle: session.name || undefined,
       serverPort: serverPort || undefined,

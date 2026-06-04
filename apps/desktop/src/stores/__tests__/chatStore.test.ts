@@ -27,7 +27,7 @@ describe('chatStore', () => {
       toolCallsHistory: {},
       runContentBlocks: {},
       systemInfoBySession: {},
-      planModeBySession: {},
+      modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
       permissionOverrides: {},
@@ -371,31 +371,31 @@ describe('chatStore', () => {
     });
   });
 
-  // ── Plan mode ──────────────────────────────────────
+  // ── Mode ───────────────────────────────────────────
 
-  describe('plan mode', () => {
-    it('setPlanMode + getPlanMode round-trip', () => {
-      useChatStore.getState().setPlanMode('s1', true);
-      expect(useChatStore.getState().getPlanMode('s1')).toBe(true);
-      useChatStore.getState().setPlanMode('s1', false);
-      expect(useChatStore.getState().getPlanMode('s1')).toBe(false);
+  describe('mode', () => {
+    it('setMode + getMode round-trip', () => {
+      useChatStore.getState().setMode('s1', 'plan');
+      expect(useChatStore.getState().getMode('s1')).toBe('plan');
+      useChatStore.getState().setMode('s1', 'default');
+      expect(useChatStore.getState().getMode('s1')).toBe('default');
     });
 
-    it('getPlanMode defaults to false for unknown session', () => {
-      expect(useChatStore.getState().getPlanMode('unknown')).toBe(false);
+    it('getMode defaults to empty string for unknown session', () => {
+      expect(useChatStore.getState().getMode('unknown')).toBe('');
     });
 
     it('tracks runtime mode separately and clears it when a run ends', () => {
-      useChatStore.getState().setPlanMode('sess-1', false);
+      useChatStore.getState().setMode('sess-1', 'default');
       useChatStore.getState().setRuntimeMode('sess-1', 'plan');
       useChatStore.getState().startRun('run-1', 'sess-1');
 
-      expect(useChatStore.getState().getPlanMode('sess-1')).toBe(false);
+      expect(useChatStore.getState().getMode('sess-1')).toBe('default');
       expect(useChatStore.getState().getRuntimeMode('sess-1')).toBe('plan');
 
       useChatStore.getState().endRun('run-1');
 
-      expect(useChatStore.getState().getPlanMode('sess-1')).toBe(false);
+      expect(useChatStore.getState().getMode('sess-1')).toBe('default');
       expect(useChatStore.getState().getRuntimeMode('sess-1')).toBe('');
     });
   });

@@ -13,7 +13,7 @@ interface UseCommandHandlerParams {
   currentSession: Session | undefined;
   currentProject: Project | null | undefined;
   isForcedPlanSession: boolean;
-  planMode: boolean;
+  mode: string;
   addMessage: (sessionId: string, message: { id: string; clientMessageId?: string; sessionId: string; role: MessageRole; content: string; createdAt: number }) => void;
   clearMessages: (sessionId: string) => void;
   scrollToBottom: () => void;
@@ -23,7 +23,7 @@ interface UseCommandHandlerParams {
     sessionId: string;
     input: string;
     resend?: boolean;
-    planMode?: boolean;
+    mode?: string;
     workingDirectory?: string;
   }) => Promise<void>;
   llmProfileId: string | undefined;
@@ -37,7 +37,7 @@ export function useCommandHandler({
   currentSession,
   currentProject,
   isForcedPlanSession,
-  planMode,
+  mode,
   addMessage,
   clearMessages,
   scrollToBottom,
@@ -554,7 +554,7 @@ export function useCommandHandler({
         clientRequestId: clientMessageId,
         sessionId,
         input: commandText,
-        planMode: planMode || undefined,
+        mode: mode || undefined,
         workingDirectory: currentSession?.workingDirectory || undefined,
       });
       return;
@@ -604,7 +604,7 @@ export function useCommandHandler({
           clientRequestId: clientMessageId,
           sessionId,
           input: result.content,
-          planMode: planMode || undefined,
+          mode: mode || undefined,
           workingDirectory: currentSession?.workingDirectory || undefined,
         });
       }
@@ -620,7 +620,7 @@ export function useCommandHandler({
         createdAt: Date.now(),
       });
     }
-  }, [sessionId, addMessage, commands, currentSession, currentProject, handleBuiltInCommand, handleWorktreeChange, scrollToBottom, planMode, isForcedPlanSession, startRun, llmProfileId]);
+  }, [sessionId, addMessage, commands, currentSession, currentProject, handleBuiltInCommand, handleWorktreeChange, scrollToBottom, mode, isForcedPlanSession, startRun, llmProfileId]);
 
   return {
     handleCommand,

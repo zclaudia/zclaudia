@@ -75,12 +75,13 @@ interface ChatState {
   runContentBlocks: Record<string, ContentBlock[]>;
   // Provider system info from runtime init message, keyed by session ID
   systemInfoBySession: Record<string, SystemInfo>;
-  // Plan-mode toggle per session (true = plan-only read-only turn).
-  // Replaces the legacy generic `modeOverrides` string map after the
-  // selector-cleanup sub-project.
-  planModeBySession: Record<string, boolean>;
+  // User-selected mode per session (e.g. 'default' | 'plan'). The selector
+  // is driven by `ProviderCapabilities.modes`; adding new modes only needs
+  // a capabilities entry. Stored as a string so the wire `run_start.mode`
+  // and `mode_change` events can pass through directly.
+  modeBySession: Record<string, string>;
   // Runtime mode per session (provider-driven transient state, e.g. AI-entered plan mode).
-  // Still a string because the wire `mode_change` event remains a string ('plan'/'default').
+  // Mirrors backend `mode_change` events; same vocabulary as modeBySession.
   runtimeModes: Record<string, string>;
   // Token usage per session (accumulated + latest run snapshot)
   sessionUsage: Record<string, {
@@ -134,9 +135,9 @@ interface ChatState {
   clearSystemInfo: (sessionId: string) => void;
   getSystemInfo: (sessionId: string) => SystemInfo | null;
 
-  // Plan-mode actions (per session)
-  setPlanMode: (sessionId: string, planMode: boolean) => void;
-  getPlanMode: (sessionId: string) => boolean;
+  // Mode actions (per session)
+  setMode: (sessionId: string, mode: string) => void;
+  getMode: (sessionId: string) => string;
   setRuntimeMode: (sessionId: string, mode: string) => void;
   getRuntimeMode: (sessionId: string) => string;
   clearRuntimeMode: (sessionId: string) => void;
@@ -195,7 +196,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   toolCallsHistory: {},
   runContentBlocks: {},
   systemInfoBySession: {},
-  planModeBySession: {},
+  modeBySession: {},
   runtimeModes: {},
   sessionUsage: {},
   permissionOverrides: {},
@@ -600,12 +601,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
   getSystemInfo: (sessionId) => get().systemInfoBySession[sessionId] || null,
 
-  // Plan-mode actions (per session)
-  setPlanMode: (sessionId, planMode) =>
+  // Mode actions (per session). Default getMode returns '' so ModeSelector
+  // can fall back to capabilities.defaultModeId when no override is set.
+  setMode: (sessionId, mode) =>
     set((state) => ({
-      planModeBySession: { ...state.planModeBySession, [sessionId]: planMode },
+      modeBySession: { ...state.modeBySession, [sessionId]: mode },
     })),
-  getPlanMode: (sessionId) => get().planModeBySession[sessionId] ?? false,
+  getMode: (sessionId) => get().modeBySession[sessionId] ?? '',
   setRuntimeMode: (sessionId, mode) =>
     set((state) => ({
       runtimeModes: { ...state.runtimeModes, [sessionId]: mode },

@@ -479,20 +479,20 @@ describe('ZClaudiaAdapter.run', () => {
     expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'result']);
   });
 
-  it('translates planMode boolean to systemInfo.permissionMode', async () => {
+  it('translates mode "plan" to systemInfo.permissionMode "plan"', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },
     ]);
 
     const adapter = new ZClaudiaAdapter();
-    const out = await collect(adapter, 'hi', { planMode: true });
+    const out = await collect(adapter, 'hi', { mode: 'plan' });
 
     const init = out.find(m => m.type === 'init');
     expect(init?.systemInfo?.permissionMode).toBe('plan');
   });
 
-  it('defaults permissionMode to "default" when planMode is false/undefined', async () => {
+  it('defaults permissionMode to "default" when mode is missing / non-plan', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },

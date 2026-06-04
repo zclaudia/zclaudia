@@ -2,6 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
+import { useChatStore } from '../../stores/chatStore';
 import * as api from '../../services/api';
 import type { ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
@@ -89,6 +90,18 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
   }, [capsCacheKey, llmProfileId, isConnected, isBackendDataReady, providerCapabilities, setProviderCapabilities]);
 
   const capabilities: ProviderCapabilities | null = providerCapabilities[capsCacheKey] || null;
+
+  // When capabilities arrive for a session whose mode is not yet set, seed
+  // the session mode from capabilities.defaultModeId so the ModeSelector shows
+  // the provider-chosen default (e.g. 'default') instead of falling back to
+  // the first capabilities entry. Only fires once per session-with-unset-mode.
+  useEffect(() => {
+    if (!capabilities) return;
+    const chat = useChatStore.getState();
+    if (chat.getMode(sessionId)) return;
+    const next = capabilities.defaultModeId || capabilities.modes?.[0]?.id;
+    if (next) chat.setMode(sessionId, next);
+  }, [sessionId, capabilities]);
 
   const commands = useMemo<SlashCommand[]>(() => {
     const base = providerCommands[commandsCacheKey] || [];

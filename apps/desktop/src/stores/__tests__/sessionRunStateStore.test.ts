@@ -33,7 +33,7 @@ function resetStores() {
     toolCallsHistory: {},
     runContentBlocks: {},
     systemInfoBySession: {},
-    planModeBySession: {},
+    modeBySession: {},
     runtimeModes: {},
     sessionUsage: {},
     permissionOverrides: {},

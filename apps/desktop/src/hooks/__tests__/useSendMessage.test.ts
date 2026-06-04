@@ -13,7 +13,7 @@ function makeHookProps(overrides: Partial<HookProps> = {}): HookProps {
     sessionRunId: null,
     isSessionRunning: false,
     lastSessionMessage: null,
-    planMode: false,
+    mode: '',
     permissionOverride: null,
     currentSession: undefined,
     addMessage: vi.fn(),

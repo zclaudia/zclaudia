@@ -13,9 +13,11 @@ export interface RunStartMessage {
   sessionId: string;
   input: string;
   llmProfileId?: string;
-  /** Plan mode toggle: when true, the adapter runs the turn in plan-only mode
-   *  (read-only tool subset). Replaces the legacy `mode: 'plan'` enum value. */
-  planMode?: boolean;
+  /** User-selected mode id (matches one of `ProviderCapabilities.modes`).
+   *  Adapter derives PCP `permissionMode` from this. Typical values:
+   *  `'default'` | `'plan'`. Other values can be added by extending
+   *  ProviderCapabilities.modes without touching this wire schema. */
+  mode?: string;
   permissionOverride?: Partial<UnifiedPermissionPolicy>;
   systemContext?: string;
   workingDirectory?: string;

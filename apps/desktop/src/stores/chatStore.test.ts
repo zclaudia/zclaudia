@@ -18,7 +18,7 @@ describe('chatStore', () => {
       activeToolCalls: {},
       toolCallsHistory: {},
       sessionUsage: {},
-      planModeBySession: {},
+      modeBySession: {},
       permissionOverrides: {},
     });
   });
@@ -321,18 +321,18 @@ describe('chatStore', () => {
     });
   });
 
-  describe('planMode (per-session)', () => {
-    it('setPlanMode sets plan mode for a specific session', () => {
-      useChatStore.getState().setPlanMode('session-1', true);
-      expect(useChatStore.getState().getPlanMode('session-1')).toBe(true);
-      expect(useChatStore.getState().getPlanMode('session-2')).toBe(false);
+  describe('mode (per-session)', () => {
+    it('setMode sets mode for a specific session', () => {
+      useChatStore.getState().setMode('session-1', 'plan');
+      expect(useChatStore.getState().getMode('session-1')).toBe('plan');
+      expect(useChatStore.getState().getMode('session-2')).toBe('');
     });
 
-    it('different sessions have independent plan-mode toggles', () => {
-      useChatStore.getState().setPlanMode('session-1', true);
-      useChatStore.getState().setPlanMode('session-2', false);
-      expect(useChatStore.getState().getPlanMode('session-1')).toBe(true);
-      expect(useChatStore.getState().getPlanMode('session-2')).toBe(false);
+    it('different sessions have independent modes', () => {
+      useChatStore.getState().setMode('session-1', 'plan');
+      useChatStore.getState().setMode('session-2', 'default');
+      expect(useChatStore.getState().getMode('session-1')).toBe('plan');
+      expect(useChatStore.getState().getMode('session-2')).toBe('default');
     });
   });
 

@@ -24,8 +24,9 @@ export interface RunStartMessage extends Record<string, unknown> {
   sessionId: string;
   input: string;
   llmProfileId?: string;
-  /** Plan-mode toggle from the wire. Replaces the legacy mode/permissionMode enums. */
-  planMode?: boolean;
+  /** User-selected mode id (matches one of `ProviderCapabilities.modes`). Typical
+   *  values: `'default'` | `'plan'`. */
+  mode?: string;
   permissionOverride?: Partial<import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy>;
   systemContext?: string;
   workingDirectory?: string;
@@ -148,7 +149,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   // Some providers ignore a new non-default mode when resuming an existing
   // provider session. Keep the previous behavior by default, and let providers
   // that support `resume + mode` opt into preservation via their policy.
-  const requestedMode = message.planMode ? 'plan' : undefined;
+  const requestedMode = message.mode && message.mode !== 'default' ? message.mode : undefined;
   const preservesSessionOnModeSwitch = providerPolicy?.modeSwitchSessionPolicy === 'preserve';
   const modeRequiresNewSession = Boolean(
     requestedMode

@@ -18,7 +18,7 @@ const mockChatStore = {
   addToolUseBlock: vi.fn(),
   updateToolCallResult: vi.fn(),
   updateToolCallActivity: vi.fn(),
-  setPlanMode: vi.fn(),
+  setMode: vi.fn(),
   setRuntimeMode: vi.fn(),
   setSystemInfo: vi.fn(),
   updateRunHealth: vi.fn(),
@@ -410,14 +410,14 @@ describe('handleServerMessage', () => {
     });
   });
 
-  it('handles mode_change → translates plan/default string to planMode boolean', () => {
+  it('handles mode_change → passes mode string through to setMode', () => {
     handleServerMessage({ type: 'mode_change', sessionId: 's1', mode: 'plan' }, makeCtx());
     expect(mockChatStore.setRuntimeMode).toHaveBeenCalledWith('s1', 'plan');
-    expect(mockChatStore.setPlanMode).toHaveBeenCalledWith('s1', true);
+    expect(mockChatStore.setMode).toHaveBeenCalledWith('s1', 'plan');
 
-    mockChatStore.setPlanMode.mockClear();
+    mockChatStore.setMode.mockClear();
     handleServerMessage({ type: 'mode_change', sessionId: 's1', mode: 'default' }, makeCtx());
-    expect(mockChatStore.setPlanMode).toHaveBeenCalledWith('s1', false);
+    expect(mockChatStore.setMode).toHaveBeenCalledWith('s1', 'default');
   });
 
   it('handles permission_request', () => {

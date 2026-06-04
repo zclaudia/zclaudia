@@ -54,8 +54,8 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
   // Store actions
   const addMessage = useChatStore((s) => s.addMessage);
   const clearMessages = useChatStore((s) => s.clearMessages);
-  const setPlanMode = useChatStore((s) => s.setPlanMode);
-  const selectedPlanMode = useChatStore((s) => s.planModeBySession[sessionId] ?? false);
+  const setMode = useChatStore((s) => s.setMode);
+  const selectedMode = useChatStore((s) => s.modeBySession[sessionId] ?? '');
   const runtimeMode = useChatStore((s) => s.runtimeModes[sessionId] || '');
   const permissionOverride = useChatStore((s) => s.getPermissionOverride(sessionId));
   const setPermissionOverride = useChatStore((s) => s.setPermissionOverride);
@@ -86,9 +86,9 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
   const isForcedPlanSession = currentSession?.projectRole === 'task' && currentSession?.planStatus === 'planning';
   // `runtimeMode` reflects provider-side transient state within the current run
   // (for example, Claude calling EnterPlanMode mid-run). Backend mode_change
-  // events now also sync to selectedPlanMode (via setPlanMode in messageHandler)
-  // so the UI selector stays consistent with the backend's actual mode.
-  const effectivePlanMode = isForcedPlanSession || selectedPlanMode;
+  // events now also sync to selectedMode (via setMode in messageHandler) so the
+  // UI selector stays consistent with the backend's actual mode.
+  const effectiveMode = isForcedPlanSession ? 'plan' : selectedMode;
   const usageOrDefault = currentUsage || {
     inputTokens: 0,
     outputTokens: 0,
@@ -135,11 +135,11 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     commands,
     commandsCacheKey,
 
-    // Plan mode / usage
-    planMode: selectedPlanMode,
-    selectedPlanMode,
+    // Mode / usage
+    mode: selectedMode,
+    selectedMode,
     runtimeMode,
-    effectivePlanMode,
+    effectiveMode,
     permissionOverride,
     currentUsage: usageOrDefault,
     currentSystemInfo,
@@ -147,7 +147,7 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     // Store actions
     addMessage,
     clearMessages,
-    setPlanMode,
+    setMode,
     setPermissionOverride,
   };
 }

@@ -39,7 +39,7 @@ describe('ws/run-provider-launch', () => {
       nativeMode: 'default',
       runOptions: {
         cwd: '/tmp/project',
-        planMode: false,
+        mode: 'default',
       },
     });
     negotiateProfileMock.mockReturnValue({
@@ -159,7 +159,7 @@ describe('ws/run-provider-launch', () => {
       'processed hello',
       expect.objectContaining({
         cwd: '/tmp/project',
-        planMode: false,
+        mode: 'default',
         onAgentReady: expect.any(Function),
         onSteerConsumed: expect.any(Function),
       }),

@@ -64,7 +64,7 @@ describe('useBackendFacade run_event forwarding', () => {
       toolCallsHistory: {},
       runContentBlocks: {},
       systemInfoBySession: {},
-      planModeBySession: {},
+      modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
       permissionOverrides: {},

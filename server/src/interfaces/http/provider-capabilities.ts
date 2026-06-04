@@ -4,6 +4,12 @@ import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 
 const ZCLAUDIA_CAPABILITIES: ProviderCapabilities = {
+  modeLabel: 'Mode',
+  defaultModeId: 'default',
+  modes: [
+    { id: 'default', label: 'Default', description: 'Normal coding turns' },
+    { id: 'plan', label: 'Plan', description: 'Read-only planning turns (no edits / no shell)' },
+  ],
   modelLabel: 'Runtime',
   models: [],
   supportsAIReview: false,

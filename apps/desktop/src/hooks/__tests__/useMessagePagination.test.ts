@@ -25,7 +25,7 @@ describe('useMessagePagination', () => {
       toolCallsHistory: {},
       runContentBlocks: {},
       systemInfoBySession: {},
-      planModeBySession: {},
+      modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
       permissionOverrides: {},

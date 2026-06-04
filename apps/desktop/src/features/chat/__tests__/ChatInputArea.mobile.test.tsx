@@ -15,9 +15,9 @@ vi.mock('../PermissionSelector', () => ({
   PermissionSelector: () => <div data-testid="permission-selector" />,
 }));
 
-vi.mock('../PlanModeToggle', () => ({
-  PlanModeToggle: (props: { value: boolean; locked?: boolean }) => (
-    <div data-testid="plan-mode-toggle" data-value={String(props.value)} data-locked={String(Boolean(props.locked))} />
+vi.mock('../ModeSelector', () => ({
+  ModeSelector: (props: { value: string; locked?: boolean }) => (
+    <div data-testid="mode-selector" data-value={String(props.value)} data-locked={String(Boolean(props.locked))} />
   ),
 }));
 
@@ -183,7 +183,15 @@ const baseProps = {
   isLoading: false,
   isConnected: true,
   isForcedPlanSession: false,
-  planMode: false,
+  mode: '',
+  capabilities: {
+    modes: [
+      { id: 'default', label: 'Default' },
+      { id: 'plan', label: 'Plan' },
+    ],
+    models: [],
+    defaultModeId: 'default',
+  } as any,
   permissionOverride: null,
   commands: [],
   fileReferenceRoot: '/repo',
@@ -198,7 +206,7 @@ const baseProps = {
   restoreMessage: null,
   initialDraft: { content: '', attachments: [] },
   draftExists: false,
-  onSetPlanMode: vi.fn(),
+  onSetMode: vi.fn(),
   onSetPermissionOverride: vi.fn(),
   onWorktreeChange: vi.fn(async () => {}),
   onSendMessage: vi.fn(),
@@ -219,12 +227,12 @@ describe('ChatInputArea mobile selectors', () => {
     cleanup();
   });
 
-  it('shows plan-mode toggle + permission selector + worktree + terminal tool on mobile', () => {
+  it('shows mode selector + permission selector + worktree + terminal tool on mobile', () => {
     serverStoreState.activeServerSupports.mockImplementation((feature: string) => feature === 'remoteTerminal');
 
     render(<ChatInputArea {...baseProps} />);
 
-    expect(screen.getByTestId('plan-mode-toggle')).toBeTruthy();
+    expect(screen.getByTestId('mode-selector')).toBeTruthy();
     expect(screen.getByTestId('permission-selector')).toBeTruthy();
     expect(screen.getByTestId('worktree-selector')).toBeTruthy();
 
@@ -232,14 +240,14 @@ describe('ChatInputArea mobile selectors', () => {
     expect(screen.getByText('Terminal')).toBeTruthy();
   });
 
-  it('locks plan-mode toggle when isForcedPlanSession is true', () => {
+  it('locks mode selector when isForcedPlanSession is true', () => {
     serverStoreState.activeServerSupports.mockReturnValue(false);
 
     render(<ChatInputArea {...baseProps} isForcedPlanSession />);
 
-    const toggle = screen.getByTestId('plan-mode-toggle');
-    expect(toggle.getAttribute('data-locked')).toBe('true');
-    expect(toggle.getAttribute('data-value')).toBe('true');
+    const sel = screen.getByTestId('mode-selector');
+    expect(sel.getAttribute('data-locked')).toBe('true');
+    expect(sel.getAttribute('data-value')).toBe('plan');
   });
 
   it('hides terminal tool button when remote terminal is unavailable and other panels are disabled', () => {
@@ -249,5 +257,11 @@ describe('ChatInputArea mobile selectors', () => {
     render(<ChatInputArea {...baseProps} />);
 
     expect(screen.queryByTitle('More tools')).toBeNull();
+  });
+
+  it('hides mode selector entirely when capabilities is null', () => {
+    serverStoreState.activeServerSupports.mockReturnValue(false);
+    render(<ChatInputArea {...baseProps} capabilities={null} />);
+    expect(screen.queryByTestId('mode-selector')).toBeNull();
   });
 });

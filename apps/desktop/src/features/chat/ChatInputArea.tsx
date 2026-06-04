@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, ChevronDown, ChevronUp, Plus } from 'lucide-react';
-import { PlanModeToggle } from './PlanModeToggle';
+import { ModeSelector } from './ModeSelector';
 import { SystemInfoButton } from './SystemInfoButton';
 import { PermissionSelector } from './PermissionSelector';
 import { WorktreeSelector } from './WorktreeSelector';
@@ -17,6 +17,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { activatePanel, usePanelIsActive } from '../../utils/openPanel';
 import * as api from '../../services/api';
 import type { UnifiedPermissionPolicy, SlashCommand, Session, Project, SystemInfo } from '@zclaudia/shared';
+import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 import type { SessionDraft } from '../../stores/chatStore';
 
 interface ChatInputAreaProps {
@@ -27,7 +28,8 @@ interface ChatInputAreaProps {
   isLoading: boolean;
   isConnected: boolean;
   isForcedPlanSession: boolean;
-  planMode: boolean;
+  mode: string;
+  capabilities: ProviderCapabilities | null;
   permissionOverride: Partial<UnifiedPermissionPolicy> | null;
   commands: SlashCommand[];
   fileReferenceRoot: string | undefined;
@@ -45,7 +47,7 @@ interface ChatInputAreaProps {
   restoreMessage: { content: string; attachments?: Attachment[] } | null;
   initialDraft: SessionDraft | undefined;
   draftExists: boolean;
-  onSetPlanMode: (sessionId: string, planMode: boolean) => void;
+  onSetMode: (sessionId: string, mode: string) => void;
   onSetPermissionOverride: (sessionId: string, policy: Partial<UnifiedPermissionPolicy> | null) => void;
   onWorktreeChange: (path: string) => Promise<void>;
   onSendMessage: (content: string, attachments?: Attachment[]) => void;
@@ -61,7 +63,8 @@ export function ChatInputArea({
   isLoading,
   isConnected,
   isForcedPlanSession,
-  planMode,
+  mode,
+  capabilities,
   permissionOverride,
   commands,
   fileReferenceRoot,
@@ -73,7 +76,7 @@ export function ChatInputArea({
   restoreMessage,
   initialDraft,
   draftExists,
-  onSetPlanMode,
+  onSetMode,
   onSetPermissionOverride,
   onWorktreeChange,
   onSendMessage,
@@ -199,16 +202,19 @@ export function ChatInputArea({
     <div className="border-t border-border p-2 pb-3 md:p-4 safe-bottom-pad overflow-visible flex-shrink-0">
       {/* Toolbar */}
       <div className="mb-1.5 md:mb-2 flex items-center gap-1 md:gap-2">
-        <PlanModeToggle
-          value={isForcedPlanSession || planMode}
-          onChange={(next) => {
-            if (isForcedPlanSession) return;
-            onSetPlanMode(sessionId, next);
-          }}
-          disabled={isLoading}
-          locked={isForcedPlanSession}
-          lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
-        />
+        {capabilities && (
+          <ModeSelector
+            capabilities={capabilities}
+            value={isForcedPlanSession ? 'plan' : mode}
+            onChange={(m) => {
+              if (isForcedPlanSession) return;
+              onSetMode(sessionId, m);
+            }}
+            disabled={isLoading}
+            locked={isForcedPlanSession}
+            lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
+          />
+        )}
         <PermissionSelector
           value={permissionOverride}
           onChange={(policy) => onSetPermissionOverride(sessionId, policy)}
@@ -500,7 +506,7 @@ export function ChatInputArea({
             ? 'Connecting...'
             : isLoading
             ? 'Type to steer mid-run (delivered next turn)...'
-            : (isForcedPlanSession || planMode)
+            : (isForcedPlanSession || mode === 'plan')
             ? 'Plan Mode: Analyze and plan (no code changes)...'
             : advancedInput
             ? 'Type a message... (Cmd+Enter to send)'

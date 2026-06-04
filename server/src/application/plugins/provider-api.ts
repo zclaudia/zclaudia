@@ -103,7 +103,7 @@ export class PluginProviderAPI implements ProviderAPI {
       cwd: process.cwd(),
       cliPath: providerRow.cli_path || undefined,
       env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
-      planMode: true,
+      mode: 'plan',
       systemPrompt,
     };
 
@@ -191,7 +191,7 @@ export class PluginProviderAPI implements ProviderAPI {
       cwd: process.cwd(),
       cliPath: providerRow.cli_path || undefined,
       env: providerRow.env ? JSON.parse(providerRow.env) : undefined,
-      planMode: true,
+      mode: 'plan',
       systemPrompt,
     };
 

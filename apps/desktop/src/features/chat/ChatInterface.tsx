@@ -75,9 +75,9 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
     sessionToolCalls, sessionContentBlocks, sessionToolCallHistory, useStreamingSegmented,
     lastStreamingBlock, streamingContentSignature,
     currentSession, currentProject, isForcedPlanSession, fileReferenceRoot, fileReferenceBackendId,
-    llmProfileId, commands, commandsCacheKey,
-    effectivePlanMode, permissionOverride, currentUsage, currentSystemInfo,
-    addMessage, clearMessages, setPlanMode, setPermissionOverride,
+    llmProfileId, capabilities, commands, commandsCacheKey,
+    effectiveMode, permissionOverride, currentUsage, currentSystemInfo,
+    addMessage, clearMessages, setMode, setPermissionOverride,
   } = session;
 
   // Mobile viewport management
@@ -100,7 +100,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   // Message sending
   const send = useSendMessage({
     sessionId, isConnected, isLoading, sessionRunId, isSessionRunning, lastSessionMessage,
-    planMode: effectivePlanMode, permissionOverride, currentSession, addMessage, scrollToBottom, wsSendMessage,
+    mode: effectiveMode, permissionOverride, currentSession, addMessage, scrollToBottom, wsSendMessage,
   });
   const {
     handleSendMessage, handleCancelRun, handleResendLastMessage,
@@ -111,7 +111,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   const chatActionsValue = useMemo<ChatActionsContextValue>(() => ({
     handleSendMessage,
-    setPlanMode: useChatStore.getState().setPlanMode,
+    setMode: useChatStore.getState().setMode,
   }), [handleSendMessage]);
 
   // UI state
@@ -131,15 +131,15 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   // Task planning sessions are hard-locked to Plan mode.
   useEffect(() => {
-    if (isForcedPlanSession && !effectivePlanMode) {
-      setPlanMode(sessionId, true);
+    if (isForcedPlanSession && effectiveMode !== 'plan') {
+      setMode(sessionId, 'plan');
     }
-  }, [isForcedPlanSession, effectivePlanMode, sessionId, setPlanMode]);
+  }, [isForcedPlanSession, effectiveMode, sessionId, setMode]);
 
   // Command handler
   const { handleCommand, handleResetProviderSession, handleWorktreeChange } = useCommandHandler({
     sessionId, commands, currentSession, currentProject, isForcedPlanSession,
-    planMode: effectivePlanMode, addMessage, clearMessages, scrollToBottom, startRun,
+    mode: effectiveMode, addMessage, clearMessages, scrollToBottom, startRun,
     llmProfileId, commandsCacheKey, setDrawerOpen,
   });
 
@@ -190,7 +190,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
               clientRequestId: crypto.randomUUID(),
               sessionId,
               input: 'continue',
-              planMode: effectivePlanMode || undefined,
+              mode: effectiveMode || undefined,
               workingDirectory: currentSession?.workingDirectory || undefined,
             });
           }}
@@ -310,7 +310,8 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           isLoading={isLoading}
           isConnected={isConnected}
           isForcedPlanSession={isForcedPlanSession}
-          planMode={effectivePlanMode}
+          mode={effectiveMode}
+          capabilities={capabilities}
           permissionOverride={permissionOverride}
           commands={commands}
           fileReferenceRoot={fileReferenceRoot}
@@ -322,7 +323,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           restoreMessage={restoreMessage}
           initialDraft={initialDraft}
           draftExists={draftExists}
-          onSetPlanMode={setPlanMode}
+          onSetMode={setMode}
           onSetPermissionOverride={setPermissionOverride}
           onWorktreeChange={handleWorktreeChange}
           onSendMessage={handleSendMessage}

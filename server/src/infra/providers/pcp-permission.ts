@@ -1,12 +1,11 @@
 import type { PCPProviderManifest, PCPPermissionMode } from '@zclaudia/shared/core/pcp';
 
 /**
- * Legacy mode-string vocabulary still used internally by adapters and the
- * mode_change event stream ('default' | 'plan'), plus the historical
- * 'acceptEdits' / 'bypassPermissions' values that some adapters / fixtures
- * may still emit. PermissionMode was dropped from shared types when the UI
- * selectors moved to `planMode` + `permissionOverride`; this local alias
- * keeps the mapping table strict.
+ * Legacy mode-string vocabulary used by adapter manifests' `permissionModeMap`.
+ * `ProviderCapabilities.modes` currently exposes only 'default' | 'plan' to
+ * the user-facing dropdown, but adapters/fixtures may still map the historical
+ * 'acceptEdits' / 'bypassPermissions' values, so the legacy alias keeps the
+ * mapping table strict.
  */
 type LegacyPermissionMode = 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 

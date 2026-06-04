@@ -57,8 +57,8 @@ describe('useProviderCapabilities', () => {
     } as any);
 
     useChatStore.setState({
-      getPlanMode: vi.fn(() => false),
-      setPlanMode: vi.fn(),
+      getMode: vi.fn(() => ''),
+      setMode: vi.fn(),
     } as any);
 
     vi.mocked(api.getProviderTypeCommands).mockResolvedValue([
@@ -101,9 +101,8 @@ describe('useProviderCapabilities', () => {
     expect(useLlmProfileMetaStore.getState().providerCapabilities['local:_default']).toEqual(
       expect.objectContaining({ defaultModeId: 'plan' })
     );
-    // After selector-cleanup, capabilities no longer drive Mode selector state;
-    // setPlanMode is not invoked from capability fetches.
-    expect((useChatStore.getState() as any).setPlanMode).not.toHaveBeenCalled();
+    // Capabilities arrive for an unset session → setMode seeded from defaultModeId.
+    expect((useChatStore.getState() as any).setMode).toHaveBeenCalledWith('sess-1', 'plan');
   });
 
   it('loads provider-specific metadata when session resolves to agent → llm-profile', async () => {

@@ -220,7 +220,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       sessionId,
       model: process.env.PI_MODEL || DEFAULT_MODEL,
       cwd: options.cwd,
-      permissionMode: options.planMode ? 'plan' : 'default',
+      permissionMode: options.mode === 'plan' ? 'plan' : 'default',
     };
 
     // 1. Build the model first (config errors stop here, before any init event).
