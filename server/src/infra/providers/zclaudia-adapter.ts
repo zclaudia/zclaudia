@@ -377,7 +377,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
             isComplete: true,
           });
           // Skip the `result` translation: run-events treats `error` as a
-          // terminal event (sets activeRun.completed and emits run_failed).
+          // terminal event (sets activeRun.phase = 'failed' and emits run_failed).
           // Emitting result on top would double-fire run_completed and persist
           // an empty assistant message.
           return;
