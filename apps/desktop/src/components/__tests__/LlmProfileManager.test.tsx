@@ -109,6 +109,8 @@ vi.mock('../../services/api', () => ({
   updateLlmProfile: vi.fn(),
   deleteLlmProfile: vi.fn(),
   setDefaultLlmProfile: vi.fn(),
+  fetchModelsForLlmProfile: vi.fn(),
+  probeLlmProfileModel: vi.fn(),
 }));
 
 import { useServerStore } from '../../stores/serverStore';
@@ -144,6 +146,8 @@ describe('ProviderManager', () => {
     vi.mocked(api.updateLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.deleteLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
+    vi.mocked(api.fetchModelsForLlmProfile).mockResolvedValue({ ok: true, models: [] });
+    vi.mocked(api.probeLlmProfileModel).mockResolvedValue({ ok: true, latencyMs: 0 });
     mockProviderMetaState.getProviders.mockReturnValue([]);
     mockServerState.activeServerId = 'local';
     mockServerState.connections.local.status = 'connected';
@@ -790,6 +794,223 @@ describe('ProviderManager', () => {
         expect(screen.getByText('Invalid JSON in compat field')).toBeInTheDocument();
       });
       expect(api.createLlmProfile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Models block', () => {
+    it('shows empty hint when profile has no models declared', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      // Editing the first existing profile (which has no models) should show the empty hint
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText(/No models declared/i)).toBeInTheDocument();
+      });
+    });
+
+    it('disables Fetch from /models for an unsaved (just-opened) Add Provider form', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+
+      const fetchBtn = screen.getByText('Fetch from /models');
+      expect(fetchBtn).toBeDisabled();
+      expect(fetchBtn).toHaveAttribute('title', 'Save the profile first to fetch models');
+    });
+
+    it('+ Add model inserts an empty row with all four inputs', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+
+      expect(screen.getByPlaceholderText(/model id \(e\.g\./)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/display name/)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/context window/)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/max tokens/)).toBeInTheDocument();
+    });
+
+    it('shows inline duplicate error when two rows share a modelId', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'With Models',
+          providerType: 'anthropic' as const,
+          isDefault: false,
+          models: [{ modelId: 'opus' }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('With Models')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+      await clickAsync(screen.getByText('+ Add model'));
+
+      const idInputs = screen.getAllByPlaceholderText(/model id \(e\.g\./);
+      expect(idInputs).toHaveLength(2);
+      fireEvent.change(idInputs[1], { target: { value: 'opus' } });
+
+      // Both rows surface the duplicate marker — assert ≥1 inline error appears
+      await waitFor(() => {
+        expect(screen.getAllByText(/duplicate model id/i).length).toBeGreaterThan(0);
+      });
+    });
+
+    it('shows inline error for non-positive contextWindow', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('+ Add model'));
+
+      const idInput = screen.getByPlaceholderText(/model id \(e\.g\./);
+      fireEvent.change(idInput, { target: { value: 'm1' } });
+      const cwInput = screen.getByPlaceholderText(/context window/);
+      fireEvent.change(cwInput, { target: { value: '0' } });
+
+      await waitFor(() => {
+        expect(screen.getByText(/contextWindow must be a positive integer/i)).toBeInTheDocument();
+      });
+    });
+
+    it('serializes models into the update payload, dropping empty rows and empty overrides', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('+ Add model'));
+      const idInput = screen.getByPlaceholderText(/model id \(e\.g\./);
+      fireEvent.change(idInput, { target: { value: 'claude-opus-4-7' } });
+      const cwInput = screen.getByPlaceholderText(/context window/);
+      fireEvent.change(cwInput, { target: { value: '1000000' } });
+
+      // Add a second fully-empty row that should be dropped on save
+      await clickAsync(screen.getByText('+ Add model'));
+
+      await clickAsync(screen.getByText('Update'));
+
+      await waitFor(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'p1',
+          expect.objectContaining({
+            models: [{ modelId: 'claude-opus-4-7', contextWindow: 1000000 }],
+          })
+        );
+      });
+    });
+
+    it('Test button is disabled when the row has an empty modelId', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('+ Add model'));
+
+      const testBtn = screen.getByText('Test');
+      expect(testBtn).toBeDisabled();
+      expect(testBtn).toHaveAttribute('title', 'Enter a model id first');
+    });
+
+    it('renders a probed ok status with latency on a successful probe', async () => {
+      vi.mocked(api.probeLlmProfileModel).mockResolvedValueOnce({ ok: true, latencyMs: 423 });
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'opus' } });
+
+      await clickAsync(screen.getByText('Test'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/✓ 423 ms/)).toBeInTheDocument();
+      });
+      expect(api.probeLlmProfileModel).toHaveBeenCalledWith('p1', 'opus');
+    });
+
+    it('opens the picker dialog when Fetch returns ids, and adds selected ids on confirm', async () => {
+      vi.mocked(api.fetchModelsForLlmProfile).mockResolvedValueOnce({
+        ok: true,
+        models: ['claude-opus-4-7', 'claude-sonnet-4-6'],
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('Fetch from /models'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Import models from /models')).toBeInTheDocument();
+      });
+
+      expect(screen.getByText('claude-opus-4-7')).toBeInTheDocument();
+      expect(screen.getByText('claude-sonnet-4-6')).toBeInTheDocument();
+
+      // Both selected by default → confirm
+      await clickAsync(screen.getByText(/Add 2 models/));
+
+      await waitFor(() => {
+        const idInputs = screen.getAllByPlaceholderText(/model id \(e\.g\./);
+        const values = idInputs.map((el) => (el as HTMLInputElement).value);
+        expect(values).toContain('claude-opus-4-7');
+        expect(values).toContain('claude-sonnet-4-6');
+      });
+    });
+
+    it('surfaces a fetch error inline when Fetch from /models fails', async () => {
+      vi.mocked(api.fetchModelsForLlmProfile).mockResolvedValueOnce({
+        ok: false,
+        error: 'Upstream returned 403 Forbidden',
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('Fetch from /models'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Upstream returned 403 Forbidden/)).toBeInTheDocument();
+      });
     });
   });
 });

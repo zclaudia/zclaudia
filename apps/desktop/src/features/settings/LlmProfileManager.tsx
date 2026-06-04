@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import type { LlmProfileConfig, LlmProfileCompat } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry } from '@zclaudia/shared';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -22,6 +22,85 @@ const PROVIDER_CAPABILITIES: Record<string, CapabilitySummary> = {
 };
 
 const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
+
+/**
+ * Draft shape used by the Models repeater. We keep contextWindow / maxTokens as
+ * raw strings so the editor can distinguish "empty (no override)" from
+ * "0/non-numeric (validation error)" without lossy coercion on every keystroke.
+ */
+interface ModelRowDraft {
+  modelId: string;
+  displayName: string;
+  contextWindowStr: string;
+  maxTokensStr: string;
+  /** Last probe result; cleared after a few seconds via a setTimeout. */
+  testStatus?:
+    | { kind: 'running' }
+    | { kind: 'ok'; latencyMs: number }
+    | { kind: 'fail'; error: string };
+}
+
+function entryToDraft(entry: LlmProfileModelEntry): ModelRowDraft {
+  return {
+    modelId: entry.modelId,
+    displayName: entry.displayName ?? '',
+    contextWindowStr: entry.contextWindow != null ? String(entry.contextWindow) : '',
+    maxTokensStr: entry.maxTokens != null ? String(entry.maxTokens) : '',
+  };
+}
+
+function parsePositiveInteger(raw: string): { value: number | undefined; error: string | null } {
+  const trimmed = raw.trim();
+  if (!trimmed) return { value: undefined, error: null };
+  const n = Number(trimmed);
+  if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
+    return { value: undefined, error: 'must be a positive integer' };
+  }
+  return { value: n, error: null };
+}
+
+interface ModelRowError {
+  modelId?: string;
+  contextWindow?: string;
+  maxTokens?: string;
+}
+
+function validateModelDraftRow(draft: ModelRowDraft, allDrafts: ModelRowDraft[], index: number): ModelRowError {
+  const err: ModelRowError = {};
+  const id = draft.modelId.trim();
+  if (!id) {
+    err.modelId = 'required';
+  } else {
+    const dup = allDrafts.findIndex((d, i) => i !== index && d.modelId.trim() === id);
+    if (dup !== -1) err.modelId = 'duplicate';
+  }
+  const cw = parsePositiveInteger(draft.contextWindowStr);
+  if (cw.error) err.contextWindow = cw.error;
+  const mt = parsePositiveInteger(draft.maxTokensStr);
+  if (mt.error) err.maxTokens = mt.error;
+  return err;
+}
+
+/**
+ * Serialize draft rows into the wire shape. Drops rows with empty modelId so a
+ * half-typed "Add model" row never blocks save.
+ */
+function draftsToEntries(drafts: ModelRowDraft[]): LlmProfileModelEntry[] {
+  const out: LlmProfileModelEntry[] = [];
+  for (const d of drafts) {
+    const id = d.modelId.trim();
+    if (!id) continue;
+    const entry: LlmProfileModelEntry = { modelId: id };
+    const display = d.displayName.trim();
+    if (display) entry.displayName = display;
+    const cw = parsePositiveInteger(d.contextWindowStr);
+    if (cw.value !== undefined) entry.contextWindow = cw.value;
+    const mt = parsePositiveInteger(d.maxTokensStr);
+    if (mt.value !== undefined) entry.maxTokens = mt.value;
+    out.push(entry);
+  }
+  return out;
+}
 
 function CapabilityTags({ providerType }: { providerType: string }) {
   const caps = PROVIDER_CAPABILITIES[providerType];
@@ -87,10 +166,15 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const [formRequestHeaders, setFormRequestHeaders] = useState('');
   const [formRequestHeadersError, setFormRequestHeadersError] = useState<string | null>(null);
   const [formIsDefault, setFormIsDefault] = useState(false);
+  const [formModels, setFormModels] = useState<ModelRowDraft[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
+  const [fetchModelsError, setFetchModelsError] = useState<string | null>(null);
+  const [fetchPicker, setFetchPicker] = useState<{ candidates: string[]; selected: Set<string> } | null>(null);
   const [saving, setSaving] = useState(false);
   const [pendingDeleteProfileId, setPendingDeleteProfileId] = useState<string | null>(null);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
+  const testStatusTimersRef = useRef<Map<number, number>>(new Map());
 
   useAndroidBack(onClose, isOpen && !inline, 20);
 
@@ -146,11 +230,19 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       if (deleteConfirmTimeoutRef.current !== null) {
         window.clearTimeout(deleteConfirmTimeoutRef.current);
       }
+      for (const t of testStatusTimersRef.current.values()) window.clearTimeout(t);
+      testStatusTimersRef.current.clear();
     };
   }, []);
 
+  const clearAllTestTimers = () => {
+    for (const t of testStatusTimersRef.current.values()) window.clearTimeout(t);
+    testStatusTimersRef.current.clear();
+  };
+
   const resetForm = () => {
     clearDeleteConfirmation();
+    clearAllTestTimers();
     setFormName('');
     setFormProviderType('anthropic');
     setFormBaseUrl('');
@@ -161,12 +253,16 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormRequestHeaders('');
     setFormRequestHeadersError(null);
     setFormIsDefault(false);
+    setFormModels([]);
+    setFetchModelsError(null);
+    setFetchPicker(null);
     setEditingProfile(null);
     setShowAddForm(false);
   };
 
   const openEditForm = (profile: LlmProfileConfig) => {
     clearDeleteConfirmation();
+    clearAllTestTimers();
     setFormName(profile.name);
     setFormProviderType(profile.providerType);
     setFormBaseUrl(profile.baseUrl || '');
@@ -178,6 +274,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormRequestHeaders(profile.requestHeaders ? JSON.stringify(profile.requestHeaders, null, 2) : '');
     setFormRequestHeadersError(null);
     setFormIsDefault(profile.isDefault || false);
+    setFormModels(profile.models ? profile.models.map(entryToDraft) : []);
+    setFetchModelsError(null);
+    setFetchPicker(null);
     setEditingProfile(profile);
     setShowAddForm(true);
   };
@@ -241,6 +340,22 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       }
       setFormCompatError(null);
 
+      // Models — block save if any row has an inline error (duplicate / empty
+      // id / non-positive-integer override). Empty rows are silently dropped.
+      for (let i = 0; i < formModels.length; i += 1) {
+        const row = formModels[i];
+        if (!row.modelId.trim() && !row.displayName.trim() && !row.contextWindowStr.trim() && !row.maxTokensStr.trim()) {
+          continue; // fully empty — drop on serialize
+        }
+        const errs = validateModelDraftRow(row, formModels, i);
+        if (errs.modelId || errs.contextWindow || errs.maxTokens) {
+          alert(`Fix the model row ${i + 1} before saving (${errs.modelId ?? errs.contextWindow ?? errs.maxTokens}).`);
+          setSaving(false);
+          return;
+        }
+      }
+      const modelsArr = draftsToEntries(formModels);
+
       const data = {
         name: formName.trim(),
         providerType: formProviderType,
@@ -248,6 +363,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         apiKey: formApiKey.trim() || undefined,
         compat: compatObj,
         requestHeaders: requestHeadersObj,
+        models: modelsArr,
         isDefault: formIsDefault
       };
 
@@ -265,6 +381,99 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       alert(`Failed to ${editingProfile ? 'update' : 'create'} provider: ${message}`);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const addEmptyModelRow = () => {
+    setFormModels((rows) => [
+      ...rows,
+      { modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '' },
+    ]);
+  };
+
+  const updateModelRow = (index: number, patch: Partial<ModelRowDraft>) => {
+    setFormModels((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  };
+
+  const removeModelRow = (index: number) => {
+    const t = testStatusTimersRef.current.get(index);
+    if (t != null) {
+      window.clearTimeout(t);
+      testStatusTimersRef.current.delete(index);
+    }
+    setFormModels((rows) => rows.filter((_, i) => i !== index));
+  };
+
+  const scheduleClearTestStatus = (index: number) => {
+    const existing = testStatusTimersRef.current.get(index);
+    if (existing != null) window.clearTimeout(existing);
+    const id = window.setTimeout(() => {
+      testStatusTimersRef.current.delete(index);
+      setFormModels((rows) => rows.map((r, i) => (i === index ? { ...r, testStatus: undefined } : r)));
+    }, 6000);
+    testStatusTimersRef.current.set(index, id);
+  };
+
+  const handleFetchModels = async () => {
+    if (!editingProfile?.id) return;
+    setFetchModelsError(null);
+    setFetchingModels(true);
+    try {
+      const result = await api.fetchModelsForLlmProfile(editingProfile.id);
+      if (!result.ok) {
+        setFetchModelsError(result.error);
+        return;
+      }
+      // Filter out ids already in the form so the picker is just net-new.
+      const existing = new Set(formModels.map((r) => r.modelId.trim()).filter(Boolean));
+      const candidates = result.models.filter((id) => !existing.has(id));
+      if (candidates.length === 0) {
+        setFetchModelsError('No new model ids returned (all candidates are already in the list).');
+        return;
+      }
+      setFetchPicker({ candidates, selected: new Set(candidates) });
+    } catch (err) {
+      setFetchModelsError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFetchingModels(false);
+    }
+  };
+
+  const confirmFetchPicker = () => {
+    if (!fetchPicker) return;
+    const existing = new Set(formModels.map((r) => r.modelId.trim()).filter(Boolean));
+    const toAdd = Array.from(fetchPicker.selected).filter((id) => !existing.has(id));
+    if (toAdd.length > 0) {
+      setFormModels((rows) => [
+        ...rows,
+        ...toAdd.map<ModelRowDraft>((modelId) => ({
+          modelId,
+          displayName: '',
+          contextWindowStr: '',
+          maxTokensStr: '',
+        })),
+      ]);
+    }
+    setFetchPicker(null);
+  };
+
+  const handleProbeModel = async (index: number) => {
+    if (!editingProfile?.id) return;
+    const row = formModels[index];
+    const modelId = row?.modelId.trim();
+    if (!modelId) return;
+    updateModelRow(index, { testStatus: { kind: 'running' } });
+    try {
+      const result = await api.probeLlmProfileModel(editingProfile.id, modelId);
+      if (result.ok) {
+        updateModelRow(index, { testStatus: { kind: 'ok', latencyMs: result.latencyMs } });
+      } else {
+        updateModelRow(index, { testStatus: { kind: 'fail', error: result.error } });
+      }
+    } catch (err) {
+      updateModelRow(index, { testStatus: { kind: 'fail', error: err instanceof Error ? err.message : String(err) } });
+    } finally {
+      scheduleClearTestStatus(index);
     }
   };
 
@@ -380,6 +589,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           </p>
         )}
       </div>
+
+      <ModelsSection
+        models={formModels}
+        profileSaved={Boolean(editingProfile?.id)}
+        fetching={fetchingModels}
+        fetchError={fetchModelsError}
+        onAdd={addEmptyModelRow}
+        onUpdate={updateModelRow}
+        onRemove={removeModelRow}
+        onFetch={handleFetchModels}
+        onProbe={handleProbeModel}
+      />
 
       <div>
         <button
@@ -541,9 +762,34 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     </div>
   );
 
+  const fetchPickerOverlay = fetchPicker ? (
+    <FetchModelsPickerDialog
+      candidates={fetchPicker.candidates}
+      selected={fetchPicker.selected}
+      onToggle={(id) => {
+        setFetchPicker((cur) => {
+          if (!cur) return cur;
+          const next = new Set(cur.selected);
+          if (next.has(id)) next.delete(id);
+          else next.add(id);
+          return { ...cur, selected: next };
+        });
+      }}
+      onSelectAll={() => setFetchPicker((cur) => (cur ? { ...cur, selected: new Set(cur.candidates) } : cur))}
+      onSelectNone={() => setFetchPicker((cur) => (cur ? { ...cur, selected: new Set() } : cur))}
+      onCancel={() => setFetchPicker(null)}
+      onConfirm={confirmFetchPicker}
+    />
+  ) : null;
+
   // Inline mode - just return the content
   if (inline) {
-    return content;
+    return (
+      <>
+        {content}
+        {fetchPickerOverlay}
+      </>
+    );
   }
 
   // Modal mode - wrap with backdrop and modal container
@@ -572,6 +818,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           {content}
         </div>
       </div>
+      {fetchPickerOverlay}
     </>
   );
 }
@@ -586,6 +833,269 @@ const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_T
   value,
   label: PROVIDER_TYPE_LABELS[value] ?? value,
 }));
+
+interface ModelsSectionProps {
+  models: ModelRowDraft[];
+  profileSaved: boolean;
+  fetching: boolean;
+  fetchError: string | null;
+  onAdd: () => void;
+  onUpdate: (index: number, patch: Partial<ModelRowDraft>) => void;
+  onRemove: (index: number) => void;
+  onFetch: () => void;
+  onProbe: (index: number) => void;
+}
+
+function ModelsSection({
+  models,
+  profileSaved,
+  fetching,
+  fetchError,
+  onAdd,
+  onUpdate,
+  onRemove,
+  onFetch,
+  onProbe,
+}: ModelsSectionProps) {
+  const fetchDisabledReason = !profileSaved ? 'Save the profile first to fetch models' : undefined;
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="block text-sm font-medium text-muted-foreground">Models</label>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onFetch}
+            disabled={!profileSaved || fetching}
+            title={fetchDisabledReason}
+            className="px-2.5 py-1 text-xs rounded-md border border-border bg-secondary hover:bg-secondary/80 text-foreground disabled:opacity-50"
+          >
+            {fetching ? 'Fetching…' : 'Fetch from /models'}
+          </button>
+          <button
+            type="button"
+            onClick={onAdd}
+            className="px-2.5 py-1 text-xs rounded-md border border-border bg-secondary hover:bg-secondary/80 text-foreground"
+          >
+            + Add model
+          </button>
+        </div>
+      </div>
+      {fetchError && (
+        <p className="text-xs text-destructive mb-2">{fetchError}</p>
+      )}
+      {models.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          No models declared. Agent profiles bound to this LLM profile will fall back to pi-ai registry defaults for whatever model id they request.
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {models.map((row, idx) => (
+            <ModelRow
+              key={idx}
+              index={idx}
+              row={row}
+              allRows={models}
+              profileSaved={profileSaved}
+              onChange={(patch) => onUpdate(idx, patch)}
+              onRemove={() => onRemove(idx)}
+              onProbe={() => onProbe(idx)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ModelRowProps {
+  index: number;
+  row: ModelRowDraft;
+  allRows: ModelRowDraft[];
+  profileSaved: boolean;
+  onChange: (patch: Partial<ModelRowDraft>) => void;
+  onRemove: () => void;
+  onProbe: () => void;
+}
+
+function ModelRow({ index, row, allRows, profileSaved, onChange, onRemove, onProbe }: ModelRowProps) {
+  const errs = validateModelDraftRow(row, allRows, index);
+  const isRunning = row.testStatus?.kind === 'running';
+  const testDisabled = !profileSaved || isRunning || !row.modelId.trim() || !!errs.modelId;
+  const testDisabledReason = !profileSaved
+    ? 'Save the profile first to test models'
+    : !row.modelId.trim()
+      ? 'Enter a model id first'
+      : errs.modelId
+        ? `Fix model id (${errs.modelId}) first`
+        : undefined;
+
+  return (
+    <div className="p-3 bg-secondary/40 border border-border rounded-lg space-y-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <div>
+          <input
+            type="text"
+            value={row.modelId}
+            onChange={(e) => onChange({ modelId: e.target.value })}
+            placeholder="model id (e.g. claude-opus-4-7)"
+            aria-label="model id"
+            className={`w-full px-2 py-1.5 bg-background border ${errs.modelId ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
+          />
+          {errs.modelId && (
+            <p className="text-[10px] text-destructive mt-0.5">
+              {errs.modelId === 'duplicate' ? 'duplicate model id in this profile' : 'model id is required'}
+            </p>
+          )}
+        </div>
+        <input
+          type="text"
+          value={row.displayName}
+          onChange={(e) => onChange({ displayName: e.target.value })}
+          placeholder="display name (optional)"
+          aria-label="display name"
+          className="w-full px-2 py-1.5 bg-background border border-border rounded-md text-sm focus:outline-none focus:border-primary"
+        />
+        <div>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={row.contextWindowStr}
+            onChange={(e) => onChange({ contextWindowStr: e.target.value })}
+            placeholder="context window (optional override)"
+            aria-label="context window"
+            className={`w-full px-2 py-1.5 bg-background border ${errs.contextWindow ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
+          />
+          {errs.contextWindow && (
+            <p className="text-[10px] text-destructive mt-0.5">contextWindow {errs.contextWindow}</p>
+          )}
+        </div>
+        <div>
+          <input
+            type="text"
+            inputMode="numeric"
+            value={row.maxTokensStr}
+            onChange={(e) => onChange({ maxTokensStr: e.target.value })}
+            placeholder="max tokens (optional override)"
+            aria-label="max tokens"
+            className={`w-full px-2 py-1.5 bg-background border ${errs.maxTokens ? 'border-destructive' : 'border-border'} rounded-md text-sm focus:outline-none focus:border-primary font-mono`}
+          />
+          {errs.maxTokens && (
+            <p className="text-[10px] text-destructive mt-0.5">maxTokens {errs.maxTokens}</p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center justify-between">
+        <ModelTestStatus status={row.testStatus} />
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onProbe}
+            disabled={testDisabled}
+            title={testDisabledReason}
+            className="px-2.5 py-1 text-xs rounded-md border border-border bg-background hover:bg-secondary text-foreground disabled:opacity-50"
+          >
+            {isRunning ? 'Testing…' : 'Test'}
+          </button>
+          <button
+            type="button"
+            onClick={onRemove}
+            title="Remove model"
+            className="px-2 py-1 text-xs rounded-md border border-border bg-background hover:bg-destructive/10 text-destructive"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModelTestStatus({ status }: { status: ModelRowDraft['testStatus'] }) {
+  if (!status) return <span className="text-[11px] text-muted-foreground" />;
+  if (status.kind === 'running') return <span className="text-[11px] text-muted-foreground">Probing…</span>;
+  if (status.kind === 'ok') return <span className="text-[11px] text-emerald-600 dark:text-emerald-400">✓ {status.latencyMs} ms</span>;
+  return (
+    <span className="text-[11px] text-destructive truncate max-w-[280px]" title={status.error}>
+      ✗ {status.error}
+    </span>
+  );
+}
+
+interface FetchModelsPickerDialogProps {
+  candidates: string[];
+  selected: Set<string>;
+  onToggle: (id: string) => void;
+  onSelectAll: () => void;
+  onSelectNone: () => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}
+
+function FetchModelsPickerDialog({
+  candidates,
+  selected,
+  onToggle,
+  onSelectAll,
+  onSelectNone,
+  onCancel,
+  onConfirm,
+}: FetchModelsPickerDialogProps) {
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-[60]" onClick={onCancel} />
+      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[480px] md:max-h-[70vh] bg-card rounded-lg shadow-xl z-[60] flex flex-col border border-border">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+          <h3 className="text-sm font-semibold">Import models from /models</h3>
+          <button
+            onClick={onCancel}
+            className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+            aria-label="Close picker"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border text-xs text-muted-foreground">
+          <span>{candidates.length} candidates — {selected.size} selected</span>
+          <div className="flex gap-2">
+            <button onClick={onSelectAll} className="hover:text-foreground">All</button>
+            <button onClick={onSelectNone} className="hover:text-foreground">None</button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto px-2 py-2">
+          {candidates.map((id) => (
+            <label key={id} className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-secondary cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.has(id)}
+                onChange={() => onToggle(id)}
+                className="rounded-md border-border bg-secondary"
+              />
+              <span className="text-sm font-mono">{id}</span>
+            </label>
+          ))}
+        </div>
+        <div className="flex gap-2 p-3 border-t border-border">
+          <button
+            onClick={onConfirm}
+            disabled={selected.size === 0}
+            className="flex-1 px-3 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium disabled:opacity-50"
+          >
+            Add {selected.size} model{selected.size === 1 ? '' : 's'}
+          </button>
+          <button
+            onClick={onCancel}
+            className="flex-1 px-3 py-2 bg-secondary hover:bg-secondary/80 rounded-md text-sm font-medium"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
 
 function ProviderTypeSelector({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
