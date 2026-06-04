@@ -158,8 +158,10 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
 
   // If the provider stream ended without emitting a result/error event,
   // the frontend never receives run_completed/run_failed and gets stuck in
-  // a permanent loading state.  Emit a synthetic run_completed so the client
-  // can move on.
+  // a permanent loading state. Emit a synthetic run_completed so the client
+  // can move on; set phase to 'completed' to keep wire and phase aligned —
+  // we have no positive signal that this was an error, and any server-side
+  // distinguishing of this degraded path can rely on the trace event below.
   if (!isTerminalPhase(activeRun.phase)) {
     trace.log('server_norm', 'stream_ended_without_result', { runId, providerType }, 'provider stream ended without result event');
     sendRunEvent({
@@ -167,7 +169,7 @@ export async function consumeProviderStream(input: ConsumeProviderStreamInput): 
       runId,
       sessionId,
     });
-    setPhase(activeRun, 'failed');
+    setPhase(activeRun, 'completed');
     broadcastHeartbeat();
     postRunCompletedNotification({
       db,
