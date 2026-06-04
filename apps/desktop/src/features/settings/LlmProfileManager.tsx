@@ -29,6 +29,12 @@ const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
  * "0/non-numeric (validation error)" without lossy coercion on every keystroke.
  */
 interface ModelRowDraft {
+  /**
+   * Stable per-row identifier independent of array index. Used as the key for
+   * the testStatus auto-clear timer Map so reordering / row deletion above the
+   * probed row can't clear the wrong row's status when the timer fires.
+   */
+  rowUid: string;
   modelId: string;
   displayName: string;
   contextWindowStr: string;
@@ -40,8 +46,16 @@ interface ModelRowDraft {
     | { kind: 'fail'; error: string };
 }
 
+function generateRowUid(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 function entryToDraft(entry: LlmProfileModelEntry): ModelRowDraft {
   return {
+    rowUid: generateRowUid(),
     modelId: entry.modelId,
     displayName: entry.displayName ?? '',
     contextWindowStr: entry.contextWindow != null ? String(entry.contextWindow) : '',
@@ -174,7 +188,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const [pendingDeleteProfileId, setPendingDeleteProfileId] = useState<string | null>(null);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
-  const testStatusTimersRef = useRef<Map<number, number>>(new Map());
+  const testStatusTimersRef = useRef<Map<string, number>>(new Map());
 
   useAndroidBack(onClose, isOpen && !inline, 20);
 
@@ -387,7 +401,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const addEmptyModelRow = () => {
     setFormModels((rows) => [
       ...rows,
-      { modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '' },
+      { rowUid: generateRowUid(), modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '' },
     ]);
   };
 
@@ -395,23 +409,30 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormModels((rows) => rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   };
 
+  const updateModelRowByUid = (rowUid: string, patch: Partial<ModelRowDraft>) => {
+    setFormModels((rows) => rows.map((r) => (r.rowUid === rowUid ? { ...r, ...patch } : r)));
+  };
+
   const removeModelRow = (index: number) => {
-    const t = testStatusTimersRef.current.get(index);
-    if (t != null) {
-      window.clearTimeout(t);
-      testStatusTimersRef.current.delete(index);
+    const row = formModels[index];
+    if (row) {
+      const t = testStatusTimersRef.current.get(row.rowUid);
+      if (t != null) {
+        window.clearTimeout(t);
+        testStatusTimersRef.current.delete(row.rowUid);
+      }
     }
     setFormModels((rows) => rows.filter((_, i) => i !== index));
   };
 
-  const scheduleClearTestStatus = (index: number) => {
-    const existing = testStatusTimersRef.current.get(index);
+  const scheduleClearTestStatus = (rowUid: string) => {
+    const existing = testStatusTimersRef.current.get(rowUid);
     if (existing != null) window.clearTimeout(existing);
     const id = window.setTimeout(() => {
-      testStatusTimersRef.current.delete(index);
-      setFormModels((rows) => rows.map((r, i) => (i === index ? { ...r, testStatus: undefined } : r)));
+      testStatusTimersRef.current.delete(rowUid);
+      setFormModels((rows) => rows.map((r) => (r.rowUid === rowUid ? { ...r, testStatus: undefined } : r)));
     }, 6000);
-    testStatusTimersRef.current.set(index, id);
+    testStatusTimersRef.current.set(rowUid, id);
   };
 
   const handleFetchModels = async () => {
@@ -447,6 +468,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       setFormModels((rows) => [
         ...rows,
         ...toAdd.map<ModelRowDraft>((modelId) => ({
+          rowUid: generateRowUid(),
           modelId,
           displayName: '',
           contextWindowStr: '',
@@ -461,19 +483,20 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     if (!editingProfile?.id) return;
     const row = formModels[index];
     const modelId = row?.modelId.trim();
-    if (!modelId) return;
-    updateModelRow(index, { testStatus: { kind: 'running' } });
+    if (!row || !modelId) return;
+    const rowUid = row.rowUid;
+    updateModelRowByUid(rowUid, { testStatus: { kind: 'running' } });
     try {
       const result = await api.probeLlmProfileModel(editingProfile.id, modelId);
       if (result.ok) {
-        updateModelRow(index, { testStatus: { kind: 'ok', latencyMs: result.latencyMs } });
+        updateModelRowByUid(rowUid, { testStatus: { kind: 'ok', latencyMs: result.latencyMs } });
       } else {
-        updateModelRow(index, { testStatus: { kind: 'fail', error: result.error } });
+        updateModelRowByUid(rowUid, { testStatus: { kind: 'fail', error: result.error } });
       }
     } catch (err) {
-      updateModelRow(index, { testStatus: { kind: 'fail', error: err instanceof Error ? err.message : String(err) } });
+      updateModelRowByUid(rowUid, { testStatus: { kind: 'fail', error: err instanceof Error ? err.message : String(err) } });
     } finally {
-      scheduleClearTestStatus(index);
+      scheduleClearTestStatus(rowUid);
     }
   };
 
@@ -892,7 +915,7 @@ function ModelsSection({
         <div className="space-y-2">
           {models.map((row, idx) => (
             <ModelRow
-              key={idx}
+              key={row.rowUid}
               index={idx}
               row={row}
               allRows={models}
