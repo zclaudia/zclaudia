@@ -31,6 +31,7 @@ import { createAutomationRoutes } from '../../interfaces/http/automations.js';
 import type { NotificationSender } from '../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../domains/notification-feed/index.js';
 import { PermissionBridge } from '../conversation/agent/permission-bridge.js';
+import { recomputePhase, computeBlockers } from '../conversation/runtime/active-run-phase.js';
 import { AIRiskAnalysisAdapter } from '../conversation/agent/ai-risk-analysis-adapter.js';
 import type { WorkflowRunEvent } from '../../domains/workflows/run-events.js';
 import { ExecutorRegistry, ManualAdapter, ExecutorInstanceRepository } from '../../domains/executor/index.js';
@@ -228,6 +229,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
       if (!pending) continue;
       if (pending.timeout) clearTimeout(pending.timeout);
       run.pendingPermissions.delete(requestId);
+      recomputePhase(run, computeBlockers(run));
       run.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
         .run('running', Date.now(), run.sessionId);
       return true;

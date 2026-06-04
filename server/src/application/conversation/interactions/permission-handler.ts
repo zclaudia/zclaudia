@@ -13,6 +13,7 @@ import { broadcastRunMessage } from '../transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
+import { recomputePhase, computeBlockers } from '../runtime/active-run-phase.js';
 
 function broadcastPermissionResolved(
   run: ActiveRun,
@@ -58,6 +59,7 @@ export function handlePermissionDecision(
       const wfRunId = permissionBridge?.removeAndGetWorkflowRunId(message.requestId);
       if (wfRunId) cancelWorkflowRun?.(wfRunId);
       run.pendingPermissions.delete(message.requestId);
+      recomputePhase(run, computeBlockers(run));
 
       // Revert to running status after permission resolved
       run.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
@@ -172,6 +174,7 @@ export function handlePromptAnswer(
     if (pending) {
       if (pending.timeout) clearTimeout(pending.timeout);
       run.pendingPermissions.delete(message.requestId);
+      recomputePhase(run, computeBlockers(run));
 
       // Revert to running status after question answered
       run.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')

@@ -26,6 +26,7 @@ import {
 } from '../agent/permission-evaluator.js';
 import { isBashLikeTool, isSudoCommand } from '../../../utils/server-utils.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
+import { recomputePhase, computeBlockers } from './active-run-phase.js';
 
 /** Read-only bash commands that are safe to auto-approve for remembered outside-workspace directories. */
 const READONLY_BASH_COMMANDS = /^\s*(ls|cat|head|tail|wc|file|stat|du|find|tree|realpath|dirname|basename)\b/;
@@ -355,6 +356,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             ...(isAskUserQuestion && { questions: askUserQuestions }),
           },
         });
+        recomputePhase(activeRun, computeBlockers(activeRun));
 
         db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
           .run('waiting', Date.now(), activeRun.sessionId);

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PhaseEmitter } from '../active-run-phase.js';
+import { PhaseEmitter, recomputePhase, computeBlockers } from '../active-run-phase.js';
 
 const findProcessPidsByTaskCommandMock = vi.fn();
 const cleanupPendingPermissionsMock = vi.fn();
@@ -1165,6 +1165,54 @@ describe('ws/run-events', () => {
 
       expect(activeRun.pendingBackgroundTasks).toBe(0);
       expect(activeRun.phase).toBe('running');
+    });
+  });
+
+  // A1: the permission queue mutates `pendingPermissions` from many sites
+  // (run-permissions.set, permission-handler.delete, feature-domains.delete).
+  // Each callsite is expected to call recomputePhase(activeRun, computeBlockers(activeRun))
+  // after mutating the map. These tests directly exercise the helper pair to
+  // confirm the phase priority logic (`awaiting_permission` beats
+  // `awaiting_followup` beats `running`) used at every callsite.
+  describe('permission queue — phase transitions (A1)', () => {
+    function buildRun(overrides: Record<string, unknown> = {}): any {
+      return {
+        runId: 'run-1',
+        phase: 'running',
+        phaseEmitter: new PhaseEmitter(),
+        pendingPermissions: new Map(),
+        pendingBackgroundTasks: 0,
+        ...overrides,
+      };
+    }
+
+    it('first permission enqueue → awaiting_permission', () => {
+      const activeRun = buildRun();
+      activeRun.pendingPermissions.set('req-1', {} as any);
+      recomputePhase(activeRun, computeBlockers(activeRun));
+      expect(activeRun.phase).toBe('awaiting_permission');
+    });
+
+    it('last permission resolve → back to running', () => {
+      const activeRun = buildRun();
+      activeRun.pendingPermissions.set('req-1', {} as any);
+      recomputePhase(activeRun, computeBlockers(activeRun));
+      expect(activeRun.phase).toBe('awaiting_permission');
+
+      activeRun.pendingPermissions.delete('req-1');
+      recomputePhase(activeRun, computeBlockers(activeRun));
+      expect(activeRun.phase).toBe('running');
+    });
+
+    it('permission resolved while background task in flight → awaiting_followup', () => {
+      const activeRun = buildRun({ pendingBackgroundTasks: 1 });
+      activeRun.pendingPermissions.set('req-1', {} as any);
+      recomputePhase(activeRun, computeBlockers(activeRun));
+      expect(activeRun.phase).toBe('awaiting_permission');
+
+      activeRun.pendingPermissions.delete('req-1');
+      recomputePhase(activeRun, computeBlockers(activeRun));
+      expect(activeRun.phase).toBe('awaiting_followup');
     });
   });
 });

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { createPermissionCallback } from '../run-permissions.js';
 import { PermissionWorkflowResolver } from '../../../../domains/workflows/permission-workflow-resolver.js';
+import { PhaseEmitter } from '../active-run-phase.js';
 
 const {
   broadcastRunMessageMock,
@@ -151,6 +152,9 @@ function createInput(db: Database.Database, resolver: PermissionWorkflowResolver
       allowedOutsideWorkspaceRoots: new Set(),
       pendingPermissions: new Map(),
       workspaceRoot: '/Users/test/workspace',
+      phase: 'running' as const,
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     },
     cwd: '/Users/test/workspace',
     db: { prepare: vi.fn(() => ({ run: vi.fn() })) },

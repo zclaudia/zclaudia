@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPermissionCallback } from '../run-permissions.js';
+import { PhaseEmitter } from '../active-run-phase.js';
 
 const {
   broadcastRunMessageMock,
@@ -86,6 +87,9 @@ function createInput() {
       allowedOutsideWorkspaceRoots: new Set(),
       pendingPermissions: new Map(),
       workspaceRoot: '/Users/test/workspace',
+      phase: 'running' as const,
+      phaseEmitter: new PhaseEmitter(),
+      runId: 'run-1',
     },
     cwd: '/Users/test/workspace',
     db: { prepare: vi.fn(() => ({ run: vi.fn() })) },

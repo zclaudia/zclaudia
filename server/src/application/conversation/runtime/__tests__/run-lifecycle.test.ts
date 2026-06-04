@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { ActiveRun } from '../../transport/types.js';
 import type { CancelRunContext } from '../run-lifecycle.js';
+import { PhaseEmitter, setPhase } from '../active-run-phase.js';
 
 const broadcastRunMessageMock = vi.fn();
 const sendMessageMock = vi.fn();
@@ -31,8 +32,9 @@ vi.mock('../../../../infra/storage/metadata-extractor.js', () => ({
 void upsertAssistantMessageMock;
 
 function makeActiveRun(overrides: Partial<ActiveRun> & { pendingSteers: AgentMessage[] }): ActiveRun {
+  const runId = overrides.runId ?? 'r1';
   const base = {
-    runId: overrides.runId ?? 'r1',
+    runId,
     clientId: 'client-1',
     client: {
       id: 'client-1',
@@ -61,6 +63,8 @@ function makeActiveRun(overrides: Partial<ActiveRun> & { pendingSteers: AgentMes
     allowedOutsideWorkspaceRoots: new Set<string>(),
     eventSeq: 0,
     steerHandle: { steer: vi.fn() },
+    phase: 'running' as const,
+    phaseEmitter: new PhaseEmitter(),
     ...overrides,
   };
   return base as unknown as ActiveRun;
@@ -140,5 +144,89 @@ describe('cancelRun — restoreDraft', () => {
 
     const failedCall = broadcastRunMessageMock.mock.calls.find(([, m]) => m.type === 'run_failed');
     expect(failedCall![1].restoreDraft).toBe('plain string steer');
+  });
+});
+
+// A1: cancelRun must drive the ActiveRun phase machine through
+// `cancelling → cancelled` (happy path) or `cancelling → failed`
+// (when the partial-message save throws). A terminal-phase run that
+// receives a late cancel must be cleaned up silently without emitting
+// any further phase transitions.
+describe('cancelRun — phase transitions (A1)', () => {
+  beforeEach(() => {
+    broadcastRunMessageMock.mockReset();
+    sendMessageMock.mockReset();
+    cancelBySessionMock.mockReset();
+  });
+
+  it('cancelRun → cancelling → cancelled', async () => {
+    const { cancelRun } = await import('../run-lifecycle.js');
+    const ctx = makeCtx();
+    const run = makeActiveRun({
+      runId: 'r-phase-happy',
+      sessionId: 's1',
+      pendingSteers: [],
+    });
+    ctx.activeRuns.set(run.runId, run);
+
+    cancelRun(run.runId, ctx);
+
+    expect(run.phase).toBe('cancelled');
+  });
+
+  it('cancelRun on already-terminal run is a no-op (no illegal-transition warn)', async () => {
+    const { cancelRun } = await import('../run-lifecycle.js');
+    const ctx = makeCtx();
+    const run = makeActiveRun({
+      runId: 'r-phase-terminal',
+      sessionId: 's1',
+      pendingSteers: [],
+    });
+    // Move to a terminal phase via the validated state machine.
+    setPhase(run, 'completed');
+    ctx.activeRuns.set(run.runId, run);
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    cancelRun(run.runId, ctx);
+
+    expect(run.phase).toBe('completed');
+    expect(warnSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining('illegal phase transition'),
+    );
+    // Terminal early-return still cleans up activeRuns and pings heartbeat.
+    expect(ctx.activeRuns.has(run.runId)).toBe(false);
+    // No run_failed broadcast either — there's nothing to tell clients.
+    const failedCall = broadcastRunMessageMock.mock.calls.find(([, m]) => m?.type === 'run_failed');
+    expect(failedCall).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it('cancelRun whose upsertAssistantMessage throws → failed', async () => {
+    const { cancelRun } = await import('../run-lifecycle.js');
+    const ctx = makeCtx();
+    // Force upsertAssistantMessage to throw by giving it nonempty content
+    // (so it doesn't short-circuit) and a db whose prepare() throws.
+    const throwingDb = {
+      prepare: () => {
+        throw new Error('db blown up');
+      },
+    } as never;
+    const run = makeActiveRun({
+      runId: 'r-phase-failed',
+      sessionId: 's1',
+      pendingSteers: [],
+      db: throwingDb,
+      fullContent: 'partial assistant text',
+    });
+    ctx.activeRuns.set(run.runId, run);
+
+    // The catch in cancelRun logs the error — silence it for clean test output.
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    cancelRun(run.runId, ctx);
+
+    expect(run.phase).toBe('failed');
+    errSpy.mockRestore();
   });
 });

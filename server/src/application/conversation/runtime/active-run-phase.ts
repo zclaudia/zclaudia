@@ -132,6 +132,25 @@ export function recomputePhase(run: PhaseHolder, blockers: PhaseBlockers): void 
 }
 
 /**
+ * Inspect an ActiveRun-like object for the three concurrent blockers
+ * `recomputePhase` cares about. Exported so callsites that mutate any of
+ * (pendingPermissions, pendingBackgroundTasks, abortController) can call
+ * `recomputePhase(activeRun, computeBlockers(activeRun))` without manually
+ * assembling the bag.
+ */
+export function computeBlockers(run: {
+  abortController?: AbortController;
+  pendingPermissions: Map<unknown, unknown>;
+  pendingBackgroundTasks?: number;
+}): PhaseBlockers {
+  return {
+    isCancelling: !!run.abortController?.signal.aborted,
+    hasPendingPermissions: run.pendingPermissions.size > 0,
+    hasPendingFollowups: (run.pendingBackgroundTasks ?? 0) > 0,
+  };
+}
+
+/**
  * Promise that resolves with the terminal phase when reached.
  * Rejects on timeout. If already terminal, resolves synchronously.
  */

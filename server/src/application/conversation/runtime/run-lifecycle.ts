@@ -10,6 +10,7 @@ import { interactionDispatcher } from '../interactions/interaction-dispatcher.js
 import { extractAndIndexMetadata, removeIndexedMetadata } from '../../../infra/storage/metadata-extractor.js';
 import { broadcastRunMessage, sendMessage } from '../transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
+import { setPhase, isTerminalPhase } from './active-run-phase.js';
 
 /**
  * Extract a plain-text string from an AgentMessage's content field, handling
@@ -117,6 +118,18 @@ export function cancelRun(
 ): void {
   const run = ctx.activeRuns.get(runId);
   if (run) {
+    // Race guard: if the run already terminated before cancel arrived,
+    // skip cleanup — there's nothing left to abort and emitting phase
+    // transitions from a terminal state would warn.
+    if (isTerminalPhase(run.phase)) {
+      ctx.activeRuns.delete(runId);
+      ctx.broadcastHeartbeat();
+      return;
+    }
+
+    // Mark the cancel-in-flight phase before any cleanup work.
+    setPhase(run, 'cancelling');
+
     // Stop periodic save
     if (run.saveInterval) {
       clearInterval(run.saveInterval);
@@ -148,6 +161,7 @@ export function cancelRun(
       }
     } catch (err) {
       console.error(`[Cancel] Failed to save partial message for run ${runId}:`, err);
+      setPhase(run, 'failed');
     }
 
     // If the user queued any mid-run steers that pi hadn't yet drained, hand
@@ -181,6 +195,13 @@ export function cancelRun(
     run.steerHandle = undefined;
 
     interactionDispatcher.cancelBySession(run.sessionId);
+
+    // Cleanup finished. Only set 'cancelled' if we're still in 'cancelling'
+    // (the catch above may have already set 'failed').
+    if (run.phase === 'cancelling') {
+      setPhase(run, 'cancelled');
+    }
+
     ctx.activeRuns.delete(runId);
     ctx.broadcastHeartbeat();
     console.log(`${options.logLabel ?? 'Run'} ${runId} cancelled`);

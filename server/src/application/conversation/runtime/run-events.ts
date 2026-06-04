@@ -16,7 +16,7 @@ import type { ClaudeMessage, SystemInfo } from '../../../infra/providers/types.j
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import { postRunCompletedNotification, postRunFailedNotification } from './run-terminal-notifications.js';
-import { setPhase, recomputePhase, isTerminalPhase, type PhaseBlockers } from './active-run-phase.js';
+import { setPhase, recomputePhase, isTerminalPhase, computeBlockers } from './active-run-phase.js';
 
 export interface ProviderEventState {
   sdkSessionId?: string;
@@ -44,18 +44,6 @@ interface HandleProviderEventParams {
   msg: ClaudeMessage;
   broadcastHeartbeat: () => void;
   providerRegistry: ProviderRegistryPort;
-}
-
-/**
- * Capture the active blockers that influence phase. Called wherever a
- * counter or set mutation might change which "waiting state" the run is in.
- */
-function computeBlockers(run: ActiveRun): PhaseBlockers {
-  return {
-    isCancelling: !!run.abortController?.signal.aborted,
-    hasPendingPermissions: run.pendingPermissions.size > 0,
-    hasPendingFollowups: (run.pendingBackgroundTasks ?? 0) > 0,
-  };
 }
 
 function markBackgroundTaskStarted(activeRun: ActiveRun, state: ProviderEventState, key?: string): void {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { handlePermissionDecision } from '../permission-handler.js';
 import type { ActiveRun, ConnectedClient } from '../../transport/types.js';
+import { PhaseEmitter } from '../../runtime/active-run-phase.js';
 
 vi.mock('../../../../utils/crypto.js', () => ({
   decryptCredential: vi.fn(() => {
@@ -77,6 +78,8 @@ describe('permission-handler', () => {
       recentToolCalls: [],
       loopHeartbeatStreak: 0,
       eventSeq: 0,
+      phase: 'awaiting_permission',
+      phaseEmitter: new PhaseEmitter(),
     };
     activeRuns = new Map([['run-1', run]]);
     connectedClients = new Map([
