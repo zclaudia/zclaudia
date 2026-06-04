@@ -87,9 +87,14 @@ describe('compaction-service', () => {
   it('maybeCompact compacts when above threshold (small contextWindow override)', async () => {
     const seed = seedSession(db, 100);
     // Force threshold: 100-token window, default reserveTokens 16384 → threshold trivially exceeded.
-    const ap = { ...seed.agentProfile, contextWindow: 100 };
+    // Override lives on the LLM profile's models[] entry (the agent profile
+    // no longer carries a contextWindow field as of migration 003).
+    const lp = {
+      ...seed.llmProfile,
+      models: [{ modelId: seed.agentProfile.model, contextWindow: 100 }],
+    };
     const result = await maybeCompact({
-      db, sessionId: 's1', agentProfile: ap, llmProfile: seed.llmProfile,
+      db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp,
       source: 'auto',
     });
     expect(result.compacted).toBe(true);
@@ -155,9 +160,12 @@ describe('compaction-service', () => {
       error: { message: 'llm timeout' } as any,
     });
     const seed = seedSession(db, 100);
-    const ap = { ...seed.agentProfile, contextWindow: 100 };
+    const lp = {
+      ...seed.llmProfile,
+      models: [{ modelId: seed.agentProfile.model, contextWindow: 100 }],
+    };
     const result = await forceCompact({
-      db, sessionId: 's1', agentProfile: ap, llmProfile: seed.llmProfile, source: 'manual',
+      db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp, source: 'manual',
     });
     expect(result.compacted).toBe(false);
     expect(result.reason).toMatch(/^error:/);

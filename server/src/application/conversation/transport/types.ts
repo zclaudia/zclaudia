@@ -94,10 +94,11 @@ export interface ActiveRun {
   /** PCP effective profile negotiated at run start */
   effectiveProfile?: PCPEffectiveProfile;
   /**
-   * Agent profile resolved at run start. Carries model + contextWindow used by
-   * compaction-service to decide when to summarize history. Optional so legacy
-   * construction sites (heartbeat reconstruction, supervision paths) keep
-   * compiling — populated eagerly by `run-bootstrap`.
+   * Agent profile resolved at run start. Carries model + system prompt used by
+   * compaction-service (combined with llmProfile.models to derive the effective
+   * context window). Optional so legacy construction sites (heartbeat
+   * reconstruction, supervision paths) keep compiling — populated eagerly by
+   * `run-bootstrap`.
    */
   agentProfile?: AgentProfileConfig;
   /**

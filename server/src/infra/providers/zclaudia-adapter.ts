@@ -230,10 +230,17 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     };
 
     // 1. Build the model first (config errors stop here, before any init event).
-    //    Init carries contextWindow which requires a built model.
+    //    Init carries contextWindow which requires a built model. If the LLM
+    //    profile declares a per-model entry for this model id, pass it so
+    //    user-declared contextWindow / maxTokens / displayName override the
+    //    pi-ai registry / openai-compat defaults (T3 of llm-profile-models).
     let modelInfo: BuiltModel;
     try {
-      modelInfo = buildModel(options.llmProfileConfig, options.agentProfile?.model);
+      const modelId = options.agentProfile?.model;
+      const modelEntry = modelId
+        ? options.llmProfileConfig?.models?.find((m) => m.modelId === modelId)
+        : undefined;
+      modelInfo = buildModel(options.llmProfileConfig, modelId, modelEntry);
     } catch (err) {
       // Emit a minimal init so the client has a sessionId, then the error.
       yield {

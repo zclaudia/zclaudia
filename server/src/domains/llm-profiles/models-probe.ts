@@ -35,7 +35,12 @@ export async function probeModel(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
   try {
-    const built = buildModel(profile, modelId);
+    // Pass the per-model entry (if declared) so any contextWindow / maxTokens
+    // / displayName overrides flow into the built model. For max_tokens=1
+    // ping this is mostly cosmetic but keeps the build path consistent with
+    // the runtime call site (zclaudia-adapter).
+    const modelEntry = profile.models?.find((m) => m.modelId === modelId);
+    const built = buildModel(profile, modelId, modelEntry);
     // Resolve api key explicitly: completeSimple's `apiKey` option takes
     // precedence over getEnvApiKey, which matches buildModel's intent.
     const apiKey = built.getApiKey ? await built.getApiKey(built.model.provider) : undefined;

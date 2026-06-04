@@ -1225,7 +1225,7 @@ describe('run-events agent_end -> maybeCompact', () => {
 
   it('calls maybeCompact when activeRun has agentProfile and llmProfile', async () => {
     const sendRunEventMock = vi.fn();
-    const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6', contextWindow: null } as any;
+    const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6' } as any;
     const llmProfile = { id: 'lp1', providerType: 'anthropic', apiKey: 'k' } as any;
     const activeRun = {
       sessionId: 'session-1',
@@ -1289,8 +1289,13 @@ describe('run-events agent_end -> maybeCompact', () => {
 
   it('sends compaction_completed event before run_completed when compaction succeeds', async () => {
     const sendRunEventMock = vi.fn();
-    const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6', contextWindow: 100 } as any;
-    const llmProfile = { id: 'lp1', providerType: 'anthropic', apiKey: 'k' } as any;
+    const agentProfile = { id: 'ap1', model: 'claude-sonnet-4-6' } as any;
+    const llmProfile = {
+      id: 'lp1', providerType: 'anthropic', apiKey: 'k',
+      // Tight per-model window forces compaction in the mocked maybeCompactMock,
+      // but we don't rely on it here — the mock returns the canned result directly.
+      models: [{ modelId: 'claude-sonnet-4-6', contextWindow: 100 }],
+    } as any;
     const activeRun = {
       sessionId: 'session-1',
       assistantMessageId: 'assistant-1',

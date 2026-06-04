@@ -811,6 +811,52 @@ describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => 
   });
 });
 
+describe('buildModel — modelEntry overrides', () => {
+  const originalEnv = { ...process.env };
+  beforeEach(() => { process.env = { ...originalEnv }; });
+  afterEach(() => { process.env = { ...originalEnv }; });
+
+  it('overrides contextWindow on openai-compat path', () => {
+    const profile = {
+      providerType: 'openai-custom',
+      baseUrl: 'http://x/v1',
+      apiKey: 'k',
+    } as any;
+    const built = buildModel(profile, 'something', { modelId: 'something', contextWindow: 999_999 });
+    expect(built.model.contextWindow).toBe(999_999);
+  });
+
+  it('overrides maxTokens on openai-compat path', () => {
+    const built = buildModel(
+      { providerType: 'openai-custom', baseUrl: 'http://x/v1' } as any,
+      'm',
+      { modelId: 'm', maxTokens: 2048 },
+    );
+    expect(built.model.maxTokens).toBe(2048);
+  });
+
+  it('replaces display name on openai-compat path', () => {
+    const built = buildModel(
+      { providerType: 'openai-custom', baseUrl: 'http://x/v1' } as any,
+      'raw-id',
+      { modelId: 'raw-id', displayName: 'Pretty Name' },
+    );
+    expect(built.model.name).toBe('Pretty Name');
+  });
+
+  it('overrides registry-resolved Model.contextWindow', () => {
+    delete process.env.OPENAI_BASE_URL;
+    const built = buildModel(undefined, 'claude-opus-4-7', { modelId: 'claude-opus-4-7', contextWindow: 1_000_000 });
+    expect(built.model.contextWindow).toBe(1_000_000);
+  });
+
+  it('leaves model untouched when entry is undefined', () => {
+    delete process.env.OPENAI_BASE_URL;
+    const built = buildModel(undefined, 'claude-opus-4-7');
+    expect(built.model.contextWindow).toBeGreaterThan(0); // whatever pi-ai default
+  });
+});
+
 describe('buildModel — profile overrides', () => {
   const originalEnv = { ...process.env };
   beforeEach(() => {

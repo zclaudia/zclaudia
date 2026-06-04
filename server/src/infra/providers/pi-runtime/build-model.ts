@@ -1,8 +1,35 @@
 import { getModel, type Model } from '@earendil-works/pi-ai';
-import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
 
 const DEFAULT_PROVIDER = 'anthropic';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
+
+/**
+ * Apply per-model overrides declared on the LLM profile's `models[]` to the
+ * already-constructed pi-ai `Model` literal. Mutates in place — callers pass
+ * locally-cloned models (registry path shallow-clones; openai-compat path
+ * literally constructs the model object), so the mutation is contained.
+ *
+ * Only positive integers for contextWindow / maxTokens are honored (the routes
+ * validator enforces this, but we double-check here so direct callers that
+ * skip validation can't accidentally zero out the window).
+ */
+function applyModelEntryOverrides(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  model: Model<any>,
+  entry: LlmProfileModelEntry | undefined,
+): void {
+  if (!entry) return;
+  if (entry.contextWindow && entry.contextWindow > 0) {
+    model.contextWindow = entry.contextWindow;
+  }
+  if (entry.maxTokens && entry.maxTokens > 0) {
+    model.maxTokens = entry.maxTokens;
+  }
+  if (entry.displayName) {
+    model.name = entry.displayName;
+  }
+}
 
 /**
  * Result of {@link buildModel}: a pi-ai `Model` literal plus an optional
@@ -22,8 +49,19 @@ export type BuiltModel = { model: Model<any>; getApiKey?: (provider: string) => 
  * `openai-completions` Model literal so any OpenAI-compatible endpoint
  * (DeepSeek / vLLM / Azure / corporate proxies / etc.) works without being
  * pre-registered in pi-ai's model registry.
+ *
+ * `modelEntry` carries per-model overrides (contextWindow / maxTokens /
+ * displayName) declared on `profile.models[]`. Applied last so they always
+ * win over registry defaults and the openai-compat literal's hardcoded
+ * 128k window / 8k maxTokens. Resolvers (e.g. `resolveContextWindow`) look
+ * up the entry by `modelId` and pass it here so any downstream code reading
+ * `model.contextWindow` sees the user-declared value.
  */
-export function buildModel(profile?: LlmProfileConfig, modelOverride?: string): BuiltModel {
+export function buildModel(
+  profile?: LlmProfileConfig,
+  modelOverride?: string,
+  modelEntry?: LlmProfileModelEntry,
+): BuiltModel {
   const baseUrl = profile?.baseUrl ?? process.env.OPENAI_BASE_URL;
   if (baseUrl) {
     const id = modelOverride ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
@@ -56,6 +94,7 @@ export function buildModel(profile?: LlmProfileConfig, modelOverride?: string): 
     if (profile?.requestHeaders) {
       model.headers = { ...(model.headers ?? {}), ...profile.requestHeaders };
     }
+    applyModelEntryOverrides(model, modelEntry);
     return {
       model,
       getApiKey: async () => profile?.apiKey ?? process.env.OPENAI_API_KEY ?? '',
@@ -77,6 +116,7 @@ export function buildModel(profile?: LlmProfileConfig, modelOverride?: string): 
   if (profile?.requestHeaders) {
     model.headers = { ...(model.headers ?? {}), ...profile.requestHeaders };
   }
+  applyModelEntryOverrides(model, modelEntry);
   return {
     model,
     getApiKey: profile?.apiKey ? async () => profile.apiKey! : undefined,

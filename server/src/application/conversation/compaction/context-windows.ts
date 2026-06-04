@@ -19,25 +19,37 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
 const FALLBACK_CONTEXT_WINDOW = 100_000;
 
 /**
- * Resolve the effective context window for a session/agent profile. Order:
- * 1. `profile.contextWindow` (user override) — used when non-null and > 0
- * 2. `MODEL_CONTEXT_WINDOWS[profile.model]` (hardcoded table)
- * 3. `buildModel(llmProfileConfig, modelId).model.contextWindow` (pi-ai registry / OpenAI-compat default)
- * 4. `FALLBACK_CONTEXT_WINDOW`
+ * Resolve the effective context window for a session. Priority chain:
  *
- * Pass `modelOverride` to resolve a window without a profile object (e.g.
- * one-off compaction call sites). Pass `llmProfileConfig` to let the function
- * delegate to pi-ai's registry for unknown ids; otherwise it stops at step 2/4.
+ * 1. `llmProfileConfig.models[*].contextWindow` — user-declared per-profile
+ *    override. Same model id can carry different real windows across
+ *    providers/tiers (e.g. Anthropic Claude vs an OpenRouter proxy), so this
+ *    is the canonical source-of-truth when set.
+ * 2. `MODEL_CONTEXT_WINDOWS[modelId]` — hardcoded table for first-party ids
+ *    so freshly-installed setups work without manual override.
+ * 3. `buildModel(llmProfileConfig, modelId).model.contextWindow` — pi-ai
+ *    registry lookup (built-in providers) or openai-compat literal default
+ *    (custom endpoints).
+ * 4. `FALLBACK_CONTEXT_WINDOW` (100k) — last-resort safety net.
+ *
+ * Note: the legacy `agent_profile.contextWindow` override level has been
+ * dropped — the override now lives on the LLM profile via `models[*]`. Pass
+ * `modelOverride` to resolve without an agent profile (e.g. one-off compaction
+ * call sites).
  */
 export function resolveContextWindow(
-  profile: { model: string; contextWindow?: number | null } | null,
+  agentProfile: { model: string } | null,
   modelOverride?: string,
   llmProfileConfig?: LlmProfileConfig,
 ): number {
-  if (profile?.contextWindow != null && profile.contextWindow > 0) {
-    return profile.contextWindow;
+  const modelId = agentProfile?.model ?? modelOverride;
+
+  if (modelId && llmProfileConfig?.models) {
+    const entry = llmProfileConfig.models.find((m) => m.modelId === modelId);
+    if (entry?.contextWindow && entry.contextWindow > 0) {
+      return entry.contextWindow;
+    }
   }
-  const modelId = profile?.model ?? modelOverride;
   if (modelId && MODEL_CONTEXT_WINDOWS[modelId]) {
     return MODEL_CONTEXT_WINDOWS[modelId];
   }
