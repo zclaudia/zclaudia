@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
-import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
+import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { LlmProfileRepository } from './repository.js';
 import {
@@ -9,6 +9,8 @@ import {
   LlmProfileInUseError,
   LlmProfileNotFoundError,
 } from './llm-profile-deletion-service.js';
+import { fetchModelsForProfile } from './models-fetch.js';
+import { probeModel } from './models-probe.js';
 
 const VALID_PROVIDER_TYPES: readonly string[] = LLM_PROVIDER_TYPES;
 
@@ -24,6 +26,65 @@ const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
  * - Reserved keys (Authorization, Content-Type, Host — case-insensitive)
  *   are rejected; pi-ai manages those via apiKey + its own client logic
  */
+/**
+ * Validate user-provided `models` list. Returns the normalized array, or
+ * `undefined` when input is null/undefined (so the repository treats it as
+ * "no change" rather than "clear to []"). Throws on any structural error.
+ *
+ * Rules:
+ * - `null` / `undefined` → returns `undefined` (no override).
+ * - Must be an array. Each entry an object with non-empty string `modelId`.
+ * - `modelId` is unique within the list (trim-compared).
+ * - `displayName` (optional) is a string.
+ * - `contextWindow` / `maxTokens` (optional) are positive integers.
+ */
+function validateModels(input: unknown): LlmProfileModelEntry[] | undefined {
+  if (input === undefined || input === null) return undefined;
+  if (!Array.isArray(input)) {
+    throw new Error('models must be an array');
+  }
+  const seen = new Set<string>();
+  const out: LlmProfileModelEntry[] = [];
+  for (let i = 0; i < input.length; i += 1) {
+    const raw = input[i];
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new Error(`models[${i}] must be an object`);
+    }
+    const entry = raw as Record<string, unknown>;
+    if (typeof entry.modelId !== 'string' || !entry.modelId.trim()) {
+      throw new Error(`models[${i}].modelId is required (non-empty string)`);
+    }
+    const id = entry.modelId.trim();
+    if (seen.has(id)) {
+      throw new Error(`models[${i}].modelId "${id}" is duplicated`);
+    }
+    seen.add(id);
+    const normalized: LlmProfileModelEntry = { modelId: id };
+    if (entry.displayName !== undefined && entry.displayName !== null) {
+      if (typeof entry.displayName !== 'string') {
+        throw new Error(`models[${i}].displayName must be a string`);
+      }
+      normalized.displayName = entry.displayName;
+    }
+    if (entry.contextWindow !== undefined && entry.contextWindow !== null) {
+      const cw = entry.contextWindow;
+      if (typeof cw !== 'number' || !Number.isFinite(cw) || cw <= 0 || !Number.isInteger(cw)) {
+        throw new Error(`models[${i}].contextWindow must be a positive integer`);
+      }
+      normalized.contextWindow = cw;
+    }
+    if (entry.maxTokens !== undefined && entry.maxTokens !== null) {
+      const mt = entry.maxTokens;
+      if (typeof mt !== 'number' || !Number.isFinite(mt) || mt <= 0 || !Number.isInteger(mt)) {
+        throw new Error(`models[${i}].maxTokens must be a positive integer`);
+      }
+      normalized.maxTokens = mt;
+    }
+    out.push(normalized);
+  }
+  return out;
+}
+
 function validateRequestHeaders(input: unknown): Record<string, string> {
   if (input == null) return {};
   if (typeof input !== 'object' || Array.isArray(input)) {
@@ -83,7 +144,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
 
   router.post('/', (req: Request, res: Response) => {
     try {
-      const { name, providerType = 'anthropic', baseUrl, apiKey, compat, requestHeaders: rawRequestHeaders, isDefault } = req.body;
+      const { name, providerType = 'anthropic', baseUrl, apiKey, compat, requestHeaders: rawRequestHeaders, models: rawModels, isDefault } = req.body;
 
       if (!name) {
         res.status(400).json({
@@ -113,6 +174,17 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         return;
       }
 
+      let validatedModels: LlmProfileModelEntry[] | undefined;
+      try {
+        validatedModels = validateModels(rawModels);
+      } catch (err) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+        });
+        return;
+      }
+
       if (isDefault) {
         repo.clearAllDefaults();
       }
@@ -124,6 +196,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         apiKey,
         compat,
         requestHeaders,
+        models: validatedModels,
         isDefault: Boolean(isDefault),
       });
 
@@ -163,6 +236,17 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         try {
           const validated = validateRequestHeaders(body.requestHeaders);
           patch.requestHeaders = Object.keys(validated).length > 0 ? validated : undefined;
+        } catch (err) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+          });
+          return;
+        }
+      }
+      if (Object.prototype.hasOwnProperty.call(body, 'models')) {
+        try {
+          patch.models = validateModels(body.models);
         } catch (err) {
           res.status(400).json({
             success: false,
@@ -243,6 +327,70 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       res.status(500).json({
         success: false,
         error: { code: 'DB_ERROR', message: 'Failed to set default llm profile' },
+      });
+    }
+  });
+
+  router.post('/:id/models/fetch', async (req: Request, res: Response) => {
+    try {
+      const profile = repo.findById(req.params.id);
+      if (!profile) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'LlmProfile not found' },
+        });
+        return;
+      }
+      const result = await fetchModelsForProfile(profile);
+      if (!result.ok) {
+        res.status(502).json({
+          success: false,
+          error: { code: 'UPSTREAM_ERROR', message: result.error },
+        });
+        return;
+      }
+      res.json({ success: true, data: { models: result.models } });
+    } catch (error) {
+      console.error('Error fetching models for llm profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'FETCH_ERROR', message: 'Failed to fetch models' },
+      });
+    }
+  });
+
+  router.post('/:id/models/probe', async (req: Request, res: Response) => {
+    try {
+      const profile = repo.findById(req.params.id);
+      if (!profile) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'LlmProfile not found' },
+        });
+        return;
+      }
+      const modelId = typeof req.body?.modelId === 'string' ? req.body.modelId.trim() : '';
+      if (!modelId) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: 'modelId is required' },
+        });
+        return;
+      }
+      const result = await probeModel(profile, modelId);
+      // Probe failures are diagnostic — return 200 with `data.ok: false`
+      // so the UI can render the error inline next to the row rather than
+      // surfacing a generic toast.
+      if (!result.ok) {
+        res.json({ success: true, data: { ok: false, error: result.error } });
+        return;
+      }
+      res.json({ success: true, data: { ok: true, latencyMs: result.latencyMs } });
+    } catch (error) {
+      console.error('Error probing model for llm profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'PROBE_ERROR', message: 'Failed to probe model' },
       });
     }
   });

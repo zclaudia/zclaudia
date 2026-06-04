@@ -147,4 +147,83 @@ describe('llm-profiles routes', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('models validation', () => {
+    it('accepts a single well-formed entry', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'ok', providerType: 'anthropic',
+        models: [{ modelId: 'claude-opus-4-7', contextWindow: 1_000_000 }],
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.data.models).toEqual([{ modelId: 'claude-opus-4-7', contextWindow: 1_000_000 }]);
+    });
+
+    it('rejects duplicate modelId', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'dup', providerType: 'anthropic',
+        models: [{ modelId: 'foo' }, { modelId: 'foo' }],
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects empty modelId', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'mid', providerType: 'anthropic',
+        models: [{}],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects zero / negative contextWindow', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'cw0', providerType: 'anthropic',
+        models: [{ modelId: 'm', contextWindow: 0 }],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects non-integer contextWindow', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'frac', providerType: 'anthropic',
+        models: [{ modelId: 'm', contextWindow: 1.5 }],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects non-string displayName', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'dn', providerType: 'anthropic',
+        models: [{ modelId: 'm', displayName: 123 }],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('rejects models not being an array', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad', providerType: 'anthropic',
+        models: 'oops',
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('treats models = null as no override (saves as undefined)', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'nil', providerType: 'anthropic', models: null,
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.data.models).toBeUndefined();
+    });
+
+    it('PUT applies same validator', async () => {
+      const created = await request(app).post('/api/llm-profiles').send({
+        name: 'patch-target', providerType: 'anthropic',
+      });
+      const id = created.body.data.id;
+      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
+        models: [{ modelId: 'a' }, { modelId: 'a' }],
+      });
+      expect(res.status).toBe(400);
+    });
+  });
 });
