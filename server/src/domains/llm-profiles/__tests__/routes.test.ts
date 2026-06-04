@@ -65,4 +65,86 @@ describe('llm-profiles routes', () => {
     const check = await request(app).get(`/api/llm-profiles/${lp.id}`);
     expect(check.status).toBe(200);
   });
+
+  describe('requestHeaders validation', () => {
+    it('POST with valid requestHeaders → 201', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'with-headers',
+        providerType: 'openai',
+        requestHeaders: { 'X-Org-Id': 'abc' },
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.data.requestHeaders).toEqual({ 'X-Org-Id': 'abc' });
+    });
+
+    it('POST rejects Authorization in requestHeaders', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad',
+        providerType: 'openai',
+        requestHeaders: { 'Authorization': 'Bearer leaked' },
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(res.body.error.message).toMatch(/Authorization/);
+    });
+
+    it('POST rejects Content-Type (case-insensitive)', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad',
+        providerType: 'openai',
+        requestHeaders: { 'CONTENT-TYPE': 'application/x-evil' },
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/Content-Type|CONTENT-TYPE/i);
+    });
+
+    it('POST rejects Host', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad',
+        providerType: 'openai',
+        requestHeaders: { 'host': 'evil.example.com' },
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('POST rejects non-string header value', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad',
+        providerType: 'openai',
+        requestHeaders: { 'X-Foo': 123 },
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.message).toMatch(/X-Foo/);
+    });
+
+    it('POST rejects non-object requestHeaders', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad',
+        providerType: 'openai',
+        requestHeaders: 'not-an-object',
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('POST rejects array as requestHeaders', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad',
+        providerType: 'openai',
+        requestHeaders: [['X-Foo', 'bar']],
+      });
+      expect(res.status).toBe(400);
+    });
+
+    it('PUT applies same validation', async () => {
+      const createRes = await request(app).post('/api/llm-profiles').send({
+        name: 'pre',
+        providerType: 'openai',
+      });
+      const id = createRes.body.data.id;
+      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
+        requestHeaders: { 'Authorization': 'Bearer x' },
+      });
+      expect(res.status).toBe(400);
+    });
+  });
 });

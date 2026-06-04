@@ -12,6 +12,36 @@ import {
 
 const VALID_PROVIDER_TYPES: readonly string[] = LLM_PROVIDER_TYPES;
 
+const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
+
+/**
+ * Validate user-provided request headers. Returns the normalized object
+ * (same shape, no mutation) or throws an Error with a user-facing message.
+ *
+ * Rules:
+ * - Must be an object (not array, not primitive)
+ * - All values must be strings
+ * - Reserved keys (Authorization, Content-Type, Host — case-insensitive)
+ *   are rejected; pi-ai manages those via apiKey + its own client logic
+ */
+function validateRequestHeaders(input: unknown): Record<string, string> {
+  if (input == null) return {};
+  if (typeof input !== 'object' || Array.isArray(input)) {
+    throw new Error('requestHeaders must be a JSON object');
+  }
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(input as Record<string, unknown>)) {
+    if (typeof value !== 'string') {
+      throw new Error(`requestHeaders["${key}"] must be a string`);
+    }
+    if (RESERVED_HEADER_KEYS.has(key.toLowerCase())) {
+      throw new Error(`Header "${key}" is reserved (managed by API key / pi-ai); remove it from requestHeaders`);
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
 export function createLlmProfileRoutes(db: Database.Database): Router {
   const router = Router();
   const repo = new LlmProfileRepository(db);
@@ -53,7 +83,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
 
   router.post('/', (req: Request, res: Response) => {
     try {
-      const { name, providerType = 'anthropic', baseUrl, apiKey, compat, env, isDefault } = req.body;
+      const { name, providerType = 'anthropic', baseUrl, apiKey, compat, requestHeaders: rawRequestHeaders, isDefault } = req.body;
 
       if (!name) {
         res.status(400).json({
@@ -71,6 +101,18 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         return;
       }
 
+      let requestHeaders: Record<string, string> | undefined;
+      try {
+        const validated = validateRequestHeaders(rawRequestHeaders);
+        requestHeaders = Object.keys(validated).length > 0 ? validated : undefined;
+      } catch (err) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+        });
+        return;
+      }
+
       if (isDefault) {
         repo.clearAllDefaults();
       }
@@ -81,7 +123,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         baseUrl,
         apiKey,
         compat,
-        env,
+        requestHeaders,
         isDefault: Boolean(isDefault),
       });
 
@@ -117,7 +159,18 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       if (Object.prototype.hasOwnProperty.call(body, 'baseUrl')) patch.baseUrl = body.baseUrl ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'apiKey')) patch.apiKey = body.apiKey ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'compat')) patch.compat = body.compat ?? null;
-      if (Object.prototype.hasOwnProperty.call(body, 'env')) patch.env = body.env ?? null;
+      if (Object.prototype.hasOwnProperty.call(body, 'requestHeaders')) {
+        try {
+          const validated = validateRequestHeaders(body.requestHeaders);
+          patch.requestHeaders = (Object.keys(validated).length > 0 ? validated : undefined) as any;
+        } catch (err) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: err instanceof Error ? err.message : String(err) },
+          });
+          return;
+        }
+      }
       if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
 
       try {
