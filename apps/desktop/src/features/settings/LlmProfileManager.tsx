@@ -21,6 +21,8 @@ const PROVIDER_CAPABILITIES: Record<string, CapabilitySummary> = {
   anthropic: { stream: 'strict', tools: 'none', interactions: 'none', backgroundTask: 'none' },
 };
 
+const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
+
 function CapabilityTags({ providerType }: { providerType: string }) {
   const caps = PROVIDER_CAPABILITIES[providerType];
   if (!caps) return null;
@@ -200,6 +202,11 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
               setSaving(false);
               return;
             }
+            if (RESERVED_HEADER_KEYS.has(key.toLowerCase())) {
+              setFormRequestHeadersError(`Header "${key}" is reserved (managed by API key); remove it from Request Headers`);
+              setSaving(false);
+              return;
+            }
           }
           requestHeadersObj = Object.keys(parsed).length > 0 ? parsed as Record<string, string> : undefined;
           setFormRequestHeadersError(null);
@@ -363,10 +370,10 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 "User-Agent": "ZClaudia/1.0"
 }`}
           rows={5}
-          className={`w-full px-3 py-2 bg-secondary border ${formRequestHeadersError ? 'border-red-500' : 'border-border'} rounded-lg text-sm focus:outline-none focus:border-primary font-mono`}
+          className={`w-full px-3 py-2 bg-secondary border ${formRequestHeadersError ? 'border-destructive' : 'border-border'} rounded-lg text-sm focus:outline-none focus:border-primary font-mono`}
         />
         {formRequestHeadersError ? (
-          <p className="text-xs text-red-500 mt-1">{formRequestHeadersError}</p>
+          <p className="text-xs text-destructive mt-1">{formRequestHeadersError}</p>
         ) : (
           <p className="text-xs text-muted-foreground mt-1">
             Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host are reserved.

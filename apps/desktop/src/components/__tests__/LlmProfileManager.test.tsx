@@ -482,6 +482,30 @@ describe('ProviderManager', () => {
       expect(api.createLlmProfile).not.toHaveBeenCalled();
     });
 
+    it('rejects Authorization in requestHeaders with inline error (client-side)', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+
+      const nameInput = screen.getByPlaceholderText(/Local ZClaudia Agent/);
+      fireEvent.change(nameInput, { target: { value: 'New Provider' } });
+
+      const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
+      fireEvent.change(headersTextarea, { target: { value: '{"Authorization": "Bearer x"}' } });
+
+      await clickAsync(screen.getByText('Create'));
+
+      await waitFor(() => {
+        expect(screen.getByText(/reserved/i)).toBeInTheDocument();
+      });
+
+      expect(api.createLlmProfile).not.toHaveBeenCalled();
+    });
+
     it('accepts valid JSON in request headers field', async () => {
       await renderProviderManager({ onClose: mockOnClose });
 
