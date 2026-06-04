@@ -35,7 +35,15 @@ export function buildModel(profile?: LlmProfileConfig, modelOverride?: string): 
       api: 'openai-completions',
       provider,
       baseUrl,
-      reasoning: false,
+      // `reasoning: true` makes pi-ai's openai-completions provider gate the
+      // thinkingFormat-specific "enable thinking" knobs (deepseek/zai/qwen/
+      // openrouter/together/string-thinking) on `options.reasoning`. Setting
+      // false would silently disable thinking for ALL reasoning-style
+      // providers regardless of agentProfile.thinkingLevel. When the user
+      // hasn't set thinkingLevel, options.reasoning is undefined and pi
+      // sends no thinking-related params (see openai-completions.js:345-346)
+      // — so `true` is safe even for non-reasoning models.
+      reasoning: true,
       input: ['text'],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
       contextWindow: 128000,

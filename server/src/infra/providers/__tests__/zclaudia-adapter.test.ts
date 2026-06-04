@@ -247,6 +247,16 @@ describe('buildModel', () => {
     const { getApiKey } = buildModel();
     expect(await getApiKey!('whatever')).toBe('sk-real-key');
   });
+
+  it('OPENAI_BASE_URL custom model: reasoning is true so pi enables thinking-format-specific knobs', () => {
+    // pi-ai's openai-completions provider gates thinkingFormat-specific
+    // "enable thinking" knobs on `model.reasoning`. Hardcoding false here
+    // would silently break thinking for deepseek / zai / qwen / openrouter
+    // / together regardless of agentProfile.thinkingLevel.
+    process.env.OPENAI_BASE_URL = 'https://api.deepseek.com/v1';
+    const { model } = buildModel();
+    expect(model.reasoning).toBe(true);
+  });
 });
 
 describe('translateEvent', () => {
