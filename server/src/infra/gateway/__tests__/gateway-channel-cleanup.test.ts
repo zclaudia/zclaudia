@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { handleChannelClosed } from '../gateway-channel-cleanup.js';
 import type { ActiveRun } from '../../../application/conversation/transport/types.js';
+import { PhaseEmitter, type RunPhase } from '../../../application/conversation/runtime/active-run-phase.js';
 
-function createRun(clientId: string, completed = false): ActiveRun {
+function createRun(clientId: string, phase: RunPhase = 'running'): ActiveRun {
   return {
     runId: `run-${clientId}`,
     clientId,
@@ -31,7 +32,8 @@ function createRun(clientId: string, completed = false): ActiveRun {
     recentToolCalls: [],
     loopHeartbeatStreak: 0,
     eventSeq: 0,
-    completed,
+    phase,
+    phaseEmitter: new PhaseEmitter(),
   };
 }
 
@@ -79,7 +81,7 @@ describe('handleChannelClosed', () => {
   it('ignores completed runs', () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const activeRuns = new Map<string, ActiveRun>([
-      ['run-1', createRun('channel-1', true)],
+      ['run-1', createRun('channel-1', 'completed')],
     ]);
 
     handleChannelClosed('channel-1', activeRuns);

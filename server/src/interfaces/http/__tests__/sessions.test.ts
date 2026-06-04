@@ -632,7 +632,7 @@ describe('sessions routes', () => {
     });
 
     it('returns activeRun when foreground run is still running', async () => {
-      activeRuns.set('run-1', { sessionId: 's1', completed: false, sessionType: 'regular' });
+      activeRuns.set('run-1', { sessionId: 's1', phase: 'running', sessionType: 'regular' });
 
       const res = await request(app).get('/api/sessions/s1/messages');
 
@@ -641,8 +641,8 @@ describe('sessions routes', () => {
     });
 
     it('does not return activeRun for completed or background runs', async () => {
-      activeRuns.set('run-completed', { sessionId: 's1', completed: true, sessionType: 'regular' });
-      activeRuns.set('run-bg', { sessionId: 's1', completed: false, sessionType: 'background' });
+      activeRuns.set('run-completed', { sessionId: 's1', phase: 'completed', sessionType: 'regular' });
+      activeRuns.set('run-bg', { sessionId: 's1', phase: 'running', sessionType: 'background' });
 
       const res = await request(app).get('/api/sessions/s1/messages');
 
@@ -1125,7 +1125,7 @@ internal reasoning zclaudia plan
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
       `).run('s1', 'project-1', 'Running', now, now);
-      activeRuns.set('run-1', { sessionId: 's1', completed: false, sessionType: 'regular' });
+      activeRuns.set('run-1', { sessionId: 's1', phase: 'running', sessionType: 'regular' });
 
       const res = await request(app).get('/api/sessions/sync?since=0');
       expect(res.status).toBe(200);
@@ -1144,7 +1144,7 @@ internal reasoning zclaudia plan
     });
 
     it('returns run state with active run', async () => {
-      activeRuns.set('run-1', { sessionId: 's1', completed: false, sessionType: 'regular' });
+      activeRuns.set('run-1', { sessionId: 's1', phase: 'running', sessionType: 'regular' });
 
       const res = await request(app).get('/api/sessions/s1/run-state');
       expect(res.status).toBe(200);
@@ -1153,7 +1153,7 @@ internal reasoning zclaudia plan
     });
 
     it('returns isRunning true for background runs', async () => {
-      activeRuns.set('run-bg', { sessionId: 's1', completed: false, sessionType: 'background' });
+      activeRuns.set('run-bg', { sessionId: 's1', phase: 'running', sessionType: 'background' });
 
       const res = await request(app).get('/api/sessions/s1/run-state');
       expect(res.status).toBe(200);
