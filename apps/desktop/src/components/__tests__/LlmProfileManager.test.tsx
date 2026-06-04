@@ -458,9 +458,7 @@ describe('ProviderManager', () => {
   });
 
   describe('Form validation', () => {
-    it('shows alert for invalid JSON in env field', async () => {
-      const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
+    it('shows inline error for invalid JSON in request headers field', async () => {
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
@@ -472,21 +470,19 @@ describe('ProviderManager', () => {
       const nameInput = screen.getByPlaceholderText(/Local ZClaudia Agent/);
       fireEvent.change(nameInput, { target: { value: 'New Provider' } });
 
-      const envTextarea = screen.getByPlaceholderText(/ANTHROPIC_API_KEY/);
-      fireEvent.change(envTextarea, { target: { value: 'invalid json' } });
+      const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
+      fireEvent.change(headersTextarea, { target: { value: 'invalid json' } });
 
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith('Invalid JSON in environment variables');
+        expect(screen.getByText(/Invalid JSON/)).toBeInTheDocument();
       });
 
       expect(api.createLlmProfile).not.toHaveBeenCalled();
-
-      alertSpy.mockRestore();
     });
 
-    it('accepts valid JSON in env field', async () => {
+    it('accepts valid JSON in request headers field', async () => {
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
@@ -498,15 +494,15 @@ describe('ProviderManager', () => {
       const nameInput = screen.getByPlaceholderText(/Local ZClaudia Agent/);
       fireEvent.change(nameInput, { target: { value: 'New Provider' } });
 
-      const envTextarea = screen.getByPlaceholderText(/ANTHROPIC_API_KEY/);
-      fireEvent.change(envTextarea, { target: { value: '{"API_KEY": "test"}' } });
+      const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
+      fireEvent.change(headersTextarea, { target: { value: '{"X-Org-Id": "test"}' } });
 
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
         expect(api.createLlmProfile).toHaveBeenCalledWith(
           expect.objectContaining({
-            env: { API_KEY: 'test' },
+            requestHeaders: { 'X-Org-Id': 'test' },
           })
         );
       });
@@ -618,15 +614,15 @@ describe('ProviderManager', () => {
     });
   });
 
-  describe('Edit form with env', () => {
-    it('populates env field when editing provider with env', async () => {
+  describe('Edit form with request headers', () => {
+    it('populates request headers field when editing provider with requestHeaders', async () => {
       vi.mocked(api.listLlmProfiles).mockResolvedValue([
         {
           id: 'p1',
-          name: 'Provider With Env',
+          name: 'Provider With Headers',
           providerType: 'anthropic' as const,
           isDefault: false,
-          env: { API_KEY: 'secret' },
+          requestHeaders: { 'X-Org-Id': 'secret' },
           createdAt: Date.now(),
           updatedAt: Date.now(),
         },
@@ -635,7 +631,7 @@ describe('ProviderManager', () => {
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
-        expect(screen.getByText('Provider With Env')).toBeInTheDocument();
+        expect(screen.getByText('Provider With Headers')).toBeInTheDocument();
       });
 
       await clickAsync(screen.getByTitle('Edit'));
@@ -644,9 +640,9 @@ describe('ProviderManager', () => {
         expect(screen.getByText('Update')).toBeInTheDocument();
       });
 
-      // Env textarea should have JSON content
-      const envTextarea = screen.getByPlaceholderText(/ANTHROPIC_API_KEY/);
-      expect(envTextarea).toHaveValue(JSON.stringify({ API_KEY: 'secret' }, null, 2));
+      // Request headers textarea should have JSON content
+      const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
+      expect(headersTextarea).toHaveValue(JSON.stringify({ 'X-Org-Id': 'secret' }, null, 2));
     });
   });
 

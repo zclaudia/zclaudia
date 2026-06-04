@@ -82,7 +82,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const [formCompat, setFormCompat] = useState('');
   const [formCompatError, setFormCompatError] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [formEnv, setFormEnv] = useState('');
+  const [formRequestHeaders, setFormRequestHeaders] = useState('');
+  const [formRequestHeadersError, setFormRequestHeadersError] = useState<string | null>(null);
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [saving, setSaving] = useState(false);
   const [pendingDeleteProfileId, setPendingDeleteProfileId] = useState<string | null>(null);
@@ -155,7 +156,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormCompat('');
     setFormCompatError(null);
     setShowAdvanced(false);
-    setFormEnv('');
+    setFormRequestHeaders('');
+    setFormRequestHeadersError(null);
     setFormIsDefault(false);
     setEditingProfile(null);
     setShowAddForm(false);
@@ -171,7 +173,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormCompat(hasCompat ? JSON.stringify(profile.compat, null, 2) : '');
     setFormCompatError(null);
     setShowAdvanced(Boolean(hasCompat));
-    setFormEnv(profile.env ? JSON.stringify(profile.env, null, 2) : '');
+    setFormRequestHeaders(profile.requestHeaders ? JSON.stringify(profile.requestHeaders, null, 2) : '');
+    setFormRequestHeadersError(null);
     setFormIsDefault(profile.isDefault || false);
     setEditingProfile(profile);
     setShowAddForm(true);
@@ -182,15 +185,31 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
     setSaving(true);
     try {
-      let envObj: Record<string, string> | undefined;
-      if (formEnv.trim()) {
+      let requestHeadersObj: Record<string, string> | undefined;
+      if (formRequestHeaders.trim()) {
         try {
-          envObj = JSON.parse(formEnv);
-        } catch {
-          alert('Invalid JSON in environment variables');
+          const parsed = JSON.parse(formRequestHeaders);
+          if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            setFormRequestHeadersError('Request headers must be a JSON object');
+            setSaving(false);
+            return;
+          }
+          for (const [key, value] of Object.entries(parsed)) {
+            if (typeof value !== 'string') {
+              setFormRequestHeadersError(`Header "${key}" value must be a string`);
+              setSaving(false);
+              return;
+            }
+          }
+          requestHeadersObj = Object.keys(parsed).length > 0 ? parsed as Record<string, string> : undefined;
+          setFormRequestHeadersError(null);
+        } catch (err) {
+          setFormRequestHeadersError(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
           setSaving(false);
           return;
         }
+      } else {
+        setFormRequestHeadersError(null);
       }
 
       let compatObj: LlmProfileCompat | undefined;
@@ -221,7 +240,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         baseUrl: formBaseUrl.trim() || undefined,
         apiKey: formApiKey.trim() || undefined,
         compat: compatObj,
-        env: envObj,
+        requestHeaders: requestHeadersObj,
         isDefault: formIsDefault
       };
 
@@ -332,19 +351,27 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">Environment Variables (JSON)</label>
+        <label className="block text-sm font-medium text-muted-foreground mb-1">Request Headers (JSON)</label>
         <textarea
-          value={formEnv}
-          onChange={(e) => setFormEnv(e.target.value)}
+          value={formRequestHeaders}
+          onChange={(e) => {
+            setFormRequestHeaders(e.target.value);
+            if (formRequestHeadersError) setFormRequestHeadersError(null);
+          }}
           placeholder={`{
-"ANTHROPIC_API_KEY": "..."
+"X-Org-Id": "abc",
+"User-Agent": "ZClaudia/1.0"
 }`}
           rows={5}
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+          className={`w-full px-3 py-2 bg-secondary border ${formRequestHeadersError ? 'border-red-500' : 'border-border'} rounded-lg text-sm focus:outline-none focus:border-primary font-mono`}
         />
-        <p className="text-xs text-muted-foreground mt-1">
-          Environment variables passed to the runtime
-        </p>
+        {formRequestHeadersError ? (
+          <p className="text-xs text-red-500 mt-1">{formRequestHeadersError}</p>
+        ) : (
+          <p className="text-xs text-muted-foreground mt-1">
+            Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host are reserved.
+          </p>
+        )}
       </div>
 
       <div>
@@ -402,7 +429,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       <div className="flex gap-2 pt-2">
         <button
           onClick={handleSubmit}
-          disabled={!formName.trim() || saving}
+          disabled={!formName.trim() || saving || !!formRequestHeadersError}
           className="flex-1 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}
