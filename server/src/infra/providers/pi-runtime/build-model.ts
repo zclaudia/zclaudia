@@ -68,11 +68,14 @@ export function buildModel(profile?: LlmProfileConfig, modelOverride?: string): 
   // Env-derived strings can't satisfy those generic constraints; cast through `string`
   // to erase the generic and let the runtime registry lookup do the work.
   // Model<T> requires T extends Api, so we use `any` to opt out of that constraint.
+  // Shallow-clone the registry model so mutations to headers/etc. don't leak
+  // across profile boundaries — pi-ai's getModel returns a cached instance from
+  // a module-level registry, so direct mutation would alias every consumer.
+  const registryModel = (getModel as (provider: string, model: string) => Model<any>)(provider, modelId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const model = (getModel as (provider: string, model: string) => Model<any>)(provider, modelId);
+  const model: Model<any> = { ...(registryModel as any) };
   if (profile?.requestHeaders) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (model as any).headers = { ...((model as any).headers ?? {}), ...profile.requestHeaders };
+    model.headers = { ...(model.headers ?? {}), ...profile.requestHeaders };
   }
   return {
     model,

@@ -923,6 +923,7 @@ describe('buildModel — profile overrides', () => {
 
   it('Registry-resolved: profile.requestHeaders also flow into model.headers', () => {
     // No baseUrl → goes through getModel registry path
+    delete process.env.OPENAI_BASE_URL;
     process.env.PI_PROVIDER = 'openai';
     process.env.PI_MODEL = 'gpt-5';
     const profile = {
@@ -931,7 +932,22 @@ describe('buildModel — profile overrides', () => {
       requestHeaders: { 'X-Trace': 'reg-path' },
     } as any;
     const { model } = buildModel(profile);
-    expect((model as any).headers).toEqual({ 'X-Trace': 'reg-path' });
+    expect(model.headers).toEqual({ 'X-Trace': 'reg-path' });
+  });
+
+  it('Registry-resolved: requestHeaders from profile A do NOT leak into profile B (registry isolation)', () => {
+    delete process.env.OPENAI_BASE_URL;
+    process.env.PI_PROVIDER = 'openai';
+    process.env.PI_MODEL = 'gpt-5';
+
+    const profileA = { providerType: 'openai', requestHeaders: { 'X-Leak-Test': 'A' } } as any;
+    const { model: modelA } = buildModel(profileA);
+    expect(modelA.headers).toEqual({ 'X-Leak-Test': 'A' });
+
+    // Profile B has NO requestHeaders — must not inherit profile A's headers
+    const profileB = { providerType: 'openai' } as any;
+    const { model: modelB } = buildModel(profileB);
+    expect(modelB.headers).toBeUndefined();
   });
 });
 
