@@ -53,6 +53,9 @@ export function buildModel(profile?: LlmProfileConfig, modelOverride?: string): 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (model as any).compat = profile.compat;
     }
+    if (profile?.requestHeaders) {
+      model.headers = { ...(model.headers ?? {}), ...profile.requestHeaders };
+    }
     return {
       model,
       getApiKey: async () => profile?.apiKey ?? process.env.OPENAI_API_KEY ?? '',
@@ -67,6 +70,10 @@ export function buildModel(profile?: LlmProfileConfig, modelOverride?: string): 
   // Model<T> requires T extends Api, so we use `any` to opt out of that constraint.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const model = (getModel as (provider: string, model: string) => Model<any>)(provider, modelId);
+  if (profile?.requestHeaders) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (model as any).headers = { ...((model as any).headers ?? {}), ...profile.requestHeaders };
+  }
   return {
     model,
     getApiKey: profile?.apiKey ? async () => profile.apiKey! : undefined,

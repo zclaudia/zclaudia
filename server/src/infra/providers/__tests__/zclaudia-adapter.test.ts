@@ -899,6 +899,40 @@ describe('buildModel — profile overrides', () => {
     expect(model.baseUrl).toBe('http://127.0.0.1:4000/v1');
     expect(await getApiKey!('openai-custom')).toBe('profile-key');
   });
+
+  it('OpenAI-compat: profile.requestHeaders flow into model.headers', () => {
+    const profile = {
+      providerType: 'openai',
+      baseUrl: 'https://custom.example.com/v1',
+      apiKey: 'sk-x',
+      requestHeaders: { 'X-Org-Id': 'abc', 'X-Trace': 'xyz' },
+    } as any;
+    const { model } = buildModel(profile);
+    expect(model.headers).toEqual({ 'X-Org-Id': 'abc', 'X-Trace': 'xyz' });
+  });
+
+  it('OpenAI-compat: missing requestHeaders → model.headers undefined', () => {
+    const profile = {
+      providerType: 'openai',
+      baseUrl: 'https://custom.example.com/v1',
+      apiKey: 'sk-x',
+    } as any;
+    const { model } = buildModel(profile);
+    expect(model.headers).toBeUndefined();
+  });
+
+  it('Registry-resolved: profile.requestHeaders also flow into model.headers', () => {
+    // No baseUrl → goes through getModel registry path
+    process.env.PI_PROVIDER = 'openai';
+    process.env.PI_MODEL = 'gpt-5';
+    const profile = {
+      providerType: 'openai',
+      apiKey: 'sk-x',
+      requestHeaders: { 'X-Trace': 'reg-path' },
+    } as any;
+    const { model } = buildModel(profile);
+    expect((model as any).headers).toEqual({ 'X-Trace': 'reg-path' });
+  });
 });
 
 describe('ZClaudiaAdapter.run — steering wiring', () => {
