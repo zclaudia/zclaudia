@@ -189,6 +189,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const [saving, setSaving] = useState(false);
   const [pendingDeleteProfileId, setPendingDeleteProfileId] = useState<string | null>(null);
   const [deletingProfileId, setDeletingProfileId] = useState<string | null>(null);
+  const [deleteErrorByProfileId, setDeleteErrorByProfileId] = useState<Record<string, string>>({});
   const deleteConfirmTimeoutRef = useRef<number | null>(null);
   const testStatusTimersRef = useRef<Map<string, number>>(new Map());
 
@@ -588,16 +589,29 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
     clearDeleteConfirmation();
     setDeletingProfileId(id);
-    try {
-      await api.deleteLlmProfile(id);
+    setDeleteErrorByProfileId((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+
+    const result = await api.deleteLlmProfile(id);
+    setDeletingProfileId(null);
+
+    if (result.ok) {
       await loadProfiles();
-    } catch (error) {
-      console.error('Failed to delete provider:', error);
-      const message = error instanceof Error ? error.message : String(error);
-      alert(`Failed to delete provider: ${message}`);
-    } finally {
-      setDeletingProfileId(null);
+      return;
     }
+
+    let message = result.message;
+    if (result.code === 'IN_USE') {
+      const count = result.agentCount ?? 0;
+      const noun = count === 1 ? 'agent profile' : 'agent profiles';
+      message = `This LLM profile is used by ${count} ${noun}. Edit those agents to bind a different profile before deleting.`;
+    }
+    console.error('Failed to delete provider:', result);
+    setDeleteErrorByProfileId((prev) => ({ ...prev, [id]: message }));
   };
 
   const handleSetDefault = async (id: string) => {
@@ -779,8 +793,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         </p>
       ) : (
         (profiles ?? []).map((profile) => (
+          <div key={profile.id} className="space-y-1">
           <div
-            key={profile.id}
             className="flex items-center justify-between p-3 bg-secondary/50 rounded-lg hover:bg-secondary"
           >
             <div className="min-w-0 flex-1">
@@ -840,6 +854,16 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
               </button>
             </div>
             )}
+          </div>
+          {deleteErrorByProfileId[profile.id] && (
+            <div
+              role="alert"
+              className="flex items-start gap-1.5 px-3 py-1.5 text-xs text-destructive"
+            >
+              <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden="true" />
+              <span>{deleteErrorByProfileId[profile.id]}</span>
+            </div>
+          )}
           </div>
         ))
       )}

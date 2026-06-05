@@ -145,7 +145,7 @@ describe('ProviderManager', () => {
     vi.mocked(api.listLlmProfiles).mockResolvedValue(mockProviders);
     vi.mocked(api.createLlmProfile).mockResolvedValue(mockProviders[0]);
     vi.mocked(api.updateLlmProfile).mockResolvedValue(undefined);
-    vi.mocked(api.deleteLlmProfile).mockResolvedValue(undefined);
+    vi.mocked(api.deleteLlmProfile).mockResolvedValue({ ok: true });
     vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValue({ ok: true, models: [] });
     vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValue({ ok: true, latencyMs: 0 });
@@ -594,10 +594,14 @@ describe('ProviderManager', () => {
       consoleSpy.mockRestore();
     });
 
-    it('shows alert when deleteProvider fails', async () => {
+    it('shows inline error when deleteProvider fails with a generic error', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-      vi.mocked(api.deleteLlmProfile).mockRejectedValueOnce(new Error('Delete error'));
+      vi.mocked(api.deleteLlmProfile).mockResolvedValueOnce({
+        ok: false,
+        code: 'UNKNOWN',
+        message: 'Delete error',
+      });
 
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -610,9 +614,62 @@ describe('ProviderManager', () => {
       await clickAsync(deleteButton);
 
       await waitFor(() => {
-        expect(alertSpy).toHaveBeenCalledWith(expect.stringContaining('Failed to delete provider'));
+        expect(screen.getByText('Delete error')).toBeInTheDocument();
       });
+      expect(alertSpy).not.toHaveBeenCalled();
       alertSpy.mockRestore();
+      consoleSpy.mockRestore();
+    });
+
+    it('shows friendly inline error when the LLM profile is in use by agents', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(api.deleteLlmProfile).mockResolvedValueOnce({
+        ok: false,
+        code: 'IN_USE',
+        message: 'LlmProfile p1 is referenced by 3 agent profile(s) and cannot be deleted',
+        agentCount: 3,
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getAllByTitle('Delete')[0];
+      await clickAsync(deleteButton);
+      await clickAsync(deleteButton);
+
+      await waitFor(() => {
+        expect(
+          screen.getByText(/used by 3 agent profiles\. Edit those agents/i),
+        ).toBeInTheDocument();
+      });
+      consoleSpy.mockRestore();
+    });
+
+    it('singularizes the friendly message when a single agent profile is bound', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      vi.mocked(api.deleteLlmProfile).mockResolvedValueOnce({
+        ok: false,
+        code: 'IN_USE',
+        message: 'LlmProfile p1 is referenced by 1 agent profile(s) and cannot be deleted',
+        agentCount: 1,
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      const deleteButton = screen.getAllByTitle('Delete')[0];
+      await clickAsync(deleteButton);
+      await clickAsync(deleteButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/used by 1 agent profile\./i)).toBeInTheDocument();
+      });
       consoleSpy.mockRestore();
     });
 

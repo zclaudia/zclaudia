@@ -2,6 +2,17 @@ import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, Provider
 import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
 import { apiCall, apiCallVoid } from './unwrap';
 
+/**
+ * Structured result for {@link deleteLlmProfile}. The DELETE route returns 409
+ * with `{code: 'IN_USE', message, agentCount}` when the profile is bound by an
+ * agent profile, and the caller (LlmProfileManager) renders that count inline.
+ * `apiCallVoid` drops the `code`/`agentCount` fields, so this helper goes
+ * straight to `fetchApi` to preserve them.
+ */
+export type DeleteLlmProfileResult =
+  | { ok: true }
+  | { ok: false; code: string; message: string; agentCount?: number };
+
 export type FetchLlmProfileModelsResult =
   | { ok: true; models: string[] }
   | { ok: false; error: string };
@@ -58,8 +69,24 @@ export async function updateLlmProfile(
   });
 }
 
-export async function deleteLlmProfile(id: string): Promise<void> {
-  return apiCallVoid(`/api/llm-profiles/${id}`, { method: 'DELETE' });
+export async function deleteLlmProfile(id: string): Promise<DeleteLlmProfileResult> {
+  try {
+    const response = await fetchApi<unknown>(`/api/llm-profiles/${id}`, { method: 'DELETE' });
+    if (response.success) return { ok: true };
+    const err = response.error as { code?: string; message?: string; agentCount?: number } | undefined;
+    return {
+      ok: false,
+      code: err?.code ?? 'UNKNOWN',
+      message: err?.message ?? 'Failed to delete LLM profile',
+      agentCount: err?.agentCount,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      code: 'NETWORK_ERROR',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
 }
 
 export async function setDefaultLlmProfile(id: string): Promise<void> {
