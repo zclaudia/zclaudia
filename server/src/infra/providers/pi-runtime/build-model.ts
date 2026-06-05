@@ -65,7 +65,7 @@ export function buildModel(
   const baseUrl = profile?.baseUrl ?? process.env.OPENAI_BASE_URL;
   if (baseUrl) {
     const id = modelOverride ?? process.env.OPENAI_MODEL ?? 'gpt-4o';
-    const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? 'openai-custom';
+    const provider = profile?.providerType ?? process.env.PI_PROVIDER ?? 'openai';
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const model: Model<any> = {
       id,

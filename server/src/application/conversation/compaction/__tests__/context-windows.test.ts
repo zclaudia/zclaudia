@@ -52,11 +52,11 @@ describe('resolveContextWindow', () => {
 
   it('uses llmProfileConfig.baseUrl-derived contextWindow with pi_ai_registry source', () => {
     const llm: LlmProfileConfig = {
-      id: 'p', name: 'c', providerType: 'openai-custom',
+      id: 'p', name: 'c', providerType: 'openai',
       baseUrl: 'https://custom.example.com/v1', apiKey: 'sk-test',
       createdAt: 0, updatedAt: 0,
     };
-    // buildModel for openai-custom returns contextWindow: 128_000 default.
+    // buildModel for openai+baseUrl returns contextWindow: 128_000 default.
     // Source is pi_ai_registry: from the resolver's perspective, any window
     // surfaced via buildModel() — whether pi-ai's registry lookup or the
     // openai-compat literal default — is "what the model itself declares".

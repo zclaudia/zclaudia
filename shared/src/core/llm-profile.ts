@@ -1,9 +1,15 @@
 // LLM connection profile types (replaces the old `provider.ts` profile shape).
 
+/**
+ * Canonical LLM provider type list. `openai-custom` was merged into `openai`
+ * in migration 004 — both shapes had identical wire behaviour (the only
+ * difference was whether `baseUrl` was required). The merged `openai` entry
+ * accepts an optional baseUrl; when absent the runtime defaults to
+ * `https://api.openai.com/v1`.
+ */
 export const LLM_PROVIDER_TYPES = [
   'anthropic',
   'openai',
-  'openai-custom',
 ] as const;
 
 export type LlmProviderType = typeof LLM_PROVIDER_TYPES[number] | string;

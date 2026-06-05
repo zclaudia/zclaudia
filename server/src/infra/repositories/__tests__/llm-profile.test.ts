@@ -309,7 +309,7 @@ describe('LlmProfileRepository — new fields (baseUrl / apiKey / compat)', () =
   it('persists baseUrl + apiKey + compat fields', () => {
     const created = repo.create({
       name: 'deepseek-local',
-      providerType: 'openai-custom',
+      providerType: 'openai',
       baseUrl: 'http://127.0.0.1:3000/v1',
       apiKey: 'sk-test',
       compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },

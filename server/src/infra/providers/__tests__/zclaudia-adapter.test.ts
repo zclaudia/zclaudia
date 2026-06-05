@@ -868,7 +868,7 @@ describe('buildModel — modelEntry overrides', () => {
 
   it('overrides contextWindow on openai-compat path', () => {
     const profile = {
-      providerType: 'openai-custom',
+      providerType: 'openai',
       baseUrl: 'http://x/v1',
       apiKey: 'k',
     } as any;
@@ -878,7 +878,7 @@ describe('buildModel — modelEntry overrides', () => {
 
   it('overrides maxTokens on openai-compat path', () => {
     const built = buildModel(
-      { providerType: 'openai-custom', baseUrl: 'http://x/v1' } as any,
+      { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
       'm',
       { modelId: 'm', maxTokens: 2048 },
     );
@@ -887,7 +887,7 @@ describe('buildModel — modelEntry overrides', () => {
 
   it('replaces display name on openai-compat path', () => {
     const built = buildModel(
-      { providerType: 'openai-custom', baseUrl: 'http://x/v1' } as any,
+      { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
       'raw-id',
       { modelId: 'raw-id', displayName: 'Pretty Name' },
     );
@@ -935,7 +935,7 @@ describe('buildModel — profile overrides', () => {
     const profile: LlmProfileConfig = {
       id: 'p2',
       name: 'deepseek',
-      providerType: 'openai-custom',
+      providerType: 'openai',
       baseUrl: 'http://127.0.0.1:3000/v1',
       apiKey: 'sk-deepseek',
       compat: { supportsDeveloperRole: false, supportsReasoningEffort: false },
@@ -964,7 +964,7 @@ describe('buildModel — profile overrides', () => {
     const profile: LlmProfileConfig = {
       id: 'p3',
       name: 'p3',
-      providerType: 'openai-custom',
+      providerType: 'openai',
       baseUrl: 'http://127.0.0.1:4000/v1',
       apiKey: 'profile-key',
       createdAt: 0,
@@ -972,7 +972,7 @@ describe('buildModel — profile overrides', () => {
     };
     const { model, getApiKey } = buildModel(profile);
     expect(model.baseUrl).toBe('http://127.0.0.1:4000/v1');
-    expect(await getApiKey!('openai-custom')).toBe('profile-key');
+    expect(await getApiKey!('openai')).toBe('profile-key');
   });
 
   it('OpenAI-compat: profile.requestHeaders flow into model.headers', () => {

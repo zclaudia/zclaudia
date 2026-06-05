@@ -19,8 +19,13 @@ const FETCH_TIMEOUT_MS = 10_000;
 
 /**
  * Translate a profile into the concrete `/models` URL + auth headers per
- * providerType. Returns `{error}` when the configuration is missing required
- * fields (e.g. openai-custom without baseUrl).
+ * providerType. baseUrl is optional for both providers — when absent the
+ * function falls back to the canonical upstream endpoint.
+ *
+ * As of migration 004 the legacy `openai-custom` provider type has been
+ * folded into `openai`; callers that previously distinguished "vanilla
+ * OpenAI" from "OpenAI-compatible proxy" now use the same providerType and
+ * just set baseUrl when targeting a custom endpoint.
  */
 function resolveSpec(profile: LlmProfileConfig): ProviderFetchSpec | { error: string } {
   const apiKey = profile.apiKey ?? '';
@@ -39,18 +44,6 @@ function resolveSpec(profile: LlmProfileConfig): ProviderFetchSpec | { error: st
     const base = profile.baseUrl ?? 'https://api.openai.com/v1';
     return {
       url: `${base.replace(/\/$/, '')}/models`,
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        ...(profile.requestHeaders ?? {}),
-      },
-    };
-  }
-  if (profile.providerType === 'openai-custom') {
-    if (!profile.baseUrl) {
-      return { error: 'openai-custom requires baseUrl to be set' };
-    }
-    return {
-      url: `${profile.baseUrl.replace(/\/$/, '')}/models`,
       headers: {
         Authorization: `Bearer ${apiKey}`,
         ...(profile.requestHeaders ?? {}),

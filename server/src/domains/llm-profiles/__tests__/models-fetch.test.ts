@@ -54,12 +54,12 @@ describe('fetchModelsForProfile', () => {
     );
   });
 
-  it('uses profile.baseUrl when set (openai-custom)', async () => {
+  it('uses profile.baseUrl when set (openai with custom endpoint)', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ data: [{ id: 'local-model' }] }), { status: 200 }),
     );
     const profile: LlmProfileConfig = {
-      id: 'p', name: 'c', providerType: 'openai-custom',
+      id: 'p', name: 'c', providerType: 'openai',
       baseUrl: 'http://my-host.local/v1', apiKey: 'k', createdAt: 0, updatedAt: 0,
     };
     const result = await fetchModelsForProfile(profile);
@@ -81,12 +81,19 @@ describe('fetchModelsForProfile', () => {
     if (!result.ok) expect(result.error).toContain('403');
   });
 
-  it('returns ok=false when openai-custom has no baseUrl', async () => {
+  it('openai without baseUrl falls back to api.openai.com/v1', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ id: 'gpt-5' }] }), { status: 200 }),
+    );
     const profile: LlmProfileConfig = {
-      id: 'p', name: 'c', providerType: 'openai-custom', apiKey: 'k', createdAt: 0, updatedAt: 0,
+      id: 'p', name: 'c', providerType: 'openai', apiKey: 'k', createdAt: 0, updatedAt: 0,
     };
     const result = await fetchModelsForProfile(profile);
-    expect(result.ok).toBe(false);
+    expect(result.ok).toBe(true);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      'https://api.openai.com/v1/models',
+      expect.anything(),
+    );
   });
 
   it('merges profile.requestHeaders into the outgoing request', async () => {
