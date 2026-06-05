@@ -109,8 +109,6 @@ vi.mock('../../services/api', () => ({
   updateLlmProfile: vi.fn(),
   deleteLlmProfile: vi.fn(),
   setDefaultLlmProfile: vi.fn(),
-  fetchModelsForLlmProfile: vi.fn(),
-  probeLlmProfileModel: vi.fn(),
   fetchModelsForLlmProfilePreview: vi.fn(),
   probeLlmProfileModelPreview: vi.fn(),
 }));
@@ -148,8 +146,6 @@ describe('ProviderManager', () => {
     vi.mocked(api.updateLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.deleteLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
-    vi.mocked(api.fetchModelsForLlmProfile).mockResolvedValue({ ok: true, models: [] });
-    vi.mocked(api.probeLlmProfileModel).mockResolvedValue({ ok: true, latencyMs: 0 });
     vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValue({ ok: true, models: [] });
     vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValue({ ok: true, latencyMs: 0 });
     mockProviderMetaState.getProviders.mockReturnValue([]);

@@ -54,40 +54,6 @@ export async function setDefaultLlmProfile(id: string): Promise<void> {
 }
 
 /**
- * Discover model ids from the upstream provider's `/models` endpoint.
- * Returns a normalized result object so callers can render either the picker
- * dialog (ok) or an inline error (failure) without duplicating try/catch.
- */
-export async function fetchModelsForLlmProfile(id: string): Promise<FetchLlmProfileModelsResult> {
-  try {
-    const data = await apiCall<{ models: string[] }>(`/api/llm-profiles/${id}/models/fetch`, {
-      method: 'POST',
-    });
-    return { ok: true, models: Array.isArray(data?.models) ? data.models : [] };
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/**
- * Send a max_tokens=1 ping through the (profile, modelId) pair to verify
- * end-to-end reachability. Server-side wraps probe failures into a success
- * envelope with `ok: false`, so transport-level errors are the only thing that
- * surface as thrown exceptions here.
- */
-export async function probeLlmProfileModel(id: string, modelId: string): Promise<ProbeLlmProfileModelResult> {
-  try {
-    const data = await apiCall<ProbeLlmProfileModelResult>(`/api/llm-profiles/${id}/models/probe`, {
-      method: 'POST',
-      body: JSON.stringify({ modelId }),
-    });
-    return data;
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/**
  * Pre-save form snapshot passed to the preview endpoints. Mirrors the subset
  * of {@link LlmProfileConfig} that `buildPreviewProfile` on the server reads —
  * we deliberately don't send `id`/`name`/`createdAt`/`updatedAt` so the form
@@ -121,8 +87,9 @@ export async function fetchModelsForLlmProfilePreview(
 }
 
 /**
- * Probe a (formDraft, modelId) pair without requiring the profile to exist on
- * disk. Same response envelope as {@link probeLlmProfileModel}.
+ * Probe a (formDraft, modelId) pair against an upstream provider. Returns the
+ * same `{ ok, latencyMs }` / `{ ok: false, error }` envelope on both transport
+ * failure and server-reported probe failure.
  */
 export async function probeLlmProfileModelPreview(
   profile: LlmProfilePreviewInput,

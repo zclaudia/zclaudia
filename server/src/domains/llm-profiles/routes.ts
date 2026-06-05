@@ -215,8 +215,8 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
     }
     try {
       const result = await probeModel(built.profile, modelId);
-      // Mirror /:id/models/probe: probe failures are diagnostic so we return
-      // 200 with data.ok=false rather than a 5xx.
+      // Probe failures are diagnostic so we return 200 with data.ok=false
+      // rather than a 5xx — UI renders inline next to the row.
       if (!result.ok) {
         res.json({ success: true, data: { ok: false, error: result.error } });
         return;
@@ -450,70 +450,6 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       res.status(500).json({
         success: false,
         error: { code: 'DB_ERROR', message: 'Failed to set default llm profile' },
-      });
-    }
-  });
-
-  router.post('/:id/models/fetch', async (req: Request, res: Response) => {
-    try {
-      const profile = repo.findById(req.params.id);
-      if (!profile) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'LlmProfile not found' },
-        });
-        return;
-      }
-      const result = await fetchModelsForProfile(profile);
-      if (!result.ok) {
-        res.status(502).json({
-          success: false,
-          error: { code: 'UPSTREAM_ERROR', message: result.error },
-        });
-        return;
-      }
-      res.json({ success: true, data: { models: result.models } });
-    } catch (error) {
-      console.error('Error fetching models for llm profile:', error);
-      res.status(500).json({
-        success: false,
-        error: { code: 'FETCH_ERROR', message: 'Failed to fetch models' },
-      });
-    }
-  });
-
-  router.post('/:id/models/probe', async (req: Request, res: Response) => {
-    try {
-      const profile = repo.findById(req.params.id);
-      if (!profile) {
-        res.status(404).json({
-          success: false,
-          error: { code: 'NOT_FOUND', message: 'LlmProfile not found' },
-        });
-        return;
-      }
-      const modelId = typeof req.body?.modelId === 'string' ? req.body.modelId.trim() : '';
-      if (!modelId) {
-        res.status(400).json({
-          success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'modelId is required' },
-        });
-        return;
-      }
-      const result = await probeModel(profile, modelId);
-      // Probe failures are diagnostic — return 200 with `data.ok: false`
-      // so the UI can render the error inline next to the row rather than
-      // surfacing a generic toast.
-      if (!result.ok) {
-        res.json({ success: true, data: { ok: false, error: result.error } });
-        return;
-      }
-      res.json({ success: true, data: { ok: true, latencyMs: result.latencyMs } });
-    } catch (error) {
-      console.error('Error probing model for llm profile:', error);
-      res.status(500).json({
-        success: false,
-        error: { code: 'PROBE_ERROR', message: 'Failed to probe model' },
       });
     }
   });
