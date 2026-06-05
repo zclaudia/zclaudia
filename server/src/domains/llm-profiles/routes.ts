@@ -103,10 +103,133 @@ function validateRequestHeaders(input: unknown): Record<string, string> {
   return out;
 }
 
+/**
+ * Build a synthetic {@link LlmProfileConfig} from a request body for the
+ * pre-save preview endpoints. The id/timestamps are placeholders — neither
+ * `fetchModelsForProfile` nor `probeModel` query the DB by id, so this keeps
+ * the type happy without persisting anything.
+ *
+ * Returns the config or a structured error so the caller can 400 cleanly.
+ */
+function buildPreviewProfile(body: unknown):
+  | { ok: true; profile: LlmProfileConfig }
+  | { ok: false; error: string } {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return { ok: false, error: 'request body must be a JSON object' };
+  }
+  const b = body as Record<string, unknown>;
+
+  const providerType = typeof b.providerType === 'string' ? b.providerType : '';
+  if (!providerType || !VALID_PROVIDER_TYPES.includes(providerType)) {
+    return { ok: false, error: `providerType is required and must be one of: ${VALID_PROVIDER_TYPES.join(', ')}` };
+  }
+
+  if (b.baseUrl !== undefined && b.baseUrl !== null && typeof b.baseUrl !== 'string') {
+    return { ok: false, error: 'baseUrl must be a string' };
+  }
+  if (b.apiKey !== undefined && b.apiKey !== null && typeof b.apiKey !== 'string') {
+    return { ok: false, error: 'apiKey must be a string' };
+  }
+
+  let requestHeaders: Record<string, string> | undefined;
+  try {
+    const validated = validateRequestHeaders(b.requestHeaders);
+    requestHeaders = Object.keys(validated).length > 0 ? validated : undefined;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  let models: LlmProfileModelEntry[] | undefined;
+  try {
+    models = validateModels(b.models);
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+
+  const profile: LlmProfileConfig = {
+    id: '',                  // preview: never persisted, no DB lookup uses it
+    name: '',                // preview: cosmetic; fetch/probe ignore it
+    providerType,
+    baseUrl: typeof b.baseUrl === 'string' ? b.baseUrl : undefined,
+    apiKey: typeof b.apiKey === 'string' ? b.apiKey : undefined,
+    requestHeaders,
+    models,
+    createdAt: 0,
+    updatedAt: 0,
+  };
+  return { ok: true, profile };
+}
+
 export function createLlmProfileRoutes(db: Database.Database): Router {
   const router = Router();
   const repo = new LlmProfileRepository(db);
   const deletionService = new LlmProfileDeletionService(db);
+
+  // Pre-save preview endpoints. Registered BEFORE any `:id` route so the
+  // literal `models` segment isn't captured as a profile id.
+
+  router.post('/models/fetch-preview', async (req: Request, res: Response) => {
+    const built = buildPreviewProfile(req.body);
+    if (!built.ok) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: built.error },
+      });
+      return;
+    }
+    try {
+      const result = await fetchModelsForProfile(built.profile);
+      if (!result.ok) {
+        res.status(502).json({
+          success: false,
+          error: { code: 'UPSTREAM_ERROR', message: result.error },
+        });
+        return;
+      }
+      res.json({ success: true, data: { models: result.models } });
+    } catch (error) {
+      console.error('Error fetching preview models for llm profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'FETCH_ERROR', message: 'Failed to fetch models' },
+      });
+    }
+  });
+
+  router.post('/models/probe-preview', async (req: Request, res: Response) => {
+    const built = buildPreviewProfile(req.body);
+    if (!built.ok) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: built.error },
+      });
+      return;
+    }
+    const modelId = typeof req.body?.modelId === 'string' ? req.body.modelId.trim() : '';
+    if (!modelId) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'modelId is required' },
+      });
+      return;
+    }
+    try {
+      const result = await probeModel(built.profile, modelId);
+      // Mirror /:id/models/probe: probe failures are diagnostic so we return
+      // 200 with data.ok=false rather than a 5xx.
+      if (!result.ok) {
+        res.json({ success: true, data: { ok: false, error: result.error } });
+        return;
+      }
+      res.json({ success: true, data: { ok: true, latencyMs: result.latencyMs } });
+    } catch (error) {
+      console.error('Error probing preview model for llm profile:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'PROBE_ERROR', message: 'Failed to probe model' },
+      });
+    }
+  });
 
   router.get('/', (_req: Request, res: Response) => {
     try {

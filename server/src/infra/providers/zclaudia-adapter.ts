@@ -5,6 +5,7 @@ import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
 import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory, buildModel, type BuiltModel } from './pi-runtime/index.js';
 import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
+import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
 
 const PLAN_MODE_SYSTEM_PROMPT_SUFFIX =
   '\n\nYou are in PLAN mode. Produce a concrete plan for the user to review and approve. ' +
@@ -262,11 +263,18 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       return;
     }
 
-    // 2. Resolve effective context window from the built model (pi-ai registry
-    //    or LLM profile per-model override applied by buildModel in T3).
-    //    Undefined only if the model carries no context window value at all.
-    const effectiveContextWindow =
-      modelInfo.model.contextWindow > 0 ? modelInfo.model.contextWindow : undefined;
+    // 2. Resolve effective context window via the single shared resolver. The
+    //    model literal `modelInfo.model.contextWindow` already has any per-model
+    //    override applied (so other pi-ai consumers read the right value), but
+    //    `systemInfo` goes through `resolveContextWindow` so the source layer
+    //    is reported uniformly and the UI can warn on the fallback path.
+    const resolvedWindow = resolveContextWindow(
+      options.agentProfile ?? null,
+      undefined,
+      options.llmProfileConfig,
+    );
+    const effectiveContextWindow = resolvedWindow.value;
+    const contextWindowSource = resolvedWindow.source;
 
     // 3. Resolve effective tool set. Plan mode collapses the agent's
     //    enabledTools to only the read-only subset (read/grep/find/ls).
@@ -284,6 +292,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       systemInfo: {
         model: ctx.model,
         contextWindow: effectiveContextWindow,
+        contextWindowSource,
         cwd: options.cwd,
         permissionMode: ctx.permissionMode || 'default',
         tools: effectiveTools,

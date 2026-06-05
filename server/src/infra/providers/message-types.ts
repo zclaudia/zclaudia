@@ -9,6 +9,7 @@ import type { Usage } from '@earendil-works/pi-ai';
 import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
 import type { ToolEffect } from '@zclaudia/shared/core/message';
 import type { ToolSemantic } from '@zclaudia/shared/wire/messages/run';
+import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
 
 export interface PermissionDecision {
   behavior: 'allow' | 'deny';
@@ -37,6 +38,10 @@ export interface SystemInfo {
   model?: string;
   /** Effective context window in tokens, derived from agent / LLM profile. */
   contextWindow?: number;
+  /** Which resolution layer supplied {@link SystemInfo.contextWindow}.
+   *  Mirrors the wire-level type so UI can render provenance + warn on
+   *  the `fallback` path. */
+  contextWindowSource?: ContextWindowSource;
   claudeCodeVersion?: string;
   cwd?: string;
   tools?: string[];

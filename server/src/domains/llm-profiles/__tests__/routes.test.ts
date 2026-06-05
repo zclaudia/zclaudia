@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
@@ -224,6 +224,78 @@ describe('llm-profiles routes', () => {
         models: [{ modelId: 'a' }, { modelId: 'a' }],
       });
       expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /models/fetch-preview', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('returns the model list from the upstream endpoint without persisting anything', async () => {
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ data: [{ id: 'gpt-5' }, { id: 'gpt-4o' }] }), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        }),
+      );
+      const before = new LlmProfileRepository(db).findAllOrdered().length;
+      const res = await request(app).post('/api/llm-profiles/models/fetch-preview').send({
+        providerType: 'openai',
+        apiKey: 'sk-x',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.data.models).toEqual(['gpt-4o', 'gpt-5']);
+      // No profile created as a side effect.
+      expect(new LlmProfileRepository(db).findAllOrdered().length).toBe(before);
+    });
+
+    it('rejects body missing providerType with 400', async () => {
+      const res = await request(app).post('/api/llm-profiles/models/fetch-preview').send({
+        apiKey: 'sk-x',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('preview is reachable on a non-existent profile id (literal route precedence)', async () => {
+      // Belt-and-braces: confirm the `/models/fetch-preview` literal segment
+      // is NOT swallowed by the `:id` matcher.
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ data: [{ id: 'm' }] }), { status: 200 }),
+      );
+      const res = await request(app).post('/api/llm-profiles/models/fetch-preview').send({
+        providerType: 'anthropic', apiKey: 'k',
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
+  describe('POST /models/probe-preview', () => {
+    afterEach(() => { vi.restoreAllMocks(); });
+
+    it('returns ok=false on upstream error without persisting anything', async () => {
+      // probeModel uses pi-ai's completeSimple, which goes through fetch.
+      // Stub fetch to a 401; probeModel translates it to {ok:false}.
+      vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response('unauthorized', { status: 401 }),
+      );
+      const before = new LlmProfileRepository(db).findAllOrdered().length;
+      const res = await request(app).post('/api/llm-profiles/models/probe-preview').send({
+        providerType: 'anthropic',
+        apiKey: 'bad',
+        modelId: 'claude-opus-4-7',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.ok).toBe(false);
+      expect(typeof res.body.data.error).toBe('string');
+      expect(new LlmProfileRepository(db).findAllOrdered().length).toBe(before);
+    });
+
+    it('rejects body missing modelId with 400', async () => {
+      const res = await request(app).post('/api/llm-profiles/models/probe-preview').send({
+        providerType: 'anthropic', apiKey: 'k',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
   });
 });

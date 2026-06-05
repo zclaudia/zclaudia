@@ -531,8 +531,58 @@ describe('ZClaudiaAdapter.run', () => {
     });
 
     const init = out.find(m => m.type === 'init');
-    // Mocked getModel returns contextWindow: 200000
+    // claude-sonnet-4-6 is in MODEL_CONTEXT_WINDOWS, so resolveContextWindow
+    // picks the hardcoded_table layer (200k), short-circuiting the registry.
     expect(init?.systemInfo?.contextWindow).toBe(200_000);
+    expect(init?.systemInfo?.contextWindowSource).toBe('hardcoded_table');
+  });
+
+  it('reports contextWindowSource=profile_entry when models[*].contextWindow is set', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      agentProfile: {
+        model: 'claude-sonnet-4-6',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
+      llmProfileConfig: {
+        id: 'lp', name: 'p', providerType: 'anthropic',
+        models: [{ modelId: 'claude-sonnet-4-6', contextWindow: 1_000_000 }],
+        createdAt: 0, updatedAt: 0,
+      } as any,
+    });
+
+    const init = out.find(m => m.type === 'init');
+    expect(init?.systemInfo?.contextWindow).toBe(1_000_000);
+    expect(init?.systemInfo?.contextWindowSource).toBe('profile_entry');
+  });
+
+  it('reports contextWindowSource=pi_ai_registry when only the registry resolves', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      agentProfile: {
+        // Not in MODEL_CONTEXT_WINDOWS — but the mocked pi-ai getModel returns
+        // contextWindow=200_000 for any id, so resolution lands on the
+        // pi_ai_registry layer.
+        model: 'some-unlisted-model',
+        systemPrompt: '',
+        enabledTools: [],
+      } as any,
+    });
+
+    const init = out.find(m => m.type === 'init');
+    expect(init?.systemInfo?.contextWindow).toBe(200_000);
+    expect(init?.systemInfo?.contextWindowSource).toBe('pi_ai_registry');
   });
 
   it('plan mode filters enabledTools to read-only subset', async () => {

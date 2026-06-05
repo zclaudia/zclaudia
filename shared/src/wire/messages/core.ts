@@ -40,12 +40,33 @@ export interface AuthResultMessage {
 // Run health status for stuck/loop detection
 export type RunHealthStatus = 'healthy' | 'idle' | 'loop';
 
+/**
+ * Which layer in the resolution chain supplied the effective context window.
+ * Lets the UI explain "why" — and warn when we hit the last-resort fallback.
+ *
+ * - `profile_entry`   — user-declared `llm_profile.models[*].contextWindow`.
+ * - `hardcoded_table` — server's built-in MODEL_CONTEXT_WINDOWS map.
+ * - `pi_ai_registry`  — pi-ai's model registry (built-in providers) or
+ *                       openai-compat literal default for custom endpoints.
+ * - `fallback`        — last-resort 100k safety net; signals "we don't actually
+ *                       know" so UI can show a warning.
+ */
+export type ContextWindowSource =
+  | 'profile_entry'
+  | 'hardcoded_table'
+  | 'pi_ai_registry'
+  | 'fallback';
+
 // Provider system info from runtime init message
 export interface SystemInfo {
   model?: string;
   /** Effective context window in tokens, resolved from agent profile / LLM
    *  profile / pi-ai registry. UI uses this for the X/Y display. */
   contextWindow?: number;
+  /** Provenance of {@link SystemInfo.contextWindow}. Set whenever
+   *  contextWindow is — UI uses this to surface "from your LLM profile" vs
+   *  "fallback estimate" and to warn on the fallback path. */
+  contextWindowSource?: ContextWindowSource;
   claudeCodeVersion?: string;
   cwd?: string;
   tools?: string[];

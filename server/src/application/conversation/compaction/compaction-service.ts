@@ -44,7 +44,7 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
   const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
   if (messages.length === 0) return { compacted: false, reason: 'no_messages' };
   const tokens = estimateContextTokens(messages).tokens;
-  const window = resolveContextWindow(ctx.agentProfile, undefined, ctx.llmProfile);
+  const window = resolveContextWindow(ctx.agentProfile, undefined, ctx.llmProfile).value;
   if (!shouldCompact(tokens, window, DEFAULT_COMPACTION_SETTINGS)) {
     return { compacted: false, tokensBefore: tokens, reason: 'below_threshold' };
   }
