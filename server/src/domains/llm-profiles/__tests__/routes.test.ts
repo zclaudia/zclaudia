@@ -298,4 +298,42 @@ describe('llm-profiles routes', () => {
       expect(res.body.error.code).toBe('VALIDATION_ERROR');
     });
   });
+
+  describe('POST /models/resolve-preview', () => {
+    it('returns {value, source} from the resolution chain without persisting anything', async () => {
+      // claude-opus-4-7 is in the hardcoded table at 200_000 — and we pass no
+      // override on the entry so we hit the hardcoded_table branch, not
+      // profile_entry. This also exercises the "self-edit gotcha avoided"
+      // behavior: the entry for `claude-opus-4-7` carries no contextWindow,
+      // mirroring what the desktop ModelRow strips before calling.
+      const before = new LlmProfileRepository(db).findAllOrdered().length;
+      const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
+        providerType: 'anthropic',
+        apiKey: 'k',
+        models: [{ modelId: 'claude-opus-4-7' }],
+        modelId: 'claude-opus-4-7',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data).toEqual({ value: 200_000, source: 'hardcoded_table' });
+      // No side-effect on the profile table.
+      expect(new LlmProfileRepository(db).findAllOrdered().length).toBe(before);
+    });
+
+    it('rejects body missing modelId with 400', async () => {
+      const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
+        providerType: 'anthropic', apiKey: 'k',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('rejects body missing providerType with 400', async () => {
+      const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
+        modelId: 'claude-opus-4-7',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
 });
