@@ -94,6 +94,14 @@ interface ChatState {
      * vs reading from their LLM profile / pi-ai registry.
      */
     contextWindowSource?: ContextWindowSource;
+    /**
+     * When `contextWindowSource === 'pi_ai_registry'`, the pi-ai provider id
+     * whose registry entry matched. Lets TokenUsageDisplay show
+     * "from registry (deepseek)" on cross-provider sweeps so users can tell
+     * which provider's spec we adopted. `undefined` on same-provider hits
+     * where the annotation would be redundant.
+     */
+    contextWindowMatchedProvider?: string;
     latestInputTokens?: number;
     latestOutputTokens?: number;
   }>;
@@ -590,6 +598,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             ...existing,
             contextWindow: info.contextWindow,
             contextWindowSource: info.contextWindowSource,
+            contextWindowMatchedProvider: info.contextWindowMatchedProvider,
           };
         } else {
           usageNext[sessionId] = {
@@ -597,6 +606,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             outputTokens: 0,
             contextWindow: info.contextWindow,
             contextWindowSource: info.contextWindowSource,
+            contextWindowMatchedProvider: info.contextWindowMatchedProvider,
           };
         }
       }
@@ -642,6 +652,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             outputTokens: existing.outputTokens + usage.output,
             contextWindow: existing.contextWindow,
             contextWindowSource: existing.contextWindowSource,
+            contextWindowMatchedProvider: existing.contextWindowMatchedProvider,
             latestInputTokens: usage.input,
             latestOutputTokens: usage.output,
           },

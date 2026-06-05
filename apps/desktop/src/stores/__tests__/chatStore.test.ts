@@ -455,13 +455,50 @@ describe('chatStore', () => {
     it('addSessionUsage preserves contextWindowSource set earlier by setSystemInfo', () => {
       useChatStore.getState().setSystemInfo('s7', {
         contextWindow: 128_000,
-        contextWindowSource: 'hardcoded_table',
+        contextWindowSource: 'pi_ai_registry',
       });
       useChatStore.getState().addSessionUsage('s7', u(50, 25));
       const usage = useChatStore.getState().sessionUsage['s7'];
-      expect(usage.contextWindowSource).toBe('hardcoded_table');
+      expect(usage.contextWindowSource).toBe('pi_ai_registry');
       expect(usage.contextWindow).toBe(128_000);
       expect(usage.inputTokens).toBe(50);
+    });
+
+    // F4: matchedProvider is the cross-provider annotation that lets the UI
+    // show "from registry (deepseek)" — it must round-trip from system_info
+    // wire through usage and survive subsequent addSessionUsage calls.
+    it('setSystemInfo copies contextWindowMatchedProvider into usage (fresh record)', () => {
+      useChatStore.getState().setSystemInfo('s8', {
+        contextWindow: 131_072,
+        contextWindowSource: 'pi_ai_registry',
+        contextWindowMatchedProvider: 'deepseek',
+      });
+      const usage = useChatStore.getState().sessionUsage['s8'];
+      expect(usage.contextWindowSource).toBe('pi_ai_registry');
+      expect(usage.contextWindowMatchedProvider).toBe('deepseek');
+    });
+
+    it('addSessionUsage preserves contextWindowMatchedProvider set earlier by setSystemInfo', () => {
+      useChatStore.getState().setSystemInfo('s9', {
+        contextWindow: 131_072,
+        contextWindowSource: 'pi_ai_registry',
+        contextWindowMatchedProvider: 'deepseek',
+      });
+      useChatStore.getState().addSessionUsage('s9', u(10, 5));
+      const usage = useChatStore.getState().sessionUsage['s9'];
+      expect(usage.contextWindowMatchedProvider).toBe('deepseek');
+      expect(usage.contextWindowSource).toBe('pi_ai_registry');
+      expect(usage.contextWindow).toBe(131_072);
+      expect(usage.inputTokens).toBe(10);
+    });
+
+    it('setSystemInfo leaves contextWindowMatchedProvider undefined when wire omits it', () => {
+      useChatStore.getState().setSystemInfo('s10', {
+        contextWindow: 200_000,
+        contextWindowSource: 'profile_entry',
+      });
+      const usage = useChatStore.getState().sessionUsage['s10'];
+      expect(usage.contextWindowMatchedProvider).toBeUndefined();
     });
   });
 

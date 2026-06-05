@@ -14,10 +14,17 @@ export type ProbeLlmProfileModelResult =
  * Result of the F3 /models/resolve-preview endpoint: the effective context
  * window value the runtime would use for `(profile draft, modelId)` plus the
  * provenance tag so the editor can render a per-source helper text.
+ *
+ * F4 added `matchedProvider`: when `source === 'pi_ai_registry'` and the
+ * registry hit came from a cross-provider sweep (e.g. running a registered
+ * `deepseek-v4` model id through an OpenAI-compat proxy), the server reports
+ * which pi-ai provider actually supplied the spec. The editor surfaces this
+ * parenthetically (e.g. "from registry (deepseek)").
  */
 export interface ResolveContextWindowPreviewResult {
   value: number;
   source: ContextWindowSource;
+  matchedProvider?: string;
 }
 
 export async function listLlmProfiles(options?: RequestInit): Promise<LlmProfileConfig[]> {

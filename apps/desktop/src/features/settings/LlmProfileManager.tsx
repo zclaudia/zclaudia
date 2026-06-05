@@ -643,7 +643,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
         />
         <p className="text-xs text-muted-foreground mt-1">
-          Override default endpoint (required for openai-custom)
+          Override default endpoint. Required for OpenAI-compatible third-party proxies (e.g. DeepSeek, Moonshot, local gateways).
         </p>
       </div>
 
@@ -925,7 +925,6 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 const PROVIDER_TYPE_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
-  'openai-custom': 'OpenAI-compatible (custom)',
 };
 
 const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_TYPES.map((value) => ({
@@ -1041,6 +1040,12 @@ interface ResolvedPreviewState {
   status: 'idle' | 'loading' | 'ok' | 'error';
   value?: number;
   source?: ContextWindowSource;
+  /**
+   * Cross-provider matched pi-ai provider id when `source === 'pi_ai_registry'`.
+   * Lets the helper text annotate e.g. "from registry (deepseek)" when an
+   * OpenAI-compat profile borrows a registered model id from another provider.
+   */
+  matchedProvider?: string;
 }
 
 function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onProbe, buildPreviewInput }: ModelRowProps) {
@@ -1099,7 +1104,7 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
       // maxTokens / displayName aren't relevant — we only need to neutralize
       // contextWindow). This way `resolveContextWindow` walks past the
       // profile_entry layer for *this* model id and reports what the next
-      // layer (hardcoded_table / pi_ai_registry / fallback) would supply.
+      // layer (pi_ai_registry / openai_compat_default / fallback) would supply.
       const sanitizedModels = (previewInput.models ?? []).map((entry) => {
         if (entry.modelId !== modelIdInput) return entry;
         const { contextWindow: _omitContextWindow, ...rest } = entry;
@@ -1116,7 +1121,12 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
         })
         .then((data) => {
           if (myRequestId !== requestIdRef.current) return; // stale
-          setResolved({ status: 'ok', value: data.value, source: data.source });
+          setResolved({
+            status: 'ok',
+            value: data.value,
+            source: data.source,
+            matchedProvider: data.matchedProvider,
+          });
         })
         .catch(() => {
           if (myRequestId !== requestIdRef.current) return; // stale
@@ -1183,7 +1193,7 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
           {errs.contextWindow && (
             <p className="text-[10px] text-destructive mt-0.5">contextWindow {errs.contextWindow}</p>
           )}
-          <ResolvedContextWindowHint state={resolved} eligible={helperEligible} />
+          <ResolvedContextWindowHint state={resolved} eligible={helperEligible} modelId={modelIdInput} />
         </div>
         <div>
           <input
@@ -1232,7 +1242,20 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
  * would resolve. Fallback rendering uses an amber AlertTriangle to make
  * "we don't actually know" visually distinct from "we have a sourced value".
  */
-function ResolvedContextWindowHint({ state, eligible }: { state: ResolvedPreviewState; eligible: boolean }) {
+function ResolvedContextWindowHint({
+  state,
+  eligible,
+  modelId,
+}: {
+  state: ResolvedPreviewState;
+  eligible: boolean;
+  /**
+   * The current row's modelId (already trimmed). Only used by the
+   * openai_compat_default warning, which calls it out by name so the user
+   * sees *which* id failed to match the registry.
+   */
+  modelId: string;
+}) {
   if (!eligible) return null;
   if (state.status === 'idle') return null;
   if (state.status === 'loading') {
@@ -1254,16 +1277,28 @@ function ResolvedContextWindowHint({ state, eligible }: { state: ResolvedPreview
           Using {formatted} via this profile's override
         </p>
       );
-    case 'hardcoded_table':
+    case 'pi_ai_registry':
+      // F4: registry hits can come from a cross-provider sweep (e.g. running
+      // `deepseek-v4` through an openai-compat proxy resolves to provider
+      // `deepseek`). Annotate parenthetically when matchedProvider is set so
+      // users see which provider's spec we adopted. Per UX, never expose
+      // "pi-ai" in user-facing copy.
       return (
         <p className="text-[10px] text-muted-foreground mt-0.5">
-          Using {formatted} from built-in table
+          Using {formatted} from registry{state.matchedProvider ? ` (${state.matchedProvider})` : ''}
         </p>
       );
-    case 'pi_ai_registry':
+    case 'openai_compat_default':
+      // F4: openai-compat proxies hand back a 128k literal when nothing in
+      // the registry matched the model id. Surface this as a distinct amber
+      // warning so users can tell "we guessed 128k for compat" apart from
+      // "we got a real spec from the registry".
       return (
-        <p className="text-[10px] text-muted-foreground mt-0.5">
-          Using {formatted} from pi-ai registry
+        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-start gap-1">
+          <AlertTriangle size={11} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <span>
+            Using {formatted} default for openai-compat. No registry match for "{modelId}" — declare contextWindow above or use a known model id.
+          </span>
         </p>
       );
     case 'fallback':

@@ -13,6 +13,13 @@ interface TokenUsageDisplayProps {
    * historical sessions and tests omit it.
    */
   contextWindowSource?: ContextWindowSource;
+  /**
+   * When `contextWindowSource === 'pi_ai_registry'`, the pi-ai provider id
+   * whose registry entry matched (e.g. `'deepseek'`). Shown parenthetically in
+   * the tooltip so cross-provider hits are visible to the user. Intentionally
+   * never mentions "pi-ai" in user-facing copy.
+   */
+  contextWindowMatchedProvider?: string;
 }
 
 function formatTokenCount(count: number): string {
@@ -27,17 +34,24 @@ function formatTokenCount(count: number): string {
 
 /**
  * Human-readable tooltip that explains where the displayed context window
- * came from. The `'fallback'` copy is intentionally actionable — it points the
- * user at the LLM-profile fix path rather than just admitting we guessed.
+ * came from. The `'fallback'` and `'openai_compat_default'` copies are
+ * intentionally actionable — they point the user at the LLM-profile fix path
+ * rather than just admitting we guessed.
  */
-function contextSourceTooltip(source: ContextWindowSource | undefined): string | null {
+function contextSourceTooltip(
+  source: ContextWindowSource | undefined,
+  matchedProvider: string | undefined,
+): string | null {
   switch (source) {
     case 'profile_entry':
       return 'Window set by your LLM profile model override';
-    case 'hardcoded_table':
-      return 'Window from built-in model spec';
     case 'pi_ai_registry':
-      return 'Window from pi-ai model registry / provider default';
+      // Per F4 UX: surface "registry" to users; never expose "pi-ai" wording.
+      // When a cross-provider sweep matched (matchedProvider set), annotate
+      // it parenthetically so users can tell which provider supplied the spec.
+      return `Window from registry${matchedProvider ? ` (${matchedProvider})` : ''}`;
+    case 'openai_compat_default':
+      return 'Using 128,000 default for openai-compat. No registry match for this model — declare the model on your LLM profile to set an accurate window.';
     case 'fallback':
       return 'Using default 100k window — no spec found for this model. Declare the model on your LLM profile for accuracy.';
     default:
@@ -52,6 +66,7 @@ export function TokenUsageDisplay({
   outputTokens,
   contextWindow,
   contextWindowSource,
+  contextWindowMatchedProvider,
 }: TokenUsageDisplayProps) {
   const total = inputTokens + outputTokens;
   const currentInput = latestInputTokens ?? inputTokens;
@@ -77,11 +92,16 @@ export function TokenUsageDisplay({
   // The numeric figures stay in the overall hover title (current/total/context)
   // so we don't regress existing user behavior. The source tooltip lives on a
   // dedicated wrapper around the value text so hovering exclusively over the
-  // "X/Y" cluster (or the fallback icon) surfaces the source explanation.
+  // "X/Y" cluster (or the warning icon) surfaces the source explanation.
   // The AlertTriangle from lucide-react doesn't accept `title`, so we wrap it
   // in a span with title + aria-label to keep accessibility intact.
-  const sourceTip = contextSourceTooltip(contextWindowSource);
-  const isFallback = hasContextWindow && contextWindowSource === 'fallback';
+  const sourceTip = contextSourceTooltip(contextWindowSource, contextWindowMatchedProvider);
+  // Both `fallback` and `openai_compat_default` are "we don't really know"
+  // states — surface them with the same amber warning glyph but a distinct
+  // aria-label so screen-reader users can tell them apart.
+  const showFallbackIcon = hasContextWindow && contextWindowSource === 'fallback';
+  const showOpenaiCompatDefaultIcon =
+    hasContextWindow && contextWindowSource === 'openai_compat_default';
 
   return (
     <div
@@ -89,11 +109,20 @@ export function TokenUsageDisplay({
       title={`Current: ${currentInput.toLocaleString()} in / ${currentOutput.toLocaleString()} out | Total: ${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out | Context: ${hasContextWindow ? contextWindow.toLocaleString() : 'unknown'}`}
     >
       <span title={sourceTip ?? undefined}>{valueText}</span>
-      {isFallback && (
+      {showFallbackIcon && (
         <span
           className="inline-flex items-center"
           title={sourceTip ?? undefined}
           aria-label="Context window is a fallback estimate"
+        >
+          <AlertTriangle size={12} className="text-amber-500 shrink-0" />
+        </span>
+      )}
+      {showOpenaiCompatDefaultIcon && (
+        <span
+          className="inline-flex items-center"
+          title={sourceTip ?? undefined}
+          aria-label="Context window is an openai-compat default (no registry match)"
         >
           <AlertTriangle size={12} className="text-amber-500 shrink-0" />
         </span>

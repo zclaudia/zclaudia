@@ -149,7 +149,7 @@ describe('ProviderManager', () => {
     vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValue({ ok: true, models: [] });
     vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValue({ ok: true, latencyMs: 0 });
-    vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({ value: 200_000, source: 'hardcoded_table' });
+    vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({ value: 200_000, source: 'pi_ai_registry' });
     mockProviderMetaState.getProviders.mockReturnValue([]);
     mockServerState.activeServerId = 'local';
     mockServerState.connections.local.status = 'connected';
@@ -775,9 +775,11 @@ describe('ProviderManager', () => {
         target: { value: 'DeepSeek Local' },
       });
 
-      // Choose providerType from dropdown: open it, pick openai-custom
+      // Choose providerType from dropdown: openai (merged with the legacy
+      // openai-custom shape in migration 004, so a baseUrl override now lives
+      // on the unified `openai` provider type).
       await clickAsync(screen.getByText('Provider Type').nextElementSibling as Element);
-      await clickAsync(screen.getByText('OpenAI-compatible (custom)'));
+      await clickAsync(screen.getByText('OpenAI'));
 
       // Fill baseUrl
       fireEvent.change(screen.getByPlaceholderText(/api\.example\.com/), {
@@ -807,7 +809,7 @@ describe('ProviderManager', () => {
         expect(api.createLlmProfile).toHaveBeenCalledWith(
           expect.objectContaining({
             name: 'DeepSeek Local',
-            providerType: 'openai-custom',
+            providerType: 'openai',
             baseUrl: 'http://127.0.0.1:3000/v1',
             apiKey: 'sk-test-123',
             compat: { supportsReasoningEffort: true },
@@ -1163,10 +1165,10 @@ describe('ProviderManager', () => {
     // The ModelRow debounces resolve-preview by 300ms; waitFor's default
     // 1s timeout is enough but we use waitFor (not waitForFast) for these.
 
-    it('shows "Using X from built-in table" for hardcoded_table source when contextWindow is left blank', async () => {
+    it('shows "Using X from registry" for pi_ai_registry source (no matchedProvider)', async () => {
       vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
         value: 200_000,
-        source: 'hardcoded_table',
+        source: 'pi_ai_registry',
       });
 
       await renderProviderManager({ onClose: mockOnClose });
@@ -1180,15 +1182,23 @@ describe('ProviderManager', () => {
         target: { value: 'claude-opus-4-7' },
       });
 
-      await waitFor(() => {
-        expect(screen.getByText(/Using 200,000 from built-in table/)).toBeInTheDocument();
-      });
+      const hint = await waitFor(() =>
+        screen.getByText(/Using 200,000 from registry/),
+      );
+      // No "(provider)" parenthetical when matchedProvider is absent.
+      expect(hint.textContent).not.toMatch(/\(/);
+      // F4: never expose "pi-ai" wording to the user.
+      expect(hint.textContent).not.toMatch(/pi-ai/i);
     });
 
-    it('shows pi-ai registry copy for pi_ai_registry source', async () => {
+    it('annotates pi_ai_registry hint with matchedProvider on cross-provider hits', async () => {
+      // Cross-provider sweep: an openai-compat profile borrows a registered
+      // `deepseek-v4` model id; the server reports matchedProvider="deepseek"
+      // so users can tell which provider's spec we adopted.
       vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
         value: 131_072,
         source: 'pi_ai_registry',
+        matchedProvider: 'deepseek',
       });
 
       await renderProviderManager({ onClose: mockOnClose });
@@ -1199,12 +1209,40 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Add Provider'));
       await clickAsync(screen.getByText('+ Add model'));
       fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
-        target: { value: 'mistral-large' },
+        target: { value: 'deepseek-v4' },
       });
 
-      await waitFor(() => {
-        expect(screen.getByText(/Using 131,072 from pi-ai registry/)).toBeInTheDocument();
+      const hint = await waitFor(() =>
+        screen.getByText(/Using 131,072 from registry \(deepseek\)/),
+      );
+      expect(hint.textContent).not.toMatch(/pi-ai/i);
+    });
+
+    it('shows amber openai_compat_default warning when registry has no match for openai-compat profile', async () => {
+      // F4 split: openai-compat proxies hand back a 128k literal when nothing
+      // in the registry matched. Distinct from the 100k `fallback` path so
+      // users can tell "we assumed compat default" from "we have no idea".
+      vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
+        value: 128_000,
+        source: 'openai_compat_default',
       });
+
+      await renderProviderManager({ onClose: mockOnClose });
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'mystery-openai-compat-model' },
+      });
+
+      const warning = await waitFor(() =>
+        screen.getByText(/Using 128,000 default for openai-compat\. No registry match for "mystery-openai-compat-model"/i),
+      );
+      const wrapper = warning.closest('p');
+      expect(wrapper?.className).toMatch(/text-amber-600/);
     });
 
     it('shows amber fallback warning with AlertTriangle for fallback source', async () => {
@@ -1237,7 +1275,7 @@ describe('ProviderManager', () => {
     it('does not show the hint when contextWindow override is filled', async () => {
       vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
         value: 200_000,
-        source: 'hardcoded_table',
+        source: 'pi_ai_registry',
       });
 
       await renderProviderManager({ onClose: mockOnClose });
@@ -1260,7 +1298,7 @@ describe('ProviderManager', () => {
       // a no-op against a still-pending request that hasn't fired yet.
       await new Promise((r) => setTimeout(r, 350));
 
-      expect(screen.queryByText(/Using .* from built-in table/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Using .* from registry/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Falls back to \d/)).not.toBeInTheDocument();
     });
 
@@ -1289,7 +1327,7 @@ describe('ProviderManager', () => {
       // call must never carry our own override even when one is mid-edit.
       vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
         value: 200_000,
-        source: 'hardcoded_table',
+        source: 'pi_ai_registry',
       });
 
       await renderProviderManager({ onClose: mockOnClose });
