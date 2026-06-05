@@ -300,12 +300,13 @@ describe('llm-profiles routes', () => {
   });
 
   describe('POST /models/resolve-preview', () => {
-    it('returns {value, source} from the resolution chain without persisting anything', async () => {
-      // claude-opus-4-7 is in the hardcoded table at 200_000 — and we pass no
-      // override on the entry so we hit the hardcoded_table branch, not
-      // profile_entry. This also exercises the "self-edit gotcha avoided"
-      // behavior: the entry for `claude-opus-4-7` carries no contextWindow,
-      // mirroring what the desktop ModelRow strips before calling.
+    it('returns {value, source, matchedProvider} from the resolution chain without persisting anything', async () => {
+      // claude-opus-4-7 is in pi-ai's registry under the `anthropic`
+      // provider key — and we pass no override on the entry so we hit the
+      // pi_ai_registry branch, not profile_entry. This also exercises the
+      // "self-edit gotcha avoided" behavior: the entry for
+      // `claude-opus-4-7` carries no contextWindow, mirroring what the
+      // desktop ModelRow strips before calling.
       const before = new LlmProfileRepository(db).findAllOrdered().length;
       const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
         providerType: 'anthropic',
@@ -315,9 +316,41 @@ describe('llm-profiles routes', () => {
       });
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data).toEqual({ value: 200_000, source: 'hardcoded_table' });
+      expect(res.body.data.source).toBe('pi_ai_registry');
+      expect(res.body.data.matchedProvider).toBe('anthropic');
+      expect(res.body.data.value).toBeGreaterThan(100_000);
       // No side-effect on the profile table.
       expect(new LlmProfileRepository(db).findAllOrdered().length).toBe(before);
+    });
+
+    it('cross-provider sweep surfaces matchedProvider for a model under a different pi-ai provider key', async () => {
+      // claude-opus-4-7 is registered under `anthropic` in pi-ai's
+      // registry. If the user picks providerType=openai (e.g. routing
+      // through an openai-compat proxy) the same-provider lookup misses
+      // but the cross-provider sweep finds the entry under `anthropic` and
+      // surfaces it via matchedProvider.
+      const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
+        providerType: 'openai',
+        apiKey: 'k',
+        baseUrl: 'https://proxy.example.com/v1',
+        modelId: 'claude-opus-4-7',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.data.source).toBe('pi_ai_registry');
+      expect(res.body.data.matchedProvider).toBe('anthropic');
+    });
+
+    it('returns openai_compat_default for an unknown id under an openai-compat proxy', async () => {
+      const res = await request(app).post('/api/llm-profiles/models/resolve-preview').send({
+        providerType: 'openai',
+        apiKey: 'k',
+        baseUrl: 'https://proxy.example.com/v1',
+        modelId: 'totally-unregistered-xyz',
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.data.source).toBe('openai_compat_default');
+      expect(res.body.data.value).toBe(128_000);
+      expect(res.body.data.matchedProvider).toBeUndefined();
     });
 
     it('rejects body missing modelId with 400', async () => {

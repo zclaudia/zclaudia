@@ -275,6 +275,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     );
     const effectiveContextWindow = resolvedWindow.value;
     const contextWindowSource = resolvedWindow.source;
+    const contextWindowMatchedProvider = resolvedWindow.matchedProvider;
 
     // 3. Resolve effective tool set. Plan mode collapses the agent's
     //    enabledTools to only the read-only subset (read/grep/find/ls).
@@ -293,6 +294,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         model: ctx.model,
         contextWindow: effectiveContextWindow,
         contextWindowSource,
+        contextWindowMatchedProvider,
         cwd: options.cwd,
         permissionMode: ctx.permissionMode || 'default',
         tools: effectiveTools,

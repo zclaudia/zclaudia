@@ -3,15 +3,20 @@ import { resolveContextWindow } from '../context-windows.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 
 describe('resolveContextWindow', () => {
-  it('returns hardcoded value for known model with hardcoded_table source', () => {
-    expect(resolveContextWindow({ model: 'claude-opus-4-7' })).toEqual({
-      value: 200_000,
-      source: 'hardcoded_table',
-    });
+  it('returns the pi-ai registry value for a known model with pi_ai_registry source + matchedProvider', () => {
+    // claude-opus-4-7 is registered under the anthropic provider in pi-ai's
+    // registry. Same-provider lookup hits, so matchedProvider === 'anthropic'.
+    const resolved = resolveContextWindow({ model: 'claude-opus-4-7' });
+    expect(resolved.source).toBe('pi_ai_registry');
+    expect(resolved.matchedProvider).toBe('anthropic');
+    expect(resolved.value).toBeGreaterThan(100_000);
   });
 
-  it('returns fallback for unknown model with fallback source', () => {
-    expect(resolveContextWindow({ model: 'unknown-model' })).toEqual({
+  it('returns fallback for an unknown model when providerType defaults to anthropic', () => {
+    // No profile, no agent profile, no override → providerType defaults to
+    // anthropic. anthropic has no openai-compat default, so we land on the
+    // 100k last-resort fallback.
+    expect(resolveContextWindow({ model: 'totally-unknown-claude-variant' })).toEqual({
       value: 100_000,
       source: 'fallback',
     });
@@ -29,7 +34,7 @@ describe('resolveContextWindow', () => {
     });
   });
 
-  it('treats entry.contextWindow=0 as no override (falls back to hardcoded_table)', () => {
+  it('treats entry.contextWindow=0 as no override (falls back to registry / pi_ai_registry)', () => {
     const llm: LlmProfileConfig = {
       id: 'p', name: 'a', providerType: 'anthropic',
       // contextWindow=0 violates the routes validator, but resolveContextWindow
@@ -37,49 +42,66 @@ describe('resolveContextWindow', () => {
       models: [{ modelId: 'claude-opus-4-7', contextWindow: 0 }],
       createdAt: 0, updatedAt: 0,
     };
-    expect(resolveContextWindow({ model: 'claude-opus-4-7' }, undefined, llm)).toEqual({
-      value: 200_000,
-      source: 'hardcoded_table',
-    });
+    const resolved = resolveContextWindow({ model: 'claude-opus-4-7' }, undefined, llm);
+    expect(resolved.source).toBe('pi_ai_registry');
+    expect(resolved.matchedProvider).toBe('anthropic');
+    expect(resolved.value).toBeGreaterThan(100_000);
   });
 
-  it('accepts null profile with modelOverride', () => {
-    expect(resolveContextWindow(null, 'claude-sonnet-4-6')).toEqual({
-      value: 200_000,
-      source: 'hardcoded_table',
-    });
+  it('accepts null profile with modelOverride and resolves via registry', () => {
+    const resolved = resolveContextWindow(null, 'claude-sonnet-4-6');
+    expect(resolved.source).toBe('pi_ai_registry');
+    expect(resolved.matchedProvider).toBe('anthropic');
+    expect(resolved.value).toBeGreaterThan(100_000);
   });
 
-  it('uses llmProfileConfig.baseUrl-derived contextWindow with pi_ai_registry source', () => {
+  it('reports openai_compat_default for an unknown model under an openai-compat proxy', () => {
     const llm: LlmProfileConfig = {
       id: 'p', name: 'c', providerType: 'openai',
       baseUrl: 'https://custom.example.com/v1', apiKey: 'sk-test',
       createdAt: 0, updatedAt: 0,
     };
-    // buildModel for openai+baseUrl returns contextWindow: 128_000 default.
-    // Source is pi_ai_registry: from the resolver's perspective, any window
-    // surfaced via buildModel() — whether pi-ai's registry lookup or the
-    // openai-compat literal default — is "what the model itself declares".
-    expect(resolveContextWindow({ model: 'unknown-custom-model' }, undefined, llm)).toEqual({
+    // Model id is not registered under any pi-ai provider, so we fall
+    // through same-provider AND cross-provider lookups to the openai-compat
+    // literal default — and tag the source distinctly so the UI doesn't
+    // claim it came from the registry.
+    expect(resolveContextWindow({ model: 'totally-unregistered-id-xyz' }, undefined, llm)).toEqual({
       value: 128_000,
-      source: 'pi_ai_registry',
+      source: 'openai_compat_default',
     });
   });
 
-  it('returns fallback when llmProfileConfig is undefined and registry misses', () => {
+  it('cross-provider sweep finds a model under a different pi-ai provider key', () => {
+    // The motivating example: user runs claude-opus-4-7 through an
+    // openai-compat proxy with providerType=openai. Same-provider lookup
+    // misses (claude-opus-4-7 is registered under `anthropic`, not
+    // `openai`), but the cross-provider sweep catches it and surfaces
+    // matchedProvider === 'anthropic'.
+    const llm: LlmProfileConfig = {
+      id: 'p', name: 'proxy', providerType: 'openai',
+      baseUrl: 'https://proxy.example.com/v1', apiKey: 'sk-x',
+      createdAt: 0, updatedAt: 0,
+    };
+    const resolved = resolveContextWindow({ model: 'claude-opus-4-7' }, undefined, llm);
+    expect(resolved.source).toBe('pi_ai_registry');
+    expect(resolved.matchedProvider).toBe('anthropic');
+    expect(resolved.value).toBeGreaterThan(100_000);
+  });
+
+  it('returns fallback 100k for unknown id under anthropic providerType (no openai-compat default)', () => {
     expect(resolveContextWindow({ model: 'totally-unknown' }, undefined, undefined)).toEqual({
       value: 100_000,
       source: 'fallback',
     });
   });
 
-  it('llm_profile.models entry wins over hardcoded MODEL_CONTEXT_WINDOWS', () => {
+  it('llm_profile.models entry wins over registry lookup', () => {
     const llm: LlmProfileConfig = {
       id: 'p', name: 'a', providerType: 'anthropic',
-      models: [{ modelId: 'gpt-5', contextWindow: 50_000 }],
+      models: [{ modelId: 'claude-opus-4-7', contextWindow: 50_000 }],
       createdAt: 0, updatedAt: 0,
     };
-    expect(resolveContextWindow({ model: 'gpt-5' }, undefined, llm)).toEqual({
+    expect(resolveContextWindow({ model: 'claude-opus-4-7' }, undefined, llm)).toEqual({
       value: 50_000,
       source: 'profile_entry',
     });

@@ -233,19 +233,25 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
   });
 
   /**
-   * F3: Resolve the effective context window for a (synthetic profile, modelId)
-   * pair without persisting anything. The LLM-profile editor calls this from
-   * each model row so users can see "if I leave this blank, the runtime will
-   * use X (from source Y)" before saving.
+   * F3 / F4: Resolve the effective context window for a (synthetic profile,
+   * modelId) pair without persisting anything. The LLM-profile editor calls
+   * this from each model row so users can see "if I leave this blank, the
+   * runtime will use X (from source Y, matched against pi-ai provider Z)"
+   * before saving.
    *
    * Self-edit gotcha: when the caller's `models[]` contains an entry whose
-   * `modelId` matches the request's top-level `modelId` AND that entry already
-   * has a `contextWindow` override, `resolveContextWindow` will of course
-   * return that override (source: 'profile_entry'). The editor avoids this by
-   * stripping `contextWindow` from the current row's entry before calling —
-   * but we keep the server side honest: it just resolves whatever profile it
-   * receives. The 'profile_entry' branch is still reachable if a *different*
-   * row happens to declare the same modelId, which is intentional.
+   * `modelId` matches the request's top-level `modelId` AND that entry
+   * already has a `contextWindow` override, `resolveContextWindow` will of
+   * course return that override (source: 'profile_entry'). The editor avoids
+   * this by stripping `contextWindow` from the current row's entry before
+   * calling — but we keep the server side honest: it just resolves whatever
+   * profile it receives. The 'profile_entry' branch is still reachable if a
+   * *different* row happens to declare the same modelId, which is
+   * intentional.
+   *
+   * Response shape: `{value, source, matchedProvider?}` — `matchedProvider`
+   * is the pi-ai provider id whose registry entry produced the value, and
+   * is only set when source === 'pi_ai_registry'.
    */
   router.post('/models/resolve-preview', (req: Request, res: Response) => {
     const built = buildPreviewProfile(req.body);
@@ -266,7 +272,14 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
     }
     try {
       const resolved = resolveContextWindow({ model: modelId }, undefined, built.profile);
-      res.json({ success: true, data: { value: resolved.value, source: resolved.source } });
+      res.json({
+        success: true,
+        data: {
+          value: resolved.value,
+          source: resolved.source,
+          matchedProvider: resolved.matchedProvider,
+        },
+      });
     } catch (error) {
       console.error('Error resolving preview context window for llm profile:', error);
       res.status(500).json({

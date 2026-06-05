@@ -140,6 +140,7 @@ export function handleProviderEvent({
             model: msg.systemInfo.model,
             contextWindow: msg.systemInfo.contextWindow,
             contextWindowSource: msg.systemInfo.contextWindowSource,
+            contextWindowMatchedProvider: msg.systemInfo.contextWindowMatchedProvider,
             claudeCodeVersion: msg.systemInfo.claudeCodeVersion,
             cwd: msg.systemInfo.cwd,
             permissionMode: msg.systemInfo.permissionMode,

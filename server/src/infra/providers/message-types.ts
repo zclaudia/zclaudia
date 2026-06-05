@@ -42,6 +42,10 @@ export interface SystemInfo {
    *  Mirrors the wire-level type so UI can render provenance + warn on
    *  the `fallback` path. */
   contextWindowSource?: ContextWindowSource;
+  /** Set when {@link SystemInfo.contextWindowSource} is `pi_ai_registry`;
+   *  the pi-ai provider id (same or cross provider) whose registry entry
+   *  supplied the contextWindow. Mirrors the wire-level field. */
+  contextWindowMatchedProvider?: string;
   claudeCodeVersion?: string;
   cwd?: string;
   tools?: string[];

@@ -7,14 +7,41 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 
-// Mock pi-ai's getModel so tests don't hit real model registry.
-vi.mock('@earendil-works/pi-ai', () => ({
-  getModel: vi.fn((provider: string, model: string) => {
-    if (provider === 'unknown') throw new Error(`unknown provider: ${provider}`);
-    if (model === 'invalid-model') throw new Error(`unknown model: ${model}`);
+// Mock pi-ai's registry helpers so tests don't hit the real model registry.
+// The new buildModel calls getModel for same-provider lookup, then
+// getProviders + getModels for cross-provider sweep. The mock returns a
+// registry-shaped Model for any non-pathological (provider, modelId) pair so
+// existing assertions about contextWindow=200_000 still hold; getProviders
+// returns the known providers so cross-provider sweep can iterate; getModels
+// returns the entry only when the provider+id pair would have hit getModel.
+vi.mock('@earendil-works/pi-ai', () => {
+  const KNOWN_PROVIDERS = ['anthropic', 'openai', 'deepseek'];
+  function buildEntry(provider: string, model: string) {
     return { provider, id: model, contextWindow: 200000, maxTokens: 8000 };
-  }),
-}));
+  }
+  return {
+    getModel: vi.fn((provider: string, model: string) => {
+      if (provider === 'unknown') throw new Error(`unknown provider: ${provider}`);
+      if (model === 'invalid-model') throw new Error(`unknown model: ${model}`);
+      // Registry-style "not found": return undefined for an ad-hoc
+      // "unregistered" id so the new buildModel falls back to the
+      // openai-compat literal path. Existing tests pass concrete model ids
+      // (e.g. claude-sonnet-4-6) which we treat as registered.
+      if (model.startsWith('unregistered-')) return undefined;
+      return buildEntry(provider, model);
+    }),
+    getProviders: vi.fn(() => KNOWN_PROVIDERS),
+    getModels: vi.fn((provider: string) => {
+      // The mock's getModel returns a hit for any non-`unregistered-` id, so
+      // we don't need an exhaustive enumeration here — return a tiny
+      // stand-in list for cross-provider sweeps. Tests that need specific
+      // cross-provider hits create them via build-model unit tests that
+      // override the mock.
+      if (!KNOWN_PROVIDERS.includes(provider)) return [];
+      return [buildEntry(provider, `registered-${provider}-model`)];
+    }),
+  };
+});
 
 // Hoisted collections used inside vi.mock factory.
 const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
@@ -531,10 +558,12 @@ describe('ZClaudiaAdapter.run', () => {
     });
 
     const init = out.find(m => m.type === 'init');
-    // claude-sonnet-4-6 is in MODEL_CONTEXT_WINDOWS, so resolveContextWindow
-    // picks the hardcoded_table layer (200k), short-circuiting the registry.
+    // claude-sonnet-4-6 is found via the mocked pi-ai registry (any non-
+    // `unregistered-*` id matches). MODEL_CONTEXT_WINDOWS was retired in
+    // F4 — pi_ai_registry is now the canonical source.
     expect(init?.systemInfo?.contextWindow).toBe(200_000);
-    expect(init?.systemInfo?.contextWindowSource).toBe('hardcoded_table');
+    expect(init?.systemInfo?.contextWindowSource).toBe('pi_ai_registry');
+    expect(init?.systemInfo?.contextWindowMatchedProvider).toBe('anthropic');
   });
 
   it('reports contextWindowSource=profile_entry when models[*].contextWindow is set', async () => {
@@ -571,9 +600,9 @@ describe('ZClaudiaAdapter.run', () => {
     const adapter = new ZClaudiaAdapter();
     const out = await collect(adapter, 'hi', {
       agentProfile: {
-        // Not in MODEL_CONTEXT_WINDOWS — but the mocked pi-ai getModel returns
-        // contextWindow=200_000 for any id, so resolution lands on the
-        // pi_ai_registry layer.
+        // The mocked pi-ai getModel returns contextWindow=200_000 for any
+        // non-`unregistered-*` id, so resolution lands on the pi_ai_registry
+        // layer with matchedProvider = the configured providerType.
         model: 'some-unlisted-model',
         systemPrompt: '',
         enabledTools: [],
@@ -866,30 +895,33 @@ describe('buildModel — modelEntry overrides', () => {
   beforeEach(() => { process.env = { ...originalEnv }; });
   afterEach(() => { process.env = { ...originalEnv }; });
 
-  it('overrides contextWindow on openai-compat path', () => {
+  it('overrides contextWindow on openai-compat literal path (unregistered id)', () => {
     const profile = {
       providerType: 'openai',
       baseUrl: 'http://x/v1',
       apiKey: 'k',
     } as any;
-    const built = buildModel(profile, 'something', { modelId: 'something', contextWindow: 999_999 });
+    // `unregistered-*` ids miss both same-provider and cross-provider
+    // lookups in the mock, so buildModel falls back to the openai-compat
+    // literal — and the modelEntry override still wins.
+    const built = buildModel(profile, 'unregistered-x', { modelId: 'unregistered-x', contextWindow: 999_999 });
     expect(built.model.contextWindow).toBe(999_999);
   });
 
-  it('overrides maxTokens on openai-compat path', () => {
+  it('overrides maxTokens on openai-compat literal path', () => {
     const built = buildModel(
       { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
-      'm',
-      { modelId: 'm', maxTokens: 2048 },
+      'unregistered-m',
+      { modelId: 'unregistered-m', maxTokens: 2048 },
     );
     expect(built.model.maxTokens).toBe(2048);
   });
 
-  it('replaces display name on openai-compat path', () => {
+  it('replaces display name on openai-compat literal path', () => {
     const built = buildModel(
       { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
-      'raw-id',
-      { modelId: 'raw-id', displayName: 'Pretty Name' },
+      'unregistered-raw-id',
+      { modelId: 'unregistered-raw-id', displayName: 'Pretty Name' },
     );
     expect(built.model.name).toBe('Pretty Name');
   });
@@ -1023,6 +1055,59 @@ describe('buildModel — profile overrides', () => {
     const profileB = { providerType: 'openai' } as any;
     const { model: modelB } = buildModel(profileB);
     expect(modelB.headers).toBeUndefined();
+  });
+
+  it('cross-provider registry hit forces api to match providerType, not the registered entry', () => {
+    // Same-provider lookup hits (mock returns a hit for any non-
+    // `unregistered-*` id under any provider), so the registry path runs
+    // with providerType=openai and api gets stamped as openai-completions
+    // even if the registry literal would have come from a different provider.
+    const profile = {
+      providerType: 'openai',
+      baseUrl: 'http://proxy.example.com/v1',
+      apiKey: 'k',
+    } as any;
+    const { model } = buildModel(profile, 'claude-opus-4-7');
+    // baseUrl replaced.
+    expect(model.baseUrl).toBe('http://proxy.example.com/v1');
+    // api forced by providerType regardless of registry hit's native api.
+    expect(model.api).toBe('openai-completions');
+    // provider also flipped to providerType.
+    expect(model.provider).toBe('openai');
+    // contextWindow inherited from registry (mock returns 200_000).
+    expect(model.contextWindow).toBe(200_000);
+  });
+
+  it('falls back to openai-compat literal (128k) when both same-provider and cross-provider lookups miss', () => {
+    // `unregistered-*` ids are designed by the mock to miss every lookup.
+    const profile = {
+      providerType: 'openai',
+      baseUrl: 'http://proxy.example.com/v1',
+      apiKey: 'k',
+    } as any;
+    const { model } = buildModel(profile, 'unregistered-fake-id');
+    expect(model.id).toBe('unregistered-fake-id');
+    expect(model.api).toBe('openai-completions');
+    expect(model.baseUrl).toBe('http://proxy.example.com/v1');
+    expect(model.contextWindow).toBe(128_000);
+  });
+
+  it('anthropic providerType + missing registry → falls through to openai-compat literal too', () => {
+    // anthropic with an unregistered id: same-provider miss, cross-provider
+    // miss (none of the mocked providers have it), so the openai-compat
+    // literal kicks in. The literal stamps api='openai-completions' because
+    // the literal builder is generic; resolveContextWindow returns
+    // `fallback` 100k in this case (no openai-compat default for anthropic
+    // providerType) — but buildModel always produces an openai-compat
+    // literal as its terminal fallback, regardless of providerType.
+    const profile = {
+      providerType: 'anthropic',
+      apiKey: 'k',
+    } as any;
+    const { model } = buildModel(profile, 'unregistered-claude-future');
+    expect(model.id).toBe('unregistered-claude-future');
+    // Literal's contextWindow is the openai-compat default.
+    expect(model.contextWindow).toBe(128_000);
   });
 });
 

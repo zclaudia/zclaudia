@@ -44,17 +44,28 @@ export type RunHealthStatus = 'healthy' | 'idle' | 'loop';
  * Which layer in the resolution chain supplied the effective context window.
  * Lets the UI explain "why" — and warn when we hit the last-resort fallback.
  *
- * - `profile_entry`   — user-declared `llm_profile.models[*].contextWindow`.
- * - `hardcoded_table` — server's built-in MODEL_CONTEXT_WINDOWS map.
- * - `pi_ai_registry`  — pi-ai's model registry (built-in providers) or
- *                       openai-compat literal default for custom endpoints.
- * - `fallback`        — last-resort 100k safety net; signals "we don't actually
- *                       know" so UI can show a warning.
+ * - `profile_entry`         — user-declared `llm_profile.models[*].contextWindow`.
+ * - `pi_ai_registry`        — pi-ai's model registry. May come from the
+ *                             same-provider lookup (e.g. providerType=openai
+ *                             + modelId="gpt-5") or a cross-provider sweep
+ *                             when the user runs a registered model id
+ *                             through an OpenAI-compatible proxy. The
+ *                             matched pi-ai provider is reported in
+ *                             {@link SystemInfo.contextWindowMatchedProvider}.
+ * - `openai_compat_default` — fallback 128k literal that the openai-compat
+ *                             code path assumes when no registry entry
+ *                             matches. Distinguishing this from `fallback`
+ *                             lets the UI explain "we assumed the standard
+ *                             openai-compat window because nothing else
+ *                             matched" without misleadingly claiming a
+ *                             registry hit.
+ * - `fallback`              — last-resort 100k safety net; signals "we don't
+ *                             actually know" so UI can show a warning.
  */
 export type ContextWindowSource =
   | 'profile_entry'
-  | 'hardcoded_table'
   | 'pi_ai_registry'
+  | 'openai_compat_default'
   | 'fallback';
 
 // Provider system info from runtime init message
@@ -67,6 +78,13 @@ export interface SystemInfo {
    *  contextWindow is — UI uses this to surface "from your LLM profile" vs
    *  "fallback estimate" and to warn on the fallback path. */
   contextWindowSource?: ContextWindowSource;
+  /** When `contextWindowSource === 'pi_ai_registry'`, the pi-ai provider id
+   *  whose registry entry was matched. Same-provider hits set this to the
+   *  configured providerType (e.g. `anthropic`); cross-provider hits set it
+   *  to whichever provider supplied the matching model id (e.g. running
+   *  `deepseek-v4` through an openai-compat proxy resolves to `deepseek`).
+   *  Lets the UI show "from registry (deepseek)" instead of just "registry". */
+  contextWindowMatchedProvider?: string;
   claudeCodeVersion?: string;
   cwd?: string;
   tools?: string[];
