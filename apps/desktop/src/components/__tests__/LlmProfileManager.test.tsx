@@ -111,6 +111,7 @@ vi.mock('../../services/api', () => ({
   setDefaultLlmProfile: vi.fn(),
   fetchModelsForLlmProfilePreview: vi.fn(),
   probeLlmProfileModelPreview: vi.fn(),
+  resolveContextWindowPreview: vi.fn(),
 }));
 
 import { useServerStore } from '../../stores/serverStore';
@@ -148,6 +149,7 @@ describe('ProviderManager', () => {
     vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValue({ ok: true, models: [] });
     vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValue({ ok: true, latencyMs: 0 });
+    vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({ value: 200_000, source: 'hardcoded_table' });
     mockProviderMetaState.getProviders.mockReturnValue([]);
     mockServerState.activeServerId = 'local';
     mockServerState.connections.local.status = 'connected';
@@ -1154,6 +1156,167 @@ describe('ProviderManager', () => {
       expect(alertSpy).not.toHaveBeenCalled();
       expect(api.updateLlmProfile).not.toHaveBeenCalled();
       alertSpy.mockRestore();
+    });
+  });
+
+  describe('Resolved contextWindow hint (F3)', () => {
+    // The ModelRow debounces resolve-preview by 300ms; waitFor's default
+    // 1s timeout is enough but we use waitFor (not waitForFast) for these.
+
+    it('shows "Using X from built-in table" for hardcoded_table source when contextWindow is left blank', async () => {
+      vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
+        value: 200_000,
+        source: 'hardcoded_table',
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'claude-opus-4-7' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Using 200,000 from built-in table/)).toBeInTheDocument();
+      });
+    });
+
+    it('shows pi-ai registry copy for pi_ai_registry source', async () => {
+      vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
+        value: 131_072,
+        source: 'pi_ai_registry',
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'mistral-large' },
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Using 131,072 from pi-ai registry/)).toBeInTheDocument();
+      });
+    });
+
+    it('shows amber fallback warning with AlertTriangle for fallback source', async () => {
+      vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
+        value: 100_000,
+        source: 'fallback',
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'unknown-model-xyz' },
+      });
+
+      const warning = await waitFor(() =>
+        screen.getByText(/Falls back to 100,000 — no spec found/i)
+      );
+      // The amber class lives on the wrapper <p>; the icon is a sibling
+      // span inside it. Verify the amber class so we don't regress the
+      // distinct visual treatment of the fallback path.
+      const wrapper = warning.closest('p');
+      expect(wrapper?.className).toMatch(/text-amber-600/);
+    });
+
+    it('does not show the hint when contextWindow override is filled', async () => {
+      vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
+        value: 200_000,
+        source: 'hardcoded_table',
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'claude-opus-4-7' },
+      });
+      // Now fill the override — the helper should disappear (and no resolve
+      // request should be in flight either).
+      fireEvent.change(screen.getByPlaceholderText(/context window/), {
+        target: { value: '500000' },
+      });
+
+      // Give the debounce window time to elapse so the assertion isn't
+      // a no-op against a still-pending request that hasn't fired yet.
+      await new Promise((r) => setTimeout(r, 350));
+
+      expect(screen.queryByText(/Using .* from built-in table/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Falls back to \d/)).not.toBeInTheDocument();
+    });
+
+    it('does not fire a resolve request when modelId is empty', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+
+      // Wait past the debounce window — the empty modelId must keep the
+      // hint silent and the API mock untouched.
+      await new Promise((r) => setTimeout(r, 350));
+
+      expect(api.resolveContextWindowPreview).not.toHaveBeenCalled();
+      expect(screen.queryByText(/Using \d/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Falls back to \d/)).not.toBeInTheDocument();
+    });
+
+    it('strips the row\'s own contextWindow from models[] before calling (self-edit guard)', async () => {
+      // Simulates the user typing a contextWindow then clearing it — the
+      // entry still exists in formModels with contextWindow=undefined (which
+      // draftsToEntries already drops), but importantly the resolve-preview
+      // call must never carry our own override even when one is mid-edit.
+      vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({
+        value: 200_000,
+        source: 'hardcoded_table',
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'claude-opus-4-7' },
+      });
+
+      await waitFor(() => {
+        expect(api.resolveContextWindowPreview).toHaveBeenCalled();
+      });
+
+      const lastCall = vi.mocked(api.resolveContextWindowPreview).mock.calls.at(-1)?.[0];
+      expect(lastCall?.modelId).toBe('claude-opus-4-7');
+      // Find the entry for this modelId in the request payload — it must not
+      // carry a contextWindow (or carry undefined), regardless of what other
+      // rows look like.
+      const ourEntry = lastCall?.models?.find((m) => m.modelId === 'claude-opus-4-7');
+      // ourEntry may be undefined (row hasn't been serialized into draftsToEntries
+      // because no contextWindow override was set) — either way, it must not
+      // declare a contextWindow.
+      expect(ourEntry?.contextWindow).toBeUndefined();
     });
   });
 });

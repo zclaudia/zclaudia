@@ -1,4 +1,4 @@
-import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, ProviderCapabilities, SlashCommand, ContextWindowSource } from '@zclaudia/shared';
 import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
 import { apiCall, apiCallVoid } from './unwrap';
 
@@ -9,6 +9,16 @@ export type FetchLlmProfileModelsResult =
 export type ProbeLlmProfileModelResult =
   | { ok: true; latencyMs: number }
   | { ok: false; error: string };
+
+/**
+ * Result of the F3 /models/resolve-preview endpoint: the effective context
+ * window value the runtime would use for `(profile draft, modelId)` plus the
+ * provenance tag so the editor can render a per-source helper text.
+ */
+export interface ResolveContextWindowPreviewResult {
+  value: number;
+  source: ContextWindowSource;
+}
 
 export async function listLlmProfiles(options?: RequestInit): Promise<LlmProfileConfig[]> {
   return apiCall<LlmProfileConfig[]>('/api/llm-profiles', options);
@@ -104,6 +114,33 @@ export async function probeLlmProfileModelPreview(
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   }
+}
+
+/**
+ * Ask the server which context-window value + source the runtime would resolve
+ * for `(formDraft, modelId)`. Used by the LLM-profile editor to render a
+ * "if you leave this blank, X via Y" helper text under each row's
+ * contextWindow input.
+ *
+ * Self-edit warning: when caller passes `models[]` containing an entry for
+ * the same `modelId` with a `contextWindow` override, the server will
+ * (correctly) return that override as `source: 'profile_entry'`. To get the
+ * value of the *next* resolution layer (what would happen if the row were
+ * left blank), the caller must strip the current row's `contextWindow` from
+ * its entry before invoking — this matches what the ModelRow does.
+ */
+export async function resolveContextWindowPreview(input: {
+  providerType: string;
+  baseUrl?: string;
+  apiKey?: string;
+  requestHeaders?: Record<string, string>;
+  models?: LlmProfileModelEntry[];
+  modelId: string;
+}): Promise<ResolveContextWindowPreviewResult> {
+  return apiCall<ResolveContextWindowPreviewResult>(
+    '/api/llm-profiles/models/resolve-preview',
+    { method: 'POST', body: JSON.stringify(input) },
+  );
 }
 
 // Runtime adapter capability/command routes stay under `/api/providers` —

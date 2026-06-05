@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { ChevronDown, Check } from 'lucide-react';
-import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry } from '@zclaudia/shared';
+import { ChevronDown, Check, AlertTriangle } from 'lucide-react';
+import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, ContextWindowSource } from '@zclaudia/shared';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -697,6 +697,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         onRemove={removeModelRow}
         onFetch={handleFetchModels}
         onProbe={handleProbeModel}
+        buildPreviewInput={buildPreviewInputFromForm}
       />
 
       <div>
@@ -943,6 +944,12 @@ interface ModelsSectionProps {
   onRemove: (index: number) => void;
   onFetch: () => void;
   onProbe: (index: number) => void;
+  /**
+   * Build a snapshot of the *current* form draft for the F3 resolve-preview
+   * call. Each ModelRow uses this to ask the server "what context window
+   * would the runtime resolve for my modelId if I left the override blank?".
+   */
+  buildPreviewInput: () => LlmProfilePreviewInput;
 }
 
 function ModelsSection({
@@ -956,6 +963,7 @@ function ModelsSection({
   onRemove,
   onFetch,
   onProbe,
+  buildPreviewInput,
 }: ModelsSectionProps) {
   // F2: Fetch/Test now hit the preview endpoints, so neither needs the profile
   // to be saved or the form to be pristine. The only remaining hard gate is
@@ -1009,6 +1017,7 @@ function ModelsSection({
               onChange={(patch) => onUpdate(idx, patch)}
               onRemove={() => onRemove(idx)}
               onProbe={() => onProbe(idx)}
+              buildPreviewInput={buildPreviewInput}
             />
           ))}
         </div>
@@ -1025,9 +1034,16 @@ interface ModelRowProps {
   onChange: (patch: Partial<ModelRowDraft>) => void;
   onRemove: () => void;
   onProbe: () => void;
+  buildPreviewInput: () => LlmProfilePreviewInput;
 }
 
-function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onProbe }: ModelRowProps) {
+interface ResolvedPreviewState {
+  status: 'idle' | 'loading' | 'ok' | 'error';
+  value?: number;
+  source?: ContextWindowSource;
+}
+
+function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onProbe, buildPreviewInput }: ModelRowProps) {
   const errs = validateModelDraftRow(row, allRows, index);
   const isRunning = row.testStatus?.kind === 'running';
   const testDisabled =
@@ -1039,6 +1055,94 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
       : errs.modelId
         ? `Fix model id (${errs.modelId}) first`
         : undefined;
+
+  // F3: when contextWindow is left blank, ask the server what the runtime would
+  // resolve for this modelId so users see "if you save this row blank, X via
+  // Y" inline. Debounced so a fast typer doesn't fan out a request per
+  // keystroke; an abort + version counter ensures stale responses don't
+  // overwrite the freshest result.
+  const [resolved, setResolved] = useState<ResolvedPreviewState>({ status: 'idle' });
+  const requestIdRef = useRef(0);
+  const debounceTimerRef = useRef<number | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const modelIdInput = row.modelId.trim();
+  const contextOverrideEmpty = !row.contextWindowStr.trim();
+  const helperEligible = !!providerType && !!modelIdInput && contextOverrideEmpty && !errs.modelId;
+
+  useEffect(() => {
+    // Clear any pending debounce + abort the in-flight request on every input
+    // change. If we're no longer eligible (override filled, modelId cleared,
+    // etc.) just reset to idle — the UI hides the helper text in those cases.
+    if (debounceTimerRef.current !== null) {
+      window.clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+    if (!helperEligible) {
+      // Don't surface stale results when the helper isn't applicable.
+      if (resolved.status !== 'idle') setResolved({ status: 'idle' });
+      return;
+    }
+
+    const myRequestId = ++requestIdRef.current;
+    setResolved({ status: 'loading' });
+
+    debounceTimerRef.current = window.setTimeout(() => {
+      debounceTimerRef.current = null;
+      const previewInput = buildPreviewInput();
+      // Self-edit guard: strip the current row's own contextWindow override
+      // (it's empty by the helperEligible gate, but also strip the entry's
+      // maxTokens / displayName aren't relevant — we only need to neutralize
+      // contextWindow). This way `resolveContextWindow` walks past the
+      // profile_entry layer for *this* model id and reports what the next
+      // layer (hardcoded_table / pi_ai_registry / fallback) would supply.
+      const sanitizedModels = (previewInput.models ?? []).map((entry) => {
+        if (entry.modelId !== modelIdInput) return entry;
+        const { contextWindow: _omitContextWindow, ...rest } = entry;
+        void _omitContextWindow;
+        return rest;
+      });
+
+      abortRef.current = new AbortController();
+      api
+        .resolveContextWindowPreview({
+          ...previewInput,
+          models: sanitizedModels,
+          modelId: modelIdInput,
+        })
+        .then((data) => {
+          if (myRequestId !== requestIdRef.current) return; // stale
+          setResolved({ status: 'ok', value: data.value, source: data.source });
+        })
+        .catch(() => {
+          if (myRequestId !== requestIdRef.current) return; // stale
+          setResolved({ status: 'error' });
+        });
+    }, 300);
+
+    return () => {
+      if (debounceTimerRef.current !== null) {
+        window.clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+    };
+    // We intentionally depend on the inputs that drive the request shape.
+    // buildPreviewInput is recreated on every parent render — that's fine
+    // because the debounce + version guard makes redundant calls safe.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [helperEligible, modelIdInput, providerType, row.displayName, row.maxTokensStr]);
+
+  // Clean up on unmount (covers row removal too).
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current !== null) window.clearTimeout(debounceTimerRef.current);
+      if (abortRef.current) abortRef.current.abort();
+    };
+  }, []);
 
   return (
     <div className="p-3 bg-secondary/40 border border-border rounded-lg space-y-2">
@@ -1079,6 +1183,7 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
           {errs.contextWindow && (
             <p className="text-[10px] text-destructive mt-0.5">contextWindow {errs.contextWindow}</p>
           )}
+          <ResolvedContextWindowHint state={resolved} eligible={helperEligible} />
         </div>
         <div>
           <input
@@ -1119,6 +1224,60 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
       </div>
     </div>
   );
+}
+
+/**
+ * Helper text shown directly beneath the contextWindow input, explaining
+ * (when the user hasn't typed an override) which value + source the runtime
+ * would resolve. Fallback rendering uses an amber AlertTriangle to make
+ * "we don't actually know" visually distinct from "we have a sourced value".
+ */
+function ResolvedContextWindowHint({ state, eligible }: { state: ResolvedPreviewState; eligible: boolean }) {
+  if (!eligible) return null;
+  if (state.status === 'idle') return null;
+  if (state.status === 'loading') {
+    return <p className="text-[10px] text-muted-foreground mt-0.5">Resolving…</p>;
+  }
+  if (state.status === 'error') {
+    return <p className="text-[10px] text-muted-foreground mt-0.5">—</p>;
+  }
+  // 'ok'
+  if (state.value == null || state.source == null) return null;
+  const formatted = state.value.toLocaleString();
+  switch (state.source) {
+    case 'profile_entry':
+      // Theoretically unreachable because we strip our own override before
+      // calling — leave a sane label in case a *different* row declares the
+      // same modelId (rare; still informative).
+      return (
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          Using {formatted} via this profile's override
+        </p>
+      );
+    case 'hardcoded_table':
+      return (
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          Using {formatted} from built-in table
+        </p>
+      );
+    case 'pi_ai_registry':
+      return (
+        <p className="text-[10px] text-muted-foreground mt-0.5">
+          Using {formatted} from pi-ai registry
+        </p>
+      );
+    case 'fallback':
+      return (
+        <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-0.5 flex items-start gap-1">
+          <AlertTriangle size={11} className="shrink-0 mt-0.5" aria-hidden="true" />
+          <span>
+            Falls back to {formatted} — no spec found. Declare contextWindow above or add to LLM profile.
+          </span>
+        </p>
+      );
+    default:
+      return null;
+  }
 }
 
 function ModelTestStatus({ status }: { status: ModelRowDraft['testStatus'] }) {
