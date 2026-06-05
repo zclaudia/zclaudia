@@ -588,7 +588,6 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     }
 
     clearDeleteConfirmation();
-    setDeletingProfileId(id);
     setDeleteErrorByProfileId((prev) => {
       if (!(id in prev)) return prev;
       const next = { ...prev };
@@ -596,13 +595,44 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       return next;
     });
 
+    // Snapshot for optimistic rollback if the DELETE fails.
+    const snapshot = profiles.find((p) => p.id === id);
+    const originalIndex = profiles.findIndex((p) => p.id === id);
+    if (!snapshot) return;
+    const wasDefault = snapshot.isDefault === true;
+
+    // Optimistic local + meta-store removal — list update is instant; the
+    // DELETE round-trip + (sometimes) follow-up sync runs in the background.
+    setProfiles((prev) => prev.filter((p) => p.id !== id));
+    const metaStore = useLlmProfileMetaStore.getState();
+    metaStore.setProviders(
+      metaStore.getProviders(activeServerId).filter((p) => p.id !== id),
+      activeServerId,
+    );
+
+    setDeletingProfileId(id);
     const result = await api.deleteLlmProfile(id);
     setDeletingProfileId(null);
 
     if (result.ok) {
-      await loadProfiles();
+      // Server auto-picks a replacement default when the deleted profile was
+      // the default — refetch so the badge moves to the right row.
+      if (wasDefault) void loadProfiles();
       return;
     }
+
+    // Rollback: restore the row at its original index + the meta store.
+    setProfiles((prev) => {
+      const next = [...prev];
+      const insertAt = Math.max(0, Math.min(originalIndex, next.length));
+      next.splice(insertAt, 0, snapshot);
+      return next;
+    });
+    const metaStoreAfter = useLlmProfileMetaStore.getState();
+    metaStoreAfter.setProviders(
+      [...metaStoreAfter.getProviders(activeServerId), snapshot],
+      activeServerId,
+    );
 
     let message = result.message;
     if (result.code === 'IN_USE') {
