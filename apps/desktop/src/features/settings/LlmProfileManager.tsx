@@ -6,6 +6,7 @@ import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import * as api from '../../services/api';
+import type { LlmProfilePreviewInput } from '../../services/api/llm-profiles';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 
@@ -299,55 +300,45 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   /**
-   * Snapshot of the form state in the same wire shape as the editing profile,
-   * used to derive `formDirty` for gating Test / Fetch buttons. We compare
-   * against this rather than tracking each input individually so any future
-   * field added below the form picks up dirty detection for free.
+   * Build a `LlmProfilePreviewInput` snapshot of the *current form state* for
+   * the pre-save fetch/probe preview endpoints. Unlike the legacy /:id/models
+   * routes, the preview endpoints don't need the profile to be persisted —
+   * they accept providerType + baseUrl + apiKey + headers + models directly,
+   * so Fetch / Test can run on a brand-new "Add Provider" form and reflect
+   * unsaved edits without a save-first round trip.
+   *
+   * We parse requestHeaders defensively here; on JSON parse failure we fall
+   * back to omitting them rather than throwing, mirroring the lenient behavior
+   * the server-side preview validator already accepts.
    */
-  const editingProfileSnapshot = (() => {
-    if (!editingProfile) return null;
-    const headersStr = editingProfile.requestHeaders
-      ? JSON.stringify(editingProfile.requestHeaders, null, 2)
-      : '';
-    const compatStr =
-      editingProfile.compat && Object.keys(editingProfile.compat).length > 0
-        ? JSON.stringify(editingProfile.compat, null, 2)
-        : '';
+  const buildPreviewInputFromForm = (): LlmProfilePreviewInput => {
+    let requestHeadersObj: Record<string, string> | undefined;
+    if (formRequestHeaders.trim()) {
+      try {
+        const parsed = JSON.parse(formRequestHeaders);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          requestHeadersObj = Object.keys(parsed).length > 0 ? (parsed as Record<string, string>) : undefined;
+        }
+      } catch {
+        // Surfaced separately by Save validation; leave headers undefined here.
+      }
+    }
     return {
-      name: editingProfile.name,
-      providerType: editingProfile.providerType,
-      baseUrl: editingProfile.baseUrl ?? '',
-      apiKey: editingProfile.apiKey ?? '',
-      requestHeaders: headersStr,
-      compat: compatStr,
-      isDefault: editingProfile.isDefault ?? false,
-      models: editingProfile.models ?? [],
+      providerType: formProviderType,
+      baseUrl: formBaseUrl.trim() || undefined,
+      apiKey: formApiKey.trim() || undefined,
+      requestHeaders: requestHeadersObj,
+      models: draftsToEntries(formModels),
     };
-  })();
+  };
 
   /**
-   * Whether the form has unsaved changes vs the persisted editingProfile.
-   * `false` for a brand-new (unsaved) profile because `profileSaved` already
-   * gates the buttons in that case; the dirty signal is only meaningful when
-   * we have a saved baseline to diff against.
+   * Whether the form has at least one valid model row that would serialize to
+   * a real entry on Save. F2 makes "no declared models" a hard save error —
+   * the runtime needs an explicit declaration so context windows resolve from
+   * the profile rather than silently falling back to pi-ai defaults.
    */
-  const formDirty = (() => {
-    if (!editingProfileSnapshot) return false;
-    if (formName !== editingProfileSnapshot.name) return true;
-    if (formProviderType !== editingProfileSnapshot.providerType) return true;
-    if (formBaseUrl !== editingProfileSnapshot.baseUrl) return true;
-    if (formApiKey !== editingProfileSnapshot.apiKey) return true;
-    if (formRequestHeaders !== editingProfileSnapshot.requestHeaders) return true;
-    if (formCompat !== editingProfileSnapshot.compat) return true;
-    if (formIsDefault !== editingProfileSnapshot.isDefault) return true;
-    // Compare models — serialize current drafts and compare to baseline. Done
-    // by JSON shape rather than entry-by-entry so order changes count as dirty.
-    const currentEntries = draftsToEntries(formModels);
-    if (JSON.stringify(currentEntries) !== JSON.stringify(editingProfileSnapshot.models)) {
-      return true;
-    }
-    return false;
-  })();
+  const hasAtLeastOneModelEntry = draftsToEntries(formModels).length > 0;
 
   const handleSubmit = async () => {
     if (!formName.trim()) return;
@@ -429,8 +420,17 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         setSaving(false);
         return;
       }
-      setFormModelsSaveError(null);
       const modelsArr = draftsToEntries(formModels);
+      // F2: a profile with no declared models is no longer accepted. Agent
+      // profiles consume `llmProfile.models` to choose which model id to send
+      // and to resolve the context window — saving an empty list silently
+      // forces them back to the pi-ai registry fallback path.
+      if (modelsArr.length === 0) {
+        setFormModelsSaveError('Add at least one model before saving');
+        setSaving(false);
+        return;
+      }
+      setFormModelsSaveError(null);
 
       const data = {
         name: formName.trim(),
@@ -501,11 +501,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   const handleFetchModels = async () => {
-    if (!editingProfile?.id) return;
+    // F2: Fetch now uses the preview endpoint, which accepts the current form
+    // shape directly — works for brand-new (unsaved) profiles and reflects
+    // unsaved edits without requiring a save round-trip first.
+    if (!formProviderType) {
+      setFetchModelsError('Provider type is required before fetching models.');
+      return;
+    }
     setFetchModelsError(null);
     setFetchingModels(true);
     try {
-      const result = await api.fetchModelsForLlmProfile(editingProfile.id);
+      const previewInput = buildPreviewInputFromForm();
+      const result = await api.fetchModelsForLlmProfilePreview(previewInput);
       if (!result.ok) {
         setFetchModelsError(result.error);
         return;
@@ -545,14 +552,15 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   };
 
   const handleProbeModel = async (index: number) => {
-    if (!editingProfile?.id) return;
     const row = formModels[index];
     const modelId = row?.modelId.trim();
     if (!row || !modelId) return;
     const rowUid = row.rowUid;
+    // F2: probe-preview accepts the form draft so we can Test before saving.
     updateModelRowByUid(rowUid, { testStatus: { kind: 'running' } });
     try {
-      const result = await api.probeLlmProfileModel(editingProfile.id, modelId);
+      const previewInput = buildPreviewInputFromForm();
+      const result = await api.probeLlmProfileModelPreview(previewInput, modelId);
       if (result.ok) {
         updateModelRowByUid(rowUid, { testStatus: { kind: 'ok', latencyMs: result.latencyMs } });
       } else {
@@ -680,8 +688,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
       <ModelsSection
         models={formModels}
-        profileSaved={Boolean(editingProfile?.id)}
-        formDirty={formDirty}
+        providerType={formProviderType}
         fetching={fetchingModels}
         fetchError={fetchModelsError}
         saveError={formModelsSaveError}
@@ -747,7 +754,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       <div className="flex gap-2 pt-2">
         <button
           onClick={handleSubmit}
-          disabled={!formName.trim() || saving || !!formRequestHeadersError}
+          disabled={!formName.trim() || saving || !!formRequestHeadersError || !hasAtLeastOneModelEntry}
+          title={!hasAtLeastOneModelEntry ? 'Add at least one model before saving' : undefined}
           className="flex-1 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}
@@ -926,8 +934,7 @@ const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_T
 
 interface ModelsSectionProps {
   models: ModelRowDraft[];
-  profileSaved: boolean;
-  formDirty: boolean;
+  providerType: string;
   fetching: boolean;
   fetchError: string | null;
   saveError: string | null;
@@ -940,8 +947,7 @@ interface ModelsSectionProps {
 
 function ModelsSection({
   models,
-  profileSaved,
-  formDirty,
+  providerType,
   fetching,
   fetchError,
   saveError,
@@ -951,12 +957,13 @@ function ModelsSection({
   onFetch,
   onProbe,
 }: ModelsSectionProps) {
-  const fetchDisabledReason = !profileSaved
-    ? 'Save the profile first to fetch models'
-    : formDirty
-      ? 'Save the profile first to fetch models with the latest config'
-      : undefined;
-  const fetchDisabled = !profileSaved || formDirty || fetching;
+  // F2: Fetch/Test now hit the preview endpoints, so neither needs the profile
+  // to be saved or the form to be pristine. The only remaining hard gate is
+  // providerType (the preview validator requires it).
+  const fetchDisabledReason = !providerType
+    ? 'Pick a provider type first'
+    : undefined;
+  const fetchDisabled = !providerType || fetching;
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
@@ -988,7 +995,7 @@ function ModelsSection({
       )}
       {models.length === 0 ? (
         <p className="text-xs text-muted-foreground">
-          No models declared. Agent profiles bound to this LLM profile will fall back to pi-ai registry defaults for whatever model id they request.
+          No models declared. Add at least one model entry before saving — agent profiles bound to this LLM profile pick their model id from this list.
         </p>
       ) : (
         <div className="space-y-2">
@@ -998,8 +1005,7 @@ function ModelsSection({
               index={idx}
               row={row}
               allRows={models}
-              profileSaved={profileSaved}
-              formDirty={formDirty}
+              providerType={providerType}
               onChange={(patch) => onUpdate(idx, patch)}
               onRemove={() => onRemove(idx)}
               onProbe={() => onProbe(idx)}
@@ -1015,27 +1021,24 @@ interface ModelRowProps {
   index: number;
   row: ModelRowDraft;
   allRows: ModelRowDraft[];
-  profileSaved: boolean;
-  formDirty: boolean;
+  providerType: string;
   onChange: (patch: Partial<ModelRowDraft>) => void;
   onRemove: () => void;
   onProbe: () => void;
 }
 
-function ModelRow({ index, row, allRows, profileSaved, formDirty, onChange, onRemove, onProbe }: ModelRowProps) {
+function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onProbe }: ModelRowProps) {
   const errs = validateModelDraftRow(row, allRows, index);
   const isRunning = row.testStatus?.kind === 'running';
   const testDisabled =
-    !profileSaved || formDirty || isRunning || !row.modelId.trim() || !!errs.modelId;
-  const testDisabledReason = !profileSaved
-    ? 'Save the profile first to test models'
-    : formDirty
-      ? 'Save the profile first to test models with the latest config'
-      : !row.modelId.trim()
-        ? 'Enter a model id first'
-        : errs.modelId
-          ? `Fix model id (${errs.modelId}) first`
-          : undefined;
+    !providerType || isRunning || !row.modelId.trim() || !!errs.modelId;
+  const testDisabledReason = !providerType
+    ? 'Pick a provider type first'
+    : !row.modelId.trim()
+      ? 'Enter a model id first'
+      : errs.modelId
+        ? `Fix model id (${errs.modelId}) first`
+        : undefined;
 
   return (
     <div className="p-3 bg-secondary/40 border border-border rounded-lg space-y-2">

@@ -263,24 +263,29 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
 
       <LlmProfileSelector
         value={formLlmProfileId}
-        onChange={setFormLlmProfileId}
+        onChange={(id) => {
+          setFormLlmProfileId(id);
+          // Clearing the model when the LLM profile changes avoids referencing
+          // a model id that doesn't exist in the new profile's models list.
+          const newProfile = llmProfiles.find((p) => p.id === id);
+          const newProfileModels = newProfile?.models;
+          if (formModel && (!newProfileModels || !newProfileModels.some((m) => m.modelId === formModel))) {
+            setFormModel('');
+          }
+        }}
         profiles={llmProfiles}
       />
 
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">Model *</label>
-        <input
-          type="text"
-          value={formModel}
-          onChange={(e) => setFormModel(e.target.value)}
-          placeholder="e.g., claude-sonnet-4-5"
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
-        />
-        <ModelDeclarationWarning
-          formModel={formModel}
-          llmProfile={llmProfiles.find((p) => p.id === formLlmProfileId)}
-        />
-      </div>
+      <ModelSelector
+        value={formModel}
+        onChange={setFormModel}
+        llmProfile={llmProfiles.find((p) => p.id === formLlmProfileId)}
+      />
+
+      <ModelDeclarationWarning
+        formModel={formModel}
+        llmProfile={llmProfiles.find((p) => p.id === formLlmProfileId)}
+      />
 
       <div>
         <label className="block text-sm font-medium text-muted-foreground mb-1">System Prompt</label>
@@ -512,6 +517,89 @@ function ModelDeclarationWarning({
     <p className="text-xs text-amber-600 mt-1">
       This model is not declared on the selected LLM profile. The agent will work but will fall back to pi-ai registry defaults for context window / max tokens.
     </p>
+  );
+}
+
+/**
+ * F2: Model is now a dropdown rather than a free-text input. The valid set
+ * comes from the bound LLM profile's `models` list, which the LlmProfileManager
+ * now requires at least one of. We still render a degraded state for legacy
+ * profiles created before the requirement, so historical agent profiles don't
+ * break when their bound LLM profile has no models declared.
+ */
+function ModelSelector({
+  value,
+  onChange,
+  llmProfile,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  llmProfile: LlmProfileConfig | undefined;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const models = llmProfile?.models ?? [];
+  const hasModels = models.length > 0;
+  const selectedEntry = models.find((m) => m.modelId === value);
+  const displayLabel = selectedEntry
+    ? selectedEntry.displayName || selectedEntry.modelId
+    : value
+      ? value
+      : hasModels
+        ? 'Select a model'
+        : 'No models available — declare models on the LLM profile';
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-sm font-medium text-muted-foreground mb-1">Model *</label>
+      <button
+        type="button"
+        onClick={() => hasModels && setOpen(!open)}
+        disabled={!hasModels}
+        className="w-full flex items-center justify-between px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary text-left disabled:opacity-50 disabled:cursor-not-allowed font-mono"
+      >
+        <span className="truncate">{displayLabel}</span>
+        <ChevronDown size={14} className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && hasModels && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-popover/95 glass border border-border/50 rounded-xl shadow-apple-xl animate-apple-fade-in z-50 py-1 overflow-hidden max-h-72 overflow-y-auto">
+          {models.map((m) => {
+            const label = m.displayName || m.modelId;
+            return (
+              <button
+                key={m.modelId}
+                type="button"
+                onClick={() => {
+                  onChange(m.modelId);
+                  setOpen(false);
+                }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
+                  m.modelId === value ? 'text-primary font-medium bg-primary/5' : 'text-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <span className="w-4 flex-shrink-0">
+                  {m.modelId === value && <Check size={14} strokeWidth={2.5} />}
+                </span>
+                <span className="font-mono truncate">{label}</span>
+                {label !== m.modelId && (
+                  <span className="ml-auto text-[10px] text-muted-foreground font-mono">{m.modelId}</span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 

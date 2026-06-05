@@ -66,6 +66,12 @@ describe('AgentManager', () => {
       name: 'Anthropic Default',
       providerType: 'anthropic' as const,
       isDefault: true,
+      // F2: the LLM-profile Save validator now requires at least one model
+      // entry. Reflect that in fixtures so the agent dropdown has options.
+      models: [
+        { modelId: 'claude-sonnet-4-5' },
+        { modelId: 'claude-haiku-4-5' },
+      ],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     },
@@ -74,6 +80,7 @@ describe('AgentManager', () => {
       name: 'OpenAI',
       providerType: 'openai' as const,
       isDefault: false,
+      models: [{ modelId: 'gpt-4o' }],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     },
@@ -172,11 +179,11 @@ describe('AgentManager', () => {
       target: { value: 'Doc Writer' },
     });
 
-    // Default LLM should be pre-selected (Anthropic Default), so we don't need to pick.
-    // Fill model
-    fireEvent.change(screen.getByPlaceholderText(/claude-sonnet-4-5/), {
-      target: { value: 'claude-sonnet-4-5' },
-    });
+    // F2: Model is a dropdown sourced from the bound LLM profile's models list.
+    // Default LLM is pre-selected (Anthropic Default with models [sonnet, haiku]),
+    // so we open the Model dropdown and pick claude-sonnet-4-5.
+    await clickAsync(screen.getByText('Model *').nextElementSibling as Element);
+    await clickAsync(screen.getByText('claude-sonnet-4-5'));
 
     // Fill systemPrompt
     fireEvent.change(screen.getByPlaceholderText(/You are a helpful coding agent/), {
@@ -239,9 +246,11 @@ describe('AgentManager', () => {
     consoleSpy.mockRestore();
   });
 
-  describe('Model declaration soft warning', () => {
-    it('does not warn when the bound LLM profile declares no models list', async () => {
-      // mockLlmProfiles[0] has no `models` field — undefined; user types any id.
+  describe('Model dropdown', () => {
+    it('renders the bound LLM profile model entries as dropdown options', async () => {
+      // F2: Model is now a <select>-style dropdown driven by the bound LLM
+      // profile's models list. Opening the dropdown should surface each
+      // entry; the default profile here declares two.
       await renderAgentManager({ onClose: mockOnClose });
 
       await waitForFast(() => {
@@ -250,23 +259,24 @@ describe('AgentManager', () => {
 
       await clickAsync(screen.getByText('Add Agent'));
 
-      fireEvent.change(screen.getByPlaceholderText(/Default Coding Agent/), {
-        target: { value: 'X' },
-      });
-      fireEvent.change(screen.getByPlaceholderText(/claude-sonnet-4-5/), {
-        target: { value: 'totally-unknown-model' },
-      });
+      // Open the Model dropdown — labelled "Model *", trigger is the sibling
+      // button rendered by ModelSelector.
+      await clickAsync(screen.getByText('Model *').nextElementSibling as Element);
 
-      expect(screen.queryByText(/not declared on the selected LLM profile/i)).toBeNull();
+      expect(screen.getByText('claude-sonnet-4-5')).toBeInTheDocument();
+      expect(screen.getByText('claude-haiku-4-5')).toBeInTheDocument();
     });
 
-    it('warns when model is not in the bound LLM profile models list', async () => {
+    it('disables the Model dropdown and shows the empty-state copy when bound profile has no models', async () => {
+      // Legacy / degraded path: a historical LLM profile created before the
+      // F2 requirement might still have an empty models list. We surface a
+      // disabled dropdown with explanatory copy rather than silently letting
+      // the user type a free-text id.
       vi.mocked(api.listLlmProfiles).mockResolvedValue([
         {
           ...mockLlmProfiles[0],
-          models: [{ modelId: 'claude-opus-4-7' }],
+          models: [],
         },
-        mockLlmProfiles[1],
       ]);
 
       await renderAgentManager({ onClose: mockOnClose });
@@ -277,45 +287,44 @@ describe('AgentManager', () => {
 
       await clickAsync(screen.getByText('Add Agent'));
 
-      fireEvent.change(screen.getByPlaceholderText(/Default Coding Agent/), {
-        target: { value: 'Doc Writer' },
+      expect(
+        screen.getByText(/No models available — declare models on the LLM profile/i),
+      ).toBeInTheDocument();
+      const modelBtn = screen.getByText(/No models available — declare models on the LLM profile/i).closest('button');
+      expect(modelBtn).toBeDisabled();
+    });
+
+    it('warns (soft warning) when the persisted model id is not in the bound LLM profile list', async () => {
+      // The soft warning still fires for historical agent profiles whose
+      // model id no longer matches the LLM profile's current models list.
+      vi.mocked(api.listAgentProfiles).mockResolvedValue([
+        {
+          ...mockAgents[0],
+          model: 'claude-haiku-4-5',  // declared on llm-1
+        },
+      ]);
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          ...mockLlmProfiles[0],
+          models: [{ modelId: 'claude-opus-4-7' }],  // doesn't contain haiku
+        },
+        mockLlmProfiles[1],
+      ]);
+
+      await renderAgentManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
       });
-      fireEvent.change(screen.getByPlaceholderText(/claude-sonnet-4-5/), {
-        target: { value: 'claude-haiku-4-5' },
-      });
+
+      // Open the existing agent's edit form so the persisted model populates.
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
 
       await waitForFast(() => {
         expect(
-          screen.getByText(/not declared on the selected LLM profile/i)
+          screen.getByText(/not declared on the selected LLM profile/i),
         ).toBeInTheDocument();
       });
-    });
-
-    it('does not warn when model is present in the bound LLM profile models list', async () => {
-      vi.mocked(api.listLlmProfiles).mockResolvedValue([
-        {
-          ...mockLlmProfiles[0],
-          models: [{ modelId: 'claude-opus-4-7' }],
-        },
-        mockLlmProfiles[1],
-      ]);
-
-      await renderAgentManager({ onClose: mockOnClose });
-
-      await waitForFast(() => {
-        expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
-      });
-
-      await clickAsync(screen.getByText('Add Agent'));
-
-      fireEvent.change(screen.getByPlaceholderText(/Default Coding Agent/), {
-        target: { value: 'Doc Writer' },
-      });
-      fireEvent.change(screen.getByPlaceholderText(/claude-sonnet-4-5/), {
-        target: { value: 'claude-opus-4-7' },
-      });
-
-      expect(screen.queryByText(/not declared on the selected LLM profile/i)).toBeNull();
     });
   });
 

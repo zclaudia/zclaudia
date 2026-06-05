@@ -41,6 +41,7 @@ interface ChatInputAreaProps {
     latestInputTokens?: number;
     latestOutputTokens?: number;
     contextWindow?: number;
+    contextWindowSource?: import('@zclaudia/shared').ContextWindowSource;
   };
   currentSystemInfo: SystemInfo | null;
   advancedInput: boolean;
@@ -239,6 +240,7 @@ export function ChatInputArea({
             inputTokens={currentUsage.inputTokens}
             outputTokens={currentUsage.outputTokens}
             contextWindow={currentUsage.contextWindow}
+            contextWindowSource={currentUsage.contextWindowSource}
           />
         </div>
         <div className="flex-1 min-w-[8px]" />

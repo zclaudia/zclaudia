@@ -87,6 +87,58 @@ export async function probeLlmProfileModel(id: string, modelId: string): Promise
   }
 }
 
+/**
+ * Pre-save form snapshot passed to the preview endpoints. Mirrors the subset
+ * of {@link LlmProfileConfig} that `buildPreviewProfile` on the server reads —
+ * we deliberately don't send `id`/`name`/`createdAt`/`updatedAt` so the form
+ * can fetch / test before the profile has ever been persisted.
+ */
+export interface LlmProfilePreviewInput {
+  providerType: string;
+  baseUrl?: string;
+  apiKey?: string;
+  requestHeaders?: Record<string, string>;
+  models?: LlmProfileModelEntry[];
+}
+
+/**
+ * Discover model ids using the current (possibly unsaved) form draft rather
+ * than a persisted profile id. Used by the LLM profile editor so Fetch works
+ * for brand-new profiles and reflects baseUrl/apiKey edits without saving.
+ */
+export async function fetchModelsForLlmProfilePreview(
+  profile: LlmProfilePreviewInput,
+): Promise<FetchLlmProfileModelsResult> {
+  try {
+    const data = await apiCall<{ models: string[] }>(`/api/llm-profiles/models/fetch-preview`, {
+      method: 'POST',
+      body: JSON.stringify(profile),
+    });
+    return { ok: true, models: Array.isArray(data?.models) ? data.models : [] };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Probe a (formDraft, modelId) pair without requiring the profile to exist on
+ * disk. Same response envelope as {@link probeLlmProfileModel}.
+ */
+export async function probeLlmProfileModelPreview(
+  profile: LlmProfilePreviewInput,
+  modelId: string,
+): Promise<ProbeLlmProfileModelResult> {
+  try {
+    const data = await apiCall<ProbeLlmProfileModelResult>(`/api/llm-profiles/models/probe-preview`, {
+      method: 'POST',
+      body: JSON.stringify({ ...profile, modelId }),
+    });
+    return data;
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 // Runtime adapter capability/command routes stay under `/api/providers` —
 // they describe the runtime shell, not the LLM connection profile.
 

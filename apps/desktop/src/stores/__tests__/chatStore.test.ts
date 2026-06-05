@@ -429,6 +429,40 @@ describe('chatStore', () => {
       const usage = useChatStore.getState().sessionUsage['s4'];
       expect(usage.contextWindow).toBeUndefined();
     });
+
+    // F2: contextWindowSource is wired alongside contextWindow so the UI can
+    // explain provenance and warn on the fallback path.
+    it('setSystemInfo copies contextWindowSource into usage (fresh record)', () => {
+      useChatStore.getState().setSystemInfo('s5', {
+        contextWindow: 200_000,
+        contextWindowSource: 'profile_entry',
+      });
+      const usage = useChatStore.getState().sessionUsage['s5'];
+      expect(usage.contextWindow).toBe(200_000);
+      expect(usage.contextWindowSource).toBe('profile_entry');
+    });
+
+    it('setSystemInfo updates contextWindowSource on existing usage record', () => {
+      useChatStore.getState().addSessionUsage('s6', u(1, 2));
+      useChatStore.getState().setSystemInfo('s6', {
+        contextWindow: 64_000,
+        contextWindowSource: 'fallback',
+      });
+      const usage = useChatStore.getState().sessionUsage['s6'];
+      expect(usage.contextWindowSource).toBe('fallback');
+    });
+
+    it('addSessionUsage preserves contextWindowSource set earlier by setSystemInfo', () => {
+      useChatStore.getState().setSystemInfo('s7', {
+        contextWindow: 128_000,
+        contextWindowSource: 'hardcoded_table',
+      });
+      useChatStore.getState().addSessionUsage('s7', u(50, 25));
+      const usage = useChatStore.getState().sessionUsage['s7'];
+      expect(usage.contextWindowSource).toBe('hardcoded_table');
+      expect(usage.contextWindow).toBe(128_000);
+      expect(usage.inputTokens).toBe(50);
+    });
   });
 
   // ── Usage tracking ─────────────────────────────────

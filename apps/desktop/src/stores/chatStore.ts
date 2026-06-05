@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, SystemInfo, UsageInfo, ContentBlock, RunHealthStatus, UnifiedPermissionPolicy, ToolEffect, ToolSemantic } from '@zclaudia/shared';
+import type { Message, SystemInfo, UsageInfo, ContentBlock, RunHealthStatus, UnifiedPermissionPolicy, ToolEffect, ToolSemantic, ContextWindowSource } from '@zclaudia/shared';
 
 export interface PaginationInfo {
   total: number;
@@ -88,6 +88,12 @@ interface ChatState {
     inputTokens: number;
     outputTokens: number;
     contextWindow?: number;
+    /**
+     * Which layer in the resolution chain supplied `contextWindow`. Surfaced
+     * by TokenUsageDisplay so users can tell when we're guessing (fallback)
+     * vs reading from their LLM profile / pi-ai registry.
+     */
+    contextWindowSource?: ContextWindowSource;
     latestInputTokens?: number;
     latestOutputTokens?: number;
   }>;
@@ -580,12 +586,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (typeof info.contextWindow === 'number' && info.contextWindow > 0) {
         const existing = usageNext[sessionId];
         if (existing) {
-          usageNext[sessionId] = { ...existing, contextWindow: info.contextWindow };
+          usageNext[sessionId] = {
+            ...existing,
+            contextWindow: info.contextWindow,
+            contextWindowSource: info.contextWindowSource,
+          };
         } else {
           usageNext[sessionId] = {
             inputTokens: 0,
             outputTokens: 0,
             contextWindow: info.contextWindow,
+            contextWindowSource: info.contextWindowSource,
           };
         }
       }
@@ -630,6 +641,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
             inputTokens: existing.inputTokens + usage.input,
             outputTokens: existing.outputTokens + usage.output,
             contextWindow: existing.contextWindow,
+            contextWindowSource: existing.contextWindowSource,
             latestInputTokens: usage.input,
             latestOutputTokens: usage.output,
           },

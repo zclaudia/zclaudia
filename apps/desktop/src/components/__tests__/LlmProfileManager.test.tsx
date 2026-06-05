@@ -111,6 +111,8 @@ vi.mock('../../services/api', () => ({
   setDefaultLlmProfile: vi.fn(),
   fetchModelsForLlmProfile: vi.fn(),
   probeLlmProfileModel: vi.fn(),
+  fetchModelsForLlmProfilePreview: vi.fn(),
+  probeLlmProfileModelPreview: vi.fn(),
 }));
 
 import { useServerStore } from '../../stores/serverStore';
@@ -148,6 +150,8 @@ describe('ProviderManager', () => {
     vi.mocked(api.setDefaultLlmProfile).mockResolvedValue(undefined);
     vi.mocked(api.fetchModelsForLlmProfile).mockResolvedValue({ ok: true, models: [] });
     vi.mocked(api.probeLlmProfileModel).mockResolvedValue({ ok: true, latencyMs: 0 });
+    vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValue({ ok: true, models: [] });
+    vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValue({ ok: true, latencyMs: 0 });
     mockProviderMetaState.getProviders.mockReturnValue([]);
     mockServerState.activeServerId = 'local';
     mockServerState.connections.local.status = 'connected';
@@ -299,6 +303,12 @@ describe('ProviderManager', () => {
       const nameInput = screen.getByPlaceholderText(/Local ZClaudia Agent/);
       fireEvent.change(nameInput, { target: { value: 'New Provider' } });
 
+      // F2: at least one declared model is required for Save to pass validation
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'claude-opus-4-7' },
+      });
+
       await clickAsync(screen.getByText('Create'));
 
       await waitForFast(() => {
@@ -306,6 +316,7 @@ describe('ProviderManager', () => {
           expect.objectContaining({
             name: 'New Provider',
             providerType: 'anthropic',
+            models: [{ modelId: 'claude-opus-4-7' }],
           })
         );
       });
@@ -375,6 +386,12 @@ describe('ProviderManager', () => {
 
       const nameInput = screen.getByDisplayValue('ZClaudia Default');
       fireEvent.change(nameInput, { target: { value: 'Updated Name' } });
+
+      // F2: the fixture profile has no models, so Save is disabled by the
+      // new "at least one model" gate. Add a model row before Update so the
+      // payload-shape assertion below actually reaches the API call.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
 
       await clickAsync(screen.getByText('Update'));
 
@@ -477,6 +494,11 @@ describe('ProviderManager', () => {
       const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
       fireEvent.change(headersTextarea, { target: { value: 'invalid json' } });
 
+      // F2: Save is gated on having at least one model row; add one so we
+      // actually reach the headers JSON validator we're asserting on.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
@@ -501,6 +523,10 @@ describe('ProviderManager', () => {
       const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
       fireEvent.change(headersTextarea, { target: { value: '{"Authorization": "Bearer x"}' } });
 
+      // F2: declared model required for Save to reach the headers validator.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
@@ -524,6 +550,12 @@ describe('ProviderManager', () => {
 
       const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
       fireEvent.change(headersTextarea, { target: { value: '{"X-Org-Id": "test"}' } });
+
+      // F2: a declared model is required for Save to pass validation
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'm1' },
+      });
 
       await clickAsync(screen.getByText('Create'));
 
@@ -551,6 +583,10 @@ describe('ProviderManager', () => {
 
       await clickAsync(screen.getByText('Add Provider'));
       fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'New' } });
+      // F2: add a model row so Save passes the empty-models validation and we
+      // actually reach the api.createLlmProfile call that we want to fail.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
@@ -684,6 +720,9 @@ describe('ProviderManager', () => {
 
       await clickAsync(screen.getByText('Add Provider'));
       fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'New' } });
+      // F2: a declared model row is required for Save.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
 
       const checkbox = screen.getByLabelText('Set as default runtime');
       await clickAsync(checkbox);
@@ -709,6 +748,9 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Add Provider'));
       fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'Custom' } });
       fireEvent.change(screen.getByPlaceholderText(/api\.example\.com/), { target: { value: 'http://127.0.0.1:3000/v1' } });
+      // F2: declared model is required.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
 
       await clickAsync(screen.getByText('Create'));
 
@@ -755,6 +797,12 @@ describe('ProviderManager', () => {
         target: { value: '{"supportsReasoningEffort": true}' },
       });
 
+      // F2: declared model required.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'deepseek-chat' },
+      });
+
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
@@ -788,6 +836,11 @@ describe('ProviderManager', () => {
         target: { value: 'not-json' },
       });
 
+      // F2: still need a model row to get past the empty-models gate and
+      // actually trigger the compat-JSON validation we're asserting on.
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+
       await clickAsync(screen.getByText('Create'));
 
       await waitFor(() => {
@@ -809,11 +862,15 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getAllByTitle('Edit')[0]);
 
       await waitFor(() => {
-        expect(screen.getByText(/No models declared/i)).toBeInTheDocument();
+        // F2: the empty-state copy was rewritten to point users at the new
+        // "add at least one" requirement.
+        expect(screen.getByText(/No models declared\. Add at least one/i)).toBeInTheDocument();
       });
     });
 
-    it('disables Fetch from /models for an unsaved (just-opened) Add Provider form', async () => {
+    it('keeps Fetch from /models enabled on an unsaved Add Provider form (preview endpoint)', async () => {
+      // F2: Fetch/Test now use preview endpoints that accept the form draft
+      // directly, so we don't gate on profileSaved or formDirty anymore.
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
@@ -823,8 +880,7 @@ describe('ProviderManager', () => {
       await clickAsync(screen.getByText('Add Provider'));
 
       const fetchBtn = screen.getByText('Fetch from /models');
-      expect(fetchBtn).toBeDisabled();
-      expect(fetchBtn).toHaveAttribute('title', 'Save the profile first to fetch models');
+      expect(fetchBtn).not.toBeDisabled();
     });
 
     it('+ Add model inserts an empty row with all four inputs', async () => {
@@ -939,41 +995,39 @@ describe('ProviderManager', () => {
       expect(testBtn).toHaveAttribute('title', 'Enter a model id first');
     });
 
-    it('renders a probed ok status with latency on a successful probe', async () => {
-      // Probe requires profileSaved && !formDirty — load a fixture that already
-      // has a model row so we can click Test without touching the form (which
-      // would mark it dirty and disable Test per the T5 follow-up).
-      vi.mocked(api.listLlmProfiles).mockResolvedValue([
-        {
-          id: 'p1',
-          name: 'With Saved Model',
-          providerType: 'anthropic' as const,
-          isDefault: false,
-          models: [{ modelId: 'opus' }],
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-      ]);
-      vi.mocked(api.probeLlmProfileModel).mockResolvedValueOnce({ ok: true, latencyMs: 423 });
+    it('renders a probed ok status with latency on a successful preview probe', async () => {
+      // F2: probe now hits the preview endpoint with the current form draft,
+      // so we no longer need a saved fixture model row — we can type one in
+      // and click Test immediately.
+      vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValueOnce({ ok: true, latencyMs: 423 });
 
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
-        expect(screen.getByText('With Saved Model')).toBeInTheDocument();
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
       });
 
-      await clickAsync(screen.getByTitle('Edit'));
+      await clickAsync(screen.getAllByTitle('Edit')[0]);
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'opus' },
+      });
 
       await clickAsync(screen.getByText('Test'));
 
       await waitFor(() => {
         expect(screen.getByText(/✓ 423 ms/)).toBeInTheDocument();
       });
-      expect(api.probeLlmProfileModel).toHaveBeenCalledWith('p1', 'opus');
+      // probe-preview is called with the form draft (providerType + models[])
+      // plus the modelId — assert at least the providerType + modelId pair.
+      expect(api.probeLlmProfileModelPreview).toHaveBeenCalledWith(
+        expect.objectContaining({ providerType: 'anthropic' }),
+        'opus',
+      );
     });
 
-    it('opens the picker dialog when Fetch returns ids, and adds selected ids on confirm', async () => {
-      vi.mocked(api.fetchModelsForLlmProfile).mockResolvedValueOnce({
+    it('opens the picker dialog when Fetch (preview) returns ids, and adds selected ids on confirm', async () => {
+      vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValueOnce({
         ok: true,
         models: ['claude-opus-4-7', 'claude-sonnet-4-6'],
       });
@@ -1005,8 +1059,8 @@ describe('ProviderManager', () => {
       });
     });
 
-    it('surfaces a fetch error inline when Fetch from /models fails', async () => {
-      vi.mocked(api.fetchModelsForLlmProfile).mockResolvedValueOnce({
+    it('surfaces a fetch error inline when Fetch (preview) fails', async () => {
+      vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValueOnce({
         ok: false,
         error: 'Upstream returned 403 Forbidden',
       });
@@ -1025,34 +1079,45 @@ describe('ProviderManager', () => {
       });
     });
 
-    it('disables Test + Fetch when the form is dirty (unsaved changes), with a save-first tooltip', async () => {
+    it('keeps Test + Fetch enabled even with unsaved form changes (preview adoption)', async () => {
+      // F2: with preview adoption the dirty-form gate is gone — Test and
+      // Fetch should both stay enabled while the user is editing.
       await renderProviderManager({ onClose: mockOnClose });
 
       await waitFor(() => {
         expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
       });
 
-      // Edit an existing saved profile → profileSaved=true, formDirty=false.
       await clickAsync(screen.getAllByTitle('Edit')[0]);
       await clickAsync(screen.getByText('+ Add model'));
       fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
         target: { value: 'opus' },
       });
 
-      // Adding a row mutates the model draft list — formDirty is now true.
       const testBtn = screen.getByText('Test');
-      expect(testBtn).toBeDisabled();
-      expect(testBtn).toHaveAttribute(
-        'title',
-        'Save the profile first to test models with the latest config'
-      );
+      expect(testBtn).not.toBeDisabled();
 
       const fetchBtn = screen.getByText('Fetch from /models');
-      expect(fetchBtn).toBeDisabled();
-      expect(fetchBtn).toHaveAttribute(
-        'title',
-        'Save the profile first to fetch models with the latest config'
-      );
+      expect(fetchBtn).not.toBeDisabled();
+    });
+
+    it('disables Save and surfaces inline error when no models are declared', async () => {
+      // F2: empty models list is now a hard save error. The Save button is
+      // disabled with a tooltip pointing the user at the fix; clicking it
+      // would also surface the same banner inline if it were enabled.
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), { target: { value: 'No Models' } });
+
+      const createBtn = screen.getByText('Create');
+      expect(createBtn).toBeDisabled();
+      expect(createBtn).toHaveAttribute('title', 'Add at least one model before saving');
+      expect(api.createLlmProfile).not.toHaveBeenCalled();
     });
 
     it('surfaces a save-time row-level error inline (no window.alert) when a model row is duplicate on save', async () => {
