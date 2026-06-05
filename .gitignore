@@ -128,3 +128,5 @@ server/data/
 docs/superpowers/
 
 .3rd-party/
+
+.superpowers/
