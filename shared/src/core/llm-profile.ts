@@ -10,6 +10,7 @@
 export const LLM_PROVIDER_TYPES = [
   'anthropic',
   'openai',
+  'openai-codex',
 ] as const;
 
 export type LlmProviderType = typeof LLM_PROVIDER_TYPES[number] | string;
@@ -31,6 +32,19 @@ export interface LlmProfileModelEntry {
   maxTokens?: number;
 }
 
+/**
+ * OAuth credentials for `providerType === 'openai-codex'`. Shape matches
+ * pi-ai's `OAuthCredentials`. Null/undefined → not authenticated. Refreshed
+ * in-memory; persisted only when pi-ai returns rotated values.
+ */
+export interface CodexOAuthCredentials {
+  access: string;
+  refresh: string;
+  /** ms epoch (Date.now()-compatible) */
+  expires: number;
+  accountId: string;
+}
+
 export interface LlmProfileConfig {
   id: string;
   name: string;
@@ -50,6 +64,7 @@ export interface LlmProfileConfig {
    * model id the agent profile picks (and shows a soft warning in the UI).
    */
   models?: LlmProfileModelEntry[];
+  oauthCredentials?: CodexOAuthCredentials;
   isDefault?: boolean;
   createdAt: number;
   updatedAt: number;
