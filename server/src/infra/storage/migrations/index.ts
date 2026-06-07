@@ -4,6 +4,7 @@ import { migration as m_001_initial_schema } from './001_initial_schema.js';
 import { migration as m_002_request_headers } from './002_request_headers.js';
 import { migration as m_003_llm_profile_models } from './003_llm_profile_models.js';
 import { migration as m_004_merge_openai_custom } from './004_merge_openai_custom.js';
+import { migration as m_005_llm_profile_oauth } from './005_llm_profile_oauth.js';
 
 export type { Migration };
 
@@ -12,6 +13,7 @@ export const migrations: Migration[] = [
   m_002_request_headers,
   m_003_llm_profile_models,
   m_004_merge_openai_custom,
+  m_005_llm_profile_oauth,
 ];
 
 /**
