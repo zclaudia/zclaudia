@@ -132,9 +132,14 @@ ensure_native_modules() {
   fi
 }
 
-# --- Build shared + server ---
+# --- Install deps + build shared + server ---
 build() {
   setup_node
+
+  info "Installing dependencies..."
+  (cd "$PROJECT_ROOT" && pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
+  ok "Dependencies ready"
+
   ensure_native_modules
 
   info "Building shared..."
