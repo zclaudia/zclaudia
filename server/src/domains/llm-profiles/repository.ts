@@ -22,6 +22,7 @@ export class LlmProfileRepository extends BaseRepository<
       compat: row.compat ? this.parseCompat(row.compat) : undefined,
       requestHeaders: row.request_headers ? JSON.parse(row.request_headers) : undefined,
       models: row.models != null ? this.parseModels(row.models) : undefined,
+      oauthCredentials: row.oauth_credentials ? this.parseOAuthCredentials(row.oauth_credentials) : undefined,
       isDefault: row.is_default === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
@@ -51,14 +52,33 @@ export class LlmProfileRepository extends BaseRepository<
     }
   }
 
+  private parseOAuthCredentials(raw: string): LlmProfileConfig['oauthCredentials'] {
+    try {
+      const parsed = JSON.parse(raw);
+      if (
+        typeof parsed?.access === 'string' &&
+        typeof parsed?.refresh === 'string' &&
+        typeof parsed?.expires === 'number' &&
+        typeof parsed?.accountId === 'string'
+      ) {
+        return parsed;
+      }
+      console.warn('[LlmProfileRepository] oauth_credentials missing fields, ignoring');
+      return undefined;
+    } catch (err) {
+      console.warn('[LlmProfileRepository] invalid oauth_credentials JSON, ignoring:', err);
+      return undefined;
+    }
+  }
+
   createQuery(data: Omit<LlmProfileConfig, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
     const id = newId();
     const now = Date.now();
 
     return {
       sql: `
-        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, models, is_default, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, models, oauth_credentials, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -69,6 +89,7 @@ export class LlmProfileRepository extends BaseRepository<
         data.compat ? JSON.stringify(data.compat) : null,
         data.requestHeaders ? JSON.stringify(data.requestHeaders) : null,
         data.models !== undefined ? JSON.stringify(data.models) : null,
+        data.oauthCredentials ? JSON.stringify(data.oauthCredentials) : null,
         data.isDefault ? 1 : 0,
         now,
         now,
@@ -107,6 +128,10 @@ export class LlmProfileRepository extends BaseRepository<
     if (data.models !== undefined) {
       updates.push('models = ?');
       params.push(data.models !== null ? JSON.stringify(data.models) : null);
+    }
+    if (data.oauthCredentials !== undefined) {
+      updates.push('oauth_credentials = ?');
+      params.push(data.oauthCredentials === null ? null : JSON.stringify(data.oauthCredentials));
     }
     if (data.isDefault !== undefined) {
       updates.push('is_default = ?');

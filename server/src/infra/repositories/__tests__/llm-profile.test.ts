@@ -116,8 +116,10 @@ describe('LlmProfileRepository', () => {
       expect(params[6]).toBe('{"X-Api-Key":"test"}');
       // models is the 8th param (index 7) — null when omitted
       expect(params[7]).toBeNull();
-      // is_default is the 9th param (index 8)
-      expect(params[8]).toBe(1);
+      // oauth_credentials is the 9th param (index 8) — null when omitted
+      expect(params[8]).toBeNull();
+      // is_default is the 10th param (index 9)
+      expect(params[9]).toBe(1);
     });
 
     it('uses default provider type when not specified', () => {
@@ -137,8 +139,8 @@ describe('LlmProfileRepository', () => {
       const { params: paramsTrue } = repository.createQuery(dataTrue);
       const { params: paramsFalse } = repository.createQuery(dataFalse);
 
-      expect(paramsTrue[8]).toBe(1);
-      expect(paramsFalse[8]).toBe(0);
+      expect(paramsTrue[9]).toBe(1);
+      expect(paramsFalse[9]).toBe(0);
     });
 
     it('generates UUID for id', () => {
@@ -154,9 +156,9 @@ describe('LlmProfileRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      expect(params[9]).toBeGreaterThanOrEqual(before);
-      expect(params[9]).toBeLessThanOrEqual(after);
-      expect(params[10]).toBe(params[9]);
+      expect(params[10]).toBeGreaterThanOrEqual(before);
+      expect(params[10]).toBeLessThanOrEqual(after);
+      expect(params[11]).toBe(params[10]);
     });
   });
 
@@ -216,6 +218,67 @@ describe('LlmProfileRepository', () => {
       const timestamp = params[params.length - 2];
       expect(timestamp).toBeGreaterThanOrEqual(before);
       expect(timestamp).toBeLessThanOrEqual(after);
+    });
+  });
+
+  describe('oauthCredentials', () => {
+    it('mapRow parses oauth_credentials JSON', () => {
+      const row = {
+        id: 'p1',
+        name: 'codex',
+        provider_type: 'openai-codex',
+        base_url: null,
+        api_key: null,
+        compat: null,
+        request_headers: null,
+        models: null,
+        oauth_credentials: '{"access":"a","refresh":"r","expires":1,"accountId":"acct_x"}',
+        is_default: 0,
+        created_at: 1,
+        updated_at: 1,
+      };
+
+      const result = repository.mapRow(row);
+      expect(result.oauthCredentials).toEqual({ access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' });
+    });
+
+    it('mapRow yields undefined when oauth_credentials is null', () => {
+      const row = {
+        id: 'p1',
+        name: 'codex',
+        provider_type: 'openai-codex',
+        base_url: null,
+        api_key: null,
+        compat: null,
+        request_headers: null,
+        models: null,
+        oauth_credentials: null,
+        is_default: 0,
+        created_at: 1,
+        updated_at: 1,
+      };
+      const result = repository.mapRow(row);
+      expect(result.oauthCredentials).toBeUndefined();
+    });
+
+    it('createQuery serializes oauthCredentials', () => {
+      const { sql, params } = repository.createQuery({
+        name: 'codex',
+        providerType: 'openai-codex',
+        oauthCredentials: { access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' },
+      } as any);
+      expect(sql).toContain('oauth_credentials');
+      expect(params).toContain('{"access":"a","refresh":"r","expires":1,"accountId":"acct_x"}');
+    });
+
+    it('updateQuery supports clearing oauthCredentials via null', () => {
+      const { sql, params } = repository.updateQuery('p1', { oauthCredentials: undefined } as any);
+      // undefined means "don't touch"; null is the explicit clear path
+      expect(sql).not.toContain('oauth_credentials');
+      // Now test the explicit clear path:
+      const cleared = repository.updateQuery('p1', { oauthCredentials: null } as any);
+      expect(cleared.sql).toContain('oauth_credentials = ?');
+      expect(cleared.params[0]).toBeNull();
     });
   });
 
