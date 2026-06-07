@@ -1,4 +1,4 @@
-import { getModel } from '@earendil-works/pi-ai';
+import { getModels } from '@earendil-works/pi-ai';
 
 const CONTEXT_WINDOW = 272_000;
 const TTL_MS = 5 * 60 * 1000;
@@ -86,33 +86,14 @@ function mapCatalogEntry(raw: Record<string, unknown>): CodexModelEntry | null {
 }
 
 function bundledFallback(): CodexModelEntry[] {
-  // pi-ai's models.generated registers codex models under provider 'openai-codex'.
-  // We probe a known set; any that resolve are surfaced. Missing ones are silently dropped.
-  const knownIds = [
-    'gpt-5-codex',
-    'gpt-5.1-codex',
-    'gpt-5.1-codex-mini',
-    'gpt-5.1-codex-max',
-    'gpt-5.2-codex',
-    'gpt-5.3-codex',
-  ];
-
-  const out: CodexModelEntry[] = [];
-  for (const id of knownIds) {
-    try {
-      // Cast to `any` because TypeScript's keyof narrowing rejects unknown model IDs at compile time,
-      // but the JS runtime returns undefined for missing models rather than throwing.
-      const m = getModel('openai-codex', id as any);
-      if (m) {
-        out.push({
-          id,
-          displayName: (m as any).name ?? id,
-          contextWindow: CONTEXT_WINDOW,
-        });
-      }
-    } catch {
-      // not in registry, skip
-    }
+  try {
+    const models = getModels('openai-codex');
+    return models.map((m) => ({
+      id: m.id,
+      displayName: (m as any).name ?? m.id,
+      contextWindow: CONTEXT_WINDOW,  // hard-clamp
+    }));
+  } catch {
+    return [];
   }
-  return out;
 }

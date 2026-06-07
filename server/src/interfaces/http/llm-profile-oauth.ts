@@ -33,7 +33,7 @@ export function createLlmProfileOauthRouter(
       const result = method === 'browser'
         ? await sessions.startBrowserFlow(profileId)
         : await sessions.startDeviceCodeFlow(profileId);
-      res.json(result);
+      res.json({ success: true, data: result });
     } catch (err) {
       handleCodexError(res, err);
     }
@@ -46,19 +46,19 @@ export function createLlmProfileOauthRouter(
       return;
     }
     if (status.state === 'success') {
-      res.json({ state: 'success', accountId: status.accountId });
+      res.json({ success: true, data: { state: 'success', accountId: status.accountId } });
       return;
     }
     if (status.state === 'error') {
-      res.json({ state: 'error', code: status.code, message: status.message });
+      res.json({ success: true, data: { state: 'error', code: status.code, message: status.message } });
       return;
     }
-    res.json(status);
+    res.json({ success: true, data: status });
   });
 
   router.post('/:id/oauth/cancel/:sessionId', (req: Request, res: Response) => {
     sessions.cancel(req.params.sessionId);
-    res.json({ ok: true });
+    res.json({ success: true, data: { ok: true } });
   });
 
   router.post('/:id/oauth/signout', (req: Request, res: Response) => {
@@ -72,8 +72,8 @@ export function createLlmProfileOauthRouter(
       res.status(400).json({ error: { code: 'INVALID_PROVIDER', message: 'profile is not openai-codex' } });
       return;
     }
-    repo.update(profileId, { oauthCredentials: null as unknown as undefined });
-    res.json({ ok: true });
+    repo.clearOAuthCredentials(profileId);
+    res.json({ success: true, data: { ok: true } });
   });
 
   router.get('/:id/codex-models', async (req: Request, res: Response) => {
@@ -91,7 +91,7 @@ export function createLlmProfileOauthRouter(
         profile.oauthCredentials.accountId,
         { refresh },
       );
-      res.json(result);
+      res.json({ success: true, data: result });
     } catch (err) {
       handleCodexError(res, err);
     }

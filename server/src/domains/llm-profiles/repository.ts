@@ -148,6 +148,10 @@ export class LlmProfileRepository extends BaseRepository<
     };
   }
 
+  clearOAuthCredentials(id: string): void {
+    this.db.prepare(`UPDATE llm_profiles SET oauth_credentials = NULL, updated_at = ? WHERE id = ?`).run(Date.now(), id);
+  }
+
   findDefault(): LlmProfileConfig | null {
     const row = this.db.prepare(`
       SELECT * FROM llm_profiles

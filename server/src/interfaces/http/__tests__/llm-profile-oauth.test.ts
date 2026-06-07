@@ -22,7 +22,13 @@ function makeApp() {
   db.prepare(`INSERT INTO llm_profiles (id, name, provider_type, is_default, created_at, updated_at) VALUES (?, ?, 'openai-codex', 0, ?, ?)`).run('p1', 'codex', now, now);
 
   const mgr = new CodexOAuthSessionManager({
-    updateOAuthCredentials: (profileId, creds) => repo.update(profileId, { oauthCredentials: creds }),
+    updateOAuthCredentials: (profileId, creds) => {
+      if (creds === null) {
+        repo.clearOAuthCredentials(profileId);
+      } else {
+        repo.update(profileId, { oauthCredentials: creds });
+      }
+    },
   });
   const app = express();
   app.use(express.json());
@@ -42,8 +48,8 @@ describe('llm-profile-oauth router', () => {
     const { app } = makeApp();
     const resp = await request(app).post('/api/llm-profiles/p1/oauth/start').send({ method: 'browser' });
     expect(resp.status).toBe(200);
-    expect(resp.body.sessionId).toBeDefined();
-    expect(resp.body.authUrl).toContain('auth.openai.com');
+    expect(resp.body.data.sessionId).toBeDefined();
+    expect(resp.body.data.authUrl).toContain('auth.openai.com');
   });
 
   it('POST /:id/oauth/start (device_code) returns user_code', async () => {
@@ -55,7 +61,7 @@ describe('llm-profile-oauth router', () => {
     const { app } = makeApp();
     const resp = await request(app).post('/api/llm-profiles/p1/oauth/start').send({ method: 'device_code' });
     expect(resp.status).toBe(200);
-    expect(resp.body.userCode).toBe('ABCD-1234');
+    expect(resp.body.data.userCode).toBe('ABCD-1234');
   });
 
   it('GET /:id/oauth/status returns pending then success', async () => {
@@ -67,17 +73,17 @@ describe('llm-profile-oauth router', () => {
 
     const { app, repo } = makeApp();
     const start = await request(app).post('/api/llm-profiles/p1/oauth/start').send({ method: 'browser' });
-    const sessionId = start.body.sessionId;
+    const sessionId = start.body.data.sessionId;
 
     const pendingResp = await request(app).get(`/api/llm-profiles/p1/oauth/status/${sessionId}`);
-    expect(pendingResp.body.state).toBe('pending');
+    expect(pendingResp.body.data.state).toBe('pending');
 
     resolveLogin({ access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' });
     await new Promise((r) => setTimeout(r, 10));
 
     const successResp = await request(app).get(`/api/llm-profiles/p1/oauth/status/${sessionId}`);
-    expect(successResp.body.state).toBe('success');
-    expect(successResp.body.accountId).toBe('acct_x');
+    expect(successResp.body.data.state).toBe('success');
+    expect(successResp.body.data.accountId).toBe('acct_x');
 
     // credentials persisted
     const saved = repo.findById('p1');
@@ -95,7 +101,7 @@ describe('llm-profile-oauth router', () => {
 
     const { app } = makeApp();
     const start = await request(app).post('/api/llm-profiles/p1/oauth/start').send({ method: 'browser' });
-    await request(app).post(`/api/llm-profiles/p1/oauth/cancel/${start.body.sessionId}`);
+    await request(app).post(`/api/llm-profiles/p1/oauth/cancel/${start.body.data.sessionId}`);
     await new Promise((r) => setTimeout(r, 10));
     expect(aborted).toBe(true);
   });
@@ -106,10 +112,22 @@ describe('llm-profile-oauth router', () => {
 
     const resp = await request(app).post('/api/llm-profiles/p1/oauth/signout');
     expect(resp.status).toBe(200);
-    expect(resp.body.ok).toBe(true);
+    expect(resp.body.data.ok).toBe(true);
 
     const after = repo.findById('p1');
     expect(after?.oauthCredentials).toBeUndefined();
+  });
+
+  it('returns success envelope on /oauth/start', async () => {
+    (loginOpenAICodex as any).mockImplementation(async (opts: any) => {
+      opts.onAuth({ url: 'https://x' });
+      return new Promise(() => {});
+    });
+    const { app } = makeApp();
+    const resp = await request(app).post('/api/llm-profiles/p1/oauth/start').send({ method: 'browser' });
+    expect(resp.body.success).toBe(true);
+    expect(resp.body.data).toBeDefined();
+    expect(resp.body.data.sessionId).toBeDefined();
   });
 
   it('GET /:id/codex-models returns models (fallback when fetch fails)', async () => {
@@ -122,8 +140,8 @@ describe('llm-profile-oauth router', () => {
     try {
       const resp = await request(app).get('/api/llm-profiles/p1/codex-models');
       expect(resp.status).toBe(200);
-      expect(resp.body.source).toBe('fallback');
-      expect(Array.isArray(resp.body.models)).toBe(true);
+      expect(resp.body.data.source).toBe('fallback');
+      expect(Array.isArray(resp.body.data.models)).toBe(true);
     } finally {
       globalThis.fetch = origFetch;
     }

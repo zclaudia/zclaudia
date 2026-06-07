@@ -142,7 +142,11 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   // Mount OAuth flow and codex-models endpoints
   const codexOauthSessions = new CodexOAuthSessionManager({
     updateOAuthCredentials: (profileId, creds) => {
-      llmProfileRepo.update(profileId, { oauthCredentials: creds ?? undefined });
+      if (creds === null) {
+        llmProfileRepo.clearOAuthCredentials(profileId);
+      } else {
+        llmProfileRepo.update(profileId, { oauthCredentials: creds });
+      }
     },
   });
   app.use('/api/llm-profiles', authMiddleware, createLlmProfileOauthRouter(llmProfileRepo, codexOauthSessions));
