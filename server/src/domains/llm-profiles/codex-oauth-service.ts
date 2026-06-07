@@ -44,6 +44,22 @@ function classifyRefreshError(err: unknown): 'TERMINAL' | 'TRANSIENT' {
   return TERMINAL_PATTERNS.some((re) => re.test(msg)) ? 'TERMINAL' : 'TRANSIENT';
 }
 
+function asCodexCredentials(creds: unknown): CodexOAuthCredentials {
+  if (
+    creds &&
+    typeof (creds as any).access === 'string' &&
+    typeof (creds as any).refresh === 'string' &&
+    typeof (creds as any).expires === 'number' &&
+    typeof (creds as any).accountId === 'string'
+  ) {
+    return creds as CodexOAuthCredentials;
+  }
+  throw new CodexOAuthError(
+    'REFRESH_FAILED_TRANSIENT',
+    'pi-ai returned credentials without expected fields (accountId missing or wrong type)',
+  );
+}
+
 function startFlight(
   profile: LlmProfileConfig,
   entry: FlightEntry,
@@ -57,10 +73,11 @@ function startFlight(
       if (!result) {
         throw new CodexOAuthError('NOT_AUTHENTICATED', 'NOT_AUTHENTICATED: OAuth credentials missing for openai-codex');
       }
-      if (result.newCredentials !== (profile.oauthCredentials as unknown)) {
-        await writer.updateOAuthCredentials(profile.id, result.newCredentials as CodexOAuthCredentials);
+      const fresh = asCodexCredentials(result.newCredentials);
+      if (fresh !== (profile.oauthCredentials as unknown)) {
+        await writer.updateOAuthCredentials(profile.id, fresh);
       }
-      return result.newCredentials as CodexOAuthCredentials;
+      return fresh;
     } catch (err) {
       if (err instanceof CodexOAuthError) throw err;
       const cls = classifyRefreshError(err);
