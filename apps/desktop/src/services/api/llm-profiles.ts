@@ -62,8 +62,8 @@ export async function createLlmProfile(data: {
 export async function updateLlmProfile(
   id: string,
   data: Partial<LlmProfileConfig>
-): Promise<void> {
-  return apiCallVoid(`/api/llm-profiles/${id}`, {
+): Promise<LlmProfileConfig> {
+  return apiCall<LlmProfileConfig>(`/api/llm-profiles/${id}`, {
     method: 'PUT',
     body: JSON.stringify(data)
   });

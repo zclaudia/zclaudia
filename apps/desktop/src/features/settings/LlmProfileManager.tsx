@@ -342,8 +342,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
    */
   const hasAtLeastOneModelEntry = draftsToEntries(formModels).length > 0;
 
-  const handleSubmit = async () => {
-    if (!formName.trim()) return;
+  const handleSubmit = async (opts: { keepEditing?: boolean } = {}): Promise<LlmProfileConfig | null> => {
+    if (!formName.trim()) return null;
 
     setSaving(true);
     try {
@@ -354,18 +354,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
             setFormRequestHeadersError('Request headers must be a JSON object');
             setSaving(false);
-            return;
+            return null;
           }
           for (const [key, value] of Object.entries(parsed)) {
             if (typeof value !== 'string') {
               setFormRequestHeadersError(`Header "${key}" value must be a string`);
               setSaving(false);
-              return;
+              return null;
             }
             if (RESERVED_HEADER_KEYS.has(key.toLowerCase())) {
               setFormRequestHeadersError(`Header "${key}" is reserved (managed by API key); remove it from Request Headers`);
               setSaving(false);
-              return;
+              return null;
             }
           }
           requestHeadersObj = Object.keys(parsed).length > 0 ? parsed as Record<string, string> : undefined;
@@ -373,7 +373,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         } catch (err) {
           setFormRequestHeadersError(`Invalid JSON: ${err instanceof Error ? err.message : String(err)}`);
           setSaving(false);
-          return;
+          return null;
         }
       } else {
         setFormRequestHeadersError(null);
@@ -391,12 +391,12 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           } else {
             setFormCompatError('Compat must be a JSON object');
             setSaving(false);
-            return;
+            return null;
           }
         } catch {
           setFormCompatError('Invalid JSON in compat field');
           setSaving(false);
-          return;
+          return null;
         }
       }
       setFormCompatError(null);
@@ -420,7 +420,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       if (modelsSaveError) {
         setFormModelsSaveError(modelsSaveError);
         setSaving(false);
-        return;
+        return null;
       }
       const modelsArr = draftsToEntries(formModels);
       // F2: a profile with no declared models is no longer accepted. Agent
@@ -432,7 +432,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       if (modelsArr.length === 0 && formProviderType !== 'openai-codex') {
         setFormModelsSaveError('Add at least one model before saving');
         setSaving(false);
-        return;
+        return null;
       }
       setFormModelsSaveError(null);
 
@@ -447,18 +447,25 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         isDefault: formIsDefault
       };
 
+      let saved: LlmProfileConfig;
       if (editingProfile) {
-        await api.updateLlmProfile(editingProfile.id, data);
+        saved = await api.updateLlmProfile(editingProfile.id, data);
       } else {
-        await api.createLlmProfile(data);
+        saved = await api.createLlmProfile(data);
       }
 
       await loadProfiles();
-      resetForm();
+      if (opts.keepEditing) {
+        setEditingProfile(saved);
+      } else {
+        resetForm();
+      }
+      return saved;
     } catch (error) {
       console.error('Failed to save provider:', error);
       const message = error instanceof Error ? error.message : String(error);
       alert(`Failed to ${editingProfile ? 'update' : 'create'} provider: ${message}`);
+      return null;
     } finally {
       setSaving(false);
     }
@@ -713,17 +720,12 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         </>
       )}
 
-      {formProviderType === 'openai-codex' && editingProfile && editingProfile.providerType === 'openai-codex' && (
+      {formProviderType === 'openai-codex' && editingProfile && (
         <CodexOAuthSection
           profile={editingProfile}
           onCredentialsChanged={loadProfiles}
+          onBeforeSignIn={() => handleSubmit({ keepEditing: true })}
         />
-      )}
-
-      {formProviderType === 'openai-codex' && editingProfile && editingProfile.providerType !== 'openai-codex' && (
-        <p className="text-xs text-muted-foreground rounded-lg border border-border bg-secondary/50 px-3 py-2">
-          Save the profile first to switch its provider type to OpenAI Codex, then re-open it to sign in with ChatGPT.
-        </p>
       )}
 
       {formProviderType === 'openai-codex' && !editingProfile && (
@@ -824,7 +826,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
       <div className="flex gap-2 pt-2">
         <button
-          onClick={handleSubmit}
+          onClick={() => { void handleSubmit(); }}
           disabled={!formName.trim() || saving || !!formRequestHeadersError || (formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry)}
           title={(formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry) ? 'Add at least one model before saving' : undefined}
           className="flex-1 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium disabled:opacity-50"

@@ -12,13 +12,21 @@ import type { LlmProfileConfig } from '@zclaudia/shared';
 interface Props {
   profile: LlmProfileConfig;
   onCredentialsChanged: () => void;
+  /**
+   * Optional callback run when the user clicks Sign in, BEFORE the OAuth modal
+   * opens. Used by the form to persist draft changes (e.g. provider_type
+   * transition to openai-codex) to the server first so the OAuth start endpoint
+   * sees the correct profile type. Return the saved profile (so we use its id
+   * for the modal) or null to abort the sign-in.
+   */
+  onBeforeSignIn?: () => Promise<LlmProfileConfig | null>;
 }
 
 function detectIsTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
-export function CodexOAuthSection({ profile, onCredentialsChanged }: Props) {
+export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignIn }: Props) {
   const activeServerId = useServerStore((s) => s.activeServerId);
   const isCurrentLocalServer = activeServerId === 'local';
   const isTauri = detectIsTauri();
@@ -26,8 +34,29 @@ export function CodexOAuthSection({ profile, onCredentialsChanged }: Props) {
     isTauri && isCurrentLocalServer ? 'browser' : 'device_code';
 
   const [showLogin, setShowLogin] = useState(false);
+  // The profile id used by the login modal. Defaults to props.profile.id but
+  // gets overridden by whatever onBeforeSignIn persists, so a draft type change
+  // takes effect even before the parent's re-render delivers the new prop.
+  const [activeProfileId, setActiveProfileId] = useState(profile.id);
+  const [signInPending, setSignInPending] = useState(false);
   const [models, setModels] = useState<CodexModelEntry[] | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
+
+  async function handleSignIn() {
+    if (onBeforeSignIn) {
+      setSignInPending(true);
+      try {
+        const saved = await onBeforeSignIn();
+        if (!saved) return;
+        setActiveProfileId(saved.id);
+      } finally {
+        setSignInPending(false);
+      }
+    } else {
+      setActiveProfileId(profile.id);
+    }
+    setShowLogin(true);
+  }
 
   async function loadModels(refresh = false) {
     if (!profile.oauthCredentials) {
@@ -62,9 +91,9 @@ export function CodexOAuthSection({ profile, onCredentialsChanged }: Props) {
         profile={profile}
         isCurrentLocalServer={isCurrentLocalServer}
         isTauri={isTauri}
-        onSignIn={() => setShowLogin(true)}
+        onSignIn={() => void handleSignIn()}
         onSignOut={handleSignOut}
-        inFlight={showLogin}
+        inFlight={showLogin || signInPending}
       />
 
       {profile.oauthCredentials && (
@@ -107,7 +136,7 @@ export function CodexOAuthSection({ profile, onCredentialsChanged }: Props) {
 
       {showLogin && (
         <CodexOAuthLoginModal
-          profileId={profile.id}
+          profileId={activeProfileId}
           method={method}
           isTauri={isTauri}
           onClose={() => setShowLogin(false)}
