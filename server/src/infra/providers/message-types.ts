@@ -94,6 +94,8 @@ export interface ClaudeMessage {
   toolResult?: unknown;
   isToolError?: boolean;
   error?: string;
+  /** Machine-readable error code for structured error handling (e.g. CodexOAuth error codes). */
+  errorCode?: string;
   usage?: Usage;
   isComplete?: boolean;
   taskId?: string;

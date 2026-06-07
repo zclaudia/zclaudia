@@ -6,9 +6,31 @@ import { usePermissionStore } from '../../stores/permissionStore';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useServerStore } from '../../stores/serverStore';
+import { useToastStore } from '../../stores/toastStore';
 import { eagerSyncCurrentSession, recoverCurrentSessionTail } from '../sessionSync';
 import { getSessionCompaction } from '../api/sessions';
 import { scheduleDelta, flushDeltaForRun } from './delta-buffer';
+
+/**
+ * Translate a Codex OAuth error code into a user-facing message.
+ * Returns undefined when the code is not a known Codex OAuth code,
+ * so callers can fall back to the raw error string.
+ */
+function describeCodexOAuthError(code: string | undefined): string | undefined {
+  switch (code) {
+    case 'NOT_AUTHENTICATED':
+    case 'REFRESH_FAILED_TERMINAL':
+      return 'Codex 凭证已失效，请在设置中重新登录。';
+    case 'REFRESH_FAILED_TRANSIENT':
+      return '网络异常，请稍后重试。';
+    case 'RESPONSE_ENDPOINT_REJECTED':
+      return '当前 ChatGPT 订阅不支持该模型，请检查 plan 或更换模型。';
+    case 'OAUTH_PORT_CONFLICT':
+      return '端口 1455 被占用，请关闭其他正在进行登录的进程后再试。';
+    default:
+      return undefined;
+  }
+}
 
 export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext): boolean {
   const { serverId, backendId, serverRunsRef, logTag } = ctx;
@@ -125,6 +147,17 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         usePermissionStore.getState().clearRequestsForSession(failedSession);
         useInteractionStore.getState().clearSession(failedSession);
         if (msg.error) {
+          const codexToast = describeCodexOAuthError(msg.errorCode);
+          if (codexToast) {
+            useToastStore.getState().add({
+              type: 'error',
+              title: 'Codex 认证错误',
+              message: codexToast,
+              sessionId: failedSession,
+              serverId,
+              icon: 'error',
+            });
+          }
           useChatStore.getState().appendToLastMessage(failedSession, `\n\n**Error:** ${msg.error}`);
         }
         useChatStore.getState().finalizeRunToMessage(msg.runId);

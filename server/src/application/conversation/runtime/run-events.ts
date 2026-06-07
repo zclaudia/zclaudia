@@ -585,6 +585,7 @@ export function handleProviderEvent({
           runId,
           sessionId: activeRun.sessionId,
           error: errorMessage,
+          ...(msg.errorCode ? { errorCode: msg.errorCode } : {}),
         });
         setPhase(activeRun, 'failed');
         pluginEvents.emit('run.error', {

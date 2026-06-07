@@ -4,6 +4,7 @@ import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
 import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory, buildModel, type BuiltModel } from './pi-runtime/index.js';
+import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
 import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
 
@@ -418,11 +419,15 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     agent.prompt(input)
       .then(() => { queue.close(); })
       .catch(err => {
-        queue.push({
+        const errorMsg: ClaudeMessage = {
           type: 'error',
           error: err instanceof Error ? err.message : String(err),
           isComplete: true,
-        });
+        };
+        if (err instanceof CodexOAuthError) {
+          errorMsg.errorCode = err.code;
+        }
+        queue.push(errorMsg);
         queue.close();
       });
 

@@ -164,6 +164,8 @@ export interface RunFailedMessage {
   runId: string;
   sessionId: string;
   error: string;
+  /** Machine-readable error code for structured error handling (e.g. CodexOAuth error codes). */
+  errorCode?: string;
   seq?: number;
   /** When cancel was triggered with un-consumed steer messages still queued, server returns them joined here for the client to repopulate the input. */
   restoreDraft?: string;
