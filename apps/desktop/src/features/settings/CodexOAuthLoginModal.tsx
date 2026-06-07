@@ -112,18 +112,22 @@ export function CodexOAuthLoginModal({ profileId, method, isTauri, onClose, onSu
 
         {session && session.method === 'device_code' && (
           <div className="text-sm">
-            <p className="mb-2">请访问下面的网址，并输入下面的代码：</p>
+            <p className="mb-2">点击下方按钮在浏览器打开授权页面（代码已自动填入），登录 ChatGPT 后点 Allow 即可：</p>
             <a
-              href={session.verificationUri}
+              href={`${session.verificationUri}?user_code=${encodeURIComponent(session.userCode)}`}
               target="_blank"
               rel="noreferrer"
-              className="text-emerald-600 underline dark:text-emerald-400"
+              className="mt-2 block w-full rounded-lg bg-emerald-600 px-4 py-2.5 text-center text-sm font-medium text-white hover:bg-emerald-700"
             >
-              {session.verificationUri}
+              在浏览器中打开授权页面 ↗
             </a>
-            <div className="mt-3 rounded bg-secondary p-3 text-center font-mono text-2xl tracking-widest">
+            <p className="mt-3 text-xs text-muted-foreground">如果浏览器没有自动填入代码，请手动输入：</p>
+            <div className="mt-1 rounded bg-secondary p-3 text-center font-mono text-2xl tracking-widest">
               {session.userCode}
             </div>
+            <p className="mt-2 text-xs text-muted-foreground break-all">
+              或访问：<a href={session.verificationUri} target="_blank" rel="noreferrer" className="underline">{session.verificationUri}</a>
+            </p>
             <button
               type="button"
               onClick={() => navigator.clipboard?.writeText(session.userCode)}
