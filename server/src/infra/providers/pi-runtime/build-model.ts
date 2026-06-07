@@ -1,6 +1,8 @@
 import type { Model } from '@earendil-works/pi-ai';
 import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
 import { tryGetRegistryModel, findInRegistryCrossProvider, type RegistryHit } from './registry-search.js';
+import { refreshIfNeeded } from '../../../domains/llm-profiles/codex-oauth-service.js';
+import { getLlmProfileWriter } from '../../../domains/llm-profiles/repository-registry.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
@@ -179,7 +181,7 @@ export function buildModel(
     model = { ...(registryHit.model as any) };
     // Override network / protocol fields so the request lands on the user's
     // proxy with the wire shape their providerType dictates.
-    if (envBaseUrl) {
+    if (envBaseUrl && providerType !== 'openai-codex') {
       model.baseUrl = envBaseUrl;
     }
     // Stamp the wire api based on providerType: anthropic native uses the
@@ -188,7 +190,13 @@ export function buildModel(
     // `openai-completions`. This overrides whatever `api` the registry
     // entry declared so an entry registered under (say) `deepseek` reached
     // via providerType=`openai` serializes correctly.
-    model.api = providerType === 'anthropic' ? 'anthropic-messages' : 'openai-completions';
+    if (providerType === 'anthropic') {
+      model.api = 'anthropic-messages';
+    } else if (providerType === 'openai-codex') {
+      model.api = 'openai-codex-responses';
+    } else {
+      model.api = 'openai-completions';
+    }
     // Forward the user-declared providerType as the `provider` field; pi-ai
     // uses this for env-var key derivation and compat tagging downstream.
     model.provider = providerType;
@@ -213,6 +221,14 @@ export function buildModel(
   if (profile?.requestHeaders) {
     model.headers = { ...(model.headers ?? {}), ...profile.requestHeaders };
   }
+  if (profile?.providerType === 'openai-codex' && profile.oauthCredentials) {
+    model.headers = {
+      ...(model.headers ?? {}),
+      'ChatGPT-Account-Id': profile.oauthCredentials.accountId,
+      'OpenAI-Beta': 'responses=experimental',
+      originator: 'zclaudia',
+    };
+  }
   applyModelEntryOverrides(model, modelEntry);
 
   // API key resolution priority:
@@ -226,7 +242,12 @@ export function buildModel(
   //   4. Otherwise leave `getApiKey` undefined and let pi-ai own env
   //      resolution for known providers (ANTHROPIC_API_KEY etc.).
   let getApiKey: BuiltModel['getApiKey'];
-  if (profile?.apiKey) {
+  if (profile?.providerType === 'openai-codex') {
+    getApiKey = async () => {
+      const fresh = await refreshIfNeeded(profile, getLlmProfileWriter());
+      return fresh.access;
+    };
+  } else if (profile?.apiKey) {
     getApiKey = async () => profile.apiKey!;
   } else if (process.env.OPENAI_BASE_URL || !registryHit) {
     getApiKey = async () => process.env.OPENAI_API_KEY ?? '';
