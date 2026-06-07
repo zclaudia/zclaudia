@@ -713,11 +713,17 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         </>
       )}
 
-      {formProviderType === 'openai-codex' && editingProfile && (
+      {formProviderType === 'openai-codex' && editingProfile && editingProfile.providerType === 'openai-codex' && (
         <CodexOAuthSection
           profile={editingProfile}
           onCredentialsChanged={loadProfiles}
         />
+      )}
+
+      {formProviderType === 'openai-codex' && editingProfile && editingProfile.providerType !== 'openai-codex' && (
+        <p className="text-xs text-muted-foreground rounded-lg border border-border bg-secondary/50 px-3 py-2">
+          Save the profile first to switch its provider type to OpenAI Codex, then re-open it to sign in with ChatGPT.
+        </p>
       )}
 
       {formProviderType === 'openai-codex' && !editingProfile && (
