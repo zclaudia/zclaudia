@@ -43,18 +43,28 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
   const [modelsLoading, setModelsLoading] = useState(false);
 
   async function handleSignIn() {
+    let idToUse = profile.id;
     if (onBeforeSignIn) {
       setSignInPending(true);
       try {
         const saved = await onBeforeSignIn();
-        if (!saved) return;
-        setActiveProfileId(saved.id);
+        if (saved) {
+          idToUse = saved.id;
+        } else {
+          // Pre-save failed (validation, network, or server returned no
+          // updated profile). Don't bail silently — log it and continue with
+          // the existing profile id so the OAuth modal still opens. If the
+          // server-side type isn't openai-codex, oauth/start will surface a
+          // clear "profile is not openai-codex" error in the modal.
+          console.warn('[CodexOAuthSection] onBeforeSignIn returned no saved profile; using existing profile id');
+        }
+      } catch (err) {
+        console.error('[CodexOAuthSection] onBeforeSignIn threw', err);
       } finally {
         setSignInPending(false);
       }
-    } else {
-      setActiveProfileId(profile.id);
     }
+    setActiveProfileId(idToUse);
     setShowLogin(true);
   }
 
