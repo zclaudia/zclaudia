@@ -10,8 +10,8 @@ export function autoDetectProviders(db: Database.Database): void {
 
   const now = Date.now();
   db.prepare(`
-    INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, env, is_default, created_at, updated_at)
-    VALUES (?, ?, 'anthropic', NULL, NULL, NULL, NULL, 1, ?, ?)
+    INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, is_default, created_at, updated_at)
+    VALUES (?, ?, 'anthropic', NULL, NULL, NULL, 1, ?, ?)
   `).run(newId(), 'ZClaudia Agent', now, now);
 
   console.log('   Registered default ZClaudia agent runtime');
