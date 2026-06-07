@@ -12,7 +12,10 @@ import {
   buildTaskUnlockedSessionPatch,
   type SessionEventPublisherPort,
 } from '../../domains/sessions/index.js';
-import { registerLlmProfilesDomain } from '../../domains/llm-profiles/index.js';
+import { registerLlmProfilesDomain, LlmProfileRepository } from '../../domains/llm-profiles/index.js';
+import { registerLlmProfileRepository } from '../../domains/llm-profiles/repository-registry.js';
+import { CodexOAuthSessionManager } from '../../domains/llm-profiles/codex-oauth-session.js';
+import { createLlmProfileOauthRouter } from '../../interfaces/http/llm-profile-oauth.js';
 import { registerAgentProfilesDomain } from '../../domains/agent-profiles/index.js';
 import { registerRuntimeRoutes } from '../../infra/providers/runtime-routes.js';
 import { registerNotificationDomain } from '../../domains/notification-feed/index.js';
@@ -130,6 +133,20 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   registerProjectsDomain({ db, app, authMiddleware, onProjectChanged: handleProjectChanged });
   registerSessionsDomain({ app, authMiddleware, db, activeRuns, sessionEvents });
   registerLlmProfilesDomain({ app, authMiddleware, db });
+
+  // Wire the LlmProfileRepository into the registry so build-model.ts can
+  // call getLlmProfileWriter() during chat requests (T7 cross-task dependency).
+  const llmProfileRepo = new LlmProfileRepository(db);
+  registerLlmProfileRepository(llmProfileRepo);
+
+  // Mount OAuth flow and codex-models endpoints
+  const codexOauthSessions = new CodexOAuthSessionManager({
+    updateOAuthCredentials: (profileId, creds) => {
+      llmProfileRepo.update(profileId, { oauthCredentials: creds ?? undefined });
+    },
+  });
+  app.use('/api/llm-profiles', authMiddleware, createLlmProfileOauthRouter(llmProfileRepo, codexOauthSessions));
+
   registerAgentProfilesDomain({ app, authMiddleware, db });
   registerRuntimeRoutes({ app, authMiddleware, db, toolRegistry });
 

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { loginOpenAICodex, loginOpenAICodexDeviceCode } from '@earendil-works/pi-ai/oauth';
 import type { CodexOAuthCredentials } from '@zclaudia/shared/core/llm-profile';
 import { CodexOAuthError } from './codex-oauth-errors.js';
+import type { OAuthCredentialsWriter } from './codex-oauth-service.js';
 
 interface BaseSession {
   sessionId: string;
@@ -45,7 +46,7 @@ export class CodexOAuthSessionManager {
   private sessions = new Map<string, InternalSession>();
   private cleanupTimer: NodeJS.Timeout;
 
-  constructor() {
+  constructor(private readonly writer?: OAuthCredentialsWriter) {
     this.cleanupTimer = setInterval(() => this.cleanupExpired(), CLEANUP_INTERVAL_MS);
     this.cleanupTimer.unref();
   }
@@ -182,6 +183,11 @@ export class CodexOAuthSessionManager {
     const s = this.sessions.get(sessionId);
     if (!s) return;
     s.status = { state: 'success', credentials: creds, accountId: creds.accountId };
+    if (this.writer) {
+      Promise.resolve(this.writer.updateOAuthCredentials(s.profileId, creds)).catch((err) => {
+        console.error('[codex-oauth-session] failed to persist credentials', err);
+      });
+    }
   }
 
   private markError(sessionId: string, code: string, message: string): void {
