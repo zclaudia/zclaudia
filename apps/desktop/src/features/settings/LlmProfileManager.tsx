@@ -9,6 +9,7 @@ import * as api from '../../services/api';
 import type { LlmProfilePreviewInput } from '../../services/api/llm-profiles';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
+import { CodexOAuthSection } from './CodexOAuthSection';
 
 /** Lightweight PCP capability summary for UI display (mirrors server manifests) */
 type CapLevel = 'strict' | 'best_effort' | 'none';
@@ -426,7 +427,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       // profiles consume `llmProfile.models` to choose which model id to send
       // and to resolve the context window — saving an empty list silently
       // forces them back to the pi-ai registry fallback path.
-      if (modelsArr.length === 0) {
+      // Exception: openai-codex profiles fetch their model list via OAuth, so
+      // an empty models array is valid on initial save.
+      if (modelsArr.length === 0 && formProviderType !== 'openai-codex') {
         setFormModelsSaveError('Add at least one model before saving');
         setSaving(false);
         return;
@@ -677,34 +680,51 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
       <ProviderTypeSelector value={formProviderType} onChange={setFormProviderType} />
 
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">Base URL (optional)</label>
-        <input
-          type="text"
-          value={formBaseUrl}
-          onChange={(e) => setFormBaseUrl(e.target.value)}
-          placeholder="http://api.example.com/v1"
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          Override default endpoint. Required for OpenAI-compatible third-party proxies (e.g. DeepSeek, Moonshot, local gateways).
-        </p>
-      </div>
+      {formProviderType !== 'openai-codex' && (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">Base URL (optional)</label>
+            <input
+              type="text"
+              value={formBaseUrl}
+              onChange={(e) => setFormBaseUrl(e.target.value)}
+              placeholder="http://api.example.com/v1"
+              className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Override default endpoint. Required for OpenAI-compatible third-party proxies (e.g. DeepSeek, Moonshot, local gateways).
+            </p>
+          </div>
 
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">API Key (optional)</label>
-        <input
-          type="password"
-          value={formApiKey}
-          onChange={(e) => setFormApiKey(e.target.value)}
-          placeholder="sk-..."
-          autoComplete="off"
-          className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">API Key (optional)</label>
+            <input
+              type="password"
+              value={formApiKey}
+              onChange={(e) => setFormApiKey(e.target.value)}
+              placeholder="sk-..."
+              autoComplete="off"
+              className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Stored on the server. Falls back to environment if omitted.
+            </p>
+          </div>
+        </>
+      )}
+
+      {formProviderType === 'openai-codex' && editingProfile && (
+        <CodexOAuthSection
+          profile={editingProfile}
+          onCredentialsChanged={loadProfiles}
         />
-        <p className="text-xs text-muted-foreground mt-1">
-          Stored on the server. Falls back to environment if omitted.
+      )}
+
+      {formProviderType === 'openai-codex' && !editingProfile && (
+        <p className="text-xs text-muted-foreground rounded-lg border border-border bg-secondary/50 px-3 py-2">
+          Save the profile first, then sign in with ChatGPT to authenticate.
         </p>
-      </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium text-muted-foreground mb-1">Request Headers (JSON)</label>
@@ -799,8 +819,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       <div className="flex gap-2 pt-2">
         <button
           onClick={handleSubmit}
-          disabled={!formName.trim() || saving || !!formRequestHeadersError || !hasAtLeastOneModelEntry}
-          title={!hasAtLeastOneModelEntry ? 'Add at least one model before saving' : undefined}
+          disabled={!formName.trim() || saving || !!formRequestHeadersError || (formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry)}
+          title={(formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry) ? 'Add at least one model before saving' : undefined}
           className="flex-1 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}
@@ -979,6 +999,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 const PROVIDER_TYPE_LABELS: Record<string, string> = {
   anthropic: 'Anthropic',
   openai: 'OpenAI',
+  'openai-codex': 'OpenAI Codex (ChatGPT Plus/Pro)',
 };
 
 const PROVIDER_TYPE_OPTIONS: { value: string; label: string }[] = LLM_PROVIDER_TYPES.map((value) => ({
