@@ -342,7 +342,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
    */
   const hasAtLeastOneModelEntry = draftsToEntries(formModels).length > 0;
 
-  const handleSubmit = async (opts: { keepEditing?: boolean } = {}): Promise<LlmProfileConfig | null> => {
+  const handleSubmit = async (opts: { keepEditing?: boolean; targetId?: string } = {}): Promise<LlmProfileConfig | null> => {
     if (!formName.trim()) return null;
 
     setSaving(true);
@@ -447,9 +447,15 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         isDefault: formIsDefault
       };
 
+      // Prefer explicit targetId (passed by callers that have a stable id even
+      // when React state may flux, e.g. CodexOAuthSection.onBeforeSignIn) over
+      // editingProfile state. Falling back to editingProfile preserves the
+      // existing Save-button behavior. Only fall through to create when both
+      // are absent (true "+ New" flow).
+      const updateTargetId = opts.targetId ?? editingProfile?.id;
       let saved: LlmProfileConfig;
-      if (editingProfile) {
-        saved = await api.updateLlmProfile(editingProfile.id, data);
+      if (updateTargetId) {
+        saved = await api.updateLlmProfile(updateTargetId, data);
       } else {
         saved = await api.createLlmProfile(data);
       }
@@ -724,7 +730,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         <CodexOAuthSection
           profile={editingProfile}
           onCredentialsChanged={loadProfiles}
-          onBeforeSignIn={() => handleSubmit({ keepEditing: true })}
+          onBeforeSignIn={() => handleSubmit({ keepEditing: true, targetId: editingProfile.id })}
         />
       )}
 
