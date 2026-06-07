@@ -438,8 +438,9 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       }
       if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
 
+      let updated: LlmProfileConfig;
       try {
-        repo.update(req.params.id, patch);
+        updated = repo.update(req.params.id, patch);
       } catch (error) {
         if (error instanceof Error && error.message.includes('not found')) {
           res.status(404).json({
@@ -451,7 +452,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         throw error;
       }
 
-      res.json({ success: true } as ApiResponse<void>);
+      res.json({ success: true, data: updated } as ApiResponse<LlmProfileConfig>);
     } catch (error) {
       console.error('Error updating llm profile:', error);
       res.status(500).json({
