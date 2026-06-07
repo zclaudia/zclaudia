@@ -177,6 +177,63 @@ export async function resolveContextWindowPreview(input: {
   );
 }
 
+// ── Codex OAuth ────────────────────────────────────────────────────────────────
+
+export type CodexOAuthStartResult =
+  | { sessionId: string; method: 'browser'; authUrl: string; instructions?: string }
+  | { sessionId: string; method: 'device_code'; userCode: string; verificationUri: string; expiresAt: number };
+
+export type CodexOAuthStatus =
+  | { state: 'pending' }
+  | { state: 'success'; accountId: string }
+  | { state: 'error'; code: string; message: string }
+  | { state: 'cancelled' };
+
+export interface CodexModelEntry {
+  id: string;
+  displayName: string;
+  contextWindow: number;
+  supportedReasoningEfforts?: string[];
+}
+
+export interface CodexModelsResponse {
+  models: CodexModelEntry[];
+  fetchedAt: number;
+  source: 'live' | 'cache' | 'fallback';
+}
+
+export async function startCodexOAuth(
+  profileId: string,
+  method: 'browser' | 'device_code',
+): Promise<CodexOAuthStartResult> {
+  return apiCall<CodexOAuthStartResult>(`/api/llm-profiles/${profileId}/oauth/start`, {
+    method: 'POST',
+    body: JSON.stringify({ method }),
+  });
+}
+
+export async function pollCodexOAuthStatus(
+  profileId: string,
+  sessionId: string,
+): Promise<CodexOAuthStatus> {
+  return apiCall<CodexOAuthStatus>(`/api/llm-profiles/${profileId}/oauth/status/${sessionId}`);
+}
+
+export async function cancelCodexOAuth(
+  profileId: string,
+  sessionId: string,
+): Promise<void> {
+  return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/cancel/${sessionId}`, { method: 'POST' });
+}
+
+export async function fetchCodexModels(
+  profileId: string,
+  opts?: { refresh?: boolean },
+): Promise<CodexModelsResponse> {
+  const query = opts?.refresh ? '?refresh=true' : '';
+  return apiCall<CodexModelsResponse>(`/api/llm-profiles/${profileId}/codex-models${query}`);
+}
+
 // Runtime adapter capability/command routes stay under `/api/providers` —
 // they describe the runtime shell, not the LLM connection profile.
 

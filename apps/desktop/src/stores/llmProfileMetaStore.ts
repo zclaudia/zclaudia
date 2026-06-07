@@ -12,15 +12,27 @@ import { create } from 'zustand';
 import type { LlmProfileConfig, ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { useServerStore } from './serverStore';
 
+export interface CodexOAuthSessionState {
+  sessionId: string;
+  method: 'browser' | 'device_code';
+  authUrl?: string;
+  userCode?: string;
+  verificationUri?: string;
+  state: 'pending' | 'success' | 'error' | 'cancelled';
+  errorMessage?: string;
+}
+
 interface LlmProfileMetaState {
   providersByBackend: Record<string, LlmProfileConfig[]>;
   providerCommands: Record<string, SlashCommand[]>;
   providerCapabilities: Record<string, ProviderCapabilities>;
+  codexOauthSessions: Map<string, CodexOAuthSessionState>;
 
   setProviders: (providers: LlmProfileConfig[], backendId?: string | null) => void;
   getProviders: (backendId?: string | null) => LlmProfileConfig[];
   setProviderCommands: (llmProfileId: string, commands: SlashCommand[]) => void;
   setProviderCapabilities: (llmProfileId: string, capabilities: ProviderCapabilities) => void;
+  setCodexOauthSession: (profileId: string, session: CodexOAuthSessionState | null) => void;
 }
 
 const EMPTY_PROVIDERS: LlmProfileConfig[] = [];
@@ -35,6 +47,7 @@ export const useLlmProfileMetaStore = create<LlmProfileMetaState>((set, get) => 
   providersByBackend: {},
   providerCommands: {},
   providerCapabilities: {},
+  codexOauthSessions: new Map(),
 
   setProviders: (providers, backendId) => set((state) => {
     const resolvedBackendId = resolveBackendId(backendId);
@@ -68,4 +81,15 @@ export const useLlmProfileMetaStore = create<LlmProfileMetaState>((set, get) => 
         [llmProfileId]: capabilities,
       },
     })),
+
+  setCodexOauthSession: (profileId, session) =>
+    set((state) => {
+      const next = new Map(state.codexOauthSessions);
+      if (session === null) {
+        next.delete(profileId);
+      } else {
+        next.set(profileId, session);
+      }
+      return { codexOauthSessions: next };
+    }),
 }));
