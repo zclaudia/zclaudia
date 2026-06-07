@@ -234,6 +234,10 @@ export async function fetchCodexModels(
   return apiCall<CodexModelsResponse>(`/api/llm-profiles/${profileId}/codex-models${query}`);
 }
 
+export async function signOutCodexOAuth(profileId: string): Promise<void> {
+  return apiCallVoid(`/api/llm-profiles/${profileId}/oauth/signout`, { method: 'POST' });
+}
+
 // Runtime adapter capability/command routes stay under `/api/providers` —
 // they describe the runtime shell, not the LLM connection profile.
 

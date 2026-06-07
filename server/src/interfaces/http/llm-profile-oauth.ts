@@ -61,6 +61,21 @@ export function createLlmProfileOauthRouter(
     res.json({ ok: true });
   });
 
+  router.post('/:id/oauth/signout', (req: Request, res: Response) => {
+    const profileId = req.params.id;
+    const profile = repo.findById(profileId);
+    if (!profile) {
+      res.status(404).json({ error: { code: 'NOT_FOUND', message: 'profile not found' } });
+      return;
+    }
+    if (profile.providerType !== 'openai-codex') {
+      res.status(400).json({ error: { code: 'INVALID_PROVIDER', message: 'profile is not openai-codex' } });
+      return;
+    }
+    repo.update(profileId, { oauthCredentials: null as unknown as undefined });
+    res.json({ ok: true });
+  });
+
   router.get('/:id/codex-models', async (req: Request, res: Response) => {
     const profile = repo.findById(req.params.id);
     if (!profile) { res.status(404).json({ error: { code: 'NOT_FOUND', message: 'profile not found' } }); return; }

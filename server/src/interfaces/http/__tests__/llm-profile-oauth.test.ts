@@ -100,6 +100,18 @@ describe('llm-profile-oauth router', () => {
     expect(aborted).toBe(true);
   });
 
+  it('POST /:id/oauth/signout clears oauth_credentials', async () => {
+    const { app, repo } = makeApp();
+    repo.update('p1', { oauthCredentials: { access: 'a', refresh: 'r', expires: Date.now() + 10_000, accountId: 'acct_x' } });
+
+    const resp = await request(app).post('/api/llm-profiles/p1/oauth/signout');
+    expect(resp.status).toBe(200);
+    expect(resp.body.ok).toBe(true);
+
+    const after = repo.findById('p1');
+    expect(after?.oauthCredentials).toBeUndefined();
+  });
+
   it('GET /:id/codex-models returns models (fallback when fetch fails)', async () => {
     // Seed credentials so the endpoint can attempt a fetch
     const { app, repo } = makeApp();

@@ -4,7 +4,7 @@ import { CodexOAuthCard } from './CodexOAuthCard';
 import { CodexOAuthLoginModal } from './CodexOAuthLoginModal';
 import {
   fetchCodexModels,
-  updateLlmProfile,
+  signOutCodexOAuth,
   type CodexModelEntry,
 } from '../../services/api/llm-profiles';
 import type { LlmProfileConfig } from '@zclaudia/shared';
@@ -52,8 +52,7 @@ export function CodexOAuthSection({ profile, onCredentialsChanged }: Props) {
   }, [profile.id, profile.oauthCredentials?.access]);
 
   async function handleSignOut() {
-    // Clear credentials by patching oauthCredentials to undefined
-    await updateLlmProfile(profile.id, { oauthCredentials: undefined } as Partial<LlmProfileConfig>);
+    await signOutCodexOAuth(profile.id);
     onCredentialsChanged();
   }
 
