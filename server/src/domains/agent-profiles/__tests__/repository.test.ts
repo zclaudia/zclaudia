@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
+import { ALL_TOOL_NAMES } from '@zclaudia/shared/core/tools';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { AgentProfileRepository } from '../repository.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
@@ -37,12 +38,12 @@ describe('AgentProfileRepository', () => {
     expect(fetched!.llmProfileId).toBe(llmProfileId);
     expect(fetched!.model).toBe('claude-sonnet-4-6');
     expect(fetched!.systemPrompt).toBe('You are a coder.');
-    expect(fetched!.enabledTools).toEqual(['read', 'write', 'bash']);
+    expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Bash']);
     expect(fetched!.thinkingLevel).toBe('medium');
     expect(fetched!.isDefault).toBe(true);
   });
 
-  it('falls back to all 7 tools when enabled_tools JSON is corrupt', () => {
+  it('falls back to all canonical tools when enabled_tools JSON is corrupt', () => {
     const created = repo.create({
       name: 'a',
       llmProfileId,
@@ -52,7 +53,7 @@ describe('AgentProfileRepository', () => {
     });
     db.prepare('UPDATE agent_profiles SET enabled_tools = ? WHERE id = ?').run('{broken', created.id);
     const fetched = repo.findById(created.id);
-    expect(fetched!.enabledTools.sort()).toEqual(['bash', 'edit', 'find', 'grep', 'ls', 'read', 'write']);
+    expect(fetched!.enabledTools.sort()).toEqual([...ALL_TOOL_NAMES].sort());
   });
 
   it('falls back to undefined when thinking_level is unrecognized', () => {

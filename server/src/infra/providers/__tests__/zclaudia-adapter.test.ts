@@ -5,7 +5,7 @@ import { __testables, ZClaudiaAdapter } from '../zclaudia-adapter.js';
 import type { RunOptions, ClaudeMessage, SteerHandle } from '../types.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
-import type { ToolName } from '@zclaudia/shared/core/tools';
+import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
 
 // Mock pi-ai's registry helpers so tests don't hit the real model registry.
 // The new buildModel calls getModel for same-provider lookup, then
@@ -623,16 +623,63 @@ describe('ZClaudiaAdapter.run', () => {
     const adapter = new ZClaudiaAdapter();
     const out = await collect(adapter, 'hi', {
       mode: 'plan',
-      enabledTools: ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls'] as ToolName[],
+      enabledTools: [
+        'read',
+        'write',
+        'edit',
+        'bash',
+        'grep',
+        'find',
+        'Glob',
+        'ls',
+        'TodoWrite',
+        'AskUserQuestion',
+        'WebFetch',
+        'WebSearch',
+        'MCPTool',
+        'ToolSearch',
+        'ListMcpResources',
+        'ReadMcpResource',
+        'Agent',
+        'LSPTool',
+      ] as ToolName[],
     });
 
     const init = out.find(m => m.type === 'init');
-    expect(init?.systemInfo?.tools).toEqual(['read', 'grep', 'find', 'ls']);
+    expect(init?.systemInfo?.tools).toEqual([
+      'Read',
+      'Grep',
+      'Find',
+      'Glob',
+      'LS',
+      'TodoWrite',
+      'AskUserQuestion',
+      'WebFetch',
+      'WebSearch',
+      'ToolSearch',
+      'ListMcpResources',
+      'ReadMcpResource',
+      'LSPTool',
+    ]);
 
     // Agent should have been constructed with only the RO tools too.
     const constructed = mockAgentInstances[0]?.initialState?.tools as Array<{ name: string }> | undefined;
     const toolNames = (constructed ?? []).map((t) => t.name);
-    expect(toolNames).toEqual(['read', 'grep', 'find', 'ls']);
+    expect(toolNames).toEqual([
+      'Read',
+      'Grep',
+      'Find',
+      'Glob',
+      'LS',
+      'TodoWrite',
+      'AskUserQuestion',
+      'WebFetch',
+      'WebSearch',
+      'ToolSearch',
+      'ListMcpResources',
+      'ReadMcpResource',
+      'LSPTool',
+    ]);
   });
 
   it('non-plan mode passes enabledTools through unfiltered', async () => {
@@ -647,7 +694,7 @@ describe('ZClaudiaAdapter.run', () => {
     });
 
     const init = out.find(m => m.type === 'init');
-    expect(init?.systemInfo?.tools).toEqual(['read', 'write', 'bash']);
+    expect(init?.systemInfo?.tools).toEqual(['Read', 'Write', 'Bash']);
   });
 
   it('plan mode preserves intersection with restrictive agent profile (read-only ∩ enabled)', async () => {
@@ -664,7 +711,7 @@ describe('ZClaudiaAdapter.run', () => {
 
     const init = out.find(m => m.type === 'init');
     // write filtered out; read kept
-    expect(init?.systemInfo?.tools).toEqual(['read']);
+    expect(init?.systemInfo?.tools).toEqual(['Read']);
   });
 
   it('plan mode appends PLAN mode suffix to systemPrompt', async () => {
@@ -792,7 +839,7 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
 
     expect(mockAgentInstances.length).toBe(1);
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
-    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(7);
+    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(ALL_TOOL_NAMES.length);
   });
 
   it('passes 3 hooks to pi Agent constructor', async () => {
@@ -869,7 +916,7 @@ describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => 
 
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
     expect((mockAgentInstances[0].initialState as any).tools.length).toBe(2);
-    expect((mockAgentInstances[0].initialState as any).tools.map((t: any) => t.name).sort()).toEqual(['bash', 'read']);
+    expect((mockAgentInstances[0].initialState as any).tools.map((t: any) => t.name).sort()).toEqual(['Bash', 'Read']);
   });
 
   it('passes options.agentProfile.model into buildModel as override', async () => {

@@ -94,7 +94,19 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
     return new Promise<PermissionDecision>((resolve) => {
       if (forcedPlanBySession && modeValue === 'plan') {
         const planReadOnlyTools = new Set([
-          'read', 'glob', 'grep', 'webfetch', 'websearch', 'todowrite', 'ls', 'askuserquestion',
+          'read',
+          'glob',
+          'grep',
+          'find',
+          'ls',
+          'webfetch',
+          'websearch',
+          'toolsearch',
+          'todowrite',
+          'askuserquestion',
+          'listmcpresources',
+          'readmcpresource',
+          'lsptool',
         ]);
         const normalizedTool = request.toolName.toLowerCase();
         const isAllowedReadTool = planReadOnlyTools.has(normalizedTool);

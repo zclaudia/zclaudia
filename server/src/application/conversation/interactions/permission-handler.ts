@@ -180,9 +180,9 @@ export function handlePromptAnswer(
       run.db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
         .run('running', Date.now(), run.sessionId);
 
-      // Resolve with deny + user's formatted answer as the message
-      // Claude reads this message and treats it as the user's response
-      pending.resolve({ behavior: 'deny', message: message.formattedAnswer });
+      // Resolve with allow + user's formatted answer. AskUserQuestion is now
+      // executed as a normal tool, so the tool returns this text to the model.
+      pending.resolve({ behavior: 'allow', message: message.formattedAnswer });
 
       // Broadcast resolution to all clients
       const resolvedEvent = {

@@ -10,7 +10,7 @@
 
 import type { NormalizedTodoItem } from '@zclaudia/shared/interaction/forms';
 
-const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed']);
+const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed', 'cancelled']);
 
 function coerceStatus(value: unknown): NormalizedTodoItem['status'] {
   const s = typeof value === 'string' ? value : 'pending';

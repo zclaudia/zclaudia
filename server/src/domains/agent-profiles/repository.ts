@@ -1,10 +1,18 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
-import { ALL_TOOL_NAMES } from '@zclaudia/shared/core/tools';
+import { ALL_TOOL_NAMES, normalizeToolName } from '@zclaudia/shared/core/tools';
 import { newId } from '../../utils/uuid.js';
 
 const VALID_THINKING_LEVELS = new Set<ThinkingLevel>(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+
+function normalizeEnabledTools(tools: string[]): string[] {
+  const normalized = tools.flatMap((tool) => {
+    const name = normalizeToolName(tool);
+    return name ? [name] : [];
+  });
+  return [...new Set(normalized)];
+}
 
 export class AgentProfileRepository extends BaseRepository<
   AgentProfileConfig,
@@ -40,7 +48,7 @@ export class AgentProfileRepository extends BaseRepository<
         console.warn('[AgentProfileRepository] enabled_tools is not an array, falling back to all 7');
         return [...ALL_TOOL_NAMES];
       }
-      return parsed.filter((s: unknown) => typeof s === 'string');
+      return normalizeEnabledTools(parsed.filter((s: unknown): s is string => typeof s === 'string'));
     } catch (err) {
       console.warn('[AgentProfileRepository] invalid enabled_tools JSON, falling back to all 7:', err);
       return [...ALL_TOOL_NAMES];
@@ -69,7 +77,7 @@ export class AgentProfileRepository extends BaseRepository<
         data.llmProfileId,
         data.model,
         data.systemPrompt,
-        JSON.stringify(data.enabledTools),
+        JSON.stringify(normalizeEnabledTools(data.enabledTools)),
         data.thinkingLevel ?? null,
         data.isDefault ? 1 : 0,
         now,
@@ -107,7 +115,7 @@ export class AgentProfileRepository extends BaseRepository<
     }
     if (data.enabledTools !== undefined) {
       updates.push('enabled_tools = ?');
-      params.push(JSON.stringify(data.enabledTools));
+      params.push(JSON.stringify(normalizeEnabledTools(data.enabledTools)));
     }
     if (data.thinkingLevel !== undefined) {
       updates.push('thinking_level = ?');

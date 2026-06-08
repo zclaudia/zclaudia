@@ -160,6 +160,25 @@ describe('buildAgentHooks.beforeToolCall', () => {
     } as any);
     expect(permissionCallback.mock.calls[0][0].detail).toBe('ls -la /tmp');
   });
+
+  it('lets AskUserQuestion execute through its dedicated interaction tool', async () => {
+    const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'deny', message: 'Answer: use WebFetch' });
+    const hooks = buildAgentHooks({ permissionCallback });
+    const result = await hooks.beforeToolCall!({
+      toolCall: { id: 'q1', name: 'AskUserQuestion', arguments: {} },
+      args: {
+        questions: [
+          {
+            header: 'Choose the next tool',
+            question: 'Which tool should the agent use next?',
+            options: [{ label: 'WebFetch', description: 'Fetch a URL' }],
+          },
+        ],
+      },
+    } as any);
+    expect(result).toBeUndefined();
+    expect(permissionCallback).not.toHaveBeenCalled();
+  });
 });
 
 describe('buildAgentHooks.afterToolCall', () => {

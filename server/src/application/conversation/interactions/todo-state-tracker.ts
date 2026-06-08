@@ -60,7 +60,7 @@ export function trackAndAutoComplete(
     if (hasNewItems) {
       let changed = false;
       const updatedTodos = last.todos.map((t) => {
-        if (t.status !== 'completed' && !newContentSet.has(t.content)) {
+        if (t.status !== 'completed' && t.status !== 'cancelled' && !newContentSet.has(t.content)) {
           changed = true;
           return { ...t, status: 'completed' as const };
         }
@@ -93,7 +93,7 @@ export function finalizeSession(sessionId: string): TodoStateUpdate[] {
   for (const prev of previous) {
     let changed = false;
     const updatedTodos = prev.todos.map((t) => {
-      if (t.status !== 'completed') {
+      if (t.status !== 'completed' && t.status !== 'cancelled') {
         changed = true;
         return { ...t, status: 'completed' as const };
       }

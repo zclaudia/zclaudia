@@ -14,6 +14,13 @@ interface PiToolCallBlock {
   arguments: Record<string, unknown>;
 }
 
+function toolInteractionKind(toolName: string): 'todo_update' | undefined {
+  const normalized = toolName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  return normalized === 'todowrite' || normalized === 'updatetodos' || normalized === 'todolist' || normalized === 'todolistwrite'
+    ? 'todo_update'
+    : undefined;
+}
+
 function isToolCallBlock(block: unknown): block is PiToolCallBlock {
   return (
     typeof block === 'object' &&
@@ -58,12 +65,16 @@ export function translateToolEvent(
         if (!Array.isArray(content)) return undefined;
         const toolCalls = content.filter(isToolCallBlock);
         if (toolCalls.length === 0) return undefined;
-        return toolCalls.map(tc => ({
-          type: 'tool_use' as const,
-          toolUseId: tc.id,
-          toolName: tc.name,
-          toolInput: tc.arguments,
-        }));
+        return toolCalls.map(tc => {
+          const interactionKind = toolInteractionKind(tc.name);
+          return {
+            type: 'tool_use' as const,
+            toolUseId: tc.id,
+            toolName: tc.name,
+            toolInput: tc.arguments,
+            ...(interactionKind && { toolInteractionKind: interactionKind }),
+          };
+        });
       }
 
       case 'tool_execution_update': {

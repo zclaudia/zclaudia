@@ -210,7 +210,18 @@ export function isOutsideWorkspacePathAllowed(
 // Tool Categories
 // ============================================
 
-const READONLY_TOOLS = ['Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'TodoWrite'];
+const READONLY_TOOLS = [
+  'Read',
+  'Glob',
+  'Grep',
+  'WebFetch',
+  'WebSearch',
+  'TodoWrite',
+  'ToolSearch',
+  'ListMcpResources',
+  'ReadMcpResource',
+  'LSPTool',
+];
 
 const EDIT_TOOLS = ['Write', 'Edit', 'NotebookEdit'];
 

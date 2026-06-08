@@ -65,7 +65,7 @@ export interface InteractionPromptMessage extends InteractionBase {
 /** Normalized todo item for interaction layer */
 export interface NormalizedTodoItem {
   content: string;
-  status: 'pending' | 'in_progress' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
 }
 
 /** Unified todo-update interaction */

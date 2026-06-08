@@ -38,6 +38,23 @@ export interface McpToolResult {
   isError?: boolean;
 }
 
+export interface McpResourceDefinition {
+  uri: string;
+  name?: string;
+  description?: string;
+  mimeType?: string;
+}
+
+export interface McpResourceResult {
+  contents: Array<{
+    uri: string;
+    mimeType?: string;
+    text?: string;
+    blob?: string;
+    [key: string]: unknown;
+  }>;
+}
+
 // ── Command validation ─────────────────────────────────────
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -168,6 +185,16 @@ export class McpClient {
 
   async callTool(name: string, args: Record<string, unknown>): Promise<McpToolResult> {
     const result = await this.request('tools/call', { name, arguments: args }) as McpToolResult;
+    return result;
+  }
+
+  async listResources(): Promise<McpResourceDefinition[]> {
+    const result = await this.request('resources/list', {}) as { resources?: McpResourceDefinition[] };
+    return result?.resources || [];
+  }
+
+  async readResource(uri: string): Promise<McpResourceResult> {
+    const result = await this.request('resources/read', { uri }) as McpResourceResult;
     return result;
   }
 

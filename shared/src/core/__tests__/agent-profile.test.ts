@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AgentProfileConfig, ThinkingLevel } from '../agent-profile.js';
-import { ALL_TOOL_NAMES, type ToolName, isToolName } from '../tools.js';
+import { ALL_TOOL_NAMES, normalizeToolName, type ToolName, isToolName } from '../tools.js';
 
 describe('AgentProfileConfig type shape', () => {
   it('accepts minimal config', () => {
@@ -37,15 +37,50 @@ describe('AgentProfileConfig type shape', () => {
 });
 
 describe('ALL_TOOL_NAMES', () => {
-  it('contains exactly the 7 pi-coding-agent tools', () => {
-    expect([...ALL_TOOL_NAMES].sort()).toEqual(['bash', 'edit', 'find', 'grep', 'ls', 'read', 'write']);
+  it('contains the core coding tools and first-batch agent tools', () => {
+    expect([...ALL_TOOL_NAMES].sort()).toEqual([
+      'Agent',
+      'AskUserQuestion',
+      'Bash',
+      'Edit',
+      'Find',
+      'Glob',
+      'Grep',
+      'LS',
+      'LSPTool',
+      'ListMcpResources',
+      'MCPTool',
+      'Read',
+      'ReadMcpResource',
+      'TodoWrite',
+      'ToolSearch',
+      'WebFetch',
+      'WebSearch',
+      'Write',
+    ]);
   });
 });
 
 describe('isToolName guard', () => {
-  it('returns true for known tools', () => {
-    expect(isToolName('read')).toBe(true);
-    expect(isToolName('bash')).toBe(true);
+  it('returns true for canonical tools', () => {
+    expect(isToolName('Read')).toBe(true);
+    expect(isToolName('Bash')).toBe(true);
+    expect(isToolName('Glob')).toBe(true);
+    expect(isToolName('WebFetch')).toBe(true);
+    expect(isToolName('ToolSearch')).toBe(true);
+    expect(isToolName('Agent')).toBe(true);
+  });
+
+  it('normalizes legacy lowercase aliases to canonical tools', () => {
+    expect(normalizeToolName('read')).toBe('Read');
+    expect(normalizeToolName('write')).toBe('Write');
+    expect(normalizeToolName('edit')).toBe('Edit');
+    expect(normalizeToolName('bash')).toBe('Bash');
+    expect(normalizeToolName('grep')).toBe('Grep');
+    expect(normalizeToolName('find')).toBe('Find');
+    expect(normalizeToolName('ls')).toBe('LS');
+    expect(normalizeToolName('WebFetch')).toBe('WebFetch');
+    expect(normalizeToolName('nonexistent')).toBeUndefined();
   });
 
   it('returns false for unknown strings', () => {

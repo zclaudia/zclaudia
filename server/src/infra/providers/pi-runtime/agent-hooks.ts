@@ -73,6 +73,16 @@ function buildToolDetail(piToolName: string, args: unknown): string {
   if (piToolName === 'ls' && typeof argsObj.path === 'string') {
     return `ls ${argsObj.path}`;
   }
+  if (piToolName === 'AskUserQuestion' && Array.isArray(argsObj.questions)) {
+    const [firstQuestion] = argsObj.questions;
+    if (firstQuestion && typeof firstQuestion === 'object') {
+      const question = (firstQuestion as { question?: unknown }).question;
+      if (typeof question === 'string' && question.trim()) {
+        const extra = argsObj.questions.length > 1 ? ` (+${argsObj.questions.length - 1} more)` : '';
+        return question.trim() + extra;
+      }
+    }
+  }
 
   const json = JSON.stringify(args);
   return json.length > 120 ? json.slice(0, 117) + '...' : json;
@@ -162,6 +172,9 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
     beforeToolCall: async (ctx: any) => {
       const { toolCall, args } = ctx;
       const piName: string = toolCall.name;
+      if (piName === 'AskUserQuestion') {
+        return undefined;
+      }
       const decision = await input.permissionCallback({
         requestId: newId(),
         toolName: canonicalToolName(piName),

@@ -24,6 +24,33 @@ describe('translateToolEvent', () => {
     ]);
   });
 
+  it('marks TodoWrite tool_use events as todo updates for the interaction tracker', () => {
+    const out = translateToolEvent({
+      type: 'message_end',
+      message: {
+        role: 'assistant',
+        content: [
+          {
+            type: 'toolCall',
+            id: 'todo-1',
+            name: 'TodoWrite',
+            arguments: { todos: [{ content: 'Ship Phase 1', status: 'in_progress' }] },
+          },
+        ],
+      },
+    } as any, ctx);
+
+    expect(out).toEqual([
+      {
+        type: 'tool_use',
+        toolUseId: 'todo-1',
+        toolName: 'TodoWrite',
+        toolInput: { todos: [{ content: 'Ship Phase 1', status: 'in_progress' }] },
+        toolInteractionKind: 'todo_update',
+      },
+    ]);
+  });
+
   it('returns undefined for message_end with text only (no toolCalls)', () => {
     const out = translateToolEvent({
       type: 'message_end',

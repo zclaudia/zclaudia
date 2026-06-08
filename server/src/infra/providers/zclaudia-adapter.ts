@@ -5,12 +5,12 @@ import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
 import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory, buildModel, type BuiltModel } from './pi-runtime/index.js';
 import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
-import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
+import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
 
 const PLAN_MODE_SYSTEM_PROMPT_SUFFIX =
   '\n\nYou are in PLAN mode. Produce a concrete plan for the user to review and approve. ' +
-  'Do not modify files or execute side-effecting commands; only read-only tools (read, grep, find, ls) are available. ' +
+  'Do not modify files or execute side-effecting commands; only read-only or clarification tools are available. ' +
   'Once the plan is ready, end your turn and wait for the user to confirm before executing anything.';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
@@ -282,7 +282,11 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     //    enabledTools to only the read-only subset (read/grep/find/ls).
     //    Non-plan modes pass through whatever the agent profile requested.
     const isPlanMode = options.mode === 'plan';
-    const requestedTools: ToolName[] = options.enabledTools ?? [...ALL_TOOL_NAMES];
+    const requestedTools: ToolName[] = (options.enabledTools ?? [...ALL_TOOL_NAMES])
+      .flatMap((tool) => {
+        const normalized = normalizeToolName(tool);
+        return normalized ? [normalized] : [];
+      });
     const effectiveTools: ToolName[] = isPlanMode
       ? requestedTools.filter((t) => READ_ONLY_TOOL_NAMES.includes(t))
       : requestedTools;
@@ -318,7 +322,13 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     }
 
     // 6. Construct Agent — wire tools + hooks from pi-runtime
-    const tools = buildTools(options.cwd, { enabled: effectiveTools });
+    const tools = buildTools(options.cwd, {
+      enabled: effectiveTools,
+      serverPort: options.serverPort,
+      sessionId: options.claudiaSessionId,
+      db: options.db,
+      permissionCallback: onPermission,
+    });
     const hooks = buildAgentHooks({
       permissionCallback: onPermission ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
     });

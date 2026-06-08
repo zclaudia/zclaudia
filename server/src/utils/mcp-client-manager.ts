@@ -5,7 +5,13 @@
  * Idle connections are automatically closed after 60 seconds.
  */
 
-import { McpClient, type McpToolDefinition, type McpToolResult } from './mcp-client.js';
+import {
+  McpClient,
+  type McpResourceDefinition,
+  type McpResourceResult,
+  type McpToolDefinition,
+  type McpToolResult,
+} from './mcp-client.js';
 
 interface CachedClient {
   client: McpClient;
@@ -106,6 +112,23 @@ export class McpClientManager {
   ): Promise<McpToolDefinition[]> {
     const client = await this.getClient(serverName, config);
     return client.listTools();
+  }
+
+  async listResources(
+    serverName: string,
+    config: { command: string; args?: string[]; env?: Record<string, string> },
+  ): Promise<McpResourceDefinition[]> {
+    const client = await this.getClient(serverName, config);
+    return client.listResources();
+  }
+
+  async readResource(
+    serverName: string,
+    config: { command: string; args?: string[]; env?: Record<string, string> },
+    uri: string,
+  ): Promise<McpResourceResult> {
+    const client = await this.getClient(serverName, config);
+    return client.readResource(uri);
   }
 
   /**

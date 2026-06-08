@@ -116,7 +116,18 @@ function makeMockDb(rows: Record<string, unknown> = {}) {
 
 describe('classify', () => {
   it('should classify fileRead tools', () => {
-    for (const tool of ['Read', 'Glob', 'Grep', 'WebFetch', 'WebSearch', 'TodoWrite']) {
+    for (const tool of [
+      'Read',
+      'Glob',
+      'Grep',
+      'WebFetch',
+      'WebSearch',
+      'TodoWrite',
+      'ToolSearch',
+      'ListMcpResources',
+      'ReadMcpResource',
+      'LSPTool',
+    ]) {
       expect(classify(tool, {}, '')).toBe('fileRead' as PermissionCategory);
     }
   });
