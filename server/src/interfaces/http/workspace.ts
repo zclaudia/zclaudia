@@ -10,7 +10,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { workspaceService } from '../../application/services/workspace.js';
-import { refreshSkillCache, getExternalSkillDirs, saveExternalSkillDirs } from '../../application/plugins/skill-tools.js';
+import { refreshSkillCache, getDiscoveredSkills, getExternalSkillDirs, saveExternalSkillDirs } from '../../application/plugins/skill-tools.js';
 import { pluginSkillReloader } from '../../application/plugins/skill-bootstrap.js';
 import { pluginLoader } from '../../application/plugins/loader.js';
 import { createExecutionEnv } from '../../infra/execution-env.js';
@@ -86,7 +86,13 @@ router.put('/config', async (req: Request, res: Response) => {
  */
 router.get('/skills', async (req: Request, res: Response) => {
   try {
-    const skills = await workspaceService.listSkills();
+    const skills = getDiscoveredSkills().map((skill) => ({
+      id: skill.id,
+      name: skill.name,
+      description: skill.description,
+      path: skill.filePath,
+      source: skill.source,
+    }));
     res.json({
       success: true,
       data: skills,

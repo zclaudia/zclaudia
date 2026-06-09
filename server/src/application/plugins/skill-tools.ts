@@ -11,11 +11,13 @@
  */
 
 import * as path from 'node:path';
+import { readFileSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import type Database from 'better-sqlite3';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { workspaceService } from '../services/workspace.js';
 import type { ExecutionEnv } from '../../infra/execution-env.js';
-import { loadAllSkills, type SkillSource, type SourcedSkill } from './skill-loader.js';
+import { loadAllSkills, type SkillExecutionMetadata, type SkillSource, type SourcedSkill } from './skill-loader.js';
 import { meetsRequirements } from './skill-requirements.js';
 
 /**
@@ -29,6 +31,12 @@ export interface DiscoveredSkill {
   source: SkillSource;
   filePath: string;
   dirPath: string;
+  execution?: SkillExecutionMetadata;
+}
+
+export interface SkillRef {
+  source: SkillSource;
+  id: string;
 }
 
 /**
@@ -62,11 +70,43 @@ function toDiscoveredSkill(s: SourcedSkill): DiscoveredSkill {
     source: s.source,
     filePath: s.skill.filePath,
     dirPath: path.dirname(s.skill.filePath),
+    ...(s.execution ? { execution: s.execution } : {}),
   };
 }
 
 export function getDiscoveredSkills(): DiscoveredSkill[] {
   return cached.map(toDiscoveredSkill);
+}
+
+export function getEligibleDiscoveredSkills(): DiscoveredSkill[] {
+  return cached
+    .filter((s) => meetsRequirements(s.requirements))
+    .map(toDiscoveredSkill);
+}
+
+function findCachedSkill(ref: SkillRef): SourcedSkill | undefined {
+  if (path.basename(ref.id) !== ref.id || ref.id.includes('..')) return undefined;
+  return cached.find((s) => s.source === ref.source && skillId(s) === ref.id);
+}
+
+export async function loadDiscoveredSkillContent(ref: SkillRef): Promise<string | null> {
+  const skill = findCachedSkill(ref);
+  if (!skill || !meetsRequirements(skill.requirements)) return null;
+  try {
+    return await readFile(skill.skill.filePath, 'utf-8');
+  } catch {
+    return null;
+  }
+}
+
+export function loadDiscoveredSkillContentSync(ref: SkillRef): string | null {
+  const skill = findCachedSkill(ref);
+  if (!skill || !meetsRequirements(skill.requirements)) return null;
+  try {
+    return readFileSync(skill.skill.filePath, 'utf-8');
+  } catch {
+    return null;
+  }
 }
 
 export function getExternalSkillDirs(): string[] {

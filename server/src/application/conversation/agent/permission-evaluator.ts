@@ -6,6 +6,7 @@ import type {
   EvaluationContext,
   UnifiedPermissionPolicy,
 } from '@zclaudia/shared/interaction/permissions';
+import type { McpRiskAction, McpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
 import {
   DEFAULT_SENSITIVE_PATTERNS,
 } from '@zclaudia/shared/interaction/permissions';
@@ -320,6 +321,7 @@ export function classify(toolName: string, toolInput: unknown, detail: string): 
   if (isBlockingInteractionTool(toolName)) return 'userQuestions';
   if (READONLY_TOOLS.includes(toolName)) return 'fileRead';
   if (EDIT_TOOLS.includes(toolName)) return 'fileWrite';
+  if (toolName.startsWith('mcp__')) return 'networkOps';
 
   if (isBashLikeTool(toolName)) {
     if (isDangerousCommand(toolInput, detail)) return 'destructiveOps';
@@ -338,6 +340,33 @@ function actionToResult(action: CategoryAction): EvaluationResult {
     case 'ask': return 'escalate';
     case 'block': return 'deny';
   }
+}
+
+function mcpRiskActionToResult(action: McpRiskAction): EvaluationResult {
+  switch (action) {
+    case 'auto-approve': return 'approve';
+    case 'ask': return 'escalate';
+    case 'deny': return 'deny';
+  }
+}
+
+export function evaluateMcpToolTrustPolicy(
+  risk: { riskLevel?: 'low' | 'medium' | 'high'; declaredReadOnly?: boolean },
+  policy?: McpServerTrustPolicy,
+): EvaluationResult {
+  const riskLevel = risk.riskLevel ?? 'high';
+  const action = policy?.riskActions?.[riskLevel];
+  if (action) return mcpRiskActionToResult(action);
+
+  if (
+    risk.declaredReadOnly === true
+    && policy?.trustReadOnlyHint === true
+    && (policy.trustLevel === 'trusted-readonly' || policy.trustLevel === 'trusted')
+  ) {
+    return 'approve';
+  }
+
+  return mcpRiskActionToResult(policy?.defaultRiskAction ?? 'ask');
 }
 
 // ============================================

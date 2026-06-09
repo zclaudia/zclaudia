@@ -82,6 +82,37 @@ describe('rebuildHistory', () => {
     expect((out[0] as any).role).toBe('user');
   });
 
+  it('injects MCP instructions delta system rows as provider-visible reminders', () => {
+    const db = createTestDb();
+    insertMsg(db, {
+      id: 's1',
+      sessionId: 's',
+      role: 'system',
+      content: 'MCP server instructions updated',
+      metadata: {
+        type: 'mcp_instructions_delta',
+        delta: {
+          addedNames: ['github'],
+          addedBlocks: ['## github\nUse GitHub safely.'],
+          removedNames: [],
+          createdAt: 100,
+        },
+      },
+      createdAt: 100,
+      offset: 1,
+    });
+    insertMsg(db, { id: 'u1', sessionId: 's', role: 'user', content: 'hi', createdAt: 200, offset: 2 });
+    insertMsg(db, { id: 'a1', sessionId: 's', role: 'assistant', content: 'hello', createdAt: 300, offset: 3 });
+
+    const { messages: out } = rebuildHistory(db, 's');
+
+    expect(out[0]).toEqual(expect.objectContaining({
+      role: 'user',
+      content: expect.stringContaining('MCP server instructions updated'),
+    }));
+    expect((out[0] as any).content).toContain('## github\nUse GitHub safely.');
+  });
+
   it('reconstructs assistant content with toolCalls + emits matching toolResult messages', () => {
     const db = createTestDb();
     insertMsg(db, { id: 'u1', sessionId: 's', role: 'user', content: 'read file', createdAt: 100, offset: 1 });

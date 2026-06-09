@@ -4,6 +4,7 @@ const buildRunContextMock = vi.fn();
 const negotiateProfileMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
 const pluginEventsEmitMock = vi.fn(async () => {});
+const mcpListStatusesMock = vi.fn();
 
 vi.mock('../run-context.js', () => ({
   buildRunContext: buildRunContextMock,
@@ -20,6 +21,12 @@ vi.mock('../run-lifecycle.js', () => ({
 vi.mock('../../../../infra/events/index.js', () => ({
   pluginEvents: {
     emit: pluginEventsEmitMock,
+  },
+}));
+
+vi.mock('../../../../utils/mcp-client-manager.js', () => ({
+  mcpClientManager: {
+    listStatuses: mcpListStatusesMock,
   },
 }));
 
@@ -46,6 +53,7 @@ describe('ws/run-provider-launch', () => {
       llmProfileId: 'pcp-claude',
       capabilities: [{ id: 'edit', enabled: true, mode: 'native', reliability: 'high' }],
     });
+    mcpListStatusesMock.mockReturnValue([]);
   });
 
   it('emits run_started, background status, negotiates profile, and starts periodic save', async () => {
@@ -185,5 +193,86 @@ describe('ws/run-provider-launch', () => {
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun);
 
     clearInterval(activeRun.saveInterval);
+  });
+
+  it('persists MCP instructions delta before provider history is built', async () => {
+    mcpListStatusesMock.mockReturnValue([
+      {
+        name: 'github',
+        state: 'connected',
+        hasInstructions: true,
+        instructions: 'Use GitHub safely.',
+      },
+    ]);
+    const inserted: unknown[][] = [];
+    const db = {
+      prepare: vi.fn((sql: string) => {
+        if (sql.includes('SELECT metadata FROM messages')) {
+          return { all: vi.fn(() => []) };
+        }
+        if (sql.includes('SELECT COALESCE(MAX(offset)')) {
+          return { get: vi.fn(() => ({ nextOffset: 3 })) };
+        }
+        if (sql.includes('INSERT INTO messages')) {
+          return { run: vi.fn((...args: unknown[]) => inserted.push(args)) };
+        }
+        return { run: vi.fn(), get: vi.fn(), all: vi.fn(() => []) };
+      }),
+    };
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+
+    await launchProviderRun({
+      activeRun: { assistantMessageId: 'assistant-1', pendingSteers: [] } as any,
+      adapter,
+      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: db as any,
+      enabledTools: [],
+      forcedPlanBySession: false,
+      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: 'hello' },
+      modeValue: 'default',
+      permissionCallback: vi.fn(),
+      processedInput: 'hello',
+      providerConfig: { id: 'provider-1', providerType: 'zclaudia' } as any,
+      llmProfileId: 'provider-1',
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: vi.fn(),
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+        llm_profile_id: 'provider-1',
+        system_prompt: null,
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+    });
+
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0][2]).toContain('MCP server instructions updated');
+    expect(JSON.parse(inserted[0][3] as string)).toEqual({
+      type: 'mcp_instructions_delta',
+      delta: expect.objectContaining({
+        addedNames: ['github'],
+        addedBlocks: ['## github\nUse GitHub safely.'],
+        removedNames: [],
+      }),
+    });
+    expect(adapter.run).toHaveBeenCalled();
   });
 });

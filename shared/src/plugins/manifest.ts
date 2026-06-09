@@ -150,6 +150,17 @@ export function validatePluginManifest(manifest: unknown): PluginValidationResul
         }
       }
     }
+
+    if (contributes.agentProfiles && Array.isArray(contributes.agentProfiles)) {
+      for (const profile of contributes.agentProfiles) {
+        if (!profile.id || typeof profile.id !== 'string') {
+          errors.push('AgentProfile contribution missing "id" field');
+        }
+        if (!profile.name || typeof profile.name !== 'string') {
+          errors.push('AgentProfile contribution missing "name" field');
+        }
+      }
+    }
   }
 
   return { valid: errors.length === 0, errors, warnings };

@@ -58,6 +58,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         systemPrompt,
         enabledTools,
         toolSelection,
+        skillSelection,
+        skillExecution,
         thinkingLevel,
         isDefault,
       } = req.body ?? {};
@@ -124,6 +126,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : '',
         enabledTools: Array.isArray(enabledTools) ? enabledTools : [],
         toolSelection,
+        skillSelection,
+        skillExecution,
         thinkingLevel: thinkingLevel ?? undefined,
         isDefault: Boolean(isDefault),
       });
@@ -193,6 +197,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       if (Object.prototype.hasOwnProperty.call(body, 'systemPrompt')) patch.systemPrompt = body.systemPrompt;
       if (Object.prototype.hasOwnProperty.call(body, 'enabledTools')) patch.enabledTools = body.enabledTools;
       if (Object.prototype.hasOwnProperty.call(body, 'toolSelection')) patch.toolSelection = body.toolSelection;
+      if (Object.prototype.hasOwnProperty.call(body, 'skillSelection')) patch.skillSelection = body.skillSelection;
+      if (Object.prototype.hasOwnProperty.call(body, 'skillExecution')) patch.skillExecution = body.skillExecution;
       if (Object.prototype.hasOwnProperty.call(body, 'thinkingLevel')) patch.thinkingLevel = body.thinkingLevel ?? undefined;
       if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
 

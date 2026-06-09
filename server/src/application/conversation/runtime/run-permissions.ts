@@ -12,6 +12,7 @@ import type { AskUserQuestionItem } from '@zclaudia/shared/interaction/forms';
 import {
   buildRememberKey,
   classify,
+  evaluateMcpToolTrustPolicy,
   extractBashCommand,
   getAgentPermissionPolicy,
   getMatchedPermissionRule,
@@ -24,6 +25,15 @@ import {
   PermissionEvaluator,
   resolveRememberedDecision,
 } from '../agent/permission-evaluator.js';
+import {
+  normalizeMcpHeaders,
+  normalizeMcpOAuthConfig,
+  normalizeMcpOAuthCredentials,
+  normalizeMcpServerTransport,
+  normalizeMcpServerTrustPolicy,
+  type McpServerTrustPolicy,
+} from '@zclaudia/shared/core/mcp';
+import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
 import { isBashLikeTool, isSudoCommand } from '../../../utils/server-utils.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import { recomputePhase, computeBlockers } from './active-run-phase.js';
@@ -48,6 +58,124 @@ interface SessionContext {
 interface MessageContext {
   sessionId: string;
   permissionOverride?: Partial<UnifiedPermissionPolicy>;
+}
+
+interface McpTrustDecision {
+  server: string;
+  tool: string;
+  riskLevel: 'low' | 'medium' | 'high';
+  declaredReadOnly: boolean;
+  trustLevel: McpServerTrustPolicy['trustLevel'];
+  policyDecision: 'approve' | 'deny' | 'escalate';
+  reason: string;
+}
+
+function parseConcreteMcpToolName(toolName: string): { server: string; tool: string } | null {
+  if (!toolName.startsWith('mcp__')) return null;
+  const rest = toolName.slice('mcp__'.length);
+  const separator = rest.indexOf('__');
+  if (separator <= 0) return null;
+  const server = rest.slice(0, separator);
+  const tool = rest.slice(separator + 2);
+  return server && tool ? { server, tool } : null;
+}
+
+function parseJsonObject(raw: string | null | undefined): Record<string, unknown> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function inferMcpPermissionRisk(tool: unknown): {
+  riskLevel: 'low' | 'medium' | 'high';
+  declaredReadOnly: boolean;
+} {
+  const annotations = tool && typeof tool === 'object' && 'annotations' in tool
+    ? ((tool as { annotations?: Record<string, unknown> }).annotations ?? {})
+    : {};
+  const declaredReadOnly = annotations.readOnlyHint === true || annotations.readOnly === true;
+  const destructive = annotations.destructiveHint === true;
+  const openWorld = annotations.openWorldHint !== false;
+  return {
+    declaredReadOnly,
+    riskLevel: destructive || openWorld ? 'high' : declaredReadOnly ? 'medium' : 'high',
+  };
+}
+
+function resolveMcpTrustDecision(
+  db: ActiveRun['db'],
+  toolName: string,
+): McpTrustDecision | null {
+  const ref = parseConcreteMcpToolName(toolName);
+  if (!ref) return null;
+
+  try {
+    const row = db.prepare(`
+      SELECT name, command, args, env, enabled, trust_policy,
+             transport, url, headers, oauth_config, oauth_credentials
+      FROM mcp_servers WHERE name = ?
+    `).get(ref.server) as
+      | {
+          name: string;
+          command: string;
+          args?: string | null;
+          env?: string | null;
+          enabled?: number;
+          trust_policy?: string | null;
+          transport?: string | null;
+          url?: string | null;
+          headers?: string | null;
+          oauth_config?: string | null;
+          oauth_credentials?: string | null;
+        }
+      | undefined;
+
+    if (!row || row.enabled === 0) return null;
+    const trustPolicy = normalizeMcpServerTrustPolicy(parseJsonObject(row.trust_policy));
+    if (!trustPolicy) return null;
+
+    const transport = normalizeMcpServerTransport(row.transport);
+    const config = transport === 'streamable-http' || transport === 'sse'
+      ? {
+        transport,
+        command: row.command,
+        url: row.url || '',
+        ...(row.headers ? { headers: normalizeMcpHeaders(JSON.parse(row.headers)) } : {}),
+        ...(row.oauth_config ? { oauthConfig: normalizeMcpOAuthConfig(JSON.parse(row.oauth_config)) } : {}),
+        ...(row.oauth_credentials ? { oauthCredentials: normalizeMcpOAuthCredentials(JSON.parse(row.oauth_credentials)) } : {}),
+      }
+      : {
+        transport: 'stdio' as const,
+        command: row.command,
+        ...(row.args ? { args: JSON.parse(row.args) as string[] } : {}),
+        ...(row.env ? { env: JSON.parse(row.env) as Record<string, string> } : {}),
+      };
+    const cached = mcpInventoryCache.getCached(ref.server, mcpInventoryCache.configHash(config));
+    const tool = cached?.tools.find((item) => item.name === ref.tool);
+    if (!tool) return null;
+
+    const risk = inferMcpPermissionRisk(tool);
+    const policyDecision = evaluateMcpToolTrustPolicy(risk, trustPolicy);
+    if (policyDecision === 'escalate') return null;
+    return {
+      server: ref.server,
+      tool: ref.tool,
+      riskLevel: risk.riskLevel,
+      declaredReadOnly: risk.declaredReadOnly,
+      trustLevel: trustPolicy.trustLevel,
+      policyDecision,
+      reason: policyDecision === 'approve'
+        ? 'Auto-approved by MCP trust policy'
+        : 'Denied by MCP trust policy',
+    };
+  } catch (error) {
+    console.warn('[Permission] Failed to evaluate MCP trust policy', { toolName, error });
+    return null;
+  }
 }
 
 export interface CreatePermissionCallbackInput {
@@ -176,6 +304,38 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
         } as AgentPermissionInterceptedMessage);
         writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'allow', true);
         resolve({ behavior: 'allow', updatedInput: request.toolInput });
+        return;
+      }
+
+      const mcpTrustDecision = !isProviderNativeQuestion
+        ? resolveMcpTrustDecision(db, request.toolName)
+        : null;
+      if (mcpTrustDecision?.policyDecision === 'approve') {
+        broadcastRunMessage(activeRun, {
+          type: 'agent_permission_intercepted',
+          toolName: request.toolName,
+          decision: 'approve',
+          reason: mcpTrustDecision.reason,
+          sessionId: message.sessionId,
+          runId,
+          mcpTrust: mcpTrustDecision,
+        } as AgentPermissionInterceptedMessage);
+        writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'allow', false, mcpTrustDecision);
+        resolve({ behavior: 'allow', updatedInput: request.toolInput });
+        return;
+      }
+      if (mcpTrustDecision?.policyDecision === 'deny') {
+        broadcastRunMessage(activeRun, {
+          type: 'agent_permission_intercepted',
+          toolName: request.toolName,
+          decision: 'deny',
+          reason: mcpTrustDecision.reason,
+          sessionId: message.sessionId,
+          runId,
+          mcpTrust: mcpTrustDecision,
+        } as AgentPermissionInterceptedMessage);
+        writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'deny', false, mcpTrustDecision);
+        resolve({ behavior: 'deny', message: mcpTrustDecision.reason });
         return;
       }
 

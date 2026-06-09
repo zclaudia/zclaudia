@@ -1,6 +1,10 @@
 import type Database from 'better-sqlite3';
 import type { Message, Usage } from '@earendil-works/pi-ai';
 import { SessionCompactionRepository } from '../../../domains/sessions/compaction-repository.js';
+import {
+  MCP_INSTRUCTIONS_DELTA_METADATA_TYPE,
+  type McpInstructionsDelta,
+} from '@zclaudia/shared/core/mcp';
 
 export const HISTORY_LIMIT = 50;
 
@@ -31,6 +35,8 @@ interface ParsedThinkingBlock {
 }
 
 interface ParsedMetadata {
+  type?: string;
+  delta?: McpInstructionsDelta;
   toolCalls?: ParsedToolCall[];
   thinkingBlocks?: ParsedThinkingBlock[];
   usage?: Usage;
@@ -63,6 +69,18 @@ function serializeToolOutput(output: unknown): Array<{ type: 'text'; text: strin
   if (output == null) return [{ type: 'text', text: '' }];
   if (typeof output === 'string') return [{ type: 'text', text: output }];
   return [{ type: 'text', text: JSON.stringify(output) }];
+}
+
+function renderMcpInstructionsDelta(delta: McpInstructionsDelta): string {
+  const sections: string[] = ['<system-reminder>MCP server instructions updated.'];
+  if (delta.addedBlocks.length > 0) {
+    sections.push(`Added MCP server instructions:\n${delta.addedBlocks.join('\n\n')}`);
+  }
+  if (delta.removedNames.length > 0) {
+    sections.push(`Removed MCP server instructions: ${delta.removedNames.join(', ')}`);
+  }
+  sections.push('</system-reminder>');
+  return sections.join('\n\n');
 }
 
 /**
@@ -142,7 +160,18 @@ export function rebuildHistory(
   }
 
   for (const row of chronological) {
-    if (row.role === 'system') continue;
+    if (row.role === 'system') {
+      const meta = parseMetadata(row.metadata);
+      if (meta?.type === MCP_INSTRUCTIONS_DELTA_METADATA_TYPE && meta.delta) {
+        messages.push({
+          role: 'user',
+          content: renderMcpInstructionsDelta(meta.delta),
+          timestamp: row.createdAt,
+        });
+        dbIds.push(row.id);
+      }
+      continue;
+    }
 
     if (row.role === 'user') {
       messages.push({

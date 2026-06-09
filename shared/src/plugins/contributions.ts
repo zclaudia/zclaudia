@@ -1,4 +1,7 @@
 import type { Permission } from './permissions.js';
+import type { ThinkingLevel } from '../core/agent-profile.js';
+import type { SkillExecutionSelection, SkillSelection } from '../core/skills.js';
+import type { ToolSelection } from '../core/tools.js';
 
 export interface CommandContribution {
   command: string; // e.g., '/my-command'
@@ -110,6 +113,24 @@ export interface SkillContribution {
   path: string;
 }
 
+export interface AgentProfileContribution {
+  /** Stable ID within the plugin; combined with plugin ID for ownership/upsert. */
+  id: string;
+  name: string;
+  description?: string;
+  systemPrompt?: string;
+  model?: string;
+  toolSelection?: ToolSelection;
+  skillSelection?: SkillSelection;
+  skillExecution?: SkillExecutionSelection;
+  thinkingLevel?: ThinkingLevel;
+  /**
+   * Agent profile plugins do not ship an LLM provider. The host resolves this
+   * against local LLM profiles at install time.
+   */
+  llmProfileStrategy?: 'default' | 'first-available';
+}
+
 export interface PluginContributes {
   commands?: CommandContribution[];
   tools?: ToolContribution[];
@@ -122,6 +143,7 @@ export interface PluginContributes {
   workflowSteps?: WorkflowStepContribution[];
   triggerSources?: TriggerSourceContribution[];
   skills?: SkillContribution[];
+  agentProfiles?: AgentProfileContribution[];
   notchTabs?: NotchTabContribution[];
 }
 

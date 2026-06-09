@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import matter from 'gray-matter';
 import { loadSourcedSkills, type Skill } from '@earendil-works/pi-agent-core';
+import type { SkillExecutionMode, SkillForkToolPolicy } from '@zclaudia/shared/core/skills';
 import type { ExecutionEnv } from '../../infra/execution-env.js';
 import type { SkillRequirements } from './skill-requirements.js';
 
@@ -13,6 +14,14 @@ export interface SourcedSkill {
   source: SkillSource;
   /** Parsed from SKILL.md frontmatter `requires:` block. Pi does not surface these. */
   requirements?: SkillRequirements;
+  /** Parsed from SKILL.md frontmatter execution policy fields. */
+  execution?: SkillExecutionMetadata;
+}
+
+export interface SkillExecutionMetadata {
+  allowedModes?: SkillExecutionMode[];
+  defaultMode?: SkillExecutionMode;
+  forkToolPolicy?: SkillForkToolPolicy;
 }
 
 export interface SkillLoadDiagnostic {
@@ -60,6 +69,49 @@ function extractRequirements(filePath: string): SkillRequirements | undefined {
   }
 }
 
+function normalizeExecutionMode(value: unknown): SkillExecutionMode | undefined {
+  return value === 'inline' || value === 'fork' ? value : undefined;
+}
+
+function normalizeForkToolPolicy(value: unknown): SkillForkToolPolicy | undefined {
+  return value === 'read-only' || value === 'web' || value === 'workspace-edit' || value === 'agent-default'
+    ? value
+    : undefined;
+}
+
+function parseModes(value: unknown): SkillExecutionMode[] | undefined {
+  const raw = typeof value === 'string' ? [value] : Array.isArray(value) ? value : [];
+  const modes = [...new Set(raw.flatMap((mode) => {
+    const normalized = normalizeExecutionMode(mode);
+    return normalized ? [normalized] : [];
+  }))];
+  return modes.length > 0 ? modes : undefined;
+}
+
+function extractExecutionMetadata(filePath: string): SkillExecutionMetadata | undefined {
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const parsed = matter(raw);
+    const data = (parsed.data ?? {}) as Record<string, unknown>;
+    const nested = data.execution && typeof data.execution === 'object'
+      ? data.execution as Record<string, unknown>
+      : {};
+    const allowedModes = parseModes(nested.allowed_modes ?? nested.allowedModes ?? data.allowed_modes ?? data.allowedModes);
+    const defaultMode = normalizeExecutionMode(nested.default_mode ?? nested.defaultMode ?? data.default_mode ?? data.defaultMode);
+    const forkToolPolicy = normalizeForkToolPolicy(
+      nested.fork_tool_policy ?? nested.forkToolPolicy ?? data.fork_tool_policy ?? data.forkToolPolicy,
+    );
+    const out: SkillExecutionMetadata = {};
+    if (allowedModes) out.allowedModes = allowedModes;
+    if (defaultMode) out.defaultMode = defaultMode;
+    if (forkToolPolicy) out.forkToolPolicy = forkToolPolicy;
+    return Object.keys(out).length > 0 ? out : undefined;
+  } catch (err) {
+    console.warn(`[skill-loader] Failed to parse execution metadata for ${filePath}:`, err);
+    return undefined;
+  }
+}
+
 /**
  * Discover skills across source-tagged directories via pi `loadSourcedSkills`,
  * then enrich each skill with `requirements` parsed from its frontmatter
@@ -77,6 +129,7 @@ export async function loadAllSkills(
       skill,
       source,
       requirements: extractRequirements(skill.filePath),
+      execution: extractExecutionMetadata(skill.filePath),
     })),
     diagnostics: result.diagnostics.map((d) => ({
       type: d.type, code: d.code, message: d.message, path: d.path, source: d.source,

@@ -2,6 +2,12 @@ import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import {
+  normalizeSkillExecutionSelection,
+  normalizeSkillSelection,
+  type SkillExecutionSelection,
+  type SkillSelection,
+} from '@zclaudia/shared/core/skills';
+import {
   ALL_TOOL_NAMES,
   BUILTIN_TOOL_SETS,
   builtinToolRef,
@@ -9,6 +15,7 @@ import {
   normalizeToolName,
   resolveToolSelection,
   type BuiltinToolSetId,
+  type ExternalToolProviderRef,
   type ToolRef,
   type ToolSelection,
   type ToolSetRef,
@@ -52,6 +59,24 @@ function normalizeToolRef(ref: unknown): ToolRef | undefined {
   return undefined;
 }
 
+function normalizeExternalToolProviderRef(ref: unknown): ExternalToolProviderRef | undefined {
+  if (!ref || typeof ref !== 'object' || !('source' in ref)) return undefined;
+  const candidate = ref as Record<string, unknown>;
+  if (candidate.source === 'mcp' && typeof candidate.serverId === 'string' && candidate.serverId.trim()) {
+    return { source: 'mcp', serverId: candidate.serverId.trim() };
+  }
+  if (candidate.source === 'plugin' && typeof candidate.pluginId === 'string' && candidate.pluginId.trim()) {
+    return {
+      source: 'plugin',
+      pluginId: candidate.pluginId.trim(),
+      ...(typeof candidate.providerId === 'string' && candidate.providerId.trim()
+        ? { providerId: candidate.providerId.trim() }
+        : {}),
+    };
+  }
+  return undefined;
+}
+
 function normalizeToolSelection(value: unknown): ToolSelection | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const candidate = value as Record<string, unknown>;
@@ -69,6 +94,12 @@ function normalizeToolSelection(value: unknown): ToolSelection | undefined {
       return [];
     })
     : [];
+  const providers = Array.isArray(candidate.providers)
+    ? candidate.providers.flatMap((ref) => {
+      const normalized = normalizeExternalToolProviderRef(ref);
+      return normalized ? [normalized] : [];
+    })
+    : [];
   const include = Array.isArray(candidate.include)
     ? candidate.include.flatMap((ref) => {
       const normalized = normalizeToolRef(ref);
@@ -81,11 +112,19 @@ function normalizeToolSelection(value: unknown): ToolSelection | undefined {
       return normalized ? [normalized] : [];
     })
     : [];
-  return { sets, include, exclude };
+  return { sets, providers, include, exclude };
 }
 
 function stringifySelection(selection: ToolSelection): string {
   return JSON.stringify(selection);
+}
+
+function stringifySkillSelection(selection: SkillSelection): string {
+  return JSON.stringify(normalizeSkillSelection(selection) ?? { providers: [], include: [], exclude: [], pinned: [] });
+}
+
+function stringifySkillExecution(selection: SkillExecutionSelection): string {
+  return JSON.stringify(normalizeSkillExecutionSelection(selection) ?? { overrides: [] });
 }
 
 export class AgentProfileRepository extends BaseRepository<
@@ -111,8 +150,13 @@ export class AgentProfileRepository extends BaseRepository<
       enabledTools: resolved.builtinTools,
       toolSelection,
       resolvedTools: resolved.refs,
+      skillSelection: this.parseSkillSelection(row.skill_selection),
+      skillExecution: this.parseSkillExecution(row.skill_execution),
       thinkingLevel: this.parseThinkingLevel(row.thinking_level),
       isDefault: row.is_default === 1,
+      source: row.source === 'plugin' ? 'plugin' : 'user',
+      pluginId: row.plugin_id ?? undefined,
+      pluginProfileId: row.plugin_profile_id ?? undefined,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -145,6 +189,26 @@ export class AgentProfileRepository extends BaseRepository<
     return legacyEnabledToolsToSelection(this.parseEnabledTools(fallbackEnabledTools));
   }
 
+  private parseSkillSelection(raw: string | null | undefined): SkillSelection | undefined {
+    if (!raw) return undefined;
+    try {
+      return normalizeSkillSelection(JSON.parse(raw));
+    } catch (err) {
+      console.warn('[AgentProfileRepository] invalid skill_selection JSON, falling back to undefined:', err);
+      return undefined;
+    }
+  }
+
+  private parseSkillExecution(raw: string | null | undefined): SkillExecutionSelection | undefined {
+    if (!raw) return undefined;
+    try {
+      return normalizeSkillExecutionSelection(JSON.parse(raw));
+    } catch (err) {
+      console.warn('[AgentProfileRepository] invalid skill_execution JSON, falling back to undefined:', err);
+      return undefined;
+    }
+  }
+
   private parseThinkingLevel(raw: string | null): ThinkingLevel | undefined {
     if (!raw) return undefined;
     if (VALID_THINKING_LEVELS.has(raw as ThinkingLevel)) return raw as ThinkingLevel;
@@ -159,8 +223,8 @@ export class AgentProfileRepository extends BaseRepository<
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
     return {
       sql: `
-        INSERT INTO agent_profiles (id, name, description, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, thinking_level, is_default, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_profiles (id, name, description, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -171,8 +235,13 @@ export class AgentProfileRepository extends BaseRepository<
         data.systemPrompt,
         JSON.stringify(enabledTools),
         stringifySelection(toolSelection),
+        data.skillSelection ? stringifySkillSelection(data.skillSelection) : null,
+        data.skillExecution ? stringifySkillExecution(data.skillExecution) : null,
         data.thinkingLevel ?? null,
         data.isDefault ? 1 : 0,
+        data.source ?? 'user',
+        data.pluginId ?? null,
+        data.pluginProfileId ?? null,
         now,
         now,
       ],
@@ -219,6 +288,14 @@ export class AgentProfileRepository extends BaseRepository<
       updates.push('enabled_tools = ?');
       params.push(JSON.stringify(resolveToolSelection(toolSelection).builtinTools));
     }
+    if (data.skillSelection !== undefined) {
+      updates.push('skill_selection = ?');
+      params.push(data.skillSelection ? stringifySkillSelection(data.skillSelection) : null);
+    }
+    if (data.skillExecution !== undefined) {
+      updates.push('skill_execution = ?');
+      params.push(data.skillExecution ? stringifySkillExecution(data.skillExecution) : null);
+    }
     if (data.thinkingLevel !== undefined) {
       updates.push('thinking_level = ?');
       params.push(data.thinkingLevel || null);
@@ -226,6 +303,18 @@ export class AgentProfileRepository extends BaseRepository<
     if (data.isDefault !== undefined) {
       updates.push('is_default = ?');
       params.push(data.isDefault ? 1 : 0);
+    }
+    if (data.source !== undefined) {
+      updates.push('source = ?');
+      params.push(data.source ?? 'user');
+    }
+    if (data.pluginId !== undefined) {
+      updates.push('plugin_id = ?');
+      params.push(data.pluginId ?? null);
+    }
+    if (data.pluginProfileId !== undefined) {
+      updates.push('plugin_profile_id = ?');
+      params.push(data.pluginProfileId ?? null);
     }
 
     updates.push('updated_at = ?');
@@ -267,5 +356,12 @@ export class AgentProfileRepository extends BaseRepository<
     const profile = this.findById(id);
     if (!profile) throw new Error(`AgentProfile not found: ${id}`);
     return profile;
+  }
+
+  findByPluginProfile(pluginId: string, pluginProfileId: string): AgentProfileConfig | undefined {
+    const row = this.db
+      .prepare('SELECT * FROM agent_profiles WHERE plugin_id = ? AND plugin_profile_id = ? LIMIT 1')
+      .get(pluginId, pluginProfileId);
+    return row ? this.mapRow(row) : undefined;
   }
 }

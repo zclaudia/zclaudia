@@ -1,0 +1,337 @@
+import { describe, expect, it, vi, afterEach } from 'vitest';
+import Database from 'better-sqlite3';
+import type { AgentTool } from '@earendil-works/pi-agent-core';
+import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
+import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
+import { mcpInventoryCache } from '../../../../utils/mcp-inventory-cache.js';
+import {
+  buildExternalMetaTools,
+  buildExternalProviderCatalog,
+  type ExternalToolRuntimeState,
+} from '../external-tools.js';
+
+function createDb(): Database.Database {
+  const db = new Database(':memory:');
+  applyMigrations(db);
+  db.prepare(`
+    INSERT INTO mcp_servers (name, command, args, env, enabled, provider_scope, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+  `).run('github', 'node', '[]', NULL_JSON, '["zclaudia"]', Date.now(), Date.now());
+  return db;
+}
+
+const NULL_JSON = null;
+
+describe('external progressive tools', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    mcpInventoryCache.invalidate();
+  });
+
+  it('loads a concrete MCP tool with the inspected description and input schema', async () => {
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      {
+        name: 'search_repositories',
+        description: 'Search GitHub repositories',
+        inputSchema: {
+          type: 'object',
+          properties: { query: { type: 'string' } },
+          required: ['query'],
+        },
+      },
+    ]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const toolsArray: AgentTool<any>[] = [];
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
+    const loadTool = metaTools.find((tool) => tool.name === 'LoadExternalTool');
+
+    await loadTool!.execute('load-1', {
+      ref: { source: 'mcp', server: 'github', tool: 'search_repositories' },
+    });
+
+    const loadedTool = toolsArray.find((tool) => tool.name === 'mcp__github__search_repositories');
+    expect(loadedTool?.description).toBe('Search GitHub repositories');
+    expect(loadedTool?.parameters).toEqual({
+      type: 'object',
+      properties: { query: { type: 'string' } },
+      required: ['query'],
+    });
+  });
+
+  it('uses MCP inventory cache for repeated search and inspect calls', async () => {
+    const listTools = vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      {
+        name: 'search_repositories',
+        description: 'Search GitHub repositories',
+        inputSchema: { type: 'object', properties: { query: { type: 'string' } } },
+      },
+    ]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
+    const searchTool = metaTools.find((tool) => tool.name === 'SearchExternalTools')!;
+    const inspectTool = metaTools.find((tool) => tool.name === 'InspectExternalTool')!;
+
+    await searchTool.execute('search-1', { query: 'search' });
+    await searchTool.execute('search-2', { query: 'github' });
+    await inspectTool.execute('inspect-1', {
+      ref: { source: 'mcp', server: 'github', tool: 'search_repositories' },
+    });
+
+    expect(listTools).toHaveBeenCalledTimes(1);
+  });
+
+  it('discovers, inspects, and reads MCP resources progressively', async () => {
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([
+      { uri: 'file://readme', name: 'README', description: 'Project readme', mimeType: 'text/markdown' },
+    ]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'readResource').mockResolvedValue({
+      contents: [{ uri: 'file://readme', mimeType: 'text/markdown', text: '# Hello' }],
+    });
+
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
+    const search = metaTools.find((tool) => tool.name === 'SearchExternalResources')!;
+    const inspect = metaTools.find((tool) => tool.name === 'InspectExternalResource')!;
+    const read = metaTools.find((tool) => tool.name === 'ReadExternalResource')!;
+
+    const searchResult = await search.execute('resource-search', { query: 'readme' });
+    const inspectResult = await inspect.execute('resource-inspect', {
+      ref: { source: 'mcp-resource', server: 'github', uri: 'file://readme' },
+    });
+    const readResult = await read.execute('resource-read', {
+      ref: { source: 'mcp-resource', server: 'github', uri: 'file://readme' },
+    });
+
+    expect(JSON.stringify(searchResult.details)).toContain('"total":1');
+    expect(searchResult.content[0].text).toContain('file://readme');
+    expect(inspectResult.content[0].text).toContain('Project readme');
+    expect(readResult.content[0].text).toContain('# Hello');
+  });
+
+  it('surfaces MCP risk metadata as advisory permission summary', async () => {
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      {
+        name: 'read_issue',
+        description: 'Read an issue',
+        inputSchema: { type: 'object' },
+        annotations: { readOnlyHint: true },
+      } as any,
+    ]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
+    const search = metaTools.find((tool) => tool.name === 'SearchExternalTools')!;
+    const inspect = metaTools.find((tool) => tool.name === 'InspectExternalTool')!;
+
+    const searchResult = await search.execute('search-risk', { query: 'issue' });
+    const inspectResult = await inspect.execute('inspect-risk', {
+      ref: { source: 'mcp', server: 'github', tool: 'read_issue' },
+    });
+
+    expect(searchResult.content[0].text).toContain('"declaredReadOnly": true');
+    expect(searchResult.content[0].text).toContain('"trustedReadOnly": false');
+    expect(inspectResult.content[0].text).toContain('self-declared');
+  });
+
+  it('applies MCP server trust policy to readonly risk summaries', async () => {
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      {
+        name: 'read_issue',
+        description: 'Read an issue',
+        inputSchema: { type: 'object' },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+      } as any,
+    ]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    const db = createDb();
+    db.prepare('UPDATE mcp_servers SET trust_policy = ? WHERE name = ?').run(JSON.stringify({
+      trustLevel: 'trusted-readonly',
+      trustReadOnlyHint: true,
+      defaultRiskAction: 'ask',
+      riskActions: {},
+    }), 'github');
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const metaTools = buildExternalMetaTools({ db, state, toolsArray: [] });
+    const inspect = metaTools.find((tool) => tool.name === 'InspectExternalTool')!;
+
+    const inspectResult = await inspect.execute('inspect-trusted-risk', {
+      ref: { source: 'mcp', server: 'github', tool: 'read_issue' },
+    });
+
+    expect(inspectResult.content[0].text).toContain('"trustedReadOnly": true');
+    expect(inspectResult.content[0].text).toContain('"policyDecision": "approve"');
+  });
+
+  it('blocks direct concrete MCP execution when trust policy denies the risk', async () => {
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      {
+        name: 'delete_issue',
+        description: 'Delete an issue',
+        inputSchema: { type: 'object' },
+        annotations: { destructiveHint: true },
+      } as any,
+    ]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    const callTool = vi.spyOn(mcpClientManager, 'callTool').mockResolvedValue({
+      content: [{ type: 'text', text: 'deleted' }],
+      isError: false,
+    } as any);
+    const db = createDb();
+    db.prepare('UPDATE mcp_servers SET trust_policy = ? WHERE name = ?').run(JSON.stringify({
+      trustLevel: 'untrusted',
+      trustReadOnlyHint: false,
+      defaultRiskAction: 'ask',
+      riskActions: { high: 'deny' },
+    }), 'github');
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const toolsArray: AgentTool<any>[] = [];
+    const metaTools = buildExternalMetaTools({ db, state, toolsArray });
+    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+
+    await load.execute('load-denied-tool', {
+      ref: { source: 'mcp', server: 'github', tool: 'delete_issue' },
+    });
+    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__delete_issue')!;
+    const result = await concrete.execute('direct-denied-call', { id: '1' });
+
+    expect(callTool).not.toHaveBeenCalled();
+    expect(result.details).toEqual(expect.objectContaining({
+      ok: false,
+      error: 'mcp_tool_denied_by_policy',
+      mcpTrust: expect.objectContaining({
+        server: 'github',
+        tool: 'delete_issue',
+        policyDecision: 'deny',
+      }),
+    }));
+    expect(result.content[0].text).toContain('Denied by MCP trust policy');
+  });
+
+  it('discovers authenticate pseudo-tool for MCP servers that need auth', async () => {
+    vi.spyOn(mcpClientManager, 'getStatus').mockReturnValue({
+      name: 'github',
+      state: 'needs-auth',
+      authRequired: true,
+      authMessage: 'Authentication required for GitHub MCP.',
+    } as any);
+    const listTools = vi.spyOn(mcpClientManager, 'listTools').mockRejectedValue(new Error('401 Unauthorized'));
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
+    const search = metaTools.find((tool) => tool.name === 'SearchExternalTools')!;
+
+    const result = await search.execute('search-auth', { query: 'authenticate' });
+
+    expect(listTools).not.toHaveBeenCalled();
+    expect(result.content[0].text).toContain('"tool": "authenticate"');
+    expect(result.content[0].text).toContain('Authentication required for GitHub MCP.');
+  });
+
+  it('loads authenticate pseudo-tool and returns manual auth guidance without calling MCP server', async () => {
+    vi.spyOn(mcpClientManager, 'getStatus').mockReturnValue({
+      name: 'github',
+      state: 'needs-auth',
+      authRequired: true,
+      authMessage: 'Authentication required for GitHub MCP.',
+    } as any);
+    const callTool = vi.spyOn(mcpClientManager, 'callTool').mockResolvedValue({
+      content: [{ type: 'text', text: 'should not call' }],
+    } as any);
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const toolsArray: AgentTool<any>[] = [];
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
+    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+
+    const loadResult = await load.execute('load-auth-tool', {
+      ref: { source: 'mcp', server: 'github', tool: 'authenticate' },
+    });
+    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__authenticate')!;
+    const result = await concrete.execute('auth-call', {});
+
+    expect(loadResult.details).toEqual(expect.objectContaining({ ok: true, loaded: true }));
+    expect(callTool).not.toHaveBeenCalled();
+    expect(result.details).toEqual(expect.objectContaining({
+      ok: false,
+      authRequired: true,
+      server: 'github',
+      tool: 'authenticate',
+    }));
+    expect(result.content[0].text).toContain('Authentication required for GitHub MCP.');
+    expect(result.content[0].text).toContain('Update the MCP server credentials');
+  });
+
+  it('builds a stable compact provider catalog with inventory counts', async () => {
+    const db = createDb();
+    db.prepare(`
+      INSERT INTO mcp_servers (name, command, args, env, enabled, provider_scope, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, ?, ?, ?)
+    `).run('alpha', 'node', '[]', NULL_JSON, '["zclaudia"]', Date.now(), Date.now());
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([{ name: 'tool', description: '', inputSchema: {} }]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([{ uri: 'file://a' }]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([{ name: 'prompt' }]);
+
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [
+        { source: 'mcp', serverId: 'github' },
+        { source: 'mcp', serverId: 'alpha' },
+      ],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const metaTools = buildExternalMetaTools({ db, state, toolsArray: [] });
+    await metaTools.find((tool) => tool.name === 'SearchExternalTools')!.execute('prime-cache', { query: '' });
+
+    const catalog = buildExternalProviderCatalog(state, db);
+    const alphaIndex = catalog.indexOf('mcp/alpha');
+    const githubIndex = catalog.indexOf('mcp/github');
+
+    expect(alphaIndex).toBeGreaterThanOrEqual(0);
+    expect(githubIndex).toBeGreaterThan(alphaIndex);
+    expect(catalog).toContain('tools=1, resources=1, prompts=1');
+    expect(catalog.length).toBeLessThan(500);
+  });
+});

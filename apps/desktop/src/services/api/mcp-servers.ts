@@ -1,5 +1,16 @@
-import type { McpServerConfig } from '@zclaudia/shared';
+import type { McpServerConfig, McpServerStatus } from '@zclaudia/shared';
+import type { McpOAuthConfig, McpOAuthCredentials, McpServerTransport, McpServerTrustPolicy } from '@zclaudia/shared/core/mcp';
 import { fetchLocalApi } from './base';
+
+export type McpOAuthStartResult =
+  | { sessionId: string; method: 'browser'; authUrl: string; expiresAt: number }
+  | { sessionId: string; method: 'device_code'; userCode: string; verificationUri: string; expiresAt: number };
+
+export type McpOAuthStatus =
+  | { state: 'pending' }
+  | { state: 'success' }
+  | { state: 'error'; code: string; message: string }
+  | { state: 'cancelled' };
 
 export async function getMcpServers(): Promise<McpServerConfig[]> {
   const result = await fetchLocalApi<McpServerConfig[]>('/api/mcp-servers');
@@ -14,9 +25,15 @@ export async function createMcpServer(config: {
   command: string;
   args?: string[];
   env?: Record<string, string>;
+  transport?: McpServerTransport;
+  url?: string;
+  headers?: Record<string, string>;
+  oauthConfig?: McpOAuthConfig;
+  oauthCredentials?: McpOAuthCredentials;
   enabled?: boolean;
   description?: string;
   providerScope?: string[];
+  trustPolicy?: McpServerTrustPolicy;
 }): Promise<McpServerConfig> {
   const result = await fetchLocalApi<McpServerConfig>('/api/mcp-servers', {
     method: 'POST',
@@ -33,9 +50,15 @@ export async function updateMcpServer(id: string, config: Partial<{
   command: string;
   args: string[];
   env: Record<string, string>;
+  transport: McpServerTransport;
+  url: string;
+  headers: Record<string, string>;
+  oauthConfig: McpOAuthConfig;
+  oauthCredentials: McpOAuthCredentials | null;
   enabled: boolean;
   description: string;
   providerScope: string[];
+  trustPolicy: McpServerTrustPolicy;
 }>): Promise<McpServerConfig> {
   const result = await fetchLocalApi<McpServerConfig>(`/api/mcp-servers/${id}`, {
     method: 'PUT',
@@ -64,5 +87,80 @@ export async function toggleMcpServer(id: string): Promise<McpServerConfig> {
     throw new Error(result.error?.message || 'Failed to toggle MCP server');
   }
   return result.data;
+}
+
+export async function getMcpServerStatuses(): Promise<McpServerStatus[]> {
+  const result = await fetchLocalApi<McpServerStatus[]>('/api/mcp-servers/status');
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to fetch MCP server status');
+  }
+  return result.data;
+}
+
+export async function connectMcpServer(name: string): Promise<McpServerStatus> {
+  const result = await fetchLocalApi<McpServerStatus>(`/api/mcp-servers/${encodeURIComponent(name)}/connect`, {
+    method: 'POST',
+  });
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to connect MCP server');
+  }
+  return result.data;
+}
+
+export async function disconnectMcpServer(name: string): Promise<McpServerStatus> {
+  const result = await fetchLocalApi<McpServerStatus>(`/api/mcp-servers/${encodeURIComponent(name)}/disconnect`, {
+    method: 'POST',
+  });
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to disconnect MCP server');
+  }
+  return result.data;
+}
+
+export async function refreshMcpServer(name: string): Promise<McpServerStatus> {
+  const result = await fetchLocalApi<McpServerStatus>(`/api/mcp-servers/${encodeURIComponent(name)}/refresh`, {
+    method: 'POST',
+  });
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to refresh MCP server');
+  }
+  return result.data;
+}
+
+export async function startMcpOAuth(name: string, method: 'browser' | 'device_code'): Promise<McpOAuthStartResult> {
+  const result = await fetchLocalApi<McpOAuthStartResult>(`/api/mcp-servers/${encodeURIComponent(name)}/oauth/start`, {
+    method: 'POST',
+    body: JSON.stringify({ method }),
+  });
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to start MCP OAuth');
+  }
+  return result.data;
+}
+
+export async function pollMcpOAuthStatus(name: string, sessionId: string): Promise<McpOAuthStatus> {
+  const result = await fetchLocalApi<McpOAuthStatus>(`/api/mcp-servers/${encodeURIComponent(name)}/oauth/status/${encodeURIComponent(sessionId)}`);
+  if (!result.success || !result.data) {
+    throw new Error(result.error?.message || 'Failed to poll MCP OAuth');
+  }
+  return result.data;
+}
+
+export async function cancelMcpOAuth(name: string, sessionId: string): Promise<void> {
+  const result = await fetchLocalApi<{ ok: boolean }>(`/api/mcp-servers/${encodeURIComponent(name)}/oauth/cancel/${encodeURIComponent(sessionId)}`, {
+    method: 'POST',
+  });
+  if (!result.success) {
+    throw new Error(result.error?.message || 'Failed to cancel MCP OAuth');
+  }
+}
+
+export async function signOutMcpOAuth(name: string): Promise<void> {
+  const result = await fetchLocalApi<{ ok: boolean }>(`/api/mcp-servers/${encodeURIComponent(name)}/oauth/signout`, {
+    method: 'POST',
+  });
+  if (!result.success) {
+    throw new Error(result.error?.message || 'Failed to sign out MCP OAuth');
+  }
 }
 

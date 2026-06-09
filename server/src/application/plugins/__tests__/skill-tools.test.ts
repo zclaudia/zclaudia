@@ -8,6 +8,8 @@ import {
   refreshSkillCache,
   buildSkillDirectoryHint,
   getDiscoveredSkills,
+  getEligibleDiscoveredSkills,
+  loadDiscoveredSkillContent,
   addPluginSkills,
   setDatabase,
 } from '../skill-tools.js';
@@ -123,6 +125,93 @@ describe('skill-tools (pi-backed)', () => {
       expect(hint).not.toContain('win-only');
     }
     expect(hint).toContain('ok');
+  });
+
+  it('returns eligible discovered skills without requirements-gated entries', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'win-only',
+      'name: win-only\ndescription: gated\nrequires:\n  os:\n    - win32',
+    );
+    writeSkill(WORKSPACE_SKILLS_DIR, 'ok', 'name: ok\ndescription: no gate');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    const eligible = getEligibleDiscoveredSkills();
+
+    expect(eligible.map((skill) => skill.id)).toContain('ok');
+    if (process.platform !== 'win32') {
+      expect(eligible.map((skill) => skill.id)).not.toContain('win-only');
+    }
+  });
+
+  it('projects nested skill execution metadata from SKILL.md frontmatter', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'forked',
+      [
+        'name: forked',
+        'description: forked skill',
+        'execution:',
+        '  allowed_modes:',
+        '    - inline',
+        '    - fork',
+        '  default_mode: fork',
+        '  fork_tool_policy: web',
+      ].join('\n'),
+    );
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    expect(getDiscoveredSkills()[0].execution).toEqual({
+      allowedModes: ['inline', 'fork'],
+      defaultMode: 'fork',
+      forkToolPolicy: 'web',
+    });
+  });
+
+  it('projects flat skill execution metadata aliases and ignores invalid metadata', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'flat',
+      [
+        'name: flat',
+        'description: flat skill',
+        'allowed_modes: [fork, invalid, fork]',
+        'default_mode: inline',
+        'fork_tool_policy: dangerous',
+      ].join('\n'),
+    );
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    expect(getDiscoveredSkills()[0].execution).toEqual({
+      allowedModes: ['fork'],
+      defaultMode: 'inline',
+    });
+  });
+
+  it('loads full SKILL.md content for cached workspace, external, and plugin skills', async () => {
+    writeSkill(WORKSPACE_SKILLS_DIR, 'workspace-one', 'name: workspace-one\ndescription: ws', '# Workspace\n');
+    const extDir = path.join(process.env.HOME!, '.agents', 'skills');
+    writeSkill(extDir, 'external-one', 'name: external-one\ndescription: ext', '# External\n');
+    const pluginDir = path.join(tmpRoot, 'plugin-skills');
+    writeSkill(pluginDir, 'plugin-one', 'name: plugin-one\ndescription: plugin', '# Plugin\n');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+    const pluginResult = await import('../skill-loader.js').then(({ loadAllSkills }) =>
+      loadAllSkills(env, [{ path: pluginDir, source: 'plugin' as const }]),
+    );
+    addPluginSkills(pluginResult.skills);
+
+    await expect(loadDiscoveredSkillContent({ source: 'workspace', id: 'workspace-one' }))
+      .resolves.toContain('# Workspace');
+    await expect(loadDiscoveredSkillContent({ source: 'external', id: 'external-one' }))
+      .resolves.toContain('# External');
+    await expect(loadDiscoveredSkillContent({ source: 'plugin', id: 'plugin-one' }))
+      .resolves.toContain('# Plugin');
+    await expect(loadDiscoveredSkillContent({ source: 'workspace', id: '../bad' }))
+      .resolves.toBeNull();
   });
 
   it('refreshSkillCache resets and reloads', async () => {

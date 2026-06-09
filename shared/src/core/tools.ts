@@ -42,19 +42,45 @@ export interface McpToolRef {
   tool: string;
 }
 
+export interface McpResourceRef {
+  source: 'mcp-resource';
+  server: string;
+  uri: string;
+}
+
+export interface McpPromptRef {
+  source: 'mcp-prompt';
+  server: string;
+  name: string;
+}
+
 export interface InteractionToolRef {
   source: 'interaction';
   toolId: string;
 }
 
-export type ToolRef = BuiltinToolRef | PluginToolRef | McpToolRef | InteractionToolRef;
+export type ToolRef = BuiltinToolRef | PluginToolRef | McpToolRef | McpResourceRef | McpPromptRef | InteractionToolRef;
 
 export type ToolSetRef =
   | { source: 'builtin'; id: BuiltinToolSetId }
   | { source: 'plugin'; pluginId: string; id: string };
 
+export interface McpToolProviderRef {
+  source: 'mcp';
+  serverId: string;
+}
+
+export interface PluginToolProviderRef {
+  source: 'plugin';
+  pluginId: string;
+  providerId?: string;
+}
+
+export type ExternalToolProviderRef = McpToolProviderRef | PluginToolProviderRef;
+
 export interface ToolSelection {
   sets: ToolSetRef[];
+  providers?: ExternalToolProviderRef[];
   include: ToolRef[];
   exclude: ToolRef[];
 }
@@ -72,6 +98,18 @@ export interface ToolMetadata {
   requiresNetwork: boolean;
   requiresUserInteraction: boolean;
   riskLevel: ToolRiskLevel;
+}
+
+export interface ExternalToolRiskPolicy {
+  declaredReadOnly: boolean;
+  declaredReadOnlySource?: 'mcp-annotations' | 'plugin-metadata';
+  trustedReadOnly: boolean;
+  mutatesWorkspace: boolean;
+  requiresNetwork: boolean;
+  riskLevel: ToolRiskLevel;
+  providerTrust: PluginTrustLevel;
+  policyDecision?: 'approve' | 'deny' | 'escalate';
+  advisory: string;
 }
 
 export interface ResolvedToolSelection {
@@ -376,6 +414,7 @@ export type BuiltinToolSetId = keyof typeof BUILTIN_TOOL_SETS;
 
 export const defaultToolSelection: ToolSelection = {
   sets: [{ source: 'builtin', id: 'core-coding' }],
+  providers: [],
   include: [],
   exclude: [],
 };
@@ -405,6 +444,10 @@ export function toolRefKey(ref: ToolRef): string {
       return `plugin:${ref.pluginId}/${ref.toolId}`;
     case 'mcp':
       return `mcp:${ref.server}/${ref.tool}`;
+    case 'mcp-resource':
+      return `mcp-resource:${ref.server}/${ref.uri}`;
+    case 'mcp-prompt':
+      return `mcp-prompt:${ref.server}/${ref.name}`;
     case 'interaction':
       return `interaction:${ref.toolId}`;
   }
@@ -415,7 +458,7 @@ export function legacyEnabledToolsToSelection(tools: string[]): ToolSelection {
     const name = normalizeToolName(tool);
     return name ? [builtinToolRef(name)] : [];
   });
-  return { sets: [], include: uniqueToolRefs(include), exclude: [] };
+  return { sets: [], providers: [], include: uniqueToolRefs(include), exclude: [] };
 }
 
 function uniqueToolRefs(refs: ToolRef[]): ToolRef[] {
@@ -437,9 +480,9 @@ function expandToolSet(set: ToolSetRef): ToolRef[] {
 }
 
 export function resolveToolSelection(selection: ToolSelection): ResolvedToolSelection {
-  const expanded = selection.sets.flatMap(expandToolSet);
-  const excluded = new Set(selection.exclude.map(toolRefKey));
-  const refs = uniqueToolRefs([...expanded, ...selection.include])
+  const expanded = (selection.sets ?? []).flatMap(expandToolSet);
+  const excluded = new Set((selection.exclude ?? []).map(toolRefKey));
+  const refs = uniqueToolRefs([...expanded, ...(selection.include ?? [])])
     .filter((ref) => !excluded.has(toolRefKey(ref)));
   return {
     refs,

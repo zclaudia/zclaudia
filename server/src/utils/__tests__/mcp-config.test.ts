@@ -11,6 +11,11 @@ function createTestDb(): Database.Database {
       args TEXT,
       env TEXT,
       provider_scope TEXT,
+      transport TEXT,
+      url TEXT,
+      headers TEXT,
+      oauth_config TEXT,
+      oauth_credentials TEXT,
       enabled INTEGER DEFAULT 1
     );
   `);
@@ -34,7 +39,7 @@ describe('mcp-config', () => {
 
     const result = loadMcpServersFromDb(db);
     expect(result).toEqual({
-      'test-server': { command: 'node' },
+      'test-server': { command: 'node', transport: 'stdio' },
     });
   });
 
@@ -97,5 +102,41 @@ describe('mcp-config', () => {
     loadMcpServersFromDb(db, 'zclaudia');
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('for zclaudia'));
     consoleSpy.mockRestore();
+  });
+
+  it('loads remote MCP server transport, headers, OAuth config, and credentials', () => {
+    db.prepare(`
+      INSERT INTO mcp_servers (
+        name, command, enabled, transport, url, headers, oauth_config, oauth_credentials
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      'remote',
+      '',
+      1,
+      'streamable-http',
+      'https://mcp.example.com/mcp',
+      '{"X-Zoom-Region":"us01"}',
+      '{"enabled":true,"tokenEndpoint":"https://auth.example.com/token","clientId":"client","scopes":["repo"]}',
+      '{"accessToken":"access-token","tokenType":"Bearer"}',
+    );
+
+    const result = loadMcpServersFromDb(db);
+
+    expect(result.remote).toEqual({
+      transport: 'streamable-http',
+      command: '',
+      url: 'https://mcp.example.com/mcp',
+      headers: { 'X-Zoom-Region': 'us01' },
+      oauthConfig: {
+        enabled: true,
+        tokenEndpoint: 'https://auth.example.com/token',
+        clientId: 'client',
+        scopes: ['repo'],
+      },
+      oauthCredentials: {
+        accessToken: 'access-token',
+        tokenType: 'Bearer',
+      },
+    });
   });
 });

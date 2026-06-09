@@ -2,7 +2,11 @@ import { newId } from '../../../utils/uuid.js';
 import type { ErrorMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
-import type { ToolName } from '@zclaudia/shared/core/tools';
+import { resolveSkillSelection, skillRefKey } from '@zclaudia/shared/core/skills';
+import type { McpToolRef, PluginToolRef, ToolName } from '@zclaudia/shared/core/tools';
+import { getEligibleDiscoveredSkills, loadDiscoveredSkillContentSync, type DiscoveredSkill } from '../../../application/plugins/skill-tools.js';
+import { createSkillRuntimeState, type ExternalToolRuntimeState } from '../../../infra/providers/pi-runtime/index.js';
+import type { SkillRuntimeState } from '../../../infra/providers/pi-runtime/index.js';
 import { sendMessage, broadcastToOtherAuthenticatedClients } from '../transport/broadcast.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import { getNextOffset } from './run-lifecycle.js';
@@ -81,6 +85,39 @@ export interface RunBootstrapResult {
   session: RunSessionRecord;
   sessionType: 'regular' | 'background' | 'agent';
   userMessageId?: string;
+}
+
+function buildExternalToolRuntimeState(profile: AgentProfileConfig): ExternalToolRuntimeState {
+  const selection = profile.toolSelection;
+  const pinnedExternalTools = (selection?.include ?? []).flatMap((ref): Array<McpToolRef | PluginToolRef> => {
+    if (ref.source === 'mcp' || ref.source === 'plugin') return [ref];
+    return [];
+  });
+  return {
+    discoverableProviders: selection?.providers ?? [],
+    pinnedExternalTools,
+    loadedExternalTools: [...pinnedExternalTools],
+  };
+}
+
+export function buildSkillRuntimeState(
+  profile: AgentProfileConfig,
+  eligibleSkills: DiscoveredSkill[] = getEligibleDiscoveredSkills(),
+  loadContent: typeof loadDiscoveredSkillContentSync = loadDiscoveredSkillContentSync,
+): SkillRuntimeState {
+  const resolved = resolveSkillSelection(eligibleSkills, profile.skillSelection);
+  const state = createSkillRuntimeState(resolved.discoverable, resolved.pinned);
+  state.loadedSkills = [];
+  for (const ref of resolved.pinned) {
+    const content = loadContent(ref);
+    if (!content) {
+      console.warn(`[SkillRuntime] pinned skill unavailable: ${skillRefKey(ref)}`);
+      continue;
+    }
+    state.loadedSkills.push(ref);
+    state.loadedSkillContents[skillRefKey(ref)] = content;
+  }
+  return state;
 }
 
 export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunBootstrapResult | null {
@@ -211,6 +248,8 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     // compaction simply won't trigger in that degraded mode.
     agentProfile,
     llmProfile: providerConfig ?? undefined,
+    externalToolState: buildExternalToolRuntimeState(agentProfile),
+    skillState: buildSkillRuntimeState(agentProfile),
   };
   activeRuns.set(runId, activeRun);
 

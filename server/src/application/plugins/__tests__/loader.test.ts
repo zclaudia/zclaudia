@@ -14,6 +14,10 @@ import { permissionManager } from '../permissions';
 import { workerHost } from '../worker-host';
 import { workflowStepRegistry } from '../workflow-step-registry';
 import { checkPluginCompatibility } from '../../../utils/version.js';
+import Database from 'better-sqlite3';
+import { applyMigrations } from '../../../infra/storage/migrations/index.js';
+import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
+import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
 
 // Mock fs module
 vi.mock('fs', async () => {
@@ -194,8 +198,34 @@ describe('PluginLoader', () => {
       expect(manifests[0].id).toBe('com.test.plugin');
     });
 
+    it('should discover a plugin when a plugin directory is configured directly', async () => {
+      const directPluginDir = '/mock/direct-zcharlie';
+      const directLoader = new PluginLoader({ pluginDirs: [directPluginDir] });
+      const manifest = makeManifest({ id: 'com.zclaudia.zcharlie', name: 'ZCharlie' });
+
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        if (p === directPluginDir) return true;
+        if (p === path.join(directPluginDir, 'plugin.json')) return true;
+        return false;
+      });
+      vi.mocked(fs.readFileSync).mockReturnValueOnce(JSON.stringify(manifest));
+      vi.mocked(fs.readdirSync).mockReturnValue([]);
+
+      const manifests = await directLoader.discover();
+
+      expect(manifests).toHaveLength(1);
+      expect(manifests[0].id).toBe('com.zclaudia.zcharlie');
+      expect(directLoader.getPlugin('com.zclaudia.zcharlie')?.path).toBe(directPluginDir);
+    });
+
     it('should skip non-directory entries', async () => {
-      vi.mocked(fs.existsSync).mockReturnValue(true);
+      vi.mocked(fs.existsSync).mockImplementation((p) => {
+        if (p === mockPluginDir) return true;
+        if (p === path.join(mockPluginDir, 'plugin.json')) return false;
+        if (p === path.join(mockPluginDir, 'manifest.json')) return false;
+        if (p === path.join(mockPluginDir, 'package.json')) return false;
+        return false;
+      });
       vi.mocked(fs.readdirSync).mockReturnValue([
         { name: 'somefile.txt', isDirectory: () => false, isFile: () => true } as fs.Dirent,
       ]);
@@ -899,6 +929,71 @@ describe('PluginLoader', () => {
       expect(warnSpy).toHaveBeenCalledWith(
         expect.stringContaining('Skill path escapes plugin directory')
       );
+    });
+
+    it('should create plugin-owned agent profiles from contributes using the default LLM profile', async () => {
+      const db = new Database(':memory:');
+      db.pragma('foreign_keys = ON');
+      applyMigrations(db);
+      const llm = new LlmProfileRepository(db).create({
+        name: 'default-llm',
+        providerType: 'anthropic',
+        apiKey: 'sk-test',
+        isDefault: true,
+      });
+      loader.setDatabase(db);
+
+      const manifest = makeManifest({
+        id: 'com.zclaudia.zcharlie',
+        name: 'ZCharlie',
+        contributes: {
+          agentProfiles: [
+            {
+              id: 'default',
+              name: 'ZCharlie',
+              description: 'Investment analysis agent',
+              systemPrompt: 'You are ZCharlie.',
+              model: 'claude-sonnet-4-6',
+              toolSelection: {
+                sets: [{ source: 'builtin', id: 'core-coding' }],
+                providers: [],
+                include: [{ source: 'plugin', pluginId: 'com.zclaudia.zcharlie', toolId: 'quote_lookup' }],
+                exclude: [{ source: 'builtin', name: 'Bash' }],
+              },
+              skillSelection: {
+                providers: [{ source: 'plugin', pluginId: 'com.zclaudia.zcharlie' }],
+                pinned: [{ source: 'plugin', id: 'zcharlie-analysis' }],
+              },
+              thinkingLevel: 'medium',
+            },
+          ],
+        },
+      });
+
+      setupSinglePlugin(mockPluginDir, 'zcharlie', manifest);
+      await loader.discover();
+      await loader.activate('com.zclaudia.zcharlie');
+
+      const profiles = new AgentProfileRepository(db).findAllOrdered();
+      expect(profiles).toHaveLength(1);
+      expect(profiles[0]).toMatchObject({
+        name: 'ZCharlie',
+        description: 'Investment analysis agent',
+        llmProfileId: llm.id,
+        source: 'plugin',
+        pluginId: 'com.zclaudia.zcharlie',
+        pluginProfileId: 'default',
+        systemPrompt: 'You are ZCharlie.',
+        thinkingLevel: 'medium',
+      });
+      expect(profiles[0].toolSelection?.include).toContainEqual({
+        source: 'plugin',
+        pluginId: 'com.zclaudia.zcharlie',
+        toolId: 'quote_lookup',
+      });
+      expect(profiles[0].skillSelection?.pinned).toEqual([
+        { source: 'plugin', id: 'zcharlie-analysis' },
+      ]);
     });
 
     it('should broadcast panel registrations from contributes', async () => {

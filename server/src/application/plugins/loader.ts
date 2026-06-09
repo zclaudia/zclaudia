@@ -41,7 +41,9 @@ import { workflowStepRegistry } from './workflow-step-registry.js';
 import { workflowTriggerRegistry } from './workflow-trigger-registry.js';
 import { pluginScheduler } from './scheduler.js';
 import { mcpClientManager } from '../../utils/mcp-client-manager.js';
+import { loadMcpServersFromDb } from '../../utils/mcp-config.js';
 import type { McpRequirement, CapabilityNegotiationResult, McpCapabilityStatus } from '@zclaudia/shared/plugin-types';
+import { PluginAgentProfileService } from './agent-profile-service.js';
 
 // ============================================
 // Types
@@ -182,10 +184,33 @@ export class PluginLoader {
     const manifests: PluginManifest[] = [];
 
     for (const dir of this.getPluginDirs()) {
+      const directManifest = await this.loadManifest(dir, { warnMissing: false });
+      if (directManifest) {
+        this.addDiscoveredPlugin(directManifest, dir, manifests);
+        continue;
+      }
       await this.scanDirectory(dir, manifests);
     }
 
     return manifests;
+  }
+
+  private addDiscoveredPlugin(manifest: PluginManifest, pluginPath: string, manifests: PluginManifest[]): boolean {
+    if (this.plugins.has(manifest.id)) {
+      console.warn(
+        `[PluginLoader] Plugin "${manifest.id}" already discovered, skipping duplicate at ${pluginPath}`
+      );
+      return false;
+    }
+
+    this.plugins.set(manifest.id, {
+      manifest,
+      path: pluginPath,
+      isActive: false,
+    });
+
+    manifests.push(manifest);
+    return true;
   }
 
   /**
@@ -210,21 +235,7 @@ export class PluginLoader {
       const manifest = await this.loadManifest(pluginPath);
 
       if (manifest) {
-        // Check if already discovered (from another directory)
-        if (this.plugins.has(manifest.id)) {
-          console.warn(
-            `[PluginLoader] Plugin "${manifest.id}" already discovered, skipping duplicate at ${pluginPath}`
-          );
-          continue;
-        }
-
-        this.plugins.set(manifest.id, {
-          manifest,
-          path: pluginPath,
-          isActive: false,
-        });
-
-        manifests.push(manifest);
+        this.addDiscoveredPlugin(manifest, pluginPath, manifests);
       } else {
         // No manifest found — treat as category folder and recurse
         await this.scanDirectory(pluginPath, manifests);
@@ -235,7 +246,10 @@ export class PluginLoader {
   /**
    * Load and validate a manifest from a plugin directory.
    */
-  private async loadManifest(pluginPath: string): Promise<PluginManifest | null> {
+  private async loadManifest(
+    pluginPath: string,
+    options: { warnMissing?: boolean } = {},
+  ): Promise<PluginManifest | null> {
     // Try different manifest file names
     const manifestNames = ['plugin.json', 'manifest.json', 'package.json'];
     let manifestPath: string | null = null;
@@ -249,7 +263,9 @@ export class PluginLoader {
     }
 
     if (!manifestPath) {
-      console.warn(`[PluginLoader] No manifest found in ${pluginPath}`);
+      if (options.warnMissing !== false) {
+        console.warn(`[PluginLoader] No manifest found in ${pluginPath}`);
+      }
       return null;
     }
 
@@ -557,23 +573,10 @@ export class PluginLoader {
     }
 
     try {
-      // Look up MCP server config from DB
-      const row = this.db.prepare(
-        'SELECT name, command, args, env, enabled FROM mcp_servers WHERE name = ?',
-      ).get(req.server) as { name: string; command: string; args: string | null; env: string | null; enabled: number } | undefined;
-
-      if (!row) {
+      const config = loadMcpServersFromDb(this.db)[req.server];
+      if (!config) {
         return { server: req.server, available: false, error: `MCP server "${req.server}" not configured` };
       }
-      if (!row.enabled) {
-        return { server: req.server, available: false, error: `MCP server "${req.server}" is disabled` };
-      }
-
-      const config = {
-        command: row.command,
-        args: row.args ? JSON.parse(row.args) as string[] : [],
-        env: row.env ? JSON.parse(row.env) as Record<string, string> : undefined,
-      };
 
       // If no specific tools required, just check server exists + enabled
       if (!req.tools || req.tools.length === 0) {
@@ -734,6 +737,18 @@ export class PluginLoader {
         });
       }
       this.broadcastFn?.({ type: 'workflow_trigger_sources_changed' });
+    }
+
+    if (contributes.agentProfiles) {
+      if (this.db) {
+        const service = new PluginAgentProfileService(this.db);
+        const installed = service.installContributions(manifest.id, contributes.agentProfiles);
+        if (installed > 0) {
+          this.broadcastFn?.({ type: 'agent_profiles_changed' });
+        }
+      } else {
+        console.warn(`[PluginLoader] Cannot install agentProfiles for plugin "${manifest.id}" without database`);
+      }
     }
 
     // Collect plugin skill directories. Actual content loading happens via
@@ -1247,15 +1262,8 @@ export class PluginLoader {
               return rows.map((r) => ({ name: r.name, enabled: !!r.enabled, description: r.description || undefined }));
             },
             listTools: async (serverName: string) => {
-              const row = this.db!.prepare(
-                'SELECT command, args, env, enabled FROM mcp_servers WHERE name = ?',
-              ).get(serverName) as { command: string; args: string | null; env: string | null; enabled: number } | undefined;
-              if (!row || !row.enabled) return [];
-              const config = {
-                command: row.command,
-                args: row.args ? JSON.parse(row.args) as string[] : [],
-                env: row.env ? JSON.parse(row.env) as Record<string, string> : undefined,
-              };
+              const config = loadMcpServersFromDb(this.db!)[serverName];
+              if (!config) return [];
               const tools = await mcpClientManager.listTools(serverName, config);
               return tools.map((t: { name: string; description?: string; inputSchema?: Record<string, unknown> }) => ({
                 name: t.name,
@@ -1264,16 +1272,8 @@ export class PluginLoader {
               }));
             },
             callTool: async <T = unknown>(serverName: string, tool: string, args: Record<string, unknown>): Promise<T> => {
-              const row = this.db!.prepare(
-                'SELECT command, args, env, enabled FROM mcp_servers WHERE name = ?',
-              ).get(serverName) as { command: string; args: string | null; env: string | null; enabled: number } | undefined;
-              if (!row) throw new Error(`MCP server "${serverName}" not found`);
-              if (!row.enabled) throw new Error(`MCP server "${serverName}" is disabled`);
-              const config = {
-                command: row.command,
-                args: row.args ? JSON.parse(row.args) as string[] : [],
-                env: row.env ? JSON.parse(row.env) as Record<string, string> : undefined,
-              };
+              const config = loadMcpServersFromDb(this.db!)[serverName];
+              if (!config) throw new Error(`MCP server "${serverName}" not found or disabled`);
               const result = await mcpClientManager.callTool(serverName, config, tool, args);
               // Parse MCP text content
               const content = (result as { content?: Array<{ type: string; text?: string }> })?.content;

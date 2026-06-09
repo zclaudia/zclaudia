@@ -105,6 +105,30 @@ export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h
     );
   }
 
+  if (toolName.startsWith('mcp__')) {
+    const [, server, ...toolParts] = toolName.split('__');
+    const risk = input?.permissionSummary as Record<string, unknown> | undefined;
+    return (
+      <div className={`bg-muted/50 rounded-lg p-3 ${maxHeightClass} overflow-y-auto space-y-2`}>
+        <div className="text-xs font-mono text-foreground break-all">
+          <span className="text-muted-foreground">mcp/{server || 'unknown'}:</span>{' '}
+          {toolParts.join('__') || toolName}
+        </div>
+        {risk ? (
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div><span className="text-muted-foreground">risk:</span> {String(risk.riskLevel ?? 'unknown')}</div>
+            <div><span className="text-muted-foreground">network:</span> {String(risk.requiresNetwork ?? true)}</div>
+            <div><span className="text-muted-foreground">declared readonly:</span> {String(risk.declaredReadOnly ?? false)}</div>
+            <div><span className="text-muted-foreground">trusted readonly:</span> {String(risk.trustedReadOnly ?? false)}</div>
+          </div>
+        ) : null}
+        <pre className="text-xs text-foreground whitespace-pre-wrap break-words font-mono">
+          {detail}
+        </pre>
+      </div>
+    );
+  }
+
   // Grep/Glob: show pattern + path
   if ((toolName === 'Grep' || toolName === 'Glob') && input?.pattern) {
     return (

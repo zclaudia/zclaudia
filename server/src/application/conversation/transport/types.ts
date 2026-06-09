@@ -7,6 +7,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AskUserQuestionItem } from '@zclaudia/shared/interaction/forms';
 import type { PermissionDecision, SteerHandle, SystemInfo } from '../../../infra/providers/types.js';
+import type { ExternalToolRuntimeState, SkillRuntimeState } from '../../../infra/providers/pi-runtime/index.js';
 import type { initDatabase } from '../../../infra/storage/db.js';
 import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
@@ -106,6 +107,10 @@ export interface ActiveRun {
    * `generateSummary` calls. Populated alongside `agentProfile` in bootstrap.
    */
   llmProfile?: LlmProfileConfig;
+  /** Session-scoped MCP/plugin tools progressively loaded during this run. */
+  externalToolState?: ExternalToolRuntimeState;
+  /** Session-scoped skills progressively loaded as active context. */
+  skillState?: SkillRuntimeState;
   /**
    * Broadcast a message to ALL connected clients (not just the run's originating client).
    * Set up in run-bootstrap.ts. Falls back to run.client.ws if not wired (e.g. supervision).

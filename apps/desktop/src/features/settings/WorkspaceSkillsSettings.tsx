@@ -2,16 +2,15 @@
  * Workspace Skills Settings Component
  *
  * Manages workspace skills and external skill directories.
- * Skills are registered as MCP bridge tools for all AI providers.
+ * Skills are discoverable workflow/context packages that agents can load on demand.
  */
 
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../services/api';
-import type { WorkspaceSkillInfo, RegisteredSkillTool } from '../../services/api';
+import type { WorkspaceSkillInfo } from '../../services/api';
 
 export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boolean }) {
   const [skills, setSkills] = useState<WorkspaceSkillInfo[]>([]);
-  const [registeredTools, setRegisteredTools] = useState<RegisteredSkillTool[]>([]);
   const [externalDirs, setExternalDirs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +32,12 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
     setIsLoading(true);
     setError(null);
     try {
-      const [skillList, dirs, tools] = await Promise.all([
+      const [skillList, dirs] = await Promise.all([
         api.getWorkspaceSkills(),
         api.getExternalSkillDirs(),
-        api.getRegisteredSkillTools(),
       ]);
       setSkills(skillList);
       setExternalDirs(dirs);
-      setRegisteredTools(tools);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load skills');
     } finally {
@@ -138,6 +135,9 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
     );
   }
 
+  const workspaceSkillCount = skills.filter((skill) => (skill.source ?? 'workspace') === 'workspace').length;
+  const externalSkillCount = skills.length - workspaceSkillCount;
+
   // Editing a skill — full-screen editor
   if (editingSkillId && !readOnly) {
     return (
@@ -211,15 +211,15 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         <div className="p-3 bg-secondary/30 rounded-lg">
-          <div className="text-2xl font-bold text-foreground">{registeredTools.length}</div>
-          <div className="text-xs text-muted-foreground">Total</div>
+          <div className="text-2xl font-bold text-foreground">{skills.length}</div>
+          <div className="text-xs text-muted-foreground">Discoverable</div>
         </div>
         <div className="p-3 bg-secondary/30 rounded-lg">
-          <div className="text-2xl font-bold text-green-400">{skills.length}</div>
+          <div className="text-2xl font-bold text-green-400">{workspaceSkillCount}</div>
           <div className="text-xs text-muted-foreground">Workspace</div>
         </div>
         <div className="p-3 bg-secondary/30 rounded-lg">
-          <div className="text-2xl font-bold text-muted-foreground">{registeredTools.length - skills.length}</div>
+          <div className="text-2xl font-bold text-muted-foreground">{externalSkillCount}</div>
           <div className="text-xs text-muted-foreground">External</div>
         </div>
       </div>
@@ -272,8 +272,8 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
         </div>
       )}
 
-      {/* Registered skills list */}
-      {registeredTools.length === 0 && !showNewForm ? (
+      {/* Discoverable skills list */}
+      {skills.length === 0 && !showNewForm ? (
         <div className="text-center py-8">
           <svg
             className="w-12 h-12 mx-auto text-muted-foreground/50 mb-3"
@@ -288,32 +288,32 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
         </div>
       ) : (
         <div className="space-y-2">
-          {registeredTools.map(tool => {
-            const skillId = tool.name.replace('skill__', '');
-            const isWorkspace = skills.some(s => s.id === skillId);
-            const workspaceSkill = skills.find(s => s.id === skillId);
-            const displayName = workspaceSkill?.name || tool.description.replace(/^\[Skill\]\s*/, '').split(':')[0] || skillId;
-            const displayDesc = workspaceSkill?.description || tool.description.replace(/^\[Skill\]\s*[^:]*:\s*/, '') || '';
+          {skills.map(skill => {
+            const skillId = skill.id;
+            const source = skill.source ?? 'workspace';
+            const isWorkspace = source === 'workspace';
+            const displayName = skill.name || skillId;
+            const displayDesc = skill.description || '';
 
             return (
               <div
-                key={tool.name}
+                key={`${source}:${skillId}`}
                 className="p-3 bg-secondary/50 rounded-lg border border-border/50 hover:border-border transition-colors flex items-start gap-3"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">{displayName}</span>
                     <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-green-500/20 text-green-400">
-                      Active
+                      Discoverable
                     </span>
                     <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
                       isWorkspace ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'
                     }`}>
-                      {isWorkspace ? 'Workspace' : 'External'}
+                      {source[0].toUpperCase() + source.slice(1)}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{displayDesc}</p>
-                  <p className="text-xs text-muted-foreground/50 font-mono mt-0.5">{tool.name}</p>
+                  <p className="text-xs text-muted-foreground/50 font-mono mt-0.5">{source}/{skillId}</p>
                 </div>
                 {!readOnly && isWorkspace && (
                   <div className="flex items-center gap-1 shrink-0">
@@ -351,7 +351,7 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
           <h4 className="text-sm font-medium">External Directories</h4>
         </div>
         <p className="text-xs text-muted-foreground">
-          Directories with SKILL.md files are auto-discovered and registered as skill tools.
+          Directories with SKILL.md files are auto-discovered and available to agents through SearchSkills and LoadSkill.
         </p>
 
         {externalDirs.length > 0 && (

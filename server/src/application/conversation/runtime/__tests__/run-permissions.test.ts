@@ -2,22 +2,36 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPermissionCallback } from '../run-permissions.js';
 import { PhaseEmitter } from '../active-run-phase.js';
 
+async function shortRace<T>(promise: Promise<T>): Promise<T | 'pending'> {
+  return Promise.race([
+    promise,
+    new Promise<'pending'>((resolve) => setTimeout(() => resolve('pending'), 5)),
+  ]);
+}
+
 const {
   broadcastRunMessageMock,
   normalizeFromAskUserMock,
   permissionEvaluatorEvaluateMock,
+  evaluateMcpToolTrustPolicyMock,
   writePermissionLogMock,
   permissionWorkflowResolverMock,
+  mcpInventoryCacheMock,
 } = vi.hoisted(() => ({
   broadcastRunMessageMock: vi.fn(),
   normalizeFromAskUserMock: vi.fn(),
   permissionEvaluatorEvaluateMock: vi.fn(() => 'ask'),
+  evaluateMcpToolTrustPolicyMock: vi.fn(() => 'escalate'),
   writePermissionLogMock: vi.fn(),
   permissionWorkflowResolverMock: {
     triggerPermissionEscalation: vi.fn(async () => ({
       resolved: { workflowId: 'wf-system', source: 'system_fallback' },
       run: { id: 'wf-run-1' },
     })),
+  },
+  mcpInventoryCacheMock: {
+    configHash: vi.fn(() => 'hash-1'),
+    getCached: vi.fn(),
   },
 }));
 
@@ -67,6 +81,7 @@ vi.mock('../../agent/permission-evaluator.js', () => ({
   isOutsideWorkspacePathAllowed: vi.fn(() => false),
   mergePolicy: vi.fn((globalPolicy) => globalPolicy),
   normalizePolicy: vi.fn((policy) => policy),
+  evaluateMcpToolTrustPolicy: evaluateMcpToolTrustPolicyMock,
   PermissionEvaluator: class {
     evaluate(...args: unknown[]) {
       return permissionEvaluatorEvaluateMock(...args);
@@ -75,12 +90,37 @@ vi.mock('../../agent/permission-evaluator.js', () => ({
   resolveRememberedDecision: vi.fn(() => undefined),
 }));
 
+vi.mock('../../../../utils/mcp-inventory-cache.js', () => ({
+  mcpInventoryCache: mcpInventoryCacheMock,
+}));
+
 vi.mock('../../../../utils/server-utils.js', () => ({
   isBashLikeTool: vi.fn(() => true),
   isSudoCommand: vi.fn(() => false),
 }));
 
 function createInput() {
+  const dbPrepare = vi.fn((sql: string) => ({
+    run: vi.fn(),
+    get: vi.fn(() => {
+      if (sql.includes('FROM mcp_servers')) {
+        return {
+          name: 'github',
+          command: 'node',
+          args: '[]',
+          env: null,
+          enabled: 1,
+          trust_policy: JSON.stringify({
+            trustLevel: 'trusted-readonly',
+            trustReadOnlyHint: true,
+            defaultRiskAction: 'ask',
+            riskActions: { high: 'deny' },
+          }),
+        };
+      }
+      return undefined;
+    }),
+  }));
   return {
     activeRun: {
       rememberedDecisions: new Map(),
@@ -92,7 +132,7 @@ function createInput() {
       runId: 'run-1',
     },
     cwd: '/Users/test/workspace',
-    db: { prepare: vi.fn(() => ({ run: vi.fn() })) },
+    db: { prepare: dbPrepare },
     forcedPlanBySession: false,
     markPendingResolutionResumed: vi.fn(),
     message: { sessionId: 'session-1' },
@@ -116,6 +156,89 @@ describe('createPermissionCallback workflow routing', () => {
       run: { id: 'wf-run-1' },
     });
     permissionEvaluatorEvaluateMock.mockReturnValue('ask');
+    evaluateMcpToolTrustPolicyMock.mockReturnValue('escalate');
+    mcpInventoryCacheMock.getCached.mockReturnValue({
+      tools: [{
+        name: 'read_issue',
+        annotations: { readOnlyHint: true, openWorldHint: false },
+        inputSchema: { type: 'object' },
+      }],
+    });
+  });
+
+  it('auto-approves readonly MCP tools when trusted by server policy', async () => {
+    evaluateMcpToolTrustPolicyMock.mockReturnValue('approve');
+    const callback = createPermissionCallback(createInput() as any);
+
+    const decision = await shortRace(callback({
+      requestId: 'mcp-approve-1',
+      toolName: 'mcp__github__read_issue',
+      toolInput: { id: '1' },
+      detail: '{"id":"1"}',
+      timeoutSeconds: 0,
+    }));
+
+    expect(decision).toEqual({ behavior: 'allow', updatedInput: { id: '1' } });
+    expect(evaluateMcpToolTrustPolicyMock).toHaveBeenCalledWith(
+      expect.objectContaining({ declaredReadOnly: true, riskLevel: 'medium' }),
+      expect.objectContaining({ trustLevel: 'trusted-readonly' }),
+    );
+    expect(permissionEvaluatorEvaluateMock).not.toHaveBeenCalled();
+    expect(permissionWorkflowResolverMock.triggerPermissionEscalation).not.toHaveBeenCalled();
+    expect(broadcastRunMessageMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'agent_permission_intercepted',
+        toolName: 'mcp__github__read_issue',
+        decision: 'approve',
+        reason: expect.stringContaining('MCP trust policy'),
+        mcpTrust: expect.objectContaining({
+          server: 'github',
+          tool: 'read_issue',
+          policyDecision: 'approve',
+        }),
+      }),
+    );
+  });
+
+  it('denies MCP tools blocked by server trust policy', async () => {
+    mcpInventoryCacheMock.getCached.mockReturnValue({
+      tools: [{
+        name: 'delete_issue',
+        annotations: { destructiveHint: true },
+        inputSchema: { type: 'object' },
+      }],
+    });
+    evaluateMcpToolTrustPolicyMock.mockReturnValue('deny');
+    const callback = createPermissionCallback(createInput() as any);
+
+    const decision = await shortRace(callback({
+      requestId: 'mcp-deny-1',
+      toolName: 'mcp__github__delete_issue',
+      toolInput: { id: '1' },
+      detail: '{"id":"1"}',
+      timeoutSeconds: 0,
+    }));
+
+    expect(decision).not.toBe('pending');
+    if (decision === 'pending') return;
+    expect(decision.behavior).toBe('deny');
+    expect(decision.message).toContain('MCP trust policy');
+    expect(permissionEvaluatorEvaluateMock).not.toHaveBeenCalled();
+    expect(permissionWorkflowResolverMock.triggerPermissionEscalation).not.toHaveBeenCalled();
+    expect(writePermissionLogMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'session-1',
+      'mcp__github__delete_issue',
+      '{"id":"1"}',
+      'deny',
+      false,
+      expect.objectContaining({
+        server: 'github',
+        tool: 'delete_issue',
+        policyDecision: 'deny',
+      }),
+    );
   });
 
   it('triggers the resolved permission workflow and marks the request as workflow mode', async () => {

@@ -845,6 +845,88 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
     expect((mockAgentInstances[0].initialState as any).tools.length).toBe(ALL_TOOL_NAMES.length);
   });
 
+  it('adds external discovery meta tools when external tool state is present', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      cwd: '/tmp/project',
+      claudiaSessionId: 'session-1',
+      db: createTestDb(),
+      enabledTools: ['Read'],
+      externalToolState: {
+        discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+        pinnedExternalTools: [],
+        loadedExternalTools: [],
+      },
+    } as RunOptions);
+
+    const toolNames = ((mockAgentInstances.at(-1)?.initialState as any).tools ?? []).map((tool: any) => tool.name);
+    expect(toolNames).toEqual(expect.arrayContaining([
+      'Read',
+      'ListExternalToolProviders',
+      'SearchExternalTools',
+      'InspectExternalTool',
+      'LoadExternalTool',
+    ]));
+  });
+
+  it('adds skill meta tools and active skill context when skill state is present', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    const out = await collect(adapter, 'hi', {
+      cwd: '/tmp/project',
+      enabledTools: ['Read'],
+      skillState: {
+        discoverableSkills: [
+          {
+            id: 'design-spec',
+            name: 'design-spec',
+            description: 'Write technical design specs',
+            source: 'workspace',
+            filePath: '/tmp/skills/design-spec/SKILL.md',
+            dirPath: '/tmp/skills/design-spec',
+          },
+        ],
+        pinnedSkills: [],
+        loadedSkills: [{ source: 'workspace', id: 'design-spec' }],
+        loadedSkillContents: {
+          'workspace:design-spec': '# Design Spec\nFollow the TDS workflow.',
+        },
+      },
+    } as RunOptions);
+
+    const instance = mockAgentInstances.at(-1);
+    const toolNames = ((instance?.initialState as any).tools ?? []).map((tool: any) => tool.name);
+    const initTools = (out[0] as any).systemInfo.tools;
+    expect(toolNames).toEqual(expect.arrayContaining([
+      'Read',
+      'ListSkills',
+      'SearchSkills',
+      'InspectSkill',
+      'LoadSkill',
+      'RunSkill',
+    ]));
+    expect(initTools).toEqual(expect.arrayContaining([
+      'Read',
+      'ListSkills',
+      'SearchSkills',
+      'InspectSkill',
+      'LoadSkill',
+      'RunSkill',
+    ]));
+    expect((instance?.initialState as any).systemPrompt).toContain('Discoverable skills');
+    expect((instance?.initialState as any).systemPrompt).toContain('Active session skills');
+    expect((instance?.initialState as any).systemPrompt).toContain('Follow the TDS workflow.');
+  });
+
   it('passes 3 hooks to pi Agent constructor', async () => {
     scriptNextAgent([
       { type: 'agent_start' },

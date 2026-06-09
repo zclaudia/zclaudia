@@ -9,12 +9,18 @@ import {
   McpClient,
   type McpResourceDefinition,
   type McpResourceResult,
+  type McpPromptDefinition,
+  type McpPromptResult,
   type McpToolDefinition,
   type McpToolResult,
 } from './mcp-client.js';
+import { RemoteMcpClient } from './mcp-remote-client.js';
+import { mcpInventoryCache } from './mcp-inventory-cache.js';
+import type { McpServerStatus } from '@zclaudia/shared/core/mcp';
+import type { McpServerRuntimeConfig, McpStdioServerConfig } from './mcp-config.js';
 
 interface CachedClient {
-  client: McpClient;
+  client: McpClient | RemoteMcpClient;
   configKey: string;
   lastUsed: number;
   idleTimer: NodeJS.Timeout;
@@ -22,17 +28,34 @@ interface CachedClient {
 
 const IDLE_TIMEOUT_MS = 60_000; // 60 seconds
 
+function isAuthRequiredError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /\b(401|403|unauthorized|forbidden|auth(?:entication|orization)? required|oauth|login required)\b/i.test(message);
+}
+
+function authRequiredMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return `MCP server requires authentication before tools can be used. ${message}`;
+}
+
 export class McpClientManager {
   private clients = new Map<string, CachedClient>();
   /** Deduplicates concurrent getClient() calls for the same server. */
-  private connecting = new Map<string, Promise<McpClient>>();
+  private connecting = new Map<string, Promise<McpClient | RemoteMcpClient>>();
+  private statuses = new Map<string, McpServerStatus>();
 
-  private buildConfigKey(config: { command: string; args?: string[]; env?: Record<string, string> }): string {
-    const sortedEnv = Object.entries(config.env || {}).sort(([a], [b]) => a.localeCompare(b));
+  private buildConfigKey(config: McpServerRuntimeConfig): string {
+    const sortedEnv = Object.entries('env' in config ? config.env || {} : {}).sort(([a], [b]) => a.localeCompare(b));
+    const sortedHeaders = Object.entries('headers' in config ? config.headers || {} : {}).sort(([a], [b]) => a.localeCompare(b));
     return JSON.stringify({
+      transport: config.transport || 'stdio',
       command: config.command,
-      args: config.args || [],
+      args: 'args' in config ? config.args || [] : [],
       env: sortedEnv,
+      url: 'url' in config ? config.url : undefined,
+      headers: sortedHeaders,
+      oauthConfig: 'oauthConfig' in config ? config.oauthConfig : undefined,
+      oauthCredentials: 'oauthCredentials' in config ? config.oauthCredentials : undefined,
     });
   }
 
@@ -42,13 +65,14 @@ export class McpClientManager {
    */
   async getClient(
     serverName: string,
-    config: { command: string; args?: string[]; env?: Record<string, string> },
-  ): Promise<McpClient> {
+    config: McpServerRuntimeConfig,
+  ): Promise<McpClient | RemoteMcpClient> {
     const configKey = this.buildConfigKey(config);
     const cached = this.clients.get(serverName);
     if (cached?.client.isConnected && cached.configKey === configKey) {
       cached.lastUsed = Date.now();
       this.resetIdleTimer(serverName, cached);
+      this.markStatus(serverName, { state: 'connected' });
       return cached.client;
     }
 
@@ -68,16 +92,50 @@ export class McpClientManager {
   private async createClient(
     serverName: string,
     configKey: string,
-    config: { command: string; args?: string[]; env?: Record<string, string> },
-  ): Promise<McpClient> {
+    config: McpServerRuntimeConfig,
+  ): Promise<McpClient | RemoteMcpClient> {
     // Clean up stale entry, including config changes for the same server name.
     const cached = this.clients.get(serverName);
     if (cached) {
+      mcpInventoryCache.invalidate(serverName);
       await this.evict(serverName);
     }
 
-    const client = new McpClient(config.command, config.args || [], config.env);
-    await client.connect();
+    this.markStatus(serverName, { state: 'connecting', lastError: undefined });
+    let client: McpClient | RemoteMcpClient;
+    if ('url' in config && (config.transport === 'streamable-http' || config.transport === 'sse')) {
+      client = new RemoteMcpClient({
+        transport: config.transport,
+        url: config.url,
+        headers: config.headers,
+        oauthConfig: config.oauthConfig,
+        oauthCredentials: config.oauthCredentials,
+        onOAuthCredentials: config.onOAuthCredentials,
+      });
+    } else {
+      const stdioConfig = config as McpStdioServerConfig;
+      client = new McpClient(stdioConfig.command, stdioConfig.args || [], stdioConfig.env);
+    }
+    try {
+      await client.connect();
+    } catch (err) {
+      if (isAuthRequiredError(err)) {
+        this.markStatus(serverName, {
+          state: 'needs-auth',
+          lastError: err instanceof Error ? err.message : String(err),
+          authRequired: true,
+          authMessage: authRequiredMessage(err),
+        });
+        throw err;
+      }
+      this.markStatus(serverName, {
+        state: 'failed',
+        lastError: err instanceof Error ? err.message : String(err),
+        authRequired: false,
+        authMessage: undefined,
+      });
+      throw err;
+    }
 
     const entry: CachedClient = {
       client,
@@ -86,8 +144,58 @@ export class McpClientManager {
       idleTimer: setTimeout(() => this.evict(serverName), IDLE_TIMEOUT_MS),
     };
     this.clients.set(serverName, entry);
+    this.markStatus(serverName, {
+      state: 'connected',
+      lastConnectedAt: Date.now(),
+      lastError: undefined,
+      authRequired: false,
+      authMessage: undefined,
+      hasInstructions: !!client.instructions,
+      instructions: client.instructions,
+    });
 
     return client;
+  }
+
+  async connect(
+    serverName: string,
+    config: McpServerRuntimeConfig,
+  ): Promise<McpClient | RemoteMcpClient> {
+    return this.getClient(serverName, config);
+  }
+
+  async disconnect(serverName: string): Promise<void> {
+    mcpInventoryCache.invalidate(serverName);
+    await this.evict(serverName);
+    this.markStatus(serverName, {
+      state: 'idle-disconnected',
+      lastDisconnectedAt: Date.now(),
+    });
+  }
+
+  async refresh(
+    serverName: string,
+    config: McpServerRuntimeConfig,
+  ): Promise<McpClient | RemoteMcpClient> {
+    mcpInventoryCache.invalidate(serverName);
+    await this.evict(serverName);
+    return this.getClient(serverName, config);
+  }
+
+  getStatus(serverName: string): McpServerStatus {
+    if (this.connecting.has(serverName)) {
+      return { ...this.statuses.get(serverName), name: serverName, state: 'connecting' };
+    }
+    const cached = this.clients.get(serverName);
+    if (cached?.client.isConnected) {
+      return { ...this.statuses.get(serverName), name: serverName, state: 'connected' };
+    }
+    return this.statuses.get(serverName) ?? { name: serverName, state: 'configured' };
+  }
+
+  listStatuses(): McpServerStatus[] {
+    const names = new Set([...this.statuses.keys(), ...this.clients.keys(), ...this.connecting.keys()]);
+    return [...names].sort().map((name) => this.getStatus(name));
   }
 
   /**
@@ -95,7 +203,7 @@ export class McpClientManager {
    */
   async callTool(
     serverName: string,
-    config: { command: string; args?: string[]; env?: Record<string, string> },
+    config: McpServerRuntimeConfig,
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpToolResult> {
@@ -108,7 +216,7 @@ export class McpClientManager {
    */
   async listTools(
     serverName: string,
-    config: { command: string; args?: string[]; env?: Record<string, string> },
+    config: McpServerRuntimeConfig,
   ): Promise<McpToolDefinition[]> {
     const client = await this.getClient(serverName, config);
     return client.listTools();
@@ -116,7 +224,7 @@ export class McpClientManager {
 
   async listResources(
     serverName: string,
-    config: { command: string; args?: string[]; env?: Record<string, string> },
+    config: McpServerRuntimeConfig,
   ): Promise<McpResourceDefinition[]> {
     const client = await this.getClient(serverName, config);
     return client.listResources();
@@ -124,11 +232,29 @@ export class McpClientManager {
 
   async readResource(
     serverName: string,
-    config: { command: string; args?: string[]; env?: Record<string, string> },
+    config: McpServerRuntimeConfig,
     uri: string,
   ): Promise<McpResourceResult> {
     const client = await this.getClient(serverName, config);
     return client.readResource(uri);
+  }
+
+  async listPrompts(
+    serverName: string,
+    config: McpServerRuntimeConfig,
+  ): Promise<McpPromptDefinition[]> {
+    const client = await this.getClient(serverName, config);
+    return client.listPrompts();
+  }
+
+  async getPrompt(
+    serverName: string,
+    config: McpServerRuntimeConfig,
+    name: string,
+    args?: Record<string, unknown>,
+  ): Promise<McpPromptResult> {
+    const client = await this.getClient(serverName, config);
+    return client.getPrompt(name, args);
   }
 
   /**
@@ -153,10 +279,19 @@ export class McpClientManager {
 
     try {
       await entry.client.disconnect();
+      this.markStatus(name, {
+        state: 'idle-disconnected',
+        lastDisconnectedAt: Date.now(),
+      });
       console.log(`[McpClientManager] Disconnected idle MCP server: ${name}`);
     } catch (err) {
       console.error(`[McpClientManager] Error disconnecting ${name}:`, err);
     }
+  }
+
+  private markStatus(name: string, patch: Partial<McpServerStatus>): void {
+    const previous = this.statuses.get(name) ?? { name, state: 'configured' as const };
+    this.statuses.set(name, { ...previous, ...patch, name });
   }
 }
 

@@ -12,6 +12,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import { persistMcpInstructionsDeltaForSession } from './mcp-instructions-delta.js';
 
 interface LaunchProviderRunInput {
   activeRun: ActiveRun;
@@ -118,6 +119,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     } as import('@zclaudia/shared/wire/messages').BackgroundTaskUpdateMessage);
   }
 
+  persistMcpInstructionsDeltaForSession(db as import('better-sqlite3').Database, message.sessionId);
+
   const { runOptions } = await buildRunContext({
     adapter,
     agentProfile,
@@ -136,6 +139,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     session,
     sessionType,
   });
+  runOptions.externalToolState = activeRun.externalToolState;
+  runOptions.skillState = activeRun.skillState;
 
   // Wire mid-run steering callbacks. The closure captures `activeRun` directly
   // (not via activeRuns map) so registration is robust even if the run is

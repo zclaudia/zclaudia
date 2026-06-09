@@ -55,6 +55,9 @@ vi.mock('../../services/api', () => ({
   deleteAgentProfile: vi.fn(),
   setDefaultAgentProfile: vi.fn(),
   listLlmProfiles: vi.fn(),
+  getWorkspaceSkills: vi.fn(),
+  getMcpServers: vi.fn(),
+  getMcpServerStatuses: vi.fn(),
 }));
 
 describe('AgentManager', () => {
@@ -97,8 +100,15 @@ describe('AgentManager', () => {
       enabledTools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'Glob', 'LS'],
       toolSelection: {
         sets: [{ source: 'builtin', id: 'core-coding' }],
+        providers: [],
         include: [],
         exclude: [],
+      },
+      skillSelection: {
+        providers: [{ source: 'workspace' as const }, { source: 'external' as const }, { source: 'plugin' as const }],
+        include: [],
+        exclude: [],
+        pinned: [],
       },
       isDefault: true,
       createdAt: Date.now(),
@@ -110,6 +120,41 @@ describe('AgentManager', () => {
     vi.clearAllMocks();
     vi.mocked(api.listAgentProfiles).mockResolvedValue(mockAgents);
     vi.mocked(api.listLlmProfiles).mockResolvedValue(mockLlmProfiles);
+    vi.mocked(api.getWorkspaceSkills).mockResolvedValue([
+      {
+        id: 'coding-guidelines',
+        name: 'coding-guidelines',
+        description: 'Follow project conventions',
+        path: '/skills/coding-guidelines/SKILL.md',
+        source: 'workspace',
+      },
+      {
+        id: 'security-audit',
+        name: 'security-audit',
+        description: 'Audit code',
+        path: '/skills/security-audit/SKILL.md',
+        source: 'external',
+      },
+    ]);
+    vi.mocked(api.getMcpServers).mockResolvedValue([
+      {
+        id: 'mcp-1',
+        name: 'github',
+        command: 'npx',
+        args: ['github-mcp'],
+        enabled: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ]);
+    vi.mocked(api.getMcpServerStatuses).mockResolvedValue([
+      {
+        name: 'github',
+        state: 'connected',
+        enabled: true,
+        inventory: { tools: 2, resources: 1, prompts: 0 },
+      },
+    ]);
     vi.mocked(api.createAgentProfile).mockResolvedValue(mockAgents[0]);
     vi.mocked(api.updateAgentProfile).mockResolvedValue(mockAgents[0]);
     vi.mocked(api.deleteAgentProfile).mockResolvedValue(undefined);
@@ -227,6 +272,7 @@ describe('AgentManager', () => {
           systemPrompt: 'You are a doc writer',
           toolSelection: {
             sets: [],
+            providers: [],
             include: [
               { source: 'builtin', name: 'Read' },
               { source: 'builtin', name: 'Write' },
@@ -242,6 +288,198 @@ describe('AgentManager', () => {
           thinkingLevel: 'low',
           isDefault: true,
         })
+      );
+    });
+  });
+
+  it('shows persisted external providers and pinned external tool count in the edit form', async () => {
+    vi.mocked(api.listAgentProfiles).mockResolvedValue([
+      {
+        ...mockAgents[0],
+        toolSelection: {
+          sets: [{ source: 'builtin', id: 'core-coding' }],
+          providers: [{ source: 'mcp', serverId: 'github' }],
+          include: [{ source: 'mcp', server: 'github', tool: 'search_repositories' }],
+          exclude: [],
+        },
+      },
+    ]);
+
+    await renderAgentManager({ onClose: mockOnClose });
+
+    await waitForFast(() => {
+      expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+    });
+
+    await clickAsync(screen.getAllByTitle('Edit')[0]);
+
+    expect(screen.getByText('External Tool Providers')).toBeInTheDocument();
+    expect(screen.getByText('mcp/github')).toBeInTheDocument();
+    expect(screen.getByText('1 pinned external tool')).toBeInTheDocument();
+  });
+
+  it('adds configured MCP providers from the profile editor', async () => {
+    vi.mocked(api.listAgentProfiles).mockResolvedValue([
+      {
+        ...mockAgents[0],
+        toolSelection: {
+          sets: [{ source: 'builtin', id: 'core-coding' }],
+          providers: [],
+          include: [],
+          exclude: [],
+        },
+      },
+    ]);
+
+    await renderAgentManager();
+    await waitForFast(() => expect(screen.getByText('Default Coding Agent')).toBeInTheDocument());
+    await clickAsync(screen.getAllByTitle('Edit')[0]);
+
+    expect(screen.getByText('mcp/github')).toBeInTheDocument();
+    expect(screen.getByText('tools 2 | resources 1 | prompts 0')).toBeInTheDocument();
+    await clickAsync(screen.getByText('Add'));
+    await clickAsync(screen.getByText('Update'));
+
+    await waitForFast(() => {
+      expect(api.updateAgentProfile).toHaveBeenCalledWith(
+        'agent-1',
+        expect.objectContaining({
+          toolSelection: expect.objectContaining({
+            providers: [{ source: 'mcp', serverId: 'github' }],
+          }),
+        }),
+      );
+    });
+  });
+
+  it('shows MCP provider trust summary in the profile editor', async () => {
+    vi.mocked(api.getMcpServers).mockResolvedValue([
+      {
+        id: 'mcp-1',
+        name: 'github',
+        command: 'npx',
+        args: ['github-mcp'],
+        enabled: true,
+        trustPolicy: {
+          trustLevel: 'trusted-readonly',
+          trustReadOnlyHint: true,
+          defaultRiskAction: 'ask',
+          riskActions: { high: 'deny' },
+        },
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      },
+    ]);
+
+    await renderAgentManager({ onClose: mockOnClose });
+    await waitForFast(() => expect(screen.getByText('Default Coding Agent')).toBeInTheDocument());
+    await clickAsync(screen.getAllByTitle('Edit')[0]);
+
+    expect(screen.getByText('trust trusted-readonly')).toBeInTheDocument();
+    expect(screen.getByText('default ask')).toBeInTheDocument();
+    expect(screen.getByText('readonly hints trusted')).toBeInTheDocument();
+    expect(screen.getByText('high deny')).toBeInTheDocument();
+  });
+
+  it('edits skill selection sources and pinned inline skills', async () => {
+    vi.mocked(api.listAgentProfiles).mockResolvedValue([
+      {
+        ...mockAgents[0],
+        skillSelection: {
+          providers: [{ source: 'workspace' }],
+          include: [],
+          exclude: [],
+          pinned: [],
+        },
+      },
+    ]);
+
+    await renderAgentManager({ onClose: mockOnClose });
+
+    await waitForFast(() => {
+      expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+    });
+
+    await clickAsync(screen.getAllByTitle('Edit')[0]);
+
+    expect(screen.getByText('Skills')).toBeInTheDocument();
+    expect(screen.getByText('coding-guidelines')).toBeInTheDocument();
+    expect(screen.getByText('security-audit')).toBeInTheDocument();
+
+    await clickAsync(screen.getByLabelText('enable external skills'));
+    fireEvent.change(screen.getByLabelText('skill visibility external:security-audit'), {
+      target: { value: 'include' },
+    });
+    await clickAsync(screen.getByLabelText('pin skill external:security-audit'));
+    await clickAsync(screen.getByText('Update'));
+
+    await waitForFast(() => {
+      expect(api.updateAgentProfile).toHaveBeenCalledWith(
+        'agent-1',
+        expect.objectContaining({
+          skillSelection: {
+            providers: [{ source: 'workspace' }, { source: 'external' }],
+            include: [{ source: 'external', id: 'security-audit' }],
+            exclude: [],
+            pinned: [{ source: 'external', id: 'security-audit' }],
+          },
+        }),
+      );
+    });
+  });
+
+  it('edits skill execution policy overrides', async () => {
+    vi.mocked(api.listAgentProfiles).mockResolvedValue([
+      {
+        ...mockAgents[0],
+        skillExecution: {
+          overrides: [
+            {
+              ref: { source: 'workspace', id: 'coding-guidelines' },
+              defaultMode: 'inline',
+            },
+          ],
+        },
+      },
+    ]);
+
+    await renderAgentManager({ onClose: mockOnClose });
+
+    await waitForFast(() => {
+      expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+    });
+
+    await clickAsync(screen.getAllByTitle('Edit')[0]);
+
+    expect(screen.getByText('1 policy overrides')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('skill default mode external:security-audit'), {
+      target: { value: 'fork' },
+    });
+    await clickAsync(screen.getByLabelText('allow fork skill external:security-audit'));
+    fireEvent.change(screen.getByLabelText('skill fork tool policy external:security-audit'), {
+      target: { value: 'web' },
+    });
+    await clickAsync(screen.getByText('Update'));
+
+    await waitForFast(() => {
+      expect(api.updateAgentProfile).toHaveBeenCalledWith(
+        'agent-1',
+        expect.objectContaining({
+          skillExecution: {
+            overrides: [
+              {
+                ref: { source: 'workspace', id: 'coding-guidelines' },
+                defaultMode: 'inline',
+              },
+              {
+                ref: { source: 'external', id: 'security-audit' },
+                allowedModes: ['fork'],
+                defaultMode: 'fork',
+                forkToolPolicy: 'web',
+              },
+            ],
+          },
+        }),
       );
     });
   });

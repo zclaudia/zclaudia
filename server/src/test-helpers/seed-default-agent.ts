@@ -71,6 +71,8 @@ export function createAgentProfilesTable(db: Database.Database): void {
       system_prompt TEXT NOT NULL DEFAULT '',
       enabled_tools TEXT NOT NULL DEFAULT '["Read","Write","Edit","Bash","Grep","Find","Glob","LS"]',
       tool_selection TEXT,
+      skill_selection TEXT,
+      skill_execution TEXT,
       thinking_level TEXT,
       is_default INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,

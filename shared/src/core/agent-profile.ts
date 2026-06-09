@@ -1,4 +1,5 @@
 import type { ToolRef, ToolSelection } from './tools.js';
+import type { SkillExecutionSelection, SkillSelection } from './skills.js';
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
@@ -15,8 +16,15 @@ export interface AgentProfileConfig {
   toolSelection?: ToolSelection;
   /** Resolved tool refs returned by APIs for display/debugging; not persisted directly. */
   resolvedTools?: ToolRef[];
+  /** Optional profile-level skill visibility and pinned inline context configuration. */
+  skillSelection?: SkillSelection;
+  /** Optional profile-level skill execution policy overrides. */
+  skillExecution?: SkillExecutionSelection;
   thinkingLevel?: ThinkingLevel;
   isDefault?: boolean;
+  source?: 'user' | 'plugin';
+  pluginId?: string;
+  pluginProfileId?: string;
   createdAt: number;
   updatedAt: number;
 }

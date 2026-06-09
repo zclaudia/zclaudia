@@ -3,3 +3,24 @@ export { buildAgentHooks, truncateContent, DEFAULT_OUTPUT_LIMIT_BYTES, type Agen
 export { translateToolEvent, type TranslateToolContext } from './tool-event-translator.js';
 export { rebuildHistory, HISTORY_LIMIT } from './history-rebuilder.js';
 export { buildModel, type BuiltModel } from './build-model.js';
+export {
+  buildExternalMetaTools,
+  buildExternalProviderCatalog,
+  concreteMcpToolName,
+  createConcreteMcpTool,
+  externalToolKey,
+  type ExternalToolRuntimeState,
+  type LoadedExternalToolSchema,
+} from './external-tools.js';
+export {
+  buildActiveSkillContext,
+  buildSkillCatalog,
+  buildSkillMetaTools,
+  createSkillRuntimeState,
+  resolveSkillExecutionPolicy,
+  skillRefKey,
+  type SkillExecutionDependencies,
+  type SkillExecutionMode,
+  type SkillExecutionPolicy,
+  type SkillRuntimeState,
+} from './skills.js';

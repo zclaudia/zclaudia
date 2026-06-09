@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import Database from 'better-sqlite3';
-import { initializeRunBootstrap } from '../run-bootstrap.js';
+import { buildSkillRuntimeState, initializeRunBootstrap } from '../run-bootstrap.js';
 import { createAgentProfilesTable } from '../../../../test-helpers/seed-default-agent.js';
 
 interface CreateDbOptions {
@@ -15,6 +15,7 @@ interface CreateDbOptions {
   agentSystemPrompt?: string;
   agentEnabledTools?: string[];
   agentToolSelection?: Record<string, unknown>;
+  agentSkillSelection?: Record<string, unknown>;
   agentThinkingLevel?: string | null;
   agentModel?: string;
   /** Override the agent.id assigned to the session (default 'agent-1'); use to test stale agent_profile_id. */
@@ -116,16 +117,17 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
   // Always seed a default agent so the bootstrap chain works.
   db.prepare(`
     INSERT INTO agent_profiles (
-      id, name, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, thinking_level,
+      id, name, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, thinking_level,
       is_default, created_at, updated_at
     )
-    VALUES ('agent-1', 'Test Agent', ?, ?, ?, ?, ?, ?, 1, ?, ?)
+    VALUES ('agent-1', 'Test Agent', ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).run(
     agentLlmProfileId,
     options.agentModel ?? 'claude-sonnet-4-6',
     options.agentSystemPrompt ?? '',
     JSON.stringify(options.agentEnabledTools ?? ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls']),
     options.agentToolSelection ? JSON.stringify(options.agentToolSelection) : null,
+    options.agentSkillSelection ? JSON.stringify(options.agentSkillSelection) : null,
     options.agentThinkingLevel ?? null,
     now,
     now,
@@ -261,6 +263,7 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
       agentEnabledTools: ['read'],
       agentToolSelection: {
         sets: [{ source: 'builtin', id: 'core-coding' }],
+        providers: [],
         include: [{ source: 'plugin', pluginId: 'jira', toolId: 'search' }],
         exclude: [{ source: 'builtin', name: 'Bash' }],
       },
@@ -268,6 +271,97 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
 
     expect(result?.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Grep', 'Find', 'Glob', 'LS']);
     expect(result?.agentProfile.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
+  });
+
+  it('hydrates session-scoped external tool state from agent toolSelection', () => {
+    const result = bootstrap('anthropic', 'default', {
+      apiKey: 'sk-test',
+      agentToolSelection: {
+        sets: [{ source: 'builtin', id: 'core-coding' }],
+        providers: [{ source: 'mcp', serverId: 'github' }],
+        include: [{ source: 'mcp', server: 'github', tool: 'search_repositories' }],
+        exclude: [],
+      },
+    });
+
+    expect(result?.activeRun.externalToolState).toEqual({
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [{ source: 'mcp', server: 'github', tool: 'search_repositories' }],
+      loadedExternalTools: [{ source: 'mcp', server: 'github', tool: 'search_repositories' }],
+    });
+  });
+
+  it('initializes session-scoped skill runtime state', () => {
+    const result = bootstrap('anthropic', 'default', {
+      apiKey: 'sk-test',
+    });
+
+    expect(result?.activeRun.skillState).toEqual(expect.objectContaining({
+      discoverableSkills: expect.any(Array),
+      pinnedSkills: [],
+      loadedSkills: [],
+      loadedSkillContents: {},
+    }));
+  });
+
+  it('builds skill runtime state from profile skillSelection', () => {
+    const skills = [
+      { source: 'workspace' as const, id: 'guidelines', name: 'guidelines', description: 'Follow rules', filePath: '/skills/guidelines/SKILL.md', dirPath: '/skills/guidelines' },
+      { source: 'external' as const, id: 'audit', name: 'audit', description: 'Audit code', filePath: '/skills/audit/SKILL.md', dirPath: '/skills/audit' },
+      { source: 'plugin' as const, id: 'plugin-reviewer', name: 'plugin-reviewer', description: 'Review code', filePath: '/skills/plugin-reviewer/SKILL.md', dirPath: '/skills/plugin-reviewer' },
+    ];
+
+    const state = buildSkillRuntimeState({
+      id: 'agent-1',
+      name: 'agent',
+      llmProfileId: 'llm-1',
+      model: 'm',
+      systemPrompt: '',
+      enabledTools: [],
+      skillSelection: {
+        providers: [{ source: 'workspace' }],
+        include: [{ source: 'external', id: 'audit' }],
+        exclude: [{ source: 'workspace', id: 'guidelines' }],
+        pinned: [{ source: 'external', id: 'audit' }],
+      },
+      createdAt: 0,
+      updatedAt: 0,
+    }, skills, (ref) => ref.id === 'audit' ? '# Audit\nReview carefully.' : null);
+
+    expect(state.discoverableSkills.map((skill) => `${skill.source}:${skill.id}`)).toEqual(['external:audit']);
+    expect(state.pinnedSkills).toEqual([{ source: 'external', id: 'audit' }]);
+    expect(state.loadedSkills).toEqual([{ source: 'external', id: 'audit' }]);
+    expect(state.loadedSkillContents['external:audit']).toContain('# Audit');
+  });
+
+  it('skips missing or hidden pinned skills without failing bootstrap state creation', () => {
+    const skills = [
+      { source: 'workspace' as const, id: 'guidelines', name: 'guidelines', description: 'Follow rules', filePath: '/skills/guidelines/SKILL.md', dirPath: '/skills/guidelines' },
+    ];
+
+    const state = buildSkillRuntimeState({
+      id: 'agent-1',
+      name: 'agent',
+      llmProfileId: 'llm-1',
+      model: 'm',
+      systemPrompt: '',
+      enabledTools: [],
+      skillSelection: {
+        providers: [{ source: 'workspace' }],
+        exclude: [{ source: 'workspace', id: 'guidelines' }],
+        pinned: [
+          { source: 'workspace', id: 'guidelines' },
+          { source: 'external', id: 'missing' },
+        ],
+      },
+      createdAt: 0,
+      updatedAt: 0,
+    }, skills, () => '# unused');
+
+    expect(state.discoverableSkills).toEqual([]);
+    expect(state.pinnedSkills).toEqual([]);
+    expect(state.loadedSkills).toEqual([]);
+    expect(state.loadedSkillContents).toEqual({});
   });
 
   it('falls back to default agent when session.agent_profile_id is stale (warn log)', () => {

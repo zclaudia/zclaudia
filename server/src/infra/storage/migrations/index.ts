@@ -8,6 +8,11 @@ import { migration as m_005_llm_profile_oauth } from './005_llm_profile_oauth.js
 import { migration as m_006_tasks } from './006_tasks.js';
 import { migration as m_007_drop_legacy_orchestrator_tasks } from './007_drop_legacy_orchestrator_tasks.js';
 import { migration as m_008_agent_profile_tool_selection } from './008_agent_profile_tool_selection.js';
+import { migration as m_009_agent_profile_skill_selection } from './009_agent_profile_skill_selection.js';
+import { migration as m_010_agent_profile_skill_execution } from './010_agent_profile_skill_execution.js';
+import { migration as m_011_mcp_server_trust_policy } from './011_mcp_server_trust_policy.js';
+import { migration as m_012_mcp_remote_oauth } from './012_mcp_remote_oauth.js';
+import { migration as m_013_agent_profile_plugin_ownership } from './013_agent_profile_plugin_ownership.js';
 
 export type { Migration };
 
@@ -20,6 +25,11 @@ export const migrations: Migration[] = [
   m_006_tasks,
   m_007_drop_legacy_orchestrator_tasks,
   m_008_agent_profile_tool_selection,
+  m_009_agent_profile_skill_selection,
+  m_010_agent_profile_skill_execution,
+  m_011_mcp_server_trust_policy,
+  m_012_mcp_remote_oauth,
+  m_013_agent_profile_plugin_ownership,
 ];
 
 /**

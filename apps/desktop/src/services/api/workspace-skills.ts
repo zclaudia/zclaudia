@@ -1,11 +1,10 @@
 import { fetchLocalApi } from './base';
-import { useServerStore } from '../../stores/serverStore';
-
 export interface WorkspaceSkillInfo {
   id: string;
   name: string;
   description: string;
   path: string;
+  source?: 'workspace' | 'external' | 'plugin';
 }
 
 export async function getWorkspaceSkills(): Promise<WorkspaceSkillInfo[]> {
@@ -34,27 +33,6 @@ export async function deleteWorkspaceSkill(skillId: string): Promise<void> {
     method: 'DELETE',
   });
   if (!result.success) throw new Error(result.error?.message || 'Failed to delete workspace skill');
-}
-
-export interface RegisteredSkillTool {
-  name: string;
-  description: string;
-}
-
-export async function getRegisteredSkillTools(): Promise<RegisteredSkillTool[]> {
-  // Uses raw fetch with different error handling — returns [] on failure
-  try {
-    const localPort = useServerStore.getState().localServerPort || 3100;
-    const response = await fetch(`http://localhost:${localPort}/api/plugins/tools`);
-    if (!response.ok) return [];
-    const data = await response.json() as { tools?: Array<{ name: string; description?: string }> };
-    if (!data.tools) return [];
-    return data.tools
-      .filter(t => t.name.startsWith('skill__'))
-      .map(t => ({ name: t.name, description: t.description || '' }));
-  } catch {
-    return [];
-  }
 }
 
 export async function getExternalSkillDirs(): Promise<string[]> {

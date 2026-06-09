@@ -1,11 +1,31 @@
 import type Database from 'better-sqlite3';
+import type { McpOAuthConfig, McpOAuthCredentials, McpServerTransport } from '@zclaudia/shared/core/mcp';
+import {
+  normalizeMcpHeaders,
+  normalizeMcpOAuthConfig,
+  normalizeMcpOAuthCredentials,
+  normalizeMcpServerTransport,
+} from '@zclaudia/shared/core/mcp';
 
 export interface McpStdioServerConfig {
   type?: 'stdio';
+  transport?: 'stdio';
   command: string;
   args?: string[];
   env?: Record<string, string>;
 }
+
+export interface McpRemoteServerConfig {
+  transport: Exclude<McpServerTransport, 'stdio'>;
+  command: string;
+  url: string;
+  headers?: Record<string, string>;
+  oauthConfig?: McpOAuthConfig;
+  oauthCredentials?: McpOAuthCredentials;
+  onOAuthCredentials?: (credentials: McpOAuthCredentials | null) => void | Promise<void>;
+}
+
+export type McpServerRuntimeConfig = McpStdioServerConfig | McpRemoteServerConfig;
 
 interface McpServerRow {
   name: string;
@@ -13,6 +33,11 @@ interface McpServerRow {
   args: string | null;
   env: string | null;
   provider_scope: string | null;
+  transport?: string | null;
+  url?: string | null;
+  headers?: string | null;
+  oauth_config?: string | null;
+  oauth_credentials?: string | null;
 }
 
 /**
@@ -21,12 +46,14 @@ interface McpServerRow {
 export function loadMcpServersFromDb(
   db: Database.Database,
   providerType?: string
-): Record<string, McpStdioServerConfig> {
+): Record<string, McpServerRuntimeConfig> {
   const rows = db.prepare(
-    'SELECT name, command, args, env, provider_scope FROM mcp_servers WHERE enabled = 1'
+    `SELECT name, command, args, env, provider_scope,
+            transport, url, headers, oauth_config, oauth_credentials
+     FROM mcp_servers WHERE enabled = 1`
   ).all() as McpServerRow[];
 
-  const servers: Record<string, McpStdioServerConfig> = {};
+  const servers: Record<string, McpServerRuntimeConfig> = {};
   for (const row of rows) {
     // Filter by provider scope if specified
     if (providerType && row.provider_scope) {
@@ -38,11 +65,25 @@ export function loadMcpServersFromDb(
       }
     }
 
-    servers[row.name] = {
-      command: row.command,
-      ...(row.args && { args: JSON.parse(row.args) as string[] }),
-      ...(row.env && { env: JSON.parse(row.env) as Record<string, string> }),
-    };
+    const transport = normalizeMcpServerTransport(row.transport);
+    if (transport === 'streamable-http' || transport === 'sse') {
+      if (!row.url) continue;
+      servers[row.name] = {
+        transport,
+        command: row.command,
+        url: row.url,
+        ...(row.headers && { headers: normalizeMcpHeaders(JSON.parse(row.headers)) }),
+        ...(row.oauth_config && { oauthConfig: normalizeMcpOAuthConfig(JSON.parse(row.oauth_config)) }),
+        ...(row.oauth_credentials && { oauthCredentials: normalizeMcpOAuthCredentials(JSON.parse(row.oauth_credentials)) }),
+      };
+    } else {
+      servers[row.name] = {
+        command: row.command,
+        transport: 'stdio',
+        ...(row.args && { args: JSON.parse(row.args) as string[] }),
+        ...(row.env && { env: JSON.parse(row.env) as Record<string, string> }),
+      };
+    }
   }
 
   if (Object.keys(servers).length > 0) {

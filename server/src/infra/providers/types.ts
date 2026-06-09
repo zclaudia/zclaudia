@@ -8,6 +8,7 @@ import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { ClaudeMessage, PermissionCallback } from './message-types.js';
 import type { TaskExecutor } from '../../domains/tasks/executors/types.js';
+import type { ExternalToolRuntimeState, SkillRuntimeState } from './pi-runtime/index.js';
 
 /** Handle exposed to the application after pi Agent construction, for mid-run steering. */
 export interface SteerHandle {
@@ -41,6 +42,10 @@ export interface RunOptions {
   agentProfile?: AgentProfileConfig;
   /** Subset of pi tools to enable (derived from agent.enabledTools). */
   enabledTools?: ToolName[];
+  /** Session-scoped progressive external tool state. */
+  externalToolState?: ExternalToolRuntimeState;
+  /** Session-scoped progressive skill context state. */
+  skillState?: SkillRuntimeState;
   /** Pi thinking budget; undefined = pi default. */
   thinkingLevel?: ThinkingLevel;
   /** Called once synchronously after the pi Agent is instantiated. Application registers handle for mid-run steer. */

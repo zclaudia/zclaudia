@@ -55,6 +55,20 @@ export interface McpResourceResult {
   }>;
 }
 
+export interface McpPromptDefinition {
+  name: string;
+  description?: string;
+  arguments?: Array<{ name: string; description?: string; required?: boolean }>;
+}
+
+export interface McpPromptResult {
+  description?: string;
+  messages?: Array<{
+    role: string;
+    content: { type: string; text?: string; [key: string]: unknown };
+  }>;
+}
+
 // ── Command validation ─────────────────────────────────────
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -89,6 +103,7 @@ export class McpClient {
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void; timeoutId: NodeJS.Timeout }>();
   private connected = false;
   private framingMode: 'content-length' | 'newline' | null = null;
+  private serverInstructions: string | undefined;
 
   constructor(
     private command: string,
@@ -136,7 +151,8 @@ export class McpClient {
       protocolVersion: '2024-11-05',
       capabilities: {},
       clientInfo: { name: 'claudia-mcp-client', version: '0.1.0' },
-    }) as { protocolVersion?: string };
+    }) as { protocolVersion?: string; instructions?: string };
+    this.serverInstructions = result?.instructions?.trim() || undefined;
 
     // Send initialized notification
     this.sendNotification('notifications/initialized');
@@ -176,6 +192,10 @@ export class McpClient {
     return this.connected;
   }
 
+  get instructions(): string | undefined {
+    return this.serverInstructions;
+  }
+
   // ── Public API ──────────────────────────────────────────
 
   async listTools(): Promise<McpToolDefinition[]> {
@@ -195,6 +215,16 @@ export class McpClient {
 
   async readResource(uri: string): Promise<McpResourceResult> {
     const result = await this.request('resources/read', { uri }) as McpResourceResult;
+    return result;
+  }
+
+  async listPrompts(): Promise<McpPromptDefinition[]> {
+    const result = await this.request('prompts/list', {}) as { prompts?: McpPromptDefinition[] };
+    return result?.prompts || [];
+  }
+
+  async getPrompt(name: string, args?: Record<string, unknown>): Promise<McpPromptResult> {
+    const result = await this.request('prompts/get', { name, arguments: args ?? {} }) as McpPromptResult;
     return result;
   }
 

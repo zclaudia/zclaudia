@@ -8,6 +8,7 @@ export function writePermissionLog(
   detail: string,
   decision: 'allow' | 'deny',
   remembered: boolean,
+  _metadata?: unknown,
 ): void {
   try {
     db.prepare(

@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import type { AgentProfileConfig, ThinkingLevel, LlmProfileConfig, ToolName, ToolSelection } from '@zclaudia/shared';
+import type {
+  AgentProfileConfig,
+  ThinkingLevel,
+  LlmProfileConfig,
+  McpServerConfig,
+  McpServerStatus,
+  ToolName,
+  ToolSelection,
+  SkillSelection,
+  SkillRef,
+  SkillSource,
+  SkillExecutionSelection,
+  SkillExecutionMode,
+  SkillForkToolPolicy,
+} from '@zclaudia/shared';
 import {
   BUILTIN_TOOL_SETS,
   BUILTIN_TOOL_METADATA,
@@ -8,6 +22,8 @@ import {
   defaultToolSelection,
   legacyEnabledToolsToSelection,
   resolveToolSelection,
+  defaultSkillSelection,
+  skillRefKey,
 } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -23,6 +39,8 @@ interface AgentManagerProps {
 }
 
 type ThinkingLevelOption = '' | ThinkingLevel;
+type SkillDefaultModeOption = 'default' | SkillExecutionMode;
+type SkillForkToolPolicyOption = 'default' | SkillForkToolPolicy;
 const THINKING_LEVEL_OPTIONS: { value: ThinkingLevelOption; label: string }[] = [
   { value: '', label: 'Auto' },
   { value: 'off', label: 'off' },
@@ -56,6 +74,35 @@ function deriveCustomizedToolSetIds(selection: ToolSelection): BuiltinToolSetId[
   });
 }
 
+function externalProviderLabel(provider: NonNullable<ToolSelection['providers']>[number]): string {
+  if (provider.source === 'mcp') return `mcp/${provider.serverId}`;
+  return provider.providerId ? `plugin/${provider.pluginId}/${provider.providerId}` : `plugin/${provider.pluginId}`;
+}
+
+function externalToolRefLabel(ref: ToolSelection['include'][number]): string | undefined {
+  if (ref.source === 'mcp') return `mcp/${ref.server}/${ref.tool}`;
+  if (ref.source === 'plugin') return `plugin/${ref.pluginId}/${ref.toolId}`;
+  return undefined;
+}
+
+function formatPinnedExternalToolCount(count: number): string {
+  return `${count} pinned external ${count === 1 ? 'tool' : 'tools'}`;
+}
+
+function mcpTrustSummaryLabels(server: McpServerConfig): string[] {
+  const policy = server.trustPolicy;
+  const labels = [
+    `trust ${policy?.trustLevel ?? 'untrusted'}`,
+    `default ${policy?.defaultRiskAction ?? 'ask'}`,
+    `readonly hints ${policy?.trustReadOnlyHint ? 'trusted' : 'untrusted'}`,
+  ];
+  for (const level of ['low', 'medium', 'high'] as const) {
+    const action = policy?.riskActions?.[level];
+    if (action) labels.push(`${level} ${action}`);
+  }
+  return labels;
+}
+
 export function AgentManager({ isOpen, onClose, inline = false, readOnly = false }: AgentManagerProps) {
   const activeServerId = useServerStore((s) => s.activeServerId);
   const facadeConnectionState = useFacadeStore((s) => s.connectionState);
@@ -68,6 +115,9 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
 
   const [agents, setAgents] = useState<AgentProfileConfig[]>([]);
   const [llmProfiles, setLlmProfiles] = useState<LlmProfileConfig[]>([]);
+  const [skillCatalog, setSkillCatalog] = useState<api.WorkspaceSkillInfo[]>([]);
+  const [mcpServers, setMcpServers] = useState<McpServerConfig[]>([]);
+  const [mcpStatuses, setMcpStatuses] = useState<Record<string, McpServerStatus>>({});
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -80,6 +130,8 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
   const [formModel, setFormModel] = useState('');
   const [formSystemPrompt, setFormSystemPrompt] = useState('');
   const [formToolSelection, setFormToolSelection] = useState<ToolSelection>(defaultToolSelection);
+  const [formSkillSelection, setFormSkillSelection] = useState<SkillSelection>(defaultSkillSelection);
+  const [formSkillExecution, setFormSkillExecution] = useState<SkillExecutionSelection>({ overrides: [] });
   const [formThinkingLevel, setFormThinkingLevel] = useState<ThinkingLevelOption>('');
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -113,6 +165,22 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
       ]);
       setAgents(agentData);
       setLlmProfiles(llmData);
+      try {
+        setSkillCatalog(await api.getWorkspaceSkills());
+      } catch {
+        setSkillCatalog([]);
+      }
+      try {
+        const [servers, statuses] = await Promise.all([
+          api.getMcpServers(),
+          api.getMcpServerStatuses(),
+        ]);
+        setMcpServers(servers);
+        setMcpStatuses(Object.fromEntries(statuses.map((status) => [status.name, status])));
+      } catch {
+        setMcpServers([]);
+        setMcpStatuses({});
+      }
     } catch (error) {
       console.error('Failed to load agent profiles:', error);
       const message = error instanceof Error ? error.message : String(error);
@@ -150,6 +218,8 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setFormModel('');
     setFormSystemPrompt('');
     setFormToolSelection(defaultToolSelection);
+    setFormSkillSelection(defaultSkillSelection);
+    setFormSkillExecution({ overrides: [] });
     setFormThinkingLevel('');
     setFormIsDefault(false);
     setFormError(null);
@@ -168,6 +238,8 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setFormSystemPrompt(agent.systemPrompt);
     const nextToolSelection = agent.toolSelection ?? legacyEnabledToolsToSelection(agent.enabledTools);
     setFormToolSelection(nextToolSelection);
+    setFormSkillSelection(agent.skillSelection ?? defaultSkillSelection);
+    setFormSkillExecution(agent.skillExecution ?? { overrides: [] });
     setCustomizedToolSetIds(deriveCustomizedToolSetIds(nextToolSelection));
     setFormThinkingLevel((agent.thinkingLevel ?? '') as ThinkingLevelOption);
     setFormIsDefault(agent.isDefault ?? false);
@@ -247,6 +319,125 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setCustomizedToolSetIds((current) => current.includes(setId) ? current : [...current, setId]);
   };
 
+  const mcpProviderSelected = (serverName: string) =>
+    (formToolSelection.providers ?? []).some((provider) => provider.source === 'mcp' && provider.serverId === serverName);
+
+  const toggleMcpProvider = (serverName: string) => {
+    setFormToolSelection((current) => {
+      const providers = current.providers ?? [];
+      const selected = providers.some((provider) => provider.source === 'mcp' && provider.serverId === serverName);
+      return {
+        ...current,
+        providers: selected
+          ? providers.filter((provider) => !(provider.source === 'mcp' && provider.serverId === serverName))
+          : [...providers, { source: 'mcp', serverId: serverName }],
+      };
+    });
+  };
+
+  const skillSourceEnabled = (source: SkillSource) =>
+    (formSkillSelection.providers ?? []).some((provider) => provider.source === source);
+
+  const toggleSkillSource = (source: SkillSource) => {
+    setFormSkillSelection((current) => {
+      const providers = current.providers ?? [];
+      return {
+        ...current,
+        providers: providers.some((provider) => provider.source === source)
+          ? providers.filter((provider) => provider.source !== source)
+          : [...providers, { source } as NonNullable<SkillSelection['providers']>[number]],
+      };
+    });
+  };
+
+  const skillRefFor = (skill: api.WorkspaceSkillInfo): SkillRef => ({
+    source: skill.source ?? 'workspace',
+    id: skill.id,
+  });
+
+  const skillVisibility = (skill: api.WorkspaceSkillInfo): 'default' | 'include' | 'exclude' => {
+    const key = skillRefKey(skillRefFor(skill));
+    if ((formSkillSelection.exclude ?? []).some((ref) => skillRefKey(ref) === key)) return 'exclude';
+    if ((formSkillSelection.include ?? []).some((ref) => skillRefKey(ref) === key)) return 'include';
+    return 'default';
+  };
+
+  const setSkillVisibility = (skill: api.WorkspaceSkillInfo, visibility: 'default' | 'include' | 'exclude') => {
+    const ref = skillRefFor(skill);
+    const key = skillRefKey(ref);
+    setFormSkillSelection((current) => ({
+      ...current,
+      include: visibility === 'include'
+        ? [...(current.include ?? []).filter((item) => skillRefKey(item) !== key), ref]
+        : (current.include ?? []).filter((item) => skillRefKey(item) !== key),
+      exclude: visibility === 'exclude'
+        ? [...(current.exclude ?? []).filter((item) => skillRefKey(item) !== key), ref]
+        : (current.exclude ?? []).filter((item) => skillRefKey(item) !== key),
+      pinned: visibility === 'exclude'
+        ? (current.pinned ?? []).filter((item) => skillRefKey(item) !== key)
+        : current.pinned,
+    }));
+  };
+
+  const togglePinnedSkill = (skill: api.WorkspaceSkillInfo) => {
+    const ref = skillRefFor(skill);
+    const key = skillRefKey(ref);
+    setFormSkillSelection((current) => {
+      const pinned = current.pinned ?? [];
+      const selected = pinned.some((item) => skillRefKey(item) === key);
+      return {
+        ...current,
+        pinned: selected ? pinned.filter((item) => skillRefKey(item) !== key) : [...pinned, ref],
+      };
+    });
+  };
+
+  const skillExecutionOverrideFor = (skill: api.WorkspaceSkillInfo) => {
+    const key = skillRefKey(skillRefFor(skill));
+    return (formSkillExecution.overrides ?? []).find((override) => skillRefKey(override.ref) === key);
+  };
+
+  const updateSkillExecutionOverride = (
+    skill: api.WorkspaceSkillInfo,
+    patch: Partial<NonNullable<SkillExecutionSelection['overrides']>[number]>,
+  ) => {
+    const ref = skillRefFor(skill);
+    const key = skillRefKey(ref);
+    setFormSkillExecution((current) => {
+      const existing = (current.overrides ?? []).find((override) => skillRefKey(override.ref) === key);
+      const next = {
+        ...existing,
+        ref,
+        ...patch,
+      };
+      const normalized = {
+        ref,
+        ...(next.allowedModes && next.allowedModes.length > 0 ? { allowedModes: next.allowedModes } : {}),
+        ...(next.defaultMode ? { defaultMode: next.defaultMode } : {}),
+        ...(next.forkToolPolicy ? { forkToolPolicy: next.forkToolPolicy } : {}),
+      };
+      const hasPolicy = Boolean(normalized.allowedModes || normalized.defaultMode || normalized.forkToolPolicy);
+      const others = (current.overrides ?? []).filter((override) => skillRefKey(override.ref) !== key);
+      return { overrides: hasPolicy ? [...others, normalized] : others };
+    });
+  };
+
+  const setSkillDefaultMode = (skill: api.WorkspaceSkillInfo, mode: SkillDefaultModeOption) => {
+    updateSkillExecutionOverride(skill, { defaultMode: mode === 'default' ? undefined : mode });
+  };
+
+  const setSkillForkToolPolicy = (skill: api.WorkspaceSkillInfo, policy: SkillForkToolPolicyOption) => {
+    updateSkillExecutionOverride(skill, { forkToolPolicy: policy === 'default' ? undefined : policy });
+  };
+
+  const toggleSkillAllowedMode = (skill: api.WorkspaceSkillInfo, mode: SkillExecutionMode) => {
+    const current = skillExecutionOverrideFor(skill)?.allowedModes ?? [];
+    const selected = current.includes(mode);
+    updateSkillExecutionOverride(skill, {
+      allowedModes: selected ? current.filter((item) => item !== mode) : [...current, mode],
+    });
+  };
+
   const handleSubmit = async () => {
     if (!formName.trim()) return;
     if (!formLlmProfileId) {
@@ -270,6 +461,8 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
         systemPrompt: formSystemPrompt,
         enabledTools: resolvedTools,
         toolSelection: formToolSelection,
+        skillSelection: formSkillSelection,
+        skillExecution: formSkillExecution,
         thinkingLevel: formThinkingLevel === '' ? undefined : formThinkingLevel,
         isDefault: formIsDefault,
       };
@@ -337,6 +530,15 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
   const builtinToolSetEntries = EDITABLE_BUILTIN_TOOL_SET_IDS
     .map((setId) => ({ ...BUILTIN_TOOL_SETS[setId], id: setId }));
   const resolvedBuiltinTools = resolveToolSelection(formToolSelection).builtinTools;
+  const externalProviders = formToolSelection.providers ?? [];
+  const pinnedExternalToolLabels = formToolSelection.include.flatMap((ref) => {
+    const label = externalToolRefLabel(ref);
+    return label ? [label] : [];
+  });
+  const skillProviderCount = formSkillSelection.providers?.length ?? 0;
+  const skillIncludeCount = formSkillSelection.include?.length ?? 0;
+  const pinnedSkillCount = formSkillSelection.pinned?.length ?? 0;
+  const skillPolicyOverrideCount = formSkillExecution.overrides?.length ?? 0;
 
   const content = !isConnected ? (
     <p className="text-muted-foreground text-center py-8">Connect to a server first</p>
@@ -508,6 +710,208 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
           <p className="mt-2 text-[10px] text-muted-foreground">
             Resolved built-in tools: {resolvedBuiltinTools.join(', ') || 'none'}
           </p>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-muted-foreground mb-1">External Tool Providers</label>
+          <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">Configured MCP servers</p>
+                <span className="text-[10px] text-muted-foreground">
+                  {externalProviders.filter((provider) => provider.source === 'mcp').length} selected
+                </span>
+              </div>
+              {mcpServers.length === 0 ? (
+                <p className="rounded-md bg-background/60 px-2 py-2 text-xs text-muted-foreground">
+                  No MCP servers configured.
+                </p>
+              ) : (
+                mcpServers.map((server) => {
+                  const status = mcpStatuses[server.name];
+                  const selected = mcpProviderSelected(server.name);
+                  const state = status?.state ?? (server.enabled ? 'configured' : 'disabled');
+                  return (
+                    <div key={server.id} className="flex min-w-0 items-center justify-between gap-3 rounded-md bg-background/60 px-2 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="truncate font-mono text-xs" title={`mcp/${server.name}`}>mcp/{server.name}</span>
+                          <span className={`shrink-0 rounded-full border border-border px-2 py-0.5 text-[10px] ${
+                            state === 'connected'
+                              ? 'text-green-400'
+                              : state === 'failed'
+                                ? 'text-red-400'
+                                : state === 'needs-auth'
+                                  ? 'text-orange-300'
+                                  : 'text-muted-foreground'
+                          }`}>
+                            {state}
+                          </span>
+                        </div>
+                        <p className="mt-1 truncate text-[10px] text-muted-foreground">
+                          tools {status?.inventory?.tools ?? 'unknown'} | resources {status?.inventory?.resources ?? 'unknown'} | prompts {status?.inventory?.prompts ?? 'unknown'}
+                        </p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {mcpTrustSummaryLabels(server).map((label) => (
+                            <span key={label} className="rounded-full bg-secondary/80 px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => toggleMcpProvider(server.name)}
+                        disabled={readOnly}
+                        className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
+                          selected
+                            ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                            : 'bg-secondary text-muted-foreground hover:text-foreground'
+                        } disabled:opacity-50`}
+                      >
+                        {selected ? 'Remove' : 'Add'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+              {externalProviders.some((provider) => provider.source === 'plugin') && (
+                <div className="border-t border-border/70 pt-2">
+                  <p className="mb-1 text-xs text-muted-foreground">Plugin providers</p>
+                  {externalProviders.filter((provider) => provider.source === 'plugin').map((provider) => {
+                    const label = externalProviderLabel(provider);
+                    return (
+                      <div key={label} className="rounded-md bg-background/60 px-2 py-2">
+                        <span className="font-mono text-xs" title={label}>{label}</span>
+                        <span className="ml-2 text-[10px] text-muted-foreground">not yet connected</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="mt-2 border-t border-border/70 pt-2">
+              <p className="text-[10px] text-muted-foreground">
+                {formatPinnedExternalToolCount(pinnedExternalToolLabels.length)}
+              </p>
+              {pinnedExternalToolLabels.length > 0 && (
+                <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground" title={pinnedExternalToolLabels.join(', ')}>
+                  {pinnedExternalToolLabels.join(', ')}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-muted-foreground mb-1">Skills</label>
+          <div className="rounded-lg border border-border bg-secondary/50 p-3 text-sm">
+            <div className="mb-3 flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+              <span>{skillProviderCount} sources</span>
+              <span>{skillIncludeCount} included</span>
+              <span>{pinnedSkillCount} pinned inline</span>
+              <span>{skillPolicyOverrideCount} policy overrides</span>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              {(['workspace', 'external', 'plugin'] as SkillSource[]).map((source) => (
+                <label key={source} className="flex items-center gap-2 rounded-md bg-background/60 px-2 py-1.5 text-xs capitalize">
+                  <input
+                    type="checkbox"
+                    checked={skillSourceEnabled(source)}
+                    onChange={() => toggleSkillSource(source)}
+                    aria-label={`enable ${source} skills`}
+                  />
+                  {source}
+                </label>
+              ))}
+            </div>
+            <div className="mt-3 space-y-2 border-t border-border/70 pt-2">
+              {skillCatalog.length === 0 ? (
+                <p className="text-xs text-muted-foreground">No skills discovered.</p>
+              ) : skillCatalog.map((skill) => {
+                const ref = skillRefFor(skill);
+                const key = skillRefKey(ref);
+                const pinned = (formSkillSelection.pinned ?? []).some((item) => skillRefKey(item) === key);
+                const executionOverride = skillExecutionOverrideFor(skill);
+                return (
+                  <div key={key} className="rounded-md bg-background/60 px-2 py-2">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate font-medium text-xs" title={`${ref.source}/${skill.id}`}>{skill.name || skill.id}</span>
+                      <select
+                        aria-label={`skill visibility ${key}`}
+                        value={skillVisibility(skill)}
+                        onChange={(event) => setSkillVisibility(skill, event.target.value as 'default' | 'include' | 'exclude')}
+                        className="rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                      >
+                        <option value="default">Default</option>
+                        <option value="include">Include</option>
+                        <option value="exclude">Exclude</option>
+                      </select>
+                      <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={pinned}
+                          disabled={skillVisibility(skill) === 'exclude'}
+                          onChange={() => togglePinnedSkill(skill)}
+                          aria-label={`pin skill ${key}`}
+                        />
+                        Pin
+                      </label>
+                    </div>
+                    <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground" title={skill.description || `${ref.source}/${skill.id}`}>
+                      {ref.source}/{skill.id} · {skill.description || 'No description'}
+                    </p>
+                    <div className="mt-2 grid gap-2 border-t border-border/60 pt-2 sm:grid-cols-2">
+                      <label className="min-w-0 text-[10px] text-muted-foreground">
+                        <span className="mb-1 block">Default mode</span>
+                        <select
+                          aria-label={`skill default mode ${key}`}
+                          value={executionOverride?.defaultMode ?? 'default'}
+                          onChange={(event) => setSkillDefaultMode(skill, event.target.value as SkillDefaultModeOption)}
+                          className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                        >
+                          <option value="default">Default</option>
+                          <option value="inline">Inline</option>
+                          <option value="fork">Fork</option>
+                        </select>
+                      </label>
+                      <label className="min-w-0 text-[10px] text-muted-foreground">
+                        <span className="mb-1 block">Fork tools</span>
+                        <select
+                          aria-label={`skill fork tool policy ${key}`}
+                          value={executionOverride?.forkToolPolicy ?? 'default'}
+                          onChange={(event) => setSkillForkToolPolicy(skill, event.target.value as SkillForkToolPolicyOption)}
+                          className="w-full rounded border border-border bg-secondary px-1 py-0.5 text-[10px]"
+                        >
+                          <option value="default">Default</option>
+                          <option value="read-only">Read-only</option>
+                          <option value="web">Web</option>
+                          <option value="workspace-edit">Workspace edit</option>
+                          <option value="agent-default">Agent default</option>
+                        </select>
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={executionOverride?.allowedModes?.includes('inline') ?? false}
+                          onChange={() => toggleSkillAllowedMode(skill, 'inline')}
+                          aria-label={`allow inline skill ${key}`}
+                        />
+                        Allow inline
+                      </label>
+                      <label className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                        <input
+                          type="checkbox"
+                          checked={executionOverride?.allowedModes?.includes('fork') ?? false}
+                          onChange={() => toggleSkillAllowedMode(skill, 'fork')}
+                          aria-label={`allow fork skill ${key}`}
+                        />
+                        Allow fork
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 

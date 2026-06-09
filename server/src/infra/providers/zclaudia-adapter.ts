@@ -3,7 +3,22 @@ import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-ag
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
-import { buildTools, buildAgentHooks, translateToolEvent, rebuildHistory, buildModel, type BuiltModel } from './pi-runtime/index.js';
+import {
+  buildTools,
+  buildAgentHooks,
+  translateToolEvent,
+  rebuildHistory,
+  buildModel,
+  buildExternalMetaTools,
+  buildExternalProviderCatalog,
+  concreteMcpToolName,
+  createConcreteMcpTool,
+  externalToolKey,
+  buildActiveSkillContext,
+  buildSkillCatalog,
+  buildSkillMetaTools,
+  type BuiltModel,
+} from './pi-runtime/index.js';
 import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
 import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
@@ -290,6 +305,20 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     const effectiveTools: ToolName[] = isPlanMode
       ? requestedTools.filter((t) => READ_ONLY_TOOL_NAMES.includes(t))
       : requestedTools;
+    const externalToolNames = options.externalToolState
+      ? [
+        ...options.externalToolState.loadedExternalTools.flatMap((ref) => (
+          ref.source === 'mcp' ? [concreteMcpToolName(ref)] : []
+        )),
+        'ListExternalToolProviders',
+        'SearchExternalTools',
+        'InspectExternalTool',
+        'LoadExternalTool',
+      ]
+      : [];
+    const skillToolNames = options.skillState
+      ? ['ListSkills', 'SearchSkills', 'InspectSkill', 'LoadSkill', 'RunSkill']
+      : [];
 
     // 4. Yield init now (after we know contextWindow + effective tools).
     yield {
@@ -302,7 +331,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         contextWindowMatchedProvider,
         cwd: options.cwd,
         permissionMode: ctx.permissionMode || 'default',
-        tools: effectiveTools,
+        tools: [...effectiveTools, ...externalToolNames, ...skillToolNames],
         agents: ['zclaudia'],
       },
     };
@@ -332,13 +361,64 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       agentTaskExecutor: options.agentTaskExecutor,
       permissionCallback: onPermission,
     });
+    if (options.externalToolState) {
+      for (const ref of options.externalToolState.loadedExternalTools) {
+        if (ref.source === 'mcp') {
+          tools.push(createConcreteMcpTool(
+            ref,
+            options.db,
+            options.externalToolState.loadedExternalToolSchemas?.[externalToolKey(ref)],
+          ));
+        }
+      }
+      tools.push(...buildExternalMetaTools({
+        db: options.db,
+        state: options.externalToolState,
+        toolsArray: tools,
+      }));
+    }
+    if (options.skillState) {
+      tools.push(...buildSkillMetaTools({
+        state: options.skillState,
+        execution: {
+          cwd: options.cwd,
+          db: options.db,
+          enabledTools: effectiveTools,
+          llmProfileConfig: options.llmProfileConfig,
+          agentProfile: options.agentProfile,
+          permissionOverride: options.permissionOverride,
+          permissionCallback: onPermission,
+        },
+      }));
+    }
     const hooks = buildAgentHooks({
       permissionCallback: onPermission ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
     });
 
+    const externalProviderCatalog = options.externalToolState
+      ? buildExternalProviderCatalog(options.externalToolState, options.db)
+      : '';
+    const skillCatalog = options.skillState
+      ? buildSkillCatalog(options.skillState, options.agentProfile)
+      : '';
+    const activeSkillContext = options.skillState
+      ? buildActiveSkillContext(options.skillState)
+      : '';
+    const baseSystemPrompt = [
+      options.systemPrompt ?? '',
+      externalProviderCatalog
+        ? `\n\n${externalProviderCatalog}\nUse SearchExternalTools and InspectExternalTool before loading external tools. LoadExternalTool only makes a tool available in this session; execution may still require permission.`
+        : '',
+      skillCatalog
+        ? `\n\n${skillCatalog}`
+        : '',
+      activeSkillContext
+        ? `\n\n${activeSkillContext}`
+        : '',
+    ].join('');
     const effectiveSystemPrompt = isPlanMode
-      ? (options.systemPrompt ?? '') + PLAN_MODE_SYSTEM_PROMPT_SUFFIX
-      : (options.systemPrompt ?? '');
+      ? baseSystemPrompt + PLAN_MODE_SYSTEM_PROMPT_SUFFIX
+      : baseSystemPrompt;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const agentOpts: any = {

@@ -8,6 +8,7 @@ import type {
 import { DEFAULT_GLOBAL_GUARDS, DEFAULT_UNIFIED_POLICY, DEFAULT_UNIFIED_PROFILE, DEFAULT_AI_REVIEW_CONFIG } from '@zclaudia/shared/interaction/permissions';
 import {
   PermissionEvaluator,
+  evaluateMcpToolTrustPolicy,
   classify,
   isInternalInteractionTool,
   buildRememberKey,
@@ -195,6 +196,10 @@ describe('classify', () => {
     expect(classify('Task', {}, '')).toBe('shellSafe' as PermissionCategory);
   });
 
+  it('should classify concrete MCP tools as network operations', () => {
+    expect(classify('mcp__github__create_issue', {}, '')).toBe('networkOps' as PermissionCategory);
+  });
+
   it('should classify bash with no command as destructiveOps', () => {
     // No command means isDangerousCommand returns true
     expect(classify('Bash', {}, '')).toBe('destructiveOps' as PermissionCategory);
@@ -220,6 +225,52 @@ describe('classify', () => {
     // The snake_case MCP variant keeps its handler-driven approval flow.
     expect(isInternalInteractionTool('exit_plan_mode')).toBe(true);
     expect(isInternalInteractionTool('mcp__claudia-plugins__exit_plan_mode')).toBe(true);
+  });
+});
+
+describe('evaluateMcpToolTrustPolicy', () => {
+  it('uses explicit risk actions before the default risk action', () => {
+    expect(evaluateMcpToolTrustPolicy(
+      { riskLevel: 'low', declaredReadOnly: false },
+      {
+        trustLevel: 'untrusted',
+        trustReadOnlyHint: false,
+        defaultRiskAction: 'ask',
+        riskActions: { low: 'auto-approve', high: 'deny' },
+      },
+    )).toBe('approve');
+
+    expect(evaluateMcpToolTrustPolicy(
+      { riskLevel: 'high', declaredReadOnly: false },
+      {
+        trustLevel: 'trusted',
+        trustReadOnlyHint: false,
+        defaultRiskAction: 'ask',
+        riskActions: { low: 'auto-approve', high: 'deny' },
+      },
+    )).toBe('deny');
+  });
+
+  it('trusts readonly MCP hints only when the server policy allows it', () => {
+    expect(evaluateMcpToolTrustPolicy(
+      { riskLevel: 'medium', declaredReadOnly: true },
+      {
+        trustLevel: 'trusted-readonly',
+        trustReadOnlyHint: true,
+        defaultRiskAction: 'ask',
+        riskActions: {},
+      },
+    )).toBe('approve');
+
+    expect(evaluateMcpToolTrustPolicy(
+      { riskLevel: 'medium', declaredReadOnly: true },
+      {
+        trustLevel: 'trusted-readonly',
+        trustReadOnlyHint: false,
+        defaultRiskAction: 'ask',
+        riskActions: {},
+      },
+    )).toBe('escalate');
   });
 });
 
