@@ -7,6 +7,7 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
 import type { ClaudeMessage, PermissionCallback } from './message-types.js';
+import type { TaskExecutor } from '../../domains/tasks/executors/types.js';
 
 /** Handle exposed to the application after pi Agent construction, for mid-run steering. */
 export interface SteerHandle {
@@ -30,7 +31,10 @@ export interface RunOptions {
   sessionTitle?: string;  // Optional session title for providers that support it
   serverPort?: number;    // Main server port for MCP bridge
   claudiaSessionId?: string;  // ZClaudia session ID (for interaction tool context)
+  runId?: string;  // ZClaudia run ID for delegated task provenance
+  permissionOverride?: Partial<import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy>;
   db?: Database.Database;  // Database for loading ZClaudia-managed MCP servers
+  agentTaskExecutor?: TaskExecutor;
   /** Resolved LLM profile to drive buildModel. If undefined, buildModel falls back to env. */
   llmProfileConfig?: LlmProfileConfig;
   /** Full agent profile resolved by run-bootstrap (for tracing / future). */

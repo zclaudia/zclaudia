@@ -16,6 +16,7 @@ const BUILTIN_STEP_TYPE_LABELS: Record<BuiltinWorkflowStepType, string> = {
   create_pr: 'Create PR',
   ai_review: 'AI Review',
   ai_prompt: 'AI Prompt',
+  task: 'Task',
   shell: 'Shell Command',
   webhook: 'Webhook',
   condition: 'Condition',

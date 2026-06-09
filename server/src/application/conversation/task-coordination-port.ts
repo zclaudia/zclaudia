@@ -1,27 +1,6 @@
 import type { BranchAction } from '@zclaudia/shared/wire/messages';
-import type { NotificationSource } from '@zclaudia/shared/features/notification-feed';
-import type { OrchestratorTask } from '../orchestration/types.js';
 
 export interface TaskCoordinationPort {
-  getTask(taskId: string): OrchestratorTask | undefined;
-  spawnTask(
-    parentId: string | null,
-    config: {
-      task: string;
-      projectId?: string;
-      llmProfileId?: string;
-      initiator?: 'system' | 'claudia';
-      branchId?: string;
-      branchAction?: BranchAction;
-      contextReset?: boolean;
-      feed?: {
-        triggerId?: string;
-        source: NotificationSource;
-        title: string;
-      };
-    },
-  ): Promise<string>;
-  killTask(taskId: string): Promise<void>;
   allocateBranch(opts: {
     hostProjectId: string;
     activeBranchId?: string | null;
@@ -48,4 +27,30 @@ export interface TaskCoordinationPort {
   setActiveBranchId(hostProjectId: string, branchId: string | null): void;
   attachSession(branchId: string, sessionId: string): void;
   updateBranchTask(branchId: string, taskId: string, sessionId?: string): void;
+  submitCanonicalAgentTask(input: {
+    input: string;
+    title: string;
+    projectId: string;
+    llmProfileId?: string;
+    branchId: string;
+    branchAction: BranchAction;
+    contextReset?: boolean;
+  }): Promise<{ taskId: string; sessionId: string }>;
+  getCanonicalAgentTask(taskId: string): {
+    taskId: string;
+    projectId: string | null;
+    branchId: string | null;
+    llmProfileId?: string;
+  } | undefined;
+  continueCanonicalAgentTask(input: {
+    parentTaskId: string;
+    input: string;
+    title: string;
+    projectId: string;
+    llmProfileId?: string;
+    branchId: string;
+    branchAction: BranchAction;
+    contextReset?: boolean;
+  }): Promise<{ taskId: string; sessionId: string }>;
+  cancelCanonicalAgentTask(taskId: string): Promise<boolean>;
 }

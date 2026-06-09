@@ -5,6 +5,9 @@ import { migration as m_002_request_headers } from './002_request_headers.js';
 import { migration as m_003_llm_profile_models } from './003_llm_profile_models.js';
 import { migration as m_004_merge_openai_custom } from './004_merge_openai_custom.js';
 import { migration as m_005_llm_profile_oauth } from './005_llm_profile_oauth.js';
+import { migration as m_006_tasks } from './006_tasks.js';
+import { migration as m_007_drop_legacy_orchestrator_tasks } from './007_drop_legacy_orchestrator_tasks.js';
+import { migration as m_008_agent_profile_tool_selection } from './008_agent_profile_tool_selection.js';
 
 export type { Migration };
 
@@ -14,6 +17,9 @@ export const migrations: Migration[] = [
   m_003_llm_profile_models,
   m_004_merge_openai_custom,
   m_005_llm_profile_oauth,
+  m_006_tasks,
+  m_007_drop_legacy_orchestrator_tasks,
+  m_008_agent_profile_tool_selection,
 ];
 
 /**

@@ -640,6 +640,7 @@ describe('ZClaudiaAdapter.run', () => {
         'ToolSearch',
         'ListMcpResources',
         'ReadMcpResource',
+        'TaskOutput',
         'Agent',
         'LSPTool',
       ] as ToolName[],
@@ -659,6 +660,7 @@ describe('ZClaudiaAdapter.run', () => {
       'ToolSearch',
       'ListMcpResources',
       'ReadMcpResource',
+      'TaskOutput',
       'LSPTool',
     ]);
 
@@ -678,6 +680,7 @@ describe('ZClaudiaAdapter.run', () => {
       'ToolSearch',
       'ListMcpResources',
       'ReadMcpResource',
+      'TaskOutput',
       'LSPTool',
     ]);
   });

@@ -159,7 +159,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
     handlePopOut, handleFocusPoppedOutWindow, handleBringBackHere,
   } = useSessionActions({
     sessionId, isConnected, currentSession, currentProject,
-    activeServerId, renameValue, setIsRenamingSession,
+    activeServerId, renameValue, setIsRenamingSession, isSessionRunning,
   });
 
   const poppedOutLabel = poppedOutSessions.get(sessionId);
@@ -221,6 +221,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           onResetProviderSession={handleResetProviderSession}
           onExport={handleExportSession}
           onArchive={handleArchiveSession}
+          archiveDisabled={isSessionRunning}
           onPopOut={handlePopOut}
           onToggleSessionMenu={() => setShowSessionMenu(!showSessionMenu)}
         />

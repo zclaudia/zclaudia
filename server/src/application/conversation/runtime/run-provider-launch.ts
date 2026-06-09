@@ -11,6 +11,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
+import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 
 interface LaunchProviderRunInput {
   activeRun: ActiveRun;
@@ -30,6 +31,7 @@ interface LaunchProviderRunInput {
   llmProfileId: string | null;
   providerType: string;
   runId: string;
+  agentTaskExecutor?: TaskExecutor;
   sdkSessionId?: string;
   sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
   serverPort: number | null;
@@ -60,6 +62,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     llmProfileId,
     providerType,
     runId,
+    agentTaskExecutor,
     sdkSessionId,
     sendRunEvent,
     serverPort,
@@ -126,6 +129,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     modeValue,
     providerConfig,
     providerType,
+    runId,
+    agentTaskExecutor,
     sdkSessionId,
     serverPort,
     session,

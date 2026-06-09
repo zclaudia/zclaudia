@@ -57,6 +57,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         model,
         systemPrompt,
         enabledTools,
+        toolSelection,
         thinkingLevel,
         isDefault,
       } = req.body ?? {};
@@ -82,10 +83,10 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         });
         return;
       }
-      if (!Array.isArray(enabledTools)) {
+      if (toolSelection === undefined && !Array.isArray(enabledTools)) {
         res.status(400).json({
           success: false,
-          error: { code: 'VALIDATION_ERROR', message: 'enabledTools must be an array' },
+          error: { code: 'VALIDATION_ERROR', message: 'enabledTools must be an array when toolSelection is absent' },
         });
         return;
       }
@@ -121,7 +122,8 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         llmProfileId,
         model,
         systemPrompt: typeof systemPrompt === 'string' ? systemPrompt : '',
-        enabledTools,
+        enabledTools: Array.isArray(enabledTools) ? enabledTools : [],
+        toolSelection,
         thinkingLevel: thinkingLevel ?? undefined,
         isDefault: Boolean(isDefault),
       });
@@ -190,6 +192,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       if (Object.prototype.hasOwnProperty.call(body, 'model')) patch.model = body.model;
       if (Object.prototype.hasOwnProperty.call(body, 'systemPrompt')) patch.systemPrompt = body.systemPrompt;
       if (Object.prototype.hasOwnProperty.call(body, 'enabledTools')) patch.enabledTools = body.enabledTools;
+      if (Object.prototype.hasOwnProperty.call(body, 'toolSelection')) patch.toolSelection = body.toolSelection;
       if (Object.prototype.hasOwnProperty.call(body, 'thinkingLevel')) patch.thinkingLevel = body.thinkingLevel ?? undefined;
       if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
 

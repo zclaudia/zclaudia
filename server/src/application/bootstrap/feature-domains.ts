@@ -59,6 +59,7 @@ import { createExecutorRoutes } from '../../domains/executor/routes.js';
 import { createIssueRoutes } from '../../domains/issue-orchestration/routes.js';
 import { createEpicRoutes } from '../../domains/epics/routes.js';
 import { EpicService } from '../../domains/epics/service.js';
+import { TaskExecutorRegistry } from '../../domains/tasks/executors/registry.js';
 
 
 interface RegisterFeatureDomainsDeps {
@@ -77,6 +78,7 @@ interface RegisterFeatureDomainsDeps {
   workflowAiRunPort: WorkflowAiRunPort;
   localPrScheduling: LocalPRSchedulingPort;
   workflowScheduling: WorkflowSchedulingPort;
+  taskExecutorRegistry?: TaskExecutorRegistry;
 }
 
 export interface FeatureDomainsResult {
@@ -128,6 +130,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     workflowAiRunPort,
     localPrScheduling,
     workflowScheduling,
+    taskExecutorRegistry,
   } = deps;
 
   registerProjectsDomain({ db, app, authMiddleware, onProjectChanged: handleProjectChanged });
@@ -285,6 +288,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     aiRunPort: workflowAiRunPort,
     permissionBridge,
     aiRiskAnalysisPort,
+    taskExecutorRegistry,
   });
   const permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
   app.use('/api/automations', authMiddleware, createAutomationRoutes(workflowService));

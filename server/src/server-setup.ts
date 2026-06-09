@@ -54,11 +54,11 @@ export interface SetupResult {
   setGatewayDisconnector: (disconnector: () => Promise<void>) => void;
   supervisorService: SupervisorService;
   notificationsService: NotificationService;
-  orchestrator: import('./application/orchestration/types.js').TaskOrchestrator;
   permissionBridge?: import('./application/conversation/agent/permission-bridge.js').PermissionBridge;
   cancelWorkflowRun?: (runId: string) => void;
   permissionWorkflowResolver?: import('./domains/workflows/index.js').PermissionWorkflowResolver;
   metaWorkflowService?: import('./domains/meta-workflow/service.js').MetaWorkflowService;
+  agentTaskExecutor?: import('./domains/tasks/executors/types.js').TaskExecutor;
   /** Cleanup function: call when WebSocket server closes */
   onWssClose: () => void;
 }
@@ -117,11 +117,11 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
   const {
     supervisorService,
     notificationsService,
-    orchestrator,
     permissionBridge: permBridge,
     cancelWorkflowRun: cancelWfRun,
     permissionWorkflowResolver,
     metaWorkflowService,
+    agentTaskExecutor,
   } = bootstrapDomains({
     db, app, authMiddleware, clients, activeRuns,
     broadcastPluginState, broadcastHeartbeat,
@@ -186,11 +186,11 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     setGatewayDisconnector: gateway.setGatewayDisconnector,
     supervisorService,
     notificationsService,
-    orchestrator,
     permissionBridge: permBridge,
     cancelWorkflowRun: cancelWfRun,
     permissionWorkflowResolver,
     metaWorkflowService,
+    agentTaskExecutor,
     onWssClose,
   };
 }

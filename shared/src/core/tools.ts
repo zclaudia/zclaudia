@@ -15,11 +15,69 @@ export const ALL_TOOL_NAMES = [
   'ListMcpResources',
   'ReadMcpResource',
   'ToolSearch',
+  'TaskOutput',
+  'Monitor',
   'Agent',
   'LSPTool',
 ] as const;
 
 export type ToolName = typeof ALL_TOOL_NAMES[number];
+
+export type ToolSource = 'builtin' | 'plugin' | 'mcp' | 'interaction';
+
+export interface BuiltinToolRef {
+  source: 'builtin';
+  name: ToolName;
+}
+
+export interface PluginToolRef {
+  source: 'plugin';
+  pluginId: string;
+  toolId: string;
+}
+
+export interface McpToolRef {
+  source: 'mcp';
+  server: string;
+  tool: string;
+}
+
+export interface InteractionToolRef {
+  source: 'interaction';
+  toolId: string;
+}
+
+export type ToolRef = BuiltinToolRef | PluginToolRef | McpToolRef | InteractionToolRef;
+
+export type ToolSetRef =
+  | { source: 'builtin'; id: BuiltinToolSetId }
+  | { source: 'plugin'; pluginId: string; id: string };
+
+export interface ToolSelection {
+  sets: ToolSetRef[];
+  include: ToolRef[];
+  exclude: ToolRef[];
+}
+
+export type ToolRiskLevel = 'low' | 'medium' | 'high';
+export type PluginTrustLevel = 'untrusted' | 'trusted' | 'verified';
+
+export interface ToolMetadata {
+  ref: ToolRef;
+  label: string;
+  description?: string;
+  setIds?: string[];
+  declaredReadOnly: boolean;
+  mutatesWorkspace: boolean;
+  requiresNetwork: boolean;
+  requiresUserInteraction: boolean;
+  riskLevel: ToolRiskLevel;
+}
+
+export interface ResolvedToolSelection {
+  refs: ToolRef[];
+  builtinTools: ToolName[];
+}
 
 export const LEGACY_TOOL_NAME_ALIASES: Readonly<Record<string, ToolName>> = {
   read: 'Read',
@@ -49,8 +107,278 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   'ToolSearch',
   'ListMcpResources',
   'ReadMcpResource',
+  'TaskOutput',
   'LSPTool',
 ];
+
+export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
+  Read: {
+    ref: { source: 'builtin', name: 'Read' },
+    label: 'Read',
+    description: 'Read a text file with line pagination, size limits, and binary-file protection.',
+    setIds: ['core-coding'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  Write: {
+    ref: { source: 'builtin', name: 'Write' },
+    label: 'Write',
+    description: 'Create or overwrite files in the workspace.',
+    setIds: ['core-coding'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
+  Edit: {
+    ref: { source: 'builtin', name: 'Edit' },
+    label: 'Edit',
+    description: 'Apply targeted edits to existing workspace files.',
+    setIds: ['core-coding'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
+  Bash: {
+    ref: { source: 'builtin', name: 'Bash' },
+    label: 'Bash',
+    description: 'Run shell commands from the workspace.',
+    setIds: ['core-coding'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'high',
+  },
+  Grep: {
+    ref: { source: 'builtin', name: 'Grep' },
+    label: 'Grep',
+    description: 'Search file contents with ripgrep and structured results.',
+    setIds: ['core-coding'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  Find: {
+    ref: { source: 'builtin', name: 'Find' },
+    label: 'Find',
+    description: 'Find files and paths in the workspace.',
+    setIds: ['core-coding'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  Glob: {
+    ref: { source: 'builtin', name: 'Glob' },
+    label: 'Glob',
+    description: 'Find files by glob pattern under the workspace.',
+    setIds: ['core-coding'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  LS: {
+    ref: { source: 'builtin', name: 'LS' },
+    label: 'LS',
+    description: 'List directory contents.',
+    setIds: ['core-coding'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  TodoWrite: {
+    ref: { source: 'builtin', name: 'TodoWrite' },
+    label: 'TodoWrite',
+    description: 'Update the visible task list for the user.',
+    setIds: ['interaction'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  AskUserQuestion: {
+    ref: { source: 'builtin', name: 'AskUserQuestion' },
+    label: 'AskUserQuestion',
+    description: 'Ask the user structured questions and wait for an answer.',
+    setIds: ['interaction'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: true,
+    riskLevel: 'low',
+  },
+  WebFetch: {
+    ref: { source: 'builtin', name: 'WebFetch' },
+    label: 'WebFetch',
+    description: 'Fetch a URL and return readable text content.',
+    setIds: ['web'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  WebSearch: {
+    ref: { source: 'builtin', name: 'WebSearch' },
+    label: 'WebSearch',
+    description: 'Search the web for current information.',
+    setIds: ['web'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  MCPTool: {
+    ref: { source: 'builtin', name: 'MCPTool' },
+    label: 'MCPTool',
+    description: 'Call a tool exposed by a configured MCP server.',
+    setIds: ['mcp-control'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'high',
+  },
+  ListMcpResources: {
+    ref: { source: 'builtin', name: 'ListMcpResources' },
+    label: 'ListMcpResources',
+    description: 'List resources exposed by configured MCP servers.',
+    setIds: ['mcp-control'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  ReadMcpResource: {
+    ref: { source: 'builtin', name: 'ReadMcpResource' },
+    label: 'ReadMcpResource',
+    description: 'Read a resource exposed by a configured MCP server.',
+    setIds: ['mcp-control'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  ToolSearch: {
+    ref: { source: 'builtin', name: 'ToolSearch' },
+    label: 'ToolSearch',
+    description: 'Search tools exposed by configured MCP servers.',
+    setIds: ['mcp-control'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  TaskOutput: {
+    ref: { source: 'builtin', name: 'TaskOutput' },
+    label: 'TaskOutput',
+    description: 'Read task state, result, and lifecycle events by task id.',
+    setIds: ['tasks'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  Monitor: {
+    ref: { source: 'builtin', name: 'Monitor' },
+    label: 'Monitor',
+    description: 'Create, inspect, or stop a monitor task.',
+    setIds: ['tasks'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
+  Agent: {
+    ref: { source: 'builtin', name: 'Agent' },
+    label: 'Agent',
+    description: 'Delegate work to a background sub-agent task.',
+    setIds: ['tasks'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'high',
+  },
+  LSPTool: {
+    ref: { source: 'builtin', name: 'LSPTool' },
+    label: 'LSPTool',
+    description: 'Find symbols, references, definitions, or diagnostics in the workspace.',
+    setIds: ['code-intelligence'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+};
+
+export const BUILTIN_TOOL_SETS = {
+  'core-coding': {
+    id: 'core-coding',
+    label: 'Core Coding',
+    tools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'Glob', 'LS'],
+  },
+  interaction: {
+    id: 'interaction',
+    label: 'Interaction',
+    tools: ['TodoWrite', 'AskUserQuestion'],
+  },
+  web: {
+    id: 'web',
+    label: 'Web',
+    tools: ['WebFetch', 'WebSearch'],
+  },
+  'mcp-control': {
+    id: 'mcp-control',
+    label: 'MCP Control',
+    tools: ['ToolSearch', 'MCPTool', 'ListMcpResources', 'ReadMcpResource'],
+  },
+  tasks: {
+    id: 'tasks',
+    label: 'Tasks',
+    tools: ['Agent', 'TaskOutput', 'Monitor'],
+  },
+  'code-intelligence': {
+    id: 'code-intelligence',
+    label: 'Code Intelligence',
+    tools: ['LSPTool'],
+  },
+  'all-builtin': {
+    id: 'all-builtin',
+    label: 'All Built-in Tools',
+    tools: [...ALL_TOOL_NAMES],
+  },
+} as const satisfies Readonly<Record<string, { id: string; label: string; tools: readonly ToolName[] }>>;
+
+export type BuiltinToolSetId = keyof typeof BUILTIN_TOOL_SETS;
+
+export const defaultToolSelection: ToolSelection = {
+  sets: [{ source: 'builtin', id: 'core-coding' }],
+  include: [],
+  exclude: [],
+};
 
 export function isToolName(s: string): s is ToolName {
   return (ALL_TOOL_NAMES as readonly string[]).includes(s);
@@ -63,4 +391,68 @@ export function normalizeToolName(s: string): ToolName | undefined {
 
 export function isReadOnlyTool(name: ToolName): boolean {
   return READ_ONLY_TOOL_NAMES.includes(name);
+}
+
+export function builtinToolRef(name: ToolName): BuiltinToolRef {
+  return { source: 'builtin', name };
+}
+
+export function toolRefKey(ref: ToolRef): string {
+  switch (ref.source) {
+    case 'builtin':
+      return `builtin:${ref.name}`;
+    case 'plugin':
+      return `plugin:${ref.pluginId}/${ref.toolId}`;
+    case 'mcp':
+      return `mcp:${ref.server}/${ref.tool}`;
+    case 'interaction':
+      return `interaction:${ref.toolId}`;
+  }
+}
+
+export function legacyEnabledToolsToSelection(tools: string[]): ToolSelection {
+  const include = tools.flatMap((tool) => {
+    const name = normalizeToolName(tool);
+    return name ? [builtinToolRef(name)] : [];
+  });
+  return { sets: [], include: uniqueToolRefs(include), exclude: [] };
+}
+
+function uniqueToolRefs(refs: ToolRef[]): ToolRef[] {
+  const seen = new Set<string>();
+  const result: ToolRef[] = [];
+  for (const ref of refs) {
+    const key = toolRefKey(ref);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(ref);
+  }
+  return result;
+}
+
+function expandToolSet(set: ToolSetRef): ToolRef[] {
+  if (set.source !== 'builtin') return [];
+  const builtinSet = BUILTIN_TOOL_SETS[set.id];
+  return builtinSet ? builtinSet.tools.map(builtinToolRef) : [];
+}
+
+export function resolveToolSelection(selection: ToolSelection): ResolvedToolSelection {
+  const expanded = selection.sets.flatMap(expandToolSet);
+  const excluded = new Set(selection.exclude.map(toolRefKey));
+  const refs = uniqueToolRefs([...expanded, ...selection.include])
+    .filter((ref) => !excluded.has(toolRefKey(ref)));
+  return {
+    refs,
+    builtinTools: refs.flatMap((ref) => ref.source === 'builtin' ? [ref.name] : []),
+  };
+}
+
+export function getEffectiveReadOnly(
+  metadata: ToolMetadata,
+  options: { pluginTrust?: PluginTrustLevel } = {},
+): boolean {
+  if (metadata.mutatesWorkspace || metadata.riskLevel === 'high') return false;
+  if (!metadata.declaredReadOnly) return false;
+  if (metadata.ref.source !== 'plugin') return true;
+  return options.pluginTrust === 'trusted' || options.pluginTrust === 'verified';
 }

@@ -50,8 +50,10 @@ describe('ALL_TOOL_NAMES', () => {
       'LSPTool',
       'ListMcpResources',
       'MCPTool',
+      'Monitor',
       'Read',
       'ReadMcpResource',
+      'TaskOutput',
       'TodoWrite',
       'ToolSearch',
       'WebFetch',
@@ -68,6 +70,8 @@ describe('isToolName guard', () => {
     expect(isToolName('Glob')).toBe(true);
     expect(isToolName('WebFetch')).toBe(true);
     expect(isToolName('ToolSearch')).toBe(true);
+    expect(isToolName('TaskOutput')).toBe(true);
+    expect(isToolName('Monitor')).toBe(true);
     expect(isToolName('Agent')).toBe(true);
   });
 

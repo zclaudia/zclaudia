@@ -34,6 +34,7 @@ interface SessionLifecycleDependencies {
   broadcastSessionEvent?: (type: SessionEventType, session: Session) => void;
   emitPluginEvent?: (event: string, payload?: EventData) => Promise<unknown>;
   eventDispatcher?: EventDispatcher<SessionDomainEvent>;
+  isSessionRunning?: (sessionId: string) => boolean;
 }
 
 export class SessionLifecycleError extends Error {
@@ -53,6 +54,7 @@ export class SessionLifecycleService {
   private readonly broadcastSessionEvent: (type: SessionEventType, session: Session) => void;
   private readonly emitPluginEvent: (event: string, payload?: EventData) => Promise<unknown>;
   private readonly domainEvents: EventDispatcher<SessionDomainEvent> | undefined;
+  private readonly isSessionRunning: (sessionId: string) => boolean;
 
   constructor(
     private readonly db: Database.Database,
@@ -66,6 +68,7 @@ export class SessionLifecycleService {
     });
     this.emitPluginEvent = deps.emitPluginEvent ?? ((event, payload) => pluginEvents.emit(event, payload));
     this.domainEvents = deps.eventDispatcher;
+    this.isSessionRunning = deps.isSessionRunning ?? (() => false);
   }
 
   createSession(input: SessionCreateInput): Session {
@@ -116,6 +119,15 @@ export class SessionLifecycleService {
 
   archiveSessions(sessionIds: string[]): { archived: number } {
     this.assertSessionIds(sessionIds);
+
+    const runningIds = sessionIds.filter(id => this.isSessionRunning(id));
+    if (runningIds.length > 0) {
+      throw new SessionLifecycleError(
+        409,
+        'SESSION_RUNNING',
+        `Cannot archive a running session: ${runningIds.join(', ')}`,
+      );
+    }
 
     const now = this.now();
     const stmt = this.db.prepare('UPDATE sessions SET archived_at = ?, updated_at = ? WHERE id = ?');
@@ -316,6 +328,10 @@ export class SessionLifecycleService {
 
     if (session.isReadOnly) {
       throw new SessionLifecycleError(409, 'LOCKED', 'Cannot delete a read-only session with active task execution');
+    }
+
+    if (this.isSessionRunning(sessionId)) {
+      throw new SessionLifecycleError(409, 'SESSION_RUNNING', 'Cannot delete a running session');
     }
 
     const result = this.db.prepare('DELETE FROM sessions WHERE id = ?').run(sessionId);

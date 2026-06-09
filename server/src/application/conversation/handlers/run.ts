@@ -176,7 +176,7 @@ export async function handleAgentCancel(
   activeRuns: Map<string, ActiveRun>,
   cancelRun: (runId: string) => void,
   db: ReturnType<typeof initDatabase>,
-  taskCoordination?: Pick<TaskCoordinationPort, 'killTask'>,
+  taskCoordination?: Pick<TaskCoordinationPort, 'cancelCanonicalAgentTask'>,
 ): Promise<void> {
   let cancelled = false;
 
@@ -189,25 +189,30 @@ export async function handleAgentCancel(
   }
 
   if (!cancelled && taskCoordination) {
-    const taskRow = db.prepare(
+    const canonicalTaskRow = db.prepare(
       `SELECT id
-       FROM orchestrator_tasks
-       WHERE session_id = ? AND initiator = ?
+       FROM tasks
+       WHERE session_id = ?
+         AND type = 'agent'
+         AND json_extract(metadata, '$.initiator') = 'claudia'
        ORDER BY created_at DESC
        LIMIT 1`
-    ).get(sessionId, 'claudia') as { id: string } | undefined;
+    ).get(sessionId) as { id: string } | undefined;
 
-    if (taskRow) {
+    if (canonicalTaskRow) {
       try {
-        await taskCoordination.killTask(taskRow.id);
+        await taskCoordination.cancelCanonicalAgentTask(canonicalTaskRow.id);
+        return;
       } catch (err) {
         sendMessage(client.ws, {
           type: 'error',
           code: 'TASK_CANCEL_FAILED',
           message: err instanceof Error ? err.message : 'Failed to cancel task',
         } as ErrorMessage);
+        return;
       }
     }
+
   }
 }
 

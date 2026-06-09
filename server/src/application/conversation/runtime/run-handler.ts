@@ -17,6 +17,7 @@ import { launchProviderRun } from './run-provider-launch.js';
 import { prepareProviderRun } from './run-provider-setup.js';
 import { finalizeRun, handleRunException } from './run-recovery.js';
 import { setPhase } from './active-run-phase.js';
+import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 
 export interface RunHandlerContext {
   activeRuns: Map<string, ActiveRun>;
@@ -29,6 +30,7 @@ export interface RunHandlerContext {
   providerRegistry: ProviderRegistryPort;
   permissionBridge?: import('../agent/permission-bridge.js').PermissionBridge;
   permissionWorkflowResolver?: import('../../../domains/workflows/index.js').PermissionWorkflowResolver;
+  agentTaskExecutor?: TaskExecutor;
 }
 
 export async function handleRunStart(
@@ -174,6 +176,7 @@ export async function handleRunStart(
       llmProfileId,
       providerType,
       runId,
+      agentTaskExecutor: ctx?.agentTaskExecutor,
       sdkSessionId,
       sendRunEvent,
       serverPort,

@@ -29,9 +29,13 @@ import {
   PermissionClassifyStepExecutor,
   AIRiskAnalysisStepExecutor,
   PermissionDecideStepExecutor,
+  TaskWorkflowStepExecutor,
 } from './step-executors/index.js';
 import type { PermissionBridgePort, AIRiskAnalysisPort } from './ports/step-executor.js';
 import { VirtualClientAIRunner } from './step-executors/virtual-client-ai-runner.js';
+import { TaskRepository } from '../tasks/repository.js';
+import { TaskService } from '../tasks/task-service.js';
+import { TaskExecutorRegistry } from '../tasks/executors/registry.js';
 
 /** Minimal port for plugin step registry — avoids direct application/ import */
 type WorkflowStepRegistryPort = import('./step-executors/plugin-executor.js').PluginStepRegistry & {
@@ -55,6 +59,7 @@ export interface WorkflowDomainDeps {
   aiRunPort: WorkflowAiRunPort;
   permissionBridge?: PermissionBridgePort;
   aiRiskAnalysisPort?: AIRiskAnalysisPort;
+  taskExecutorRegistry?: TaskExecutorRegistry;
 }
 
 export interface WorkflowDomainResult {
@@ -77,6 +82,10 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
   composite.register(new AIPromptStepExecutor(aiRunner));
   composite.register(new AIReviewStepExecutor(aiRunner));
   composite.register(new GitStepExecutor());
+  composite.register(new TaskWorkflowStepExecutor(
+    new TaskService(new TaskRepository(db)),
+    deps.taskExecutorRegistry ?? new TaskExecutorRegistry(),
+  ));
   composite.registerPlugin(new PluginStepExecutor(workflowStepRegistry));
 
   // -- Permission workflow step executors --

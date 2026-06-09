@@ -2,5 +2,8 @@
   "identifier": "com.zclaudia.desktop.dev",
   "build": {
     "beforeDevCommand": ""
+  },
+  "bundle": {
+    "externalBin": []
   }
 }

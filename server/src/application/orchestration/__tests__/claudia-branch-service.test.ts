@@ -15,10 +15,13 @@ function createTestDb(): Database.Database {
       updated_at INTEGER NOT NULL
     );
 
-    CREATE TABLE orchestrator_tasks (
+    CREATE TABLE tasks (
       id TEXT PRIMARY KEY,
-      branch_id TEXT,
-      status TEXT NOT NULL
+      type TEXT NOT NULL,
+      status TEXT NOT NULL,
+      metadata TEXT,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
     );
 
     CREATE TABLE claudia_branches (
@@ -93,7 +96,8 @@ describe('ClaudiaBranchService', () => {
       hostProjectId: 'project-1',
       title: 'Conversation',
     });
-    db.prepare('INSERT INTO orchestrator_tasks (id, branch_id, status) VALUES (?, ?, ?)').run('task-1', branch.id, 'waiting');
+    db.prepare('INSERT INTO tasks (id, type, status, metadata, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run('task-1', 'agent', 'waiting', JSON.stringify({ branchId: branch.id }), 1, 1);
 
     const allocation = service.allocateBranch({
       hostProjectId: 'project-1',

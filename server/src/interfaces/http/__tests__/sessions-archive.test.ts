@@ -190,6 +190,27 @@ describe('sessions archive/restore/sync routes', () => {
       expect(row.archived_at).not.toBeNull();
       expect(row.archived_at).toBeGreaterThan(0);
     });
+
+    it('returns 409 SESSION_RUNNING when target has an active run', async () => {
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run('s-running', 'project-1', 'Running Session', now, now);
+
+      activeRuns.set('run-1', { sessionId: 's-running', phase: 'running' });
+
+      const res = await request(app)
+        .post('/api/sessions/archive')
+        .send({ sessionIds: ['s-running'] });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('SESSION_RUNNING');
+
+      const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s-running') as { archived_at: number | null };
+      expect(row.archived_at).toBeNull();
+    });
   });
 
   // ---------------------------------------------------------------------------

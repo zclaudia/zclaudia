@@ -25,7 +25,12 @@ describe('ensureDefaultAgentProfile', () => {
     expect(agents).toHaveLength(1);
     expect(agents[0].name).toBe('Default Coding Agent');
     expect(agents[0].isDefault).toBe(true);
-    expect(agents[0].enabledTools.sort()).toEqual(['bash', 'edit', 'find', 'grep', 'ls', 'read', 'write']);
+    expect(agents[0].toolSelection).toEqual({
+      sets: [{ source: 'builtin', id: 'core-coding' }],
+      include: [],
+      exclude: [],
+    });
+    expect(agents[0].enabledTools).toEqual(['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'Glob', 'LS']);
     log.mockRestore();
   });
 

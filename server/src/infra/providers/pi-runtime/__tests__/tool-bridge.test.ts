@@ -2,7 +2,10 @@ import { afterEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
+import Database from 'better-sqlite3';
 import { buildTools, ALL_TOOL_NAMES, type ToolName } from '../tool-bridge.js';
+import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
+import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
 
 describe('buildTools', () => {
@@ -30,8 +33,10 @@ describe('buildTools', () => {
       'LSPTool',
       'ListMcpResources',
       'MCPTool',
+      'Monitor',
       'Read',
       'ReadMcpResource',
+      'TaskOutput',
       'TodoWrite',
       'ToolSearch',
       'WebFetch',
@@ -80,8 +85,10 @@ describe('buildTools', () => {
       'LSPTool',
       'ListMcpResources',
       'MCPTool',
+      'Monitor',
       'Read',
       'ReadMcpResource',
+      'TaskOutput',
       'TodoWrite',
       'ToolSearch',
       'WebFetch',
@@ -313,10 +320,164 @@ describe('buildTools', () => {
     });
   });
 
-  it('Agent reports missing server context instead of launching blindly', async () => {
+  it('Agent reports missing direct executor context instead of launching blindly', async () => {
     const agent = buildTools('/tmp', { enabled: ['Agent'] })[0] as any;
     const result = await agent.execute({ prompt: 'Explore this repo' });
-    expect(result.content[0].text).toContain('requires the ZClaudia server port');
+    expect(result.content[0].text).toContain('requires a task executor');
+  });
+
+  it('Agent creates and runs a first-class agent task through the direct task executor', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+    const taskRepo = new TaskRepository(db);
+    const agentTaskExecutor = {
+      start: vi.fn(async (task: any) => ({
+        status: 'running',
+        executorRef: { providerType: 'zclaudia-agent-runner', taskId: task.id },
+      })),
+      wait: vi.fn(async () => ({
+        status: 'completed',
+        result: { text: 'direct child agent result' },
+      })),
+      stop: vi.fn(),
+    };
+    try {
+      const agent = buildTools('/tmp', {
+        enabled: ['Agent'],
+        sessionId: 'session-parent',
+        runId: 'run-parent',
+        permissionOverride: {
+          profile: {
+            fileWrite: 'ask',
+            networkOps: 'block',
+          },
+        },
+        db,
+        agentTaskExecutor: agentTaskExecutor as any,
+      })[0] as any;
+
+      const result = await agent.execute('tool-agent-1', {
+        prompt: 'Explore this repo',
+        description: 'Find auth flow',
+        wait: true,
+      });
+      const parsed = JSON.parse(result.content[0].text);
+      const task = taskRepo.findById(parsed.taskId);
+
+      expect(agentTaskExecutor.start).toHaveBeenCalledWith(expect.objectContaining({
+        id: parsed.taskId,
+        type: 'agent',
+        metadata: expect.objectContaining({
+          prompt: 'Explore this repo',
+          wait: true,
+          permissionOverride: {
+            profile: {
+              fileWrite: 'ask',
+              networkOps: 'block',
+            },
+          },
+        }),
+      }));
+      expect(agentTaskExecutor.wait).toHaveBeenCalledWith(parsed.taskId);
+      expect(parsed).toMatchObject({
+        ok: true,
+        taskId: expect.any(String),
+        status: 'completed',
+        result: { text: 'direct child agent result' },
+      });
+      expect(task).toMatchObject({
+        id: parsed.taskId,
+        type: 'agent',
+        status: 'completed',
+        parentSessionId: 'session-parent',
+        parentRunId: 'run-parent',
+        parentToolUseId: 'tool-agent-1',
+        title: 'Find auth flow',
+        result: { text: 'direct child agent result' },
+        metadata: expect.objectContaining({ prompt: 'Explore this repo', wait: true }),
+      });
+      expect(taskRepo.listEvents(parsed.taskId).map(event => event.type)).toEqual(['created', 'started', 'completed']);
+    } finally {
+      db.close();
+    }
+  });
+
+  it('TaskOutput returns task state, result, and events by task id', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+    const taskRepo = new TaskRepository(db);
+    const task = taskRepo.create({
+      type: 'agent',
+      status: 'completed',
+      title: 'Finished child',
+      result: { text: 'Child agent summary' },
+    });
+    taskRepo.addEvent({ taskId: task.id, type: 'created', status: 'queued' });
+    taskRepo.addEvent({ taskId: task.id, type: 'completed', status: 'completed', payload: { text: 'Child agent summary' } });
+    const taskOutput = buildTools('/tmp', {
+      enabled: ['TaskOutput'],
+      db,
+    })[0] as any;
+
+    const result = await taskOutput.execute('task-output-1', { task_id: task.id });
+    const parsed = JSON.parse(result.content[0].text);
+
+    expect(result.details).toMatchObject({ ok: true, taskId: task.id, status: 'completed' });
+    expect(parsed.task).toMatchObject({
+      id: task.id,
+      type: 'agent',
+      status: 'completed',
+      result: { text: 'Child agent summary' },
+    });
+    expect(parsed.events.map((event: { type: string }) => event.type)).toEqual(['created', 'completed']);
+    db.close();
+  });
+
+  it('Monitor starts and stops monitor tasks through the shared task lifecycle', async () => {
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+    const taskRepo = new TaskRepository(db);
+    const monitor = buildTools('/tmp', {
+      enabled: ['Monitor'],
+      sessionId: 'session-parent',
+      runId: 'run-parent',
+      db,
+    })[0] as any;
+
+    const startedResult = await monitor.execute('monitor-1', {
+      action: 'start',
+      title: 'Watch tests',
+      target_task_id: 'task-agent-1',
+      interval_ms: 30_000,
+    });
+    const started = JSON.parse(startedResult.content[0].text);
+    const stoppedResult = await monitor.execute('monitor-2', {
+      action: 'stop',
+      task_id: started.taskId,
+      reason: 'No longer needed',
+    });
+    const stopped = JSON.parse(stoppedResult.content[0].text);
+    const task = taskRepo.findById(started.taskId);
+
+    expect(started).toMatchObject({ ok: true, taskId: expect.any(String), status: 'running' });
+    expect(stopped).toMatchObject({ ok: true, taskId: started.taskId, status: 'stopped' });
+    expect(task).toMatchObject({
+      type: 'monitor',
+      status: 'stopped',
+      parentSessionId: 'session-parent',
+      parentRunId: 'run-parent',
+      parentToolUseId: 'monitor-1',
+      title: 'Watch tests',
+      metadata: {
+        targetTaskId: 'task-agent-1',
+        intervalMs: 30_000,
+      },
+    });
+    expect(taskRepo.listEvents(started.taskId).map(event => event.type)).toEqual(['created', 'started', 'stopped']);
+    db.close();
   });
 
   it('MCPTool reports missing db context as a structured error', async () => {

@@ -1,7 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronDown, Check } from 'lucide-react';
-import type { AgentProfileConfig, ThinkingLevel, LlmProfileConfig } from '@zclaudia/shared';
-import { ALL_TOOL_NAMES } from '@zclaudia/shared';
+import type { AgentProfileConfig, ThinkingLevel, LlmProfileConfig, ToolName, ToolSelection } from '@zclaudia/shared';
+import {
+  BUILTIN_TOOL_SETS,
+  BUILTIN_TOOL_METADATA,
+  builtinToolRef,
+  defaultToolSelection,
+  legacyEnabledToolsToSelection,
+  resolveToolSelection,
+} from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import * as api from '../../services/api';
@@ -26,6 +33,29 @@ const THINKING_LEVEL_OPTIONS: { value: ThinkingLevelOption; label: string }[] = 
   { value: 'xhigh', label: 'xhigh' },
 ];
 
+type BuiltinToolSetId = keyof typeof BUILTIN_TOOL_SETS;
+
+const EDITABLE_BUILTIN_TOOL_SET_IDS = (Object.keys(BUILTIN_TOOL_SETS) as BuiltinToolSetId[])
+  .filter((setId) => setId !== 'all-builtin');
+
+function isBuiltinRefForTools(ref: ToolSelection['include'][number], tools: readonly ToolName[]): boolean {
+  return ref.source === 'builtin' && tools.includes(ref.name);
+}
+
+function removeBuiltinRefsForTools(refs: ToolSelection['include'], tools: readonly ToolName[]): ToolSelection['include'] {
+  return refs.filter((ref) => !isBuiltinRefForTools(ref, tools));
+}
+
+function deriveCustomizedToolSetIds(selection: ToolSelection): BuiltinToolSetId[] {
+  return EDITABLE_BUILTIN_TOOL_SET_IDS.filter((setId) => {
+    const set = BUILTIN_TOOL_SETS[setId];
+    const hasFullSet = selection.sets.some((selected) => selected.source === 'builtin' && selected.id === setId);
+    if (hasFullSet) return false;
+    return selection.include.some((ref) => isBuiltinRefForTools(ref, set.tools))
+      || selection.exclude.some((ref) => isBuiltinRefForTools(ref, set.tools));
+  });
+}
+
 export function AgentManager({ isOpen, onClose, inline = false, readOnly = false }: AgentManagerProps) {
   const activeServerId = useServerStore((s) => s.activeServerId);
   const facadeConnectionState = useFacadeStore((s) => s.connectionState);
@@ -49,11 +79,13 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
   const [formLlmProfileId, setFormLlmProfileId] = useState('');
   const [formModel, setFormModel] = useState('');
   const [formSystemPrompt, setFormSystemPrompt] = useState('');
-  const [formEnabledTools, setFormEnabledTools] = useState<string[]>([]);
+  const [formToolSelection, setFormToolSelection] = useState<ToolSelection>(defaultToolSelection);
   const [formThinkingLevel, setFormThinkingLevel] = useState<ThinkingLevelOption>('');
   const [formIsDefault, setFormIsDefault] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [customizedToolSetIds, setCustomizedToolSetIds] = useState<BuiltinToolSetId[]>([]);
+  const [expandedToolSetIds, setExpandedToolSetIds] = useState<BuiltinToolSetId[]>([]);
 
   const [listError, setListError] = useState<string | null>(null);
   const [pendingDeleteAgentId, setPendingDeleteAgentId] = useState<string | null>(null);
@@ -117,10 +149,12 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setFormLlmProfileId('');
     setFormModel('');
     setFormSystemPrompt('');
-    setFormEnabledTools([]);
+    setFormToolSelection(defaultToolSelection);
     setFormThinkingLevel('');
     setFormIsDefault(false);
     setFormError(null);
+    setCustomizedToolSetIds([]);
+    setExpandedToolSetIds([]);
     setEditingAgent(null);
     setShowAddForm(false);
   };
@@ -132,7 +166,9 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setFormLlmProfileId(agent.llmProfileId);
     setFormModel(agent.model);
     setFormSystemPrompt(agent.systemPrompt);
-    setFormEnabledTools(agent.enabledTools);
+    const nextToolSelection = agent.toolSelection ?? legacyEnabledToolsToSelection(agent.enabledTools);
+    setFormToolSelection(nextToolSelection);
+    setCustomizedToolSetIds(deriveCustomizedToolSetIds(nextToolSelection));
     setFormThinkingLevel((agent.thinkingLevel ?? '') as ThinkingLevelOption);
     setFormIsDefault(agent.isDefault ?? false);
     setFormError(null);
@@ -140,10 +176,75 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setShowAddForm(true);
   };
 
-  const toggleTool = (tool: string) => {
-    setFormEnabledTools((current) =>
-      current.includes(tool) ? current.filter((t) => t !== tool) : [...current, tool]
+  const toggleToolSetExpanded = (setId: BuiltinToolSetId) => {
+    setExpandedToolSetIds((current) =>
+      current.includes(setId) ? current.filter((id) => id !== setId) : [...current, setId]
     );
+  };
+
+  const toggleToolSet = (setId: keyof typeof BUILTIN_TOOL_SETS) => {
+    setFormToolSelection((current) => {
+      const set = BUILTIN_TOOL_SETS[setId];
+      const exists = current.sets.some((set) => set.source === 'builtin' && set.id === setId);
+      return {
+        ...current,
+        sets: exists
+          ? current.sets.filter((set) => !(set.source === 'builtin' && set.id === setId))
+          : [...current.sets, { source: 'builtin', id: setId }],
+        include: removeBuiltinRefsForTools(current.include, set.tools),
+        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
+      };
+    });
+    setCustomizedToolSetIds((current) => current.filter((id) => id !== setId));
+  };
+
+  const toggleToolSetCustomize = (setId: BuiltinToolSetId) => {
+    const set = BUILTIN_TOOL_SETS[setId];
+    const customActive = customizedToolSetIds.includes(setId);
+    if (customActive) {
+      setCustomizedToolSetIds((current) => current.filter((id) => id !== setId));
+      setFormToolSelection((current) => ({
+        ...current,
+        include: removeBuiltinRefsForTools(current.include, set.tools),
+        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
+      }));
+      return;
+    }
+
+    setCustomizedToolSetIds((current) => [...current.filter((id) => id !== setId), setId]);
+    setExpandedToolSetIds((current) => current.includes(setId) ? current : [...current, setId]);
+    setFormToolSelection((current) => {
+      const fullSetActive = current.sets.some((selected) => selected.source === 'builtin' && selected.id === setId);
+      const currentlyResolved = new Set(resolveToolSelection(current).builtinTools);
+      const selectedTools = fullSetActive
+        ? set.tools
+        : set.tools.filter((tool) => currentlyResolved.has(tool));
+      return {
+        ...current,
+        sets: current.sets.filter((selected) => !(selected.source === 'builtin' && selected.id === setId)),
+        include: [
+          ...removeBuiltinRefsForTools(current.include, set.tools),
+          ...selectedTools.map(builtinToolRef),
+        ],
+        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
+      };
+    });
+  };
+
+  const toggleCustomTool = (setId: BuiltinToolSetId, tool: ToolName) => {
+    const set = BUILTIN_TOOL_SETS[setId];
+    const ref = builtinToolRef(tool);
+    setFormToolSelection((current) => {
+      const include = current.include.filter((item) => !(item.source === 'builtin' && item.name === tool));
+      const selected = current.include.some((item) => item.source === 'builtin' && item.name === tool);
+      return {
+        ...current,
+        sets: current.sets.filter((selectedSet) => !(selectedSet.source === 'builtin' && selectedSet.id === setId)),
+        include: selected ? include : [...include, ref],
+        exclude: removeBuiltinRefsForTools(current.exclude, set.tools),
+      };
+    });
+    setCustomizedToolSetIds((current) => current.includes(setId) ? current : [...current, setId]);
   };
 
   const handleSubmit = async () => {
@@ -160,13 +261,15 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setSaving(true);
     setFormError(null);
     try {
+      const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || undefined,
         llmProfileId: formLlmProfileId,
         model: formModel.trim(),
         systemPrompt: formSystemPrompt,
-        enabledTools: formEnabledTools,
+        enabledTools: resolvedTools,
+        toolSelection: formToolSelection,
         thinkingLevel: formThinkingLevel === '' ? undefined : formThinkingLevel,
         isDefault: formIsDefault,
       };
@@ -230,6 +333,10 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
   };
 
   if (!isOpen) return null;
+
+  const builtinToolSetEntries = EDITABLE_BUILTIN_TOOL_SET_IDS
+    .map((setId) => ({ ...BUILTIN_TOOL_SETS[setId], id: setId }));
+  const resolvedBuiltinTools = resolveToolSelection(formToolSelection).builtinTools;
 
   const content = !isConnected ? (
     <p className="text-muted-foreground text-center py-8">Connect to a server first</p>
@@ -298,31 +405,109 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">Enabled Tools</label>
-        <div className="flex flex-wrap gap-2">
-          {ALL_TOOL_NAMES.map((tool) => {
-            const checked = formEnabledTools.includes(tool);
-            return (
-              <label
-                key={tool}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-sm cursor-pointer transition-colors ${
-                  checked
-                    ? 'bg-primary/15 border-primary/40 text-primary'
-                    : 'bg-secondary border-border text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  checked={checked}
-                  onChange={() => toggleTool(tool)}
-                  aria-label={`enable tool ${tool}`}
-                  className="rounded-md border-border"
-                />
-                <span className="font-mono text-xs">{tool}</span>
-              </label>
-            );
-          })}
+      <div className="space-y-3">
+        <div>
+          <label className="block text-sm font-medium text-muted-foreground mb-1">Tool Sets</label>
+          <div className="space-y-2">
+            {builtinToolSetEntries
+              .map((set) => {
+                const checked = formToolSelection.sets.some((selected) => selected.source === 'builtin' && selected.id === set.id);
+                const customized = customizedToolSetIds.includes(set.id);
+                const expanded = expandedToolSetIds.includes(set.id);
+                return (
+                  <div
+                    key={set.id}
+                    className={`min-w-0 rounded-lg border p-3 text-sm transition-colors ${
+                      checked
+                        ? 'bg-primary/10 border-primary/45 text-primary shadow-sm'
+                        : customized
+                          ? 'bg-secondary/80 border-primary/25 text-foreground'
+                          : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleToolSet(set.id)}
+                        aria-label={`enable full tool set ${set.id}`}
+                        className="rounded-md border-border shrink-0"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => toggleToolSetExpanded(set.id)}
+                        aria-label={`expand tool set ${set.id}`}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="font-medium truncate">{set.label}</div>
+                          <span className="shrink-0 rounded-full bg-background/70 border border-border/70 px-2 py-0.5 text-[10px] text-muted-foreground">
+                            {set.tools.length} tools
+                          </span>
+                          <span className="min-w-0 truncate text-xs text-muted-foreground">
+                            {set.tools.slice(0, 4).join(', ')}{set.tools.length > 4 ? '...' : ''}
+                          </span>
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleToolSetCustomize(set.id)}
+                        aria-label={`customize tool set ${set.id}`}
+                        className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors ${
+                          customized
+                            ? 'border-primary/40 bg-primary/10 text-primary'
+                            : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {customized ? 'Custom' : 'Customize'}
+                      </button>
+                    </div>
+                    {expanded && (
+                      <div className="mt-3 space-y-1 border-t border-border/70 pt-2">
+                        {set.tools.map((tool) => {
+                          const selected = customized
+                            ? formToolSelection.include.some((ref) => ref.source === 'builtin' && ref.name === tool)
+                            : checked;
+                          const metadata = BUILTIN_TOOL_METADATA[tool];
+                          return (
+                            <label
+                              key={tool}
+                              className={`flex items-start gap-3 rounded-md bg-background/60 px-2 py-2 ${
+                                customized ? 'cursor-pointer hover:bg-background/80' : ''
+                              }`}
+                            >
+                              {customized ? (
+                                <input
+                                  type="checkbox"
+                                  checked={selected}
+                                  onChange={() => toggleCustomTool(set.id, tool)}
+                                  aria-label={`select tool ${tool}`}
+                                  className="mt-0.5 shrink-0"
+                                />
+                              ) : (
+                                <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${selected ? 'bg-primary' : 'bg-muted-foreground/40'}`} />
+                              )}
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate font-mono text-xs" title={tool}>{tool}</span>
+                                <span
+                                  className="mt-0.5 block truncate text-[11px] text-muted-foreground"
+                                  title={metadata.description || metadata.label}
+                                >
+                                  {metadata.description || metadata.label}
+                                </span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+          </div>
+          <p className="mt-2 text-[10px] text-muted-foreground">
+            Resolved built-in tools: {resolvedBuiltinTools.join(', ') || 'none'}
+          </p>
         </div>
       </div>
 
@@ -399,7 +584,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
                 </div>
                 {agent.enabledTools.length > 0 && (
                   <div className="text-[10px] text-muted-foreground mt-1">
-                    tools: {agent.enabledTools.join(', ')}
+                    tools: {agent.enabledTools.length} resolved · {agent.enabledTools.join(', ')}
                   </div>
                 )}
               </div>

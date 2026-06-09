@@ -220,6 +220,7 @@ const READONLY_TOOLS = [
   'ToolSearch',
   'ListMcpResources',
   'ReadMcpResource',
+  'TaskOutput',
   'LSPTool',
 ];
 

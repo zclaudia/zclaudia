@@ -39,11 +39,13 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
   // takes effect even before the parent's re-render delivers the new prop.
   const [activeProfileId, setActiveProfileId] = useState(profile.id);
   const [signInPending, setSignInPending] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
   const [models, setModels] = useState<CodexModelEntry[] | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
 
   async function handleSignIn() {
     let idToUse = profile.id;
+    setSignInError(null);
     if (onBeforeSignIn) {
       setSignInPending(true);
       try {
@@ -51,15 +53,13 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
         if (saved) {
           idToUse = saved.id;
         } else {
-          // Pre-save failed (validation, network, or server returned no
-          // updated profile). Don't bail silently — log it and continue with
-          // the existing profile id so the OAuth modal still opens. If the
-          // server-side type isn't openai-codex, oauth/start will surface a
-          // clear "profile is not openai-codex" error in the modal.
-          console.warn('[CodexOAuthSection] onBeforeSignIn returned no saved profile; using existing profile id');
+          setSignInError('登录前保存 Profile 失败，请先修正表单错误。');
+          return;
         }
       } catch (err) {
         console.error('[CodexOAuthSection] onBeforeSignIn threw', err);
+        setSignInError(err instanceof Error ? err.message : '登录前保存 Profile 失败，请稍后重试。');
+        return;
       } finally {
         setSignInPending(false);
       }
@@ -105,6 +105,11 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
         onSignOut={handleSignOut}
         inFlight={showLogin || signInPending}
       />
+      {signInError && (
+        <div className="rounded border border-destructive/40 bg-destructive/5 p-2 text-sm text-destructive">
+          {signInError}
+        </div>
+      )}
 
       {profile.oauthCredentials && (
         <div>

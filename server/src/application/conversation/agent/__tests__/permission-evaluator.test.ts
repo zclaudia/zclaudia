@@ -126,6 +126,7 @@ describe('classify', () => {
       'ToolSearch',
       'ListMcpResources',
       'ReadMcpResource',
+      'TaskOutput',
       'LSPTool',
     ]) {
       expect(classify(tool, {}, '')).toBe('fileRead' as PermissionCategory);

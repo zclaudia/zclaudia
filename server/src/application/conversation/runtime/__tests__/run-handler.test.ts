@@ -290,7 +290,7 @@ describe('ws/run-handler', () => {
       expect.objectContaining({
         systemPrompt: 'agent system prompt',
         agentProfile: expect.objectContaining({ id: 'agent-1', systemPrompt: 'agent system prompt' }),
-        enabledTools: ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls'],
+        enabledTools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'LS'],
       }),
       expect.any(Function),
     );

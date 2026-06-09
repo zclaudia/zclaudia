@@ -14,6 +14,7 @@ interface CreateDbOptions {
   /** Override fields on the seeded agent profile. */
   agentSystemPrompt?: string;
   agentEnabledTools?: string[];
+  agentToolSelection?: Record<string, unknown>;
   agentThinkingLevel?: string | null;
   agentModel?: string;
   /** Override the agent.id assigned to the session (default 'agent-1'); use to test stale agent_profile_id. */
@@ -115,15 +116,16 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
   // Always seed a default agent so the bootstrap chain works.
   db.prepare(`
     INSERT INTO agent_profiles (
-      id, name, llm_profile_id, model, system_prompt, enabled_tools, thinking_level,
+      id, name, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, thinking_level,
       is_default, created_at, updated_at
     )
-    VALUES ('agent-1', 'Test Agent', ?, ?, ?, ?, ?, 1, ?, ?)
+    VALUES ('agent-1', 'Test Agent', ?, ?, ?, ?, ?, ?, 1, ?, ?)
   `).run(
     agentLlmProfileId,
     options.agentModel ?? 'claude-sonnet-4-6',
     options.agentSystemPrompt ?? '',
     JSON.stringify(options.agentEnabledTools ?? ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls']),
+    options.agentToolSelection ? JSON.stringify(options.agentToolSelection) : null,
     options.agentThinkingLevel ?? null,
     now,
     now,
@@ -245,12 +247,27 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
     expect(result?.agentProfile).toBeDefined();
     expect(result?.agentProfile?.id).toBe('agent-1');
     expect(result?.agentProfile?.systemPrompt).toBe('You are a coder.');
-    expect(result?.agentProfile?.enabledTools).toEqual(['read', 'bash']);
+    expect(result?.agentProfile?.enabledTools).toEqual(['Read', 'Bash']);
     expect(result?.agentProfile?.thinkingLevel).toBe('medium');
     expect(result?.agentProfile?.model).toBe('claude-opus-4-7');
-    expect(result?.enabledTools).toEqual(['read', 'bash']);
+    expect(result?.enabledTools).toEqual(['Read', 'Bash']);
     expect(result?.providerConfig).toBeDefined();
     expect(result?.providerConfig?.id).toBe('provider-1');
+  });
+
+  it('resolves enabled tools from toolSelection when present', () => {
+    const result = bootstrap('anthropic', 'default', {
+      apiKey: 'sk-test',
+      agentEnabledTools: ['read'],
+      agentToolSelection: {
+        sets: [{ source: 'builtin', id: 'core-coding' }],
+        include: [{ source: 'plugin', pluginId: 'jira', toolId: 'search' }],
+        exclude: [{ source: 'builtin', name: 'Bash' }],
+      },
+    });
+
+    expect(result?.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Grep', 'Find', 'Glob', 'LS']);
+    expect(result?.agentProfile.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
   });
 
   it('falls back to default agent when session.agent_profile_id is stale (warn log)', () => {

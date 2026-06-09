@@ -94,7 +94,12 @@ describe('AgentManager', () => {
       llmProfileId: 'llm-1',
       model: 'claude-sonnet-4-5',
       systemPrompt: 'You are a coding agent.',
-      enabledTools: ['read', 'write', 'edit', 'bash'],
+      enabledTools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'Glob', 'LS'],
+      toolSelection: {
+        sets: [{ source: 'builtin', id: 'core-coding' }],
+        include: [],
+        exclude: [],
+      },
       isDefault: true,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -171,7 +176,16 @@ describe('AgentManager', () => {
     expect(screen.getByText('LLM Profile *')).toBeInTheDocument();
     expect(screen.getByText('Model *')).toBeInTheDocument();
     expect(screen.getByText('System Prompt')).toBeInTheDocument();
-    expect(screen.getByText('Enabled Tools')).toBeInTheDocument();
+    expect(screen.getByText('Tool Sets')).toBeInTheDocument();
+    expect(screen.getByText('Core Coding')).toBeInTheDocument();
+    expect(screen.getByText('8 tools')).toBeInTheDocument();
+    expect(screen.queryByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeNull();
+    await clickAsync(screen.getByLabelText('expand tool set core-coding'));
+    expect(screen.getByText('Read')).toBeInTheDocument();
+    expect(screen.getByText('Bash')).toBeInTheDocument();
+    expect(screen.getByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeInTheDocument();
+    expect(screen.getByLabelText('customize tool set core-coding')).toBeInTheDocument();
+    expect(screen.queryByLabelText('select tool Bash')).toBeNull();
     expect(screen.getByText('Thinking Level')).toBeInTheDocument();
 
     // Fill name
@@ -190,9 +204,10 @@ describe('AgentManager', () => {
       target: { value: 'You are a doc writer' },
     });
 
-    // Pick enabledTools subset: read + edit (toggle on)
-    await clickAsync(screen.getByLabelText('enable tool read'));
-    await clickAsync(screen.getByLabelText('enable tool edit'));
+    // Customize core-coding and remove Bash from the precise selection.
+    await clickAsync(screen.getByLabelText('expand tool set core-coding'));
+    await clickAsync(screen.getByLabelText('customize tool set core-coding'));
+    await clickAsync(screen.getByLabelText('select tool Bash'));
 
     // Pick thinkingLevel = "low"
     await clickAsync(screen.getByText('Thinking Level').nextElementSibling as Element);
@@ -210,7 +225,20 @@ describe('AgentManager', () => {
           llmProfileId: 'llm-1',
           model: 'claude-sonnet-4-5',
           systemPrompt: 'You are a doc writer',
-          enabledTools: ['read', 'edit'],
+          toolSelection: {
+            sets: [],
+            include: [
+              { source: 'builtin', name: 'Read' },
+              { source: 'builtin', name: 'Write' },
+              { source: 'builtin', name: 'Edit' },
+              { source: 'builtin', name: 'Grep' },
+              { source: 'builtin', name: 'Find' },
+              { source: 'builtin', name: 'Glob' },
+              { source: 'builtin', name: 'LS' },
+            ],
+            exclude: [],
+          },
+          enabledTools: ['Read', 'Write', 'Edit', 'Grep', 'Find', 'Glob', 'LS'],
           thinkingLevel: 'low',
           isDefault: true,
         })

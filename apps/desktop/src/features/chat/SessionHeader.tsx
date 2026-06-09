@@ -29,6 +29,7 @@ interface SessionHeaderProps {
   onResetProviderSession: () => void;
   onExport: () => void;
   onArchive: () => void;
+  archiveDisabled?: boolean;
   onPopOut: () => void;
   onToggleSessionMenu: () => void;
 }
@@ -50,6 +51,7 @@ export function SessionHeader({
   onResetProviderSession,
   onExport,
   onArchive,
+  archiveDisabled = false,
   onPopOut,
   onToggleSessionMenu,
 }: SessionHeaderProps) {
@@ -174,8 +176,9 @@ export function SessionHeader({
               </div>
               <button
                 onClick={onArchive}
-                className="p-0.5 rounded-lg border border-transparent text-muted-foreground transition-colors hover:bg-destructive/8 hover:text-destructive"
-                title="Archive session"
+                disabled={archiveDisabled}
+                className="p-0.5 rounded-lg border border-transparent text-muted-foreground transition-colors hover:bg-destructive/8 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+                title={archiveDisabled ? 'Stop the run before archiving' : 'Archive session'}
               >
                 <Archive size={12} />
               </button>
@@ -212,7 +215,9 @@ export function SessionHeader({
                     </button>
                     <button
                       onClick={() => { onArchive(); onToggleSessionMenu(); }}
-                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted"
+                      disabled={archiveDisabled}
+                      title={archiveDisabled ? 'Stop the run before archiving' : undefined}
+                      className="w-full text-left px-3 py-2 text-sm flex items-center gap-2 text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent"
                     >
                       <Archive size={14} />
                       Archive

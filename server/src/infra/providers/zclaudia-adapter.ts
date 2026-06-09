@@ -326,7 +326,10 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       enabled: effectiveTools,
       serverPort: options.serverPort,
       sessionId: options.claudiaSessionId,
+      runId: options.runId,
+      permissionOverride: options.permissionOverride,
       db: options.db,
+      agentTaskExecutor: options.agentTaskExecutor,
       permissionCallback: onPermission,
     });
     const hooks = buildAgentHooks({

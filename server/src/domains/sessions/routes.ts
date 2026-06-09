@@ -30,6 +30,7 @@ export function createSessionRoutes(
     broadcastSessionEvent: (type, session) => {
       sessionEvents?.publishSessionEvent(type, session);
     },
+    isSessionRunning: (sessionId) => hasAnyActiveRunForSession(activeRuns, sessionId),
   });
   const exportService = new SessionExportService(db);
   const queryService = new SessionQueryService(db, activeRuns);

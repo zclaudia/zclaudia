@@ -1,4 +1,7 @@
 {
   "identifier": "com.zclaudia.desktop.dev",
-  "productName": "ZClaudia Dev"
+  "productName": "ZClaudia Dev",
+  "bundle": {
+    "externalBin": []
+  }
 }

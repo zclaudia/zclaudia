@@ -102,6 +102,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           'webfetch',
           'websearch',
           'toolsearch',
+          'taskoutput',
           'todowrite',
           'askuserquestion',
           'listmcpresources',

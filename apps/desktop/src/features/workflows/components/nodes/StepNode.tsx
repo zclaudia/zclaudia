@@ -11,6 +11,7 @@ const STEP_ICONS: Record<BuiltinWorkflowStepType, React.ReactNode> = {
   create_pr: <GitPullRequest size={14} />,
   ai_review: <Bot size={14} />,
   ai_prompt: <Bot size={14} />,
+  task: <Bot size={14} />,
   shell: <Terminal size={14} />,
   webhook: <Globe size={14} />,
   condition: <HelpCircle size={14} />,

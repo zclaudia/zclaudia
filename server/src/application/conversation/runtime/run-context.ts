@@ -1,9 +1,11 @@
 import type Database from 'better-sqlite3';
 import type { ContextTemplate } from '../context/types.js';
 import type { RunOptions } from '../../../infra/providers/types.js';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { ToolName } from '@zclaudia/shared/core/tools';
+import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import {
   buildSkillDirectoryHint,
   toolRegistry as pluginToolRegistry,
@@ -52,6 +54,8 @@ export interface BuildRunContextInput {
   modeValue: string;
   providerConfig?: LlmProfileConfig;
   providerType: string;
+  runId: string;
+  agentTaskExecutor?: TaskExecutor;
   sdkSessionId?: string;
   serverPort: number | null;
   session: SessionContext;
@@ -73,6 +77,8 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     modeValue,
     providerConfig,
     providerType,
+    runId,
+    agentTaskExecutor,
     sdkSessionId,
     serverPort,
     session,
@@ -147,7 +153,10 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       sessionTitle: session.name || undefined,
       serverPort: serverPort || undefined,
       claudiaSessionId: message.sessionId,
+      runId,
+      permissionOverride: message.permissionOverride as Partial<UnifiedPermissionPolicy> | undefined,
       db,
+      agentTaskExecutor,
       llmProfileConfig: providerConfig,
       agentProfile,
       enabledTools,

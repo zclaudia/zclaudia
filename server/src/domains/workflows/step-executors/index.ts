@@ -11,3 +11,4 @@ export { PluginStepExecutor } from './plugin-executor.js';
 export { PermissionClassifyStepExecutor } from './permission-classify-executor.js';
 export { AIRiskAnalysisStepExecutor } from './ai-risk-analysis-executor.js';
 export { PermissionDecideStepExecutor } from './permission-decide-executor.js';
+export { TaskWorkflowStepExecutor } from './task-executor.js';

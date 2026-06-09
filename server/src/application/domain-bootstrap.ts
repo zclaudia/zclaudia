@@ -18,7 +18,6 @@ import type { SupervisorService } from '../domains/supervision/index.js';
 import type { NotificationSender } from '../infra/push/notification-sender.js';
 import { registerInteractionTools } from '../application/conversation/interactions/interaction-tools.js';
 import { registerAgentTools } from '../application/conversation/agent-tools/index.js';
-import { registerOrchestrationDomain } from '../application/orchestration/register.js';
 import { pluginEvents } from '../infra/events/index.js';
 import { localOnlyMiddleware } from '../interfaces/http/middleware/local-only.js';
 import { sendMessage } from '../application/conversation/transport/broadcast.js';
@@ -30,6 +29,11 @@ import { createDomainPorts } from './bootstrap/domain-ports.js';
 import { registerFeatureDomains } from './bootstrap/feature-domains.js';
 import { recordActivity } from './conversation/memory/activity-log.js';
 import { registerPlatformRoutes } from './bootstrap/platform-routes.js';
+import { TaskExecutorRegistry } from '../domains/tasks/executors/registry.js';
+import { AgentTaskExecutor } from '../domains/tasks/executors/agent-executor.js';
+import { createAgentTaskRunner } from './orchestration/agent-task-runner.js';
+import { SessionRepository } from '../domains/sessions/index.js';
+import type { TaskExecutor } from '../domains/tasks/executors/types.js';
 
 export interface BootstrapDeps {
   db: ReturnType<typeof initDatabase>;
@@ -49,11 +53,11 @@ export interface BootstrapDeps {
 export interface BootstrapResult {
   supervisorService: SupervisorService;
   notificationsService: NotificationService;
-  orchestrator: import('../application/orchestration/types.js').TaskOrchestrator;
   permissionBridge: import('./conversation/agent/permission-bridge.js').PermissionBridge;
   cancelWorkflowRun: (runId: string) => void;
   permissionWorkflowResolver: import('../domains/workflows/index.js').PermissionWorkflowResolver;
   metaWorkflowService: import('../domains/meta-workflow/service.js').MetaWorkflowService;
+  agentTaskExecutor: TaskExecutor;
 }
 
 export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
@@ -83,6 +87,8 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     handleRunStart,
     broadcastHeartbeat,
   });
+  const taskExecutorRegistry = new TaskExecutorRegistry();
+  const sessionRepo = new SessionRepository(db);
 
   app.use('/api/files', authMiddleware, createFilesRoutes({
     sendMessage,
@@ -141,6 +147,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     workflowAiRunPort,
     localPrScheduling: systemTaskRegistry,
     workflowScheduling: systemTaskRegistry,
+    taskExecutorRegistry,
   });
 
   registerPlatformRoutes({
@@ -165,14 +172,19 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
 
   import('../application/conversation/agent-tools/browser.js').then(m => m.registerBrowserTool());
 
-  const { orchestrator } = registerOrchestrationDomain({
+  const agentTaskExecutor = new AgentTaskExecutor(createAgentTaskRunner({
     db,
-    clients,
-    handleRunStart,
     createVirtualClient,
-    getServerPort,
-    notificationService: notificationsService,
-  });
+    handleRunStart,
+    getClients: () => clients,
+    createSession: (opts) => sessionRepo.create({
+      projectId: opts.projectId,
+      name: opts.name,
+      type: opts.type,
+    } as any),
+    sessionExists: (id) => !!sessionRepo.findById(id),
+  }));
+  taskExecutorRegistry.register(agentTaskExecutor);
 
   pluginEvents.on('run.completed', (event: any) => {
     try {
@@ -194,10 +206,10 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   return {
     supervisorService,
     notificationsService,
-    orchestrator,
     permissionBridge,
     cancelWorkflowRun,
     permissionWorkflowResolver,
     metaWorkflowService,
+    agentTaskExecutor,
   };
 }

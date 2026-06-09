@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
+import { useToastStore } from '../../stores/toastStore';
 import * as api from '../../services/api';
 import type { Session, Project } from '@zclaudia/shared';
 import { isDesktopTauri } from '../../utils/platform';
@@ -15,6 +16,7 @@ interface UseSessionActionsParams {
   activeServerId: string | null;
   renameValue: string;
   setIsRenamingSession: (v: boolean) => void;
+  isSessionRunning: boolean;
 }
 
 export function useSessionActions({
@@ -25,6 +27,7 @@ export function useSessionActions({
   activeServerId: _activeServerId,
   renameValue,
   setIsRenamingSession,
+  isSessionRunning,
 }: UseSessionActionsParams) {
   const addPoppedOutSession = useUIStore((s) => s.addPoppedOutSession);
   const removePoppedOutSession = useUIStore((s) => s.removePoppedOutSession);
@@ -60,13 +63,22 @@ export function useSessionActions({
 
   const handleArchiveSession = useCallback(async () => {
     if (!isConnected) return;
+    if (isSessionRunning) {
+      useToastStore.getState().add({
+        type: 'error',
+        title: 'Cannot archive running session',
+        message: 'Stop the run before archiving.',
+        sessionId,
+      });
+      return;
+    }
     try {
       await api.archiveSessions([sessionId]);
       useProjectStore.getState().deleteSession(sessionId);
     } catch (error) {
       console.error('Failed to archive session:', error);
     }
-  }, [isConnected, sessionId]);
+  }, [isConnected, isSessionRunning, sessionId]);
 
   const handlePopOut = useCallback(async () => {
     if (!isDesktopTauri()) return;

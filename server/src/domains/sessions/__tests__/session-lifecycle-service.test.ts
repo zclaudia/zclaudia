@@ -113,6 +113,46 @@ describe('SessionLifecycleService', () => {
     expect(emitPluginEvent).toHaveBeenCalledWith('session.restored', { sessionId: 's1' });
   });
 
+  it('rejects archive when any target session is still running', () => {
+    const service = new SessionLifecycleService(db, {
+      isSessionRunning: (id) => id === 's-running',
+    });
+    const now = Date.now();
+    db.prepare(`
+      INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run('s-running', 'project-1', 'Running', now, now);
+    db.prepare(`
+      INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run('s-idle', 'project-1', 'Idle', now, now);
+
+    expect(() => service.archiveSessions(['s-idle', 's-running'])).toThrowError(
+      expect.objectContaining({ status: 409, code: 'SESSION_RUNNING' }),
+    );
+
+    // Atomic: idle session must not have been archived either.
+    const row = db.prepare('SELECT archived_at FROM sessions WHERE id = ?').get('s-idle') as { archived_at: number | null };
+    expect(row.archived_at).toBeNull();
+  });
+
+  it('rejects delete when the session is still running', () => {
+    const service = new SessionLifecycleService(db, {
+      isSessionRunning: (id) => id === 's-running',
+    });
+    const now = Date.now();
+    db.prepare(`
+      INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+    `).run('s-running', 'project-1', 'Running', now, now);
+
+    expect(() => service.deleteSession('s-running')).toThrowError(
+      expect.objectContaining({ status: 409, code: 'SESSION_RUNNING' }),
+    );
+    const row = db.prepare('SELECT id FROM sessions WHERE id = ?').get('s-running');
+    expect(row).toBeDefined();
+  });
+
   it('updates session metadata and broadcasts updated event', () => {
     const broadcastSessionEvent = vi.fn();
     const service = new SessionLifecycleService(db, {

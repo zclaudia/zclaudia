@@ -140,8 +140,8 @@ export async function createServer(): Promise<ServerContext> {
   serverState.permissionBridge = setup.permissionBridge;
   serverState.cancelWorkflowRun = setup.cancelWorkflowRun;
   serverState.permissionWorkflowResolver = setup.permissionWorkflowResolver;
-  serverState.taskOrchestrator = setup.orchestrator;
   serverState.metaWorkflowService = setup.metaWorkflowService;
+  serverState.agentTaskExecutor = setup.agentTaskExecutor;
 
   // Error handling middleware (must be after routes)
   app.use(expressErrorHandler);

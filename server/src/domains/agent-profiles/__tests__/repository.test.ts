@@ -39,8 +39,50 @@ describe('AgentProfileRepository', () => {
     expect(fetched!.model).toBe('claude-sonnet-4-6');
     expect(fetched!.systemPrompt).toBe('You are a coder.');
     expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Bash']);
+    expect(fetched!.toolSelection).toEqual({
+      sets: [],
+      include: [
+        { source: 'builtin', name: 'Read' },
+        { source: 'builtin', name: 'Write' },
+        { source: 'builtin', name: 'Bash' },
+      ],
+      exclude: [],
+    });
+    expect(fetched!.resolvedTools).toEqual([
+      { source: 'builtin', name: 'Read' },
+      { source: 'builtin', name: 'Write' },
+      { source: 'builtin', name: 'Bash' },
+    ]);
     expect(fetched!.thinkingLevel).toBe('medium');
     expect(fetched!.isDefault).toBe(true);
+  });
+
+  it('persists toolSelection including future plugin refs without dropping them', () => {
+    const created = repo.create({
+      name: 'jira-agent',
+      llmProfileId,
+      model: 'm',
+      systemPrompt: '',
+      enabledTools: [],
+      toolSelection: {
+        sets: [{ source: 'builtin', id: 'core-coding' }],
+        include: [{ source: 'plugin', pluginId: 'jira', toolId: 'search' }],
+        exclude: [{ source: 'builtin', name: 'Bash' }],
+      },
+    });
+
+    const raw = db.prepare('SELECT tool_selection FROM agent_profiles WHERE id = ?').get(created.id) as {
+      tool_selection: string;
+    };
+    const fetched = repo.findById(created.id);
+
+    expect(JSON.parse(raw.tool_selection)).toEqual({
+      sets: [{ source: 'builtin', id: 'core-coding' }],
+      include: [{ source: 'plugin', pluginId: 'jira', toolId: 'search' }],
+      exclude: [{ source: 'builtin', name: 'Bash' }],
+    });
+    expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Grep', 'Find', 'Glob', 'LS']);
+    expect(fetched!.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
   });
 
   it('falls back to all canonical tools when enabled_tools JSON is corrupt', () => {
@@ -51,7 +93,7 @@ describe('AgentProfileRepository', () => {
       systemPrompt: '',
       enabledTools: ['read'],
     });
-    db.prepare('UPDATE agent_profiles SET enabled_tools = ? WHERE id = ?').run('{broken', created.id);
+    db.prepare('UPDATE agent_profiles SET enabled_tools = ?, tool_selection = NULL WHERE id = ?').run('{broken', created.id);
     const fetched = repo.findById(created.id);
     expect(fetched!.enabledTools.sort()).toEqual([...ALL_TOOL_NAMES].sort());
   });

@@ -7,7 +7,7 @@ import {
 } from '@earendil-works/pi-coding-agent';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
-import { request as httpRequest } from 'http';
+import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 import { execFile } from 'child_process';
@@ -17,6 +17,9 @@ import { promisify } from 'util';
 
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
+import { TaskRepository } from '../../../domains/tasks/repository.js';
+import { TaskService } from '../../../domains/tasks/task-service.js';
+import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import { loadMcpServersFromDb } from '../../../utils/mcp-config.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import type { PermissionCallback } from '../types.js';
@@ -535,43 +538,6 @@ async function validatePublicHttpUrl(rawUrl: string): Promise<{ ok: true; url: U
   return { ok: true, url: parsed };
 }
 
-async function postPluginTool(
-  serverPort: number,
-  sessionId: string | undefined,
-  name: string,
-  args: Record<string, unknown>,
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ arguments: args, sessionId });
-    const req = httpRequest({
-      hostname: '127.0.0.1',
-      port: serverPort,
-      path: `/api/plugins/tools/${encodeURIComponent(name)}/execute`,
-      method: 'POST',
-      timeout: 30_000,
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
-    }, (res) => {
-      let raw = '';
-      res.on('data', (chunk) => { raw += chunk; });
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(raw) as { result?: unknown };
-          resolve(String(parsed.result ?? raw));
-        } catch {
-          resolve(raw);
-        }
-      });
-    });
-    req.on('timeout', () => req.destroy(new Error('Plugin tool request timed out')));
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-}
-
 function getMcpServer(db: Database.Database | undefined, serverName: string) {
   if (!db) throw new Error('MCP tools require a database-backed run context');
   const servers = loadMcpServersFromDb(db, 'zclaudia');
@@ -1019,7 +985,19 @@ function createGlobTool(cwd: string): AgentTool<any> {
   } as unknown as AgentTool<any>;
 }
 
-function createAgentTool(serverPort?: number, sessionId?: string): AgentTool<any> {
+function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
+  if (typeof args.description === 'string' && args.description.trim()) return args.description.trim();
+  if (typeof args.prompt === 'string' && args.prompt.trim()) return truncateText(args.prompt.trim(), 120);
+  return undefined;
+}
+
+function createAgentTool(
+  sessionId?: string,
+  runId?: string,
+  db?: Database.Database,
+  permissionOverride?: Partial<UnifiedPermissionPolicy>,
+  agentTaskExecutor?: TaskExecutor,
+): AgentTool<any> {
   return {
     name: 'Agent',
     label: 'Agent',
@@ -1035,12 +1013,161 @@ function createAgentTool(serverPort?: number, sessionId?: string): AgentTool<any
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      if (!serverPort) return jsonResult({ error: 'Agent tool requires the ZClaudia server port' });
-      const result = await postPluginTool(serverPort, sessionId, 'spawn_task', {
-        task: args.prompt,
-        wait: args.wait,
+      if (!agentTaskExecutor) return jsonResult({ error: 'Agent tool requires a task executor' });
+      if (!db) return jsonResult({ error: 'Agent tool requires database context' });
+      if (typeof args.prompt !== 'string' || !args.prompt.trim()) {
+        return errorResult('missing_prompt', 'Agent requires a prompt');
+      }
+
+      const taskService = new TaskService(new TaskRepository(db));
+      const task = taskService.createTask({
+        type: 'agent',
+        title: taskTitleFromArgs(args),
+        parentSessionId: sessionId,
+        parentRunId: runId,
+        parentToolUseId: typeof toolCallId === 'string' ? toolCallId : undefined,
+        metadata: {
+          prompt: args.prompt,
+          wait: Boolean(args.wait),
+          permissionOverride: args.permission_override ?? args.permissionOverride ?? permissionOverride,
+        },
       });
-      return textResult(result);
+
+      try {
+        const started = await agentTaskExecutor.start(task);
+        const running = taskService.startTask(task.id, { executorRef: started.executorRef });
+        if (args.wait !== true) {
+          return jsonResult({
+            ok: true,
+            taskId: task.id,
+            status: running.status,
+          });
+        }
+        const result = await agentTaskExecutor.wait(task.id);
+        const updated = result.status === 'completed'
+          ? taskService.completeTask(task.id, result.result ?? {})
+          : result.status === 'stopped'
+            ? taskService.stopTask(task.id, result.result)
+            : taskService.failTask(task.id, result.result ?? { error: 'Agent task failed' });
+        return jsonResult({
+          ok: true,
+          taskId: task.id,
+          status: updated.status,
+          result: result.result,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        taskService.failTask(task.id, { error: message });
+        return errorResult('agent_delegate_failed', message, { taskId: task.id });
+      }
+    },
+  } as unknown as AgentTool<any>;
+}
+
+function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
+  return {
+    name: 'TaskOutput',
+    label: 'TaskOutput',
+    description: 'Read task state, result, and lifecycle events by task id.',
+    parameters: {
+      type: 'object',
+      properties: {
+        task_id: { type: 'string' },
+        taskId: { type: 'string' },
+        include_events: { type: 'boolean', default: true },
+      },
+      required: ['task_id'],
+    } as any,
+    execute: async (toolCallId: string, params: unknown) => {
+      const args = toolParams(toolCallId, params);
+      if (!db) return errorResult('missing_db_context', 'TaskOutput requires database context');
+      const taskId = args.task_id ?? args.taskId;
+      if (typeof taskId !== 'string' || !taskId.trim()) {
+        return errorResult('missing_task_id', 'TaskOutput requires task_id');
+      }
+
+      const repo = new TaskRepository(db);
+      const task = repo.findById(taskId.trim());
+      if (!task) return errorResult('task_not_found', `Task not found: ${taskId}`, { taskId });
+      const includeEvents = args.include_events !== false;
+      const events = includeEvents ? repo.listEvents(task.id) : [];
+      return textResult(JSON.stringify({ task, events }, null, 2), {
+        ok: true,
+        taskId: task.id,
+        status: task.status,
+        eventCount: events.length,
+      });
+    },
+  } as unknown as AgentTool<any>;
+}
+
+function createMonitorTool(sessionId?: string, runId?: string, db?: Database.Database): AgentTool<any> {
+  return {
+    name: 'Monitor',
+    label: 'Monitor',
+    description: 'Create, inspect, or stop a monitor task using the shared Task lifecycle.',
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['start', 'status', 'stop'], default: 'start' },
+        task_id: { type: 'string' },
+        taskId: { type: 'string' },
+        title: { type: 'string' },
+        description: { type: 'string' },
+        target_task_id: { type: 'string' },
+        interval_ms: { type: 'number' },
+        reason: { type: 'string' },
+      },
+    } as any,
+    execute: async (toolCallId: string, params: unknown) => {
+      const args = toolParams(toolCallId, params);
+      if (!db) return errorResult('missing_db_context', 'Monitor requires database context');
+      const repo = new TaskRepository(db);
+      const service = new TaskService(repo);
+      const action = typeof args.action === 'string' ? args.action : 'start';
+      const taskId = args.task_id ?? args.taskId;
+
+      if (action === 'start') {
+        const task = service.createTask({
+          type: 'monitor',
+          title: typeof args.title === 'string' ? args.title : undefined,
+          description: typeof args.description === 'string' ? args.description : undefined,
+          parentSessionId: sessionId,
+          parentRunId: runId,
+          parentToolUseId: typeof toolCallId === 'string' ? toolCallId : undefined,
+          metadata: {
+            targetTaskId: typeof args.target_task_id === 'string' ? args.target_task_id : undefined,
+            intervalMs: typeof args.interval_ms === 'number' ? args.interval_ms : undefined,
+          },
+        });
+        const running = service.startTask(task.id, {
+          executorRef: { providerType: 'task-monitor', taskId: task.id },
+        });
+        return jsonResult({ ok: true, taskId: running.id, status: running.status });
+      }
+
+      if (typeof taskId !== 'string' || !taskId.trim()) {
+        return errorResult('missing_task_id', `Monitor action "${action}" requires task_id`);
+      }
+      const task = repo.findById(taskId.trim());
+      if (!task) return errorResult('task_not_found', `Monitor task not found: ${taskId}`, { taskId });
+
+      if (action === 'status') {
+        return jsonResult({ ok: true, task, events: repo.listEvents(task.id) });
+      }
+      if (action === 'stop') {
+        try {
+          const stopped = service.stopTask(task.id, {
+            error: typeof args.reason === 'string' ? args.reason : undefined,
+          });
+          return jsonResult({ ok: true, taskId: stopped.id, status: stopped.status });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return errorResult('monitor_stop_failed', message, { taskId: task.id });
+        }
+      }
+
+      return errorResult('unknown_monitor_action', `Unknown Monitor action: ${action}`);
     },
   } as unknown as AgentTool<any>;
 }
@@ -1117,7 +1244,15 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   ToolSearch: (_cwd, options) => createToolSearchTool(options?.db),
   ListMcpResources: (_cwd, options) => createListMcpResourcesTool(options?.db),
   ReadMcpResource: (_cwd, options) => createReadMcpResourceTool(options?.db),
-  Agent: (_cwd, options) => createAgentTool(options?.serverPort, options?.sessionId),
+  TaskOutput: (_cwd, options) => createTaskOutputTool(options?.db),
+  Monitor: (_cwd, options) => createMonitorTool(options?.sessionId, options?.runId, options?.db),
+  Agent: (_cwd, options) => createAgentTool(
+    options?.sessionId,
+    options?.runId,
+    options?.db,
+    options?.permissionOverride,
+    options?.agentTaskExecutor,
+  ),
   LSPTool: (cwd) => createLspTool(cwd),
 };
 
@@ -1130,7 +1265,10 @@ export interface ToolBridgeOptions {
   /** Optional runtime context for tools that bridge into ZClaudia services. */
   serverPort?: number;
   sessionId?: string;
+  runId?: string;
+  permissionOverride?: Partial<UnifiedPermissionPolicy>;
   db?: Database.Database;
+  agentTaskExecutor?: TaskExecutor;
   /** Provider permission/interaction callback used by AskUserQuestion. */
   permissionCallback?: PermissionCallback;
 }

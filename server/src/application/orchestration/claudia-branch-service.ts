@@ -62,8 +62,9 @@ export class ClaudiaBranchService {
    */
   branchHasActiveTask(branchId: string): boolean {
     const row = this.db.prepare(
-      `SELECT 1 FROM orchestrator_tasks
-       WHERE branch_id = ? AND status IN (${ACTIVE_STATUSES.map(() => '?').join(', ')})
+      `SELECT 1 FROM tasks
+       WHERE json_extract(metadata, '$.branchId') = ?
+         AND status IN (${ACTIVE_STATUSES.map(() => '?').join(', ')})
        LIMIT 1`
     ).get(branchId, ...ACTIVE_STATUSES) as { 1: number } | undefined;
     return !!row;

@@ -26,7 +26,8 @@ export type BuiltinWorkflowStepType =
   | 'wait'
   | 'permission_classify'
   | 'ai_risk_analysis'
-  | 'permission_decide';
+  | 'permission_decide'
+  | 'task';
 
 export type WorkflowStepType = BuiltinWorkflowStepType | (string & {});
 
