@@ -1348,6 +1348,46 @@ describe('handleServerMessage', () => {
     });
   });
 
+  describe('run_retrying / retry banner', () => {
+    it('dispatching run_retrying calls updateRunRetryStatus with expected fields', () => {
+      mockChatStore.activeRuns = { r1: 's1' };
+      const receivedAtBefore = Date.now();
+      handleServerMessage({
+        type: 'run_retrying',
+        runId: 'r1',
+        sessionId: 's1',
+        attempt: 2,
+        maxAttempts: 5,
+        delayMs: 1000,
+        status: 'network',
+      }, makeCtx());
+      expect(mockChatStore.updateRunRetryStatus).toHaveBeenCalledWith('r1', expect.objectContaining({
+        attempt: 2,
+        maxAttempts: 5,
+        delayMs: 1000,
+        status: 'network',
+        sessionId: 's1',
+        receivedAt: expect.any(Number),
+      }));
+      const { receivedAt } = mockChatStore.updateRunRetryStatus.mock.calls[0][1];
+      expect(receivedAt).toBeGreaterThanOrEqual(receivedAtBefore);
+    });
+
+    it('dispatching a delta for a run clears the retry banner', () => {
+      mockChatStore.activeRuns = { r1: 's1' };
+      handleServerMessage({ type: 'delta', sessionId: 's1', runId: 'r1', content: 'hi' }, makeCtx());
+      expect(mockChatStore.clearRunRetryStatus).toHaveBeenCalledWith('r1');
+    });
+
+    it('dispatching a tool_use for a run clears the retry banner', () => {
+      mockChatStore.activeRuns = { r1: 's1' };
+      handleServerMessage({
+        type: 'tool_use', runId: 'r1', toolUseId: 'tu1', toolName: 'Read', toolInput: {},
+      }, makeCtx());
+      expect(mockChatStore.clearRunRetryStatus).toHaveBeenCalledWith('r1');
+    });
+  });
+
   it('handles unknown message type', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     handleServerMessage({ type: 'unknown_type' }, makeCtx());

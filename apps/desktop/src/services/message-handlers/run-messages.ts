@@ -229,6 +229,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'tool_use': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
+      useChatStore.getState().clearRunRetryStatus(msg.runId);
       const toolSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
       if (toolSession) {
         useChatStore.getState().addToolCall(msg.runId, msg.toolUseId, msg.toolName, msg.toolInput, msg.semantic, msg.effect);
@@ -242,6 +243,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'tool_result': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
+      useChatStore.getState().clearRunRetryStatus(msg.runId);
       const resultSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
       if (resultSession) {
         useChatStore.getState().updateToolCallResult(msg.runId, msg.toolUseId, msg.result, msg.isError, msg.effect);
@@ -254,6 +256,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'tool_activity': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
+      useChatStore.getState().clearRunRetryStatus(msg.runId);
       if (msg.runId && msg.toolUseId && msg.content) {
         useChatStore.getState().updateToolCallActivity(msg.runId, msg.toolUseId, msg.content);
       }

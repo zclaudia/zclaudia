@@ -139,6 +139,7 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
       'run_started',
       'run_completed',
       'run_failed',
+      'run_retrying',
       'tool_use',
       'tool_result',
       'tool_activity',
