@@ -241,6 +241,15 @@ describe('withStreamRetry', () => {
       expect.anything(),
     );
   });
+
+  it('surfaces a synthetic error instead of crashing when caller onResponse throws', async () => {
+    const { fn } = scriptedStream([{ response: { status: 200 }, events: [START, TEXT, DONE] }]);
+    const events = await collect(await withStreamRetry(fn)({} as never, {} as never, {
+      onResponse: () => { throw new Error('caller boom'); },
+    }));
+    expect(events.map((e) => e.type)).toEqual(['error']);
+    expect((events[0] as { error: { errorMessage?: string } }).error.errorMessage).toContain('caller boom');
+  });
 });
 
 describe('computeDelay', () => {
@@ -264,6 +273,14 @@ describe('computeDelay', () => {
 
   it('caps retry-after header value at MAX_DELAY_MS', () => {
     expect(computeDelay(1, '120')).toBe(MAX_DELAY_MS);
+  });
+
+  it('parses an HTTP-date retry-after relative to now', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-10T00:00:00Z'));
+    expect(computeDelay(1, new Date('2026-06-10T00:00:10Z').toUTCString())).toBe(10_000);
+    expect(computeDelay(1, new Date('2026-06-09T00:00:00Z').toUTCString())).toBe(0); // past date clamps to 0
+    vi.useRealTimers();
   });
 });
 

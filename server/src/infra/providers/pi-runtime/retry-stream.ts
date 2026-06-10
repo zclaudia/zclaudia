@@ -18,6 +18,8 @@ export interface RetryNotification {
   /** Upcoming attempt number (2..MAX_ATTEMPTS). */
   attempt: number;
   maxAttempts: number;
+  /** Milliseconds to wait before the next attempt. Zero is possible when a
+   * retry-after HTTP-date is in the past. */
   delayMs: number;
   /** HTTP status that triggered the retry; undefined for connection-level failures. */
   status?: number;
@@ -88,6 +90,10 @@ export function withStreamRetry(inner: StreamFn, opts: WithStreamRetryOptions = 
   };
 }
 
+/**
+ * Internal driver for withStreamRetry: one iteration per attempt; terminal
+ * events end the output stream.
+ */
 async function pump(
   inner: StreamFn,
   model: Parameters<StreamFn>[0],
@@ -96,6 +102,7 @@ async function pump(
   out: AssistantMessageEventStream,
   opts: WithStreamRetryOptions,
 ): Promise<void> {
+  try {
   const signal = streamOpts?.signal;
   const callerOnResponse = streamOpts?.onResponse;
 
@@ -107,7 +114,19 @@ async function pump(
       onResponse: async (response, m) => {
         status = response.status;
         retryAfter = response.headers?.['retry-after'];
-        await callerOnResponse?.(response, m);
+        try {
+          await callerOnResponse?.(response, m);
+        } catch (err) {
+          // callerOnResponse threw; this may be called from a fire-and-forget
+          // context (e.g. inside the inner StreamFn), so we catch here and push
+          // a synthetic error directly rather than letting the rejection escape.
+          out.push({
+            type: 'error',
+            reason: 'error',
+            error: syntheticErrorMessage(err instanceof Error ? err.message : String(err), 'error'),
+          });
+          out.end();
+        }
       },
     };
 
@@ -175,5 +194,15 @@ async function pump(
       out.end();
       return;
     }
+  }
+  } catch (err) {
+    // Last-resort guard: pump is fire-and-forget, so nothing upstream can
+    // catch a rejection from a misbehaving caller onResponse or StreamFn.
+    out.push({
+      type: 'error',
+      reason: 'error',
+      error: syntheticErrorMessage(err instanceof Error ? err.message : String(err), 'error'),
+    });
+    out.end();
   }
 }
