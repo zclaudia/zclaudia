@@ -50,6 +50,32 @@ describe('TokenUsageDisplay', () => {
     expect(container.textContent).toContain('2K/--');
   });
 
+  // Prompt-cache hit badge
+  describe('cache hit badge', () => {
+    it('renders ↺ badge with compact number when latestCacheReadTokens > 0', () => {
+      const { getByLabelText, container } = render(
+        <TokenUsageDisplay
+          inputTokens={10_000}
+          outputTokens={0}
+          latestCacheReadTokens={38200}
+        />
+      );
+      const badge = getByLabelText('Prompt cache hit');
+      expect(badge).toBeInTheDocument();
+      expect(badge.textContent).toContain('↺');
+      // formatTokenCount produces "38K" for 38200
+      expect(badge.textContent).toContain('38K');
+      expect(badge.getAttribute('title')).toMatch(/38,200 tokens read from cache/i);
+    });
+
+    it('does not render ↺ badge when latestCacheReadTokens is absent', () => {
+      const { container } = render(
+        <TokenUsageDisplay inputTokens={10_000} outputTokens={0} />
+      );
+      expect(container.textContent).not.toContain('↺');
+    });
+  });
+
   // F2/F4: surface where the context-window number came from.
   describe('contextWindowSource', () => {
     it('renders the profile_entry tooltip on the value when source is profile_entry', () => {

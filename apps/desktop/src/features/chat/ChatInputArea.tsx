@@ -43,6 +43,10 @@ interface ChatInputAreaProps {
     contextWindow?: number;
     contextWindowSource?: import('@zclaudia/shared').ContextWindowSource;
     contextWindowMatchedProvider?: string;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
+    latestCacheReadTokens?: number;
+    latestCacheWriteTokens?: number;
   };
   currentSystemInfo: SystemInfo | null;
   advancedInput: boolean;
@@ -243,6 +247,10 @@ export function ChatInputArea({
             contextWindow={currentUsage.contextWindow}
             contextWindowSource={currentUsage.contextWindowSource}
             contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
+            cacheReadTokens={currentUsage.cacheReadTokens}
+            cacheWriteTokens={currentUsage.cacheWriteTokens}
+            latestCacheReadTokens={currentUsage.latestCacheReadTokens}
+            latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
           />
         </div>
         <div className="flex-1 min-w-[8px]" />

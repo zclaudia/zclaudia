@@ -20,6 +20,14 @@ interface TokenUsageDisplayProps {
    * never mentions "pi-ai" in user-facing copy.
    */
   contextWindowMatchedProvider?: string;
+  /** Accumulated cache-read tokens for the session. */
+  cacheReadTokens?: number;
+  /** Accumulated cache-write tokens for the session. */
+  cacheWriteTokens?: number;
+  /** Cache-read tokens for the most recent agent run (snapshot). */
+  latestCacheReadTokens?: number;
+  /** Cache-write tokens for the most recent agent run (snapshot). */
+  latestCacheWriteTokens?: number;
 }
 
 function formatTokenCount(count: number): string {
@@ -67,6 +75,10 @@ export function TokenUsageDisplay({
   contextWindow,
   contextWindowSource,
   contextWindowMatchedProvider,
+  cacheReadTokens,
+  cacheWriteTokens,
+  latestCacheReadTokens,
+  latestCacheWriteTokens: _latestCacheWriteTokens,
 }: TokenUsageDisplayProps) {
   const total = inputTokens + outputTokens;
   const currentInput = latestInputTokens ?? inputTokens;
@@ -106,9 +118,18 @@ export function TokenUsageDisplay({
   return (
     <div
       className={`flex items-center gap-1 text-xs ${colorClass}`}
-      title={`Current: ${currentInput.toLocaleString()} in / ${currentOutput.toLocaleString()} out | Total: ${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out | Context: ${hasContextWindow ? contextWindow.toLocaleString() : 'unknown'}`}
+      title={`Current: ${currentInput.toLocaleString()} in / ${currentOutput.toLocaleString()} out | Total: ${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out | Context: ${hasContextWindow ? contextWindow.toLocaleString() : 'unknown'} | Cache: ${(cacheReadTokens ?? 0).toLocaleString()} read / ${(cacheWriteTokens ?? 0).toLocaleString()} written`}
     >
       <span title={sourceTip ?? undefined}>{valueText}</span>
+      {(latestCacheReadTokens ?? 0) > 0 && (
+        <span
+          className="text-muted-foreground"
+          title={`Prompt cache hit: ${(latestCacheReadTokens ?? 0).toLocaleString()} tokens read from cache this turn`}
+          aria-label="Prompt cache hit"
+        >
+          ↺ {formatTokenCount(latestCacheReadTokens ?? 0)}
+        </span>
+      )}
       {showFallbackIcon && (
         <span
           className="inline-flex items-center"
