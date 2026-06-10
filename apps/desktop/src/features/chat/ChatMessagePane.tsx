@@ -5,7 +5,7 @@ import { ToolCallList } from './tool-call/ToolCallList';
 import { LoadingIndicator } from './LoadingIndicator';
 import { InlinePermissionRequest } from './InlinePermissionRequest';
 import { InteractionItem } from './InteractionItem';
-import type { MessageWithToolCalls, ToolCallState, RunHealth } from '../../stores/chatStore';
+import type { MessageWithToolCalls, ToolCallState, RunHealth, RunRetryStatus } from '../../stores/chatStore';
 import type { PermissionRequest } from '../../stores/permissionStore';
 import type { ContentBlock } from '@zclaudia/shared';
 import type { PaginationInfo } from '../../stores/chatStore';
@@ -42,6 +42,7 @@ interface ChatMessagePaneProps {
   sessionToolCallHistory: ToolCallState[];
   sessionToolCalls: ToolCallState[];
   sessionHealth: RunHealth | null;
+  sessionRetryStatus?: RunRetryStatus | null;
   isLoading: boolean;
 
   // Resend
@@ -84,6 +85,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   sessionToolCallHistory,
   sessionToolCalls,
   sessionHealth,
+  sessionRetryStatus,
   isLoading,
   resendTargetMessageId,
   resendDisabled,
@@ -320,6 +322,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
         startedAt={sessionHealth?.startedAt}
         lastActivityAt={sessionHealth?.lastActivityAt}
         onCancel={onCancelRun}
+        retryStatus={sessionRetryStatus}
       />
 
       {/* Active tool calls */}

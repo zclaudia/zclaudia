@@ -71,7 +71,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   // ── Core hooks ──
   const session = useChatSession({ sessionId, isConnected });
   const {
-    sessionMessages, lastSessionMessage, sessionRunId, isSessionRunning, isLoading, sessionHealth,
+    sessionMessages, lastSessionMessage, sessionRunId, isSessionRunning, isLoading, sessionHealth, sessionRetryStatus,
     sessionToolCalls, sessionContentBlocks, sessionToolCallHistory, useStreamingSegmented,
     lastStreamingBlock, streamingContentSignature,
     currentSession, currentProject, isForcedPlanSession, fileReferenceRoot, fileReferenceBackendId,
@@ -267,6 +267,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
         sessionToolCallHistory={sessionToolCallHistory}
         sessionToolCalls={sessionToolCalls}
         sessionHealth={sessionHealth}
+        sessionRetryStatus={sessionRetryStatus}
         isLoading={isLoading}
         resendTargetMessageId={resendTargetMessage?.id}
         resendDisabled={!resendText || resendChecking}

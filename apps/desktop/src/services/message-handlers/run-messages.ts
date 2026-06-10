@@ -40,6 +40,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'delta': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
+      useChatStore.getState().clearRunRetryStatus(msg.runId);
       const deltaSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
       if (deltaSession) {
         scheduleDelta(deltaSession, msg.runId, msg.content);
@@ -182,6 +183,23 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       serverRunsRef.get(serverId)?.delete(msg.runId);
       ctx.clearRunSeq(msg.runId);
       console.error(`[${logTag}] Run failed:`, msg.error);
+      return true;
+    }
+
+    case 'run_retrying': {
+      if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
+      const retryingSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
+      console.log(`[${logTag}] run_retrying runId=${msg.runId} attempt=${msg.attempt}/${msg.maxAttempts} delayMs=${msg.delayMs} status=${msg.status ?? 'network'}`);
+      if (retryingSession) {
+        useChatStore.getState().updateRunRetryStatus(msg.runId, {
+          sessionId: retryingSession,
+          attempt: msg.attempt,
+          maxAttempts: msg.maxAttempts,
+          delayMs: msg.delayMs,
+          status: msg.status,
+          receivedAt: Date.now(),
+        });
+      }
       return true;
     }
 

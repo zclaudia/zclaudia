@@ -29,6 +29,11 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     return Object.entries(activeRuns).some(([runId, sid]) => sid === sessionId && !backgroundRunIds.has(runId));
   });
   const sessionHealth = useChatStore((s) => s.getSessionHealth(sessionId));
+  const sessionRetryStatus = useChatStore((s) => {
+    const runId = s.getSessionRunId(sessionId);
+    if (!runId) return null;
+    return s.runRetryStatus[runId] || null;
+  });
   const sessionToolCallsRecord = useChatStore((s) => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return null;
@@ -118,6 +123,7 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     isSessionRunning,
     isLoading,
     sessionHealth,
+    sessionRetryStatus,
 
     // Streaming / tool calls
     sessionToolCalls,

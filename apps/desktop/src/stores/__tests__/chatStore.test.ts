@@ -23,6 +23,7 @@ describe('chatStore', () => {
       activeRuns: {},
       backgroundRunIds: new Set(),
       runHealth: {},
+      runRetryStatus: {},
       activeToolCalls: {},
       toolCallsHistory: {},
       runContentBlocks: {},
@@ -686,6 +687,29 @@ describe('chatStore', () => {
 
     it('getSessionToolCallHistory returns empty when no run', () => {
       expect(useChatStore.getState().getSessionToolCallHistory('sess-1')).toEqual([]);
+    });
+  });
+
+  // ── Run retry status ─────────────────────────────────
+
+  describe('runRetryStatus', () => {
+    it('sets and clears retry status with run lifecycle', () => {
+      useChatStore.getState().startRun('run-1', 'sess-1');
+      useChatStore.getState().updateRunRetryStatus('run-1', {
+        sessionId: 'sess-1', attempt: 2, maxAttempts: 5, delayMs: 8000, status: 429, receivedAt: 123,
+      });
+      expect(useChatStore.getState().runRetryStatus['run-1']).toMatchObject({ attempt: 2, status: 429 });
+      useChatStore.getState().clearRunRetryStatus('run-1');
+      expect(useChatStore.getState().runRetryStatus['run-1']).toBeUndefined();
+    });
+
+    it('endRun cleans up retry status', () => {
+      useChatStore.getState().startRun('run-2', 'sess-2');
+      useChatStore.getState().updateRunRetryStatus('run-2', {
+        sessionId: 'sess-2', attempt: 3, maxAttempts: 5, delayMs: 4000, receivedAt: 456,
+      });
+      useChatStore.getState().endRun('run-2');
+      expect(useChatStore.getState().runRetryStatus['run-2']).toBeUndefined();
     });
   });
 });

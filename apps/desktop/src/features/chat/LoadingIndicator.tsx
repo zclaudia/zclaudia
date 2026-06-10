@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { RunHealthStatus } from '@zclaudia/shared';
 import { BrandMark } from '../../components/BrandMark';
+import type { RunRetryStatus } from '../../stores/chatStore';
 
 interface LoadingIndicatorProps {
   isLoading: boolean;
@@ -9,6 +10,7 @@ interface LoadingIndicatorProps {
   startedAt?: number;
   lastActivityAt?: number;
   onCancel?: () => void;
+  retryStatus?: RunRetryStatus | null;
 }
 
 const THINKING_MESSAGES = [
@@ -19,11 +21,12 @@ const THINKING_MESSAGES = [
   'Working on it...',
 ];
 
-export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, lastActivityAt, onCancel }: LoadingIndicatorProps) {
+export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, lastActivityAt, onCancel, retryStatus }: LoadingIndicatorProps) {
   const [messageIndex, setMessageIndex] = useState(0);
   const [dots, setDots] = useState('');
   const [idleTime, setIdleTime] = useState(0);
   const [totalTime, setTotalTime] = useState(0);
+  const [retryCountdown, setRetryCountdown] = useState(0);
 
   // Rotate through thinking messages
   useEffect(() => {
@@ -76,6 +79,24 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
 
     return () => clearInterval(interval);
   }, [isLoading, startedAt, lastActivityAt]);
+
+  useEffect(() => {
+    if (!retryStatus) { setRetryCountdown(0); return; }
+    const update = () => {
+      const remaining = Math.max(0, retryStatus.delayMs - (Date.now() - retryStatus.receivedAt));
+      setRetryCountdown(Math.ceil(remaining / 1000));
+    };
+    update();
+    const interval = setInterval(update, 250);
+    return () => clearInterval(interval);
+  }, [retryStatus]);
+
+  const retryReason = retryStatus
+    ? retryStatus.status === 429 ? 'Rate limited (429)'
+      : retryStatus.status === 529 || retryStatus.status === 503 ? `Service overloaded (${retryStatus.status})`
+      : retryStatus.status ? `Server error (${retryStatus.status})`
+      : 'Connection failed'
+    : '';
 
   if (!isLoading) return null;
 
@@ -171,6 +192,18 @@ export function LoadingIndicator({ isLoading, health, loopPattern, startedAt, la
                 Cancel
               </button>
             )}
+          </div>
+        )}
+
+        {/* Retry banner */}
+        {retryStatus && (
+          <div
+            role="status"
+            className="mt-2 px-3 py-2 rounded-md border bg-amber-500/10 border-amber-500/20 text-xs flex items-center gap-2 text-amber-600"
+          >
+            <span>
+              {retryReason} — retrying{retryCountdown > 0 ? ` in ${retryCountdown}s` : '…'} ({retryStatus.attempt}/{retryStatus.maxAttempts})
+            </span>
           </div>
         )}
       </div>

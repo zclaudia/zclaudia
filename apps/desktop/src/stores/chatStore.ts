@@ -43,6 +43,18 @@ export interface RunHealth {
   loopPattern?: string;
 }
 
+export interface RunRetryStatus {
+  sessionId: string;
+  /** Upcoming attempt number (2..maxAttempts). */
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  /** HTTP status that triggered the retry; absent for connection failures. */
+  status?: number;
+  /** Client-side receipt time, for countdown rendering. */
+  receivedAt: number;
+}
+
 export interface DraftAttachment {
   id: string;
   type: 'image' | 'file';
@@ -67,6 +79,8 @@ interface ChatState {
   backgroundRunIds: Set<string>;
   // Run health info from server heartbeat: runId → RunHealth
   runHealth: Record<string, RunHealth>;
+  // Retry status while LLM call is in backoff: runId → RunRetryStatus
+  runRetryStatus: Record<string, RunRetryStatus>;
   // Active tool calls per run: runId → { toolUseId → ToolCallState }
   activeToolCalls: Record<string, Record<string, ToolCallState>>;
   // Tool calls history per run: runId → ToolCallState[] (preserves order)
@@ -135,6 +149,8 @@ interface ChatState {
   startRun: (runId: string, sessionId: string, isBackground?: boolean) => void;
   endRun: (runId: string) => void;
   updateRunHealth: (runId: string, health: RunHealth) => void;
+  updateRunRetryStatus: (runId: string, status: RunRetryStatus) => void;
+  clearRunRetryStatus: (runId: string) => void;
 
   // Actions — Tool calls (per run)
   addToolCall: (runId: string, toolUseId: string, toolName: string, toolInput: unknown, semantic?: ToolSemantic, effect?: ToolEffect) => void;
@@ -210,6 +226,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeRuns: {},
   backgroundRunIds: new Set<string>(),
   runHealth: {},
+  runRetryStatus: {},
   activeToolCalls: {},
   toolCallsHistory: {},
   runContentBlocks: {},
@@ -417,6 +434,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       const { [runId]: _removedHist, ...remainingHist } = state.toolCallsHistory;
       const { [runId]: _removedCB, ...remainingCB } = state.runContentBlocks;
       const { [runId]: _removedHealth, ...remainingHealth } = state.runHealth;
+      const { [runId]: _removedRetry, ...remainingRetry } = state.runRetryStatus;
       const runtimeModes = { ...state.runtimeModes };
       if (sessionId) delete runtimeModes[sessionId];
       const newBackgroundRunIds = new Set(state.backgroundRunIds);
@@ -428,6 +446,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         toolCallsHistory: remainingHist,
         runContentBlocks: remainingCB,
         runHealth: remainingHealth,
+        runRetryStatus: remainingRetry,
         runtimeModes,
       };
     }),
@@ -443,6 +462,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return state;
       }
       return { runHealth: { ...state.runHealth, [runId]: health } };
+    }),
+
+  updateRunRetryStatus: (runId, status) =>
+    set((state) => ({ runRetryStatus: { ...state.runRetryStatus, [runId]: status } })),
+
+  clearRunRetryStatus: (runId) =>
+    set((state) => {
+      if (!state.runRetryStatus[runId]) return state;
+      const { [runId]: _removed, ...rest } = state.runRetryStatus;
+      return { runRetryStatus: rest };
     }),
 
   // ── Tool call actions (per run) ────────────────────────────────

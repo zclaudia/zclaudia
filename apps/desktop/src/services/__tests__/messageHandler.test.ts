@@ -5,6 +5,7 @@ import type { MessageHandlerContext } from '../messageHandler';
 const mockChatStore = {
   activeRuns: {} as Record<string, string>,
   runHealth: {} as Record<string, any>,
+  runRetryStatus: {} as Record<string, any>,
   appendToLastMessage: vi.fn(),
   appendTextBlock: vi.fn(),
   startRun: vi.fn(),
@@ -22,6 +23,8 @@ const mockChatStore = {
   setRuntimeMode: vi.fn(),
   setSystemInfo: vi.fn(),
   updateRunHealth: vi.fn(),
+  updateRunRetryStatus: vi.fn(),
+  clearRunRetryStatus: vi.fn(),
 };
 
 const mockProjectStore = {

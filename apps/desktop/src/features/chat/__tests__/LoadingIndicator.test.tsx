@@ -243,4 +243,18 @@ describe('LoadingIndicator Time Display', () => {
       vi.advanceTimersByTime(5000);
     });
   });
+
+  it('shows retry banner with status text and attempt counter', () => {
+    render(<LoadingIndicator isLoading retryStatus={{ sessionId: 's', attempt: 2, maxAttempts: 5, delayMs: 8000, status: 429, receivedAt: Date.now() }} />);
+    const banner = screen.getByRole('status');
+    expect(banner.textContent).toMatch(/Rate limited \(429\)/);
+    expect(banner.textContent).toMatch(/\(2\/5\)/);
+  });
+
+  it('shows connection-failure wording when status is absent', () => {
+    render(<LoadingIndicator isLoading retryStatus={{ sessionId: 's', attempt: 3, maxAttempts: 5, delayMs: 2000, receivedAt: Date.now() }} />);
+    const banner = screen.getByRole('status');
+    expect(banner.textContent).toMatch(/Connection failed/);
+    expect(banner.textContent).toMatch(/\(3\/5\)/);
+  });
 });
