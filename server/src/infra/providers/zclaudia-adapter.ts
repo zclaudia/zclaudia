@@ -446,6 +446,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // so a per-profile preference has to ride in via a streamFn wrapper. When
     // the profile doesn't set one, leave pi-ai's own default ('short', plus
     // the PI_CACHE_RETENTION env knob) untouched.
+    // 'none' is deliberately truthy here: it rides the wrapper to actively disable cache_control markers (pi-ai treats it as opt-out, not default).
     const cacheRetention = options.llmProfileConfig?.cacheRetention;
     if (cacheRetention) {
       const inner: StreamFn = hooks.streamFn ?? streamSimple;

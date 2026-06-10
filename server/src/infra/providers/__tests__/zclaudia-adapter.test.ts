@@ -1371,4 +1371,30 @@ describe('prompt cache wiring', () => {
 
     expect(mockAgentInstances[0].constructorOpts.sessionId).toBe('sess-cache-1');
   });
+
+  it('wraps streamFn to inject cacheRetention "none" as explicit opt-out', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      llmProfileConfig: {
+        id: 'lp3', name: 'p3', providerType: 'anthropic',
+        cacheRetention: 'none',
+        createdAt: 0, updatedAt: 0,
+      } as any,
+    });
+
+    const opts = mockAgentInstances[0].constructorOpts;
+    expect(typeof opts.streamFn).toBe('function');
+    const { streamSimple } = await import('@earendil-works/pi-ai');
+    opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
+    expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
+      { id: 'm' },
+      { messages: [] },
+      expect.objectContaining({ temperature: 0, cacheRetention: 'none' }),
+    );
+  });
 });
