@@ -1,6 +1,8 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
+import { join } from 'path';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { buildTools, ALL_TOOL_NAMES, type ToolName } from '../tool-bridge.js';
@@ -628,5 +630,28 @@ describe('buildTools', () => {
         preview: 'export function targetSymbol() {',
       }),
     ]);
+  });
+});
+
+describe('LS bridge tool', () => {
+  it('lists entries alphabetically with a trailing slash on directories', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-ls-'));
+    mkdirSync(join(dir, 'src'));
+    writeFileSync(join(dir, 'b.txt'), 'b');
+    writeFileSync(join(dir, 'a.txt'), 'a');
+    const ls = buildTools(dir, { enabled: ['LS'] })[0] as any;
+    const res = await ls.execute('call-1', {});
+    const text = res.content[0].text as string;
+    rmSync(dir, { recursive: true, force: true });
+    expect(text.split('\n')).toEqual(['a.txt', 'b.txt', 'src/']);
+  });
+
+  it('rejects a path outside the workspace', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-ls-'));
+    const ls = buildTools(dir, { enabled: ['LS'] })[0] as any;
+    const res = await ls.execute('call-2', { path: '../../etc' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).not.toBe(true);
+    expect(res.details.error).toBe('path_outside_workspace');
   });
 });

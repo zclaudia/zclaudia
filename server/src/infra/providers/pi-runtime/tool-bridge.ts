@@ -2,7 +2,6 @@ import {
   createWriteTool,
   createEditTool,
   createBashTool,
-  createLsTool,
 } from '@earendil-works/pi-coding-agent';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
@@ -10,7 +9,7 @@ import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permi
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 import { execFile } from 'child_process';
-import { readFile, stat } from 'fs/promises';
+import { readFile, readdir, stat } from 'fs/promises';
 import * as path from 'path';
 import { promisify } from 'util';
 
@@ -319,6 +318,56 @@ function createGrepBridgeTool(cwd: string): AgentTool<any> {
           });
         }
         return errorResult('grep_failed', err instanceof Error ? err.message : String(err), { pattern });
+      }
+    },
+  } as unknown as AgentTool<any>;
+}
+
+function createLsBridgeTool(cwd: string): AgentTool<any> {
+  const LS_DEFAULT_LIMIT = 500;
+  return {
+    name: 'LS',
+    label: 'LS',
+    description: 'List the immediate contents of a directory, sorted alphabetically, with a "/" suffix for subdirectories. Includes dotfiles. Use Glob/Grep for recursive search.',
+    parameters: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Workspace-relative directory (default: workspace root)' },
+        limit: { type: 'number', default: LS_DEFAULT_LIMIT },
+      },
+    } as any,
+    execute: async (toolCallId: string, params: unknown) => {
+      const args = toolParams(toolCallId, params);
+      let dirPath: string;
+      try {
+        dirPath = resolveInsideWorkspace(cwd, args.path);
+      } catch (err) {
+        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
+      }
+      const limit = Math.max(1, Math.min(Number(args.limit ?? LS_DEFAULT_LIMIT) || LS_DEFAULT_LIMIT, 2000));
+      try {
+        const dirStat = await stat(dirPath);
+        if (!dirStat.isDirectory()) {
+          return errorResult('not_a_directory', `Path is not a directory: ${toWorkspaceRelative(cwd, dirPath) || '.'}`);
+        }
+        const entries = (await readdir(dirPath)).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+        const lines: string[] = [];
+        let truncated = false;
+        for (const entry of entries) {
+          if (lines.length >= limit) { truncated = true; break; }
+          let suffix = '';
+          try {
+            if ((await stat(path.join(dirPath, entry))).isDirectory()) suffix = '/';
+          } catch { continue; }
+          lines.push(entry + suffix);
+        }
+        const relPath = toWorkspaceRelative(cwd, dirPath) || '.';
+        if (lines.length === 0) {
+          return textResult('(empty directory)', { ok: true, path: relPath, total: 0, truncated });
+        }
+        return textResult(lines.join('\n'), { ok: true, path: relPath, total: lines.length, truncated });
+      } catch (err) {
+        return errorResult('ls_failed', err instanceof Error ? err.message : String(err), { path: String(args.path ?? '.') });
       }
     },
   } as unknown as AgentTool<any>;
@@ -1256,8 +1305,7 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   Bash: (cwd) => withToolName(createBashTool(cwd) as AgentTool<any>, 'Bash'),
   Grep: (cwd) => createGrepBridgeTool(cwd),
   Glob: (cwd) => createGlobTool(cwd),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  LS: (cwd) => withToolName(createLsTool(cwd) as AgentTool<any>, 'LS'),
+  LS: (cwd) => createLsBridgeTool(cwd),
   TodoWrite: () => createTodoWriteTool(),
   AskUserQuestion: (_cwd, options) => createAskUserQuestionTool(options?.permissionCallback),
   WebFetch: () => createWebFetchTool(),
