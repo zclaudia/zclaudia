@@ -480,7 +480,6 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // 7. Subscribe → translate → queue
     // `agent_start` is intentionally not translated by translateEvent; init is
     // emitted manually above as a run-bootstrap concern.
-    // (queue is created above agentOpts so the onRetry callback can reference it)
     // Listener MUST stay synchronous: we rely on `result` being pushed to the queue
     // before `agent.prompt(input).then(close)` settles. Making this async would
     // break the init → ... → result → close ordering guarantee.

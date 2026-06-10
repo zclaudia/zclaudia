@@ -63,7 +63,9 @@ const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     steerCalls: any[];
   }>,
-  scriptQueue: [] as Array<{ events: AgentEvent[]; rejectWith?: Error }>,
+  // `waitForPromise` lets tests gate agent.prompt() resolution until an
+  // async condition is satisfied (e.g. waiting for a retry timer to fire).
+  scriptQueue: [] as Array<{ events: AgentEvent[]; rejectWith?: Error; waitForPromise?: Promise<void> }>,
 }));
 
 vi.mock('@earendil-works/pi-agent-core', () => {
@@ -98,6 +100,9 @@ vi.mock('@earendil-works/pi-agent-core', () => {
         // Give the queue a microtask between events so consumers can interleave.
         await Promise.resolve();
       }
+      // Optional gate: lets tests delay queue.close() until an async condition
+      // is met (e.g. a retry timer fired and pushed retry_scheduled).
+      if (script.waitForPromise) await script.waitForPromise;
       if (script.rejectWith) throw script.rejectWith;
     }
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -112,8 +117,8 @@ vi.mock('@earendil-works/pi-agent-core', () => {
 });
 
 // Helper to enqueue the script that the next `new Agent()` will play back.
-function scriptNextAgent(events: AgentEvent[], options?: { rejectWith?: Error }) {
-  scriptQueue.push({ events, rejectWith: options?.rejectWith });
+function scriptNextAgent(events: AgentEvent[], options?: { rejectWith?: Error; waitForPromise?: Promise<void> }) {
+  scriptQueue.push({ events, rejectWith: options?.rejectWith, waitForPromise: options?.waitForPromise });
 }
 
 const { AsyncQueue, buildModel, translateEvent, extractErrorStop } = __testables;
@@ -1424,7 +1429,11 @@ describe('stream retry wiring', () => {
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
   });
-  afterEach(() => { process.env = { ...originalEnv }; });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it('always wraps streamFn (even without cacheRetention)', async () => {
     scriptNextAgent([
@@ -1493,4 +1502,85 @@ describe('stream retry wiring', () => {
     const callOpts = vi.mocked(streamSimple).mock.calls[0][2];
     expect(callOpts).not.toHaveProperty('cacheRetention');
   });
+
+  it('e2e: retry_scheduled ClaudeMessage is yielded by adapter when streamFn gets a 429', async () => {
+    // The MockAgent never calls constructorOpts.streamFn itself — it fires
+    // AgentEvents directly. To observe retry_scheduled in the adapter's yielded
+    // output we must keep the adapter's AsyncQueue open until the retry timer fires.
+    //
+    // Mechanism: scriptNextAgent accepts a `waitForPromise` that the MockAgent
+    // awaits before resolving prompt() — which in turn delays queue.close().
+    // We resolve that promise AFTER advancing fake timers past the 1s backoff,
+    // ensuring retry_scheduled is pushed to (and yielded from) the open queue.
+    //
+    // streamFn is invoked manually inside onAgentReady (synchronous hook that
+    // fires between Agent construction and agent.prompt()). The retry wrapper's
+    // onRetry callback pushes retry_scheduled to the queue; because the queue
+    // is still open (waitForPromise hasn't resolved yet), collect() yields it.
+    vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+
+    const { createAssistantMessageEventStream, streamSimple } = await import('@earendil-works/pi-ai');
+
+    // First streamSimple call: fire onResponse(429) then push an error event.
+    vi.mocked(streamSimple).mockImplementationOnce((_model, _ctx, opts) => {
+      const stream = createAssistantMessageEventStream();
+      void (async () => {
+        await opts?.onResponse?.({ status: 429, headers: {} }, _model as never);
+        stream.push({ type: 'error', reason: 'error', error: { role: 'assistant', content: [], stopReason: 'error' } } as never);
+        stream.end();
+      })();
+      return stream;
+    });
+    // Second streamSimple call: normal done stream.
+    vi.mocked(streamSimple).mockImplementationOnce((_model, _ctx, _opts) => {
+      const stream = createAssistantMessageEventStream();
+      stream.push({ type: 'done', reason: 'stop', message: { role: 'assistant', content: [], stopReason: 'stop' } } as never);
+      stream.end();
+      return stream;
+    });
+
+    // Gate: the MockAgent will await this before closing the queue.
+    let resolveGate!: () => void;
+    const gate = new Promise<void>(resolve => { resolveGate = resolve; });
+
+    scriptNextAgent(
+      [{ type: 'agent_start' }, { type: 'agent_end', messages: [] }],
+      { waitForPromise: gate },
+    );
+
+    const adapter = new ZClaudiaAdapter();
+
+    const collectPromise = collect(adapter, 'hi', {
+      onAgentReady: () => {
+        // Synchronous: fires between Agent construction and agent.prompt().
+        // Start streamFn so the retry pump runs concurrently with agent.prompt().
+        const streamFn = mockAgentInstances[0]?.constructorOpts?.streamFn;
+        if (streamFn) {
+          void streamFn({ id: 'test-model' } as never, { messages: [] } as never, {} as never);
+        }
+      },
+    });
+
+    // Flush microtasks: adapter runs to for-await, MockAgent fires agent_start and
+    // agent_end, then hits `await gate` (waitForPromise) and suspends. Meanwhile
+    // streamFn's first call fires onResponse(429) and schedules the 1s timer.
+    await vi.advanceTimersByTimeAsync(0);
+    // Advance through the 1s backoff (Math.random()=0 → exactly 1000ms).
+    await vi.advanceTimersByTimeAsync(1_000);
+    // onRetry has now fired, pushing retry_scheduled to the still-open queue.
+    // Resolve the gate so the MockAgent resumes and queue.close() is called.
+    resolveGate();
+    // Flush remaining microtasks (second streamFn call, queue drain).
+    await vi.advanceTimersByTimeAsync(0);
+
+    const out = await collectPromise;
+
+    const retryMessages = out.filter(m => m.type === 'retry_scheduled');
+    expect(retryMessages.length).toBeGreaterThanOrEqual(1);
+    expect(retryMessages[0]).toMatchObject({
+      type: 'retry_scheduled',
+      retryInfo: expect.objectContaining({ attempt: 2, maxAttempts: 5, status: 429 }),
+    });
+  }, 10_000);
 });

@@ -103,98 +103,98 @@ async function pump(
   opts: WithStreamRetryOptions,
 ): Promise<void> {
   try {
-  const signal = streamOpts?.signal;
-  const callerOnResponse = streamOpts?.onResponse;
+    const signal = streamOpts?.signal;
+    const callerOnResponse = streamOpts?.onResponse;
 
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    let status: number | undefined;
-    let retryAfter: string | undefined;
-    const attemptOpts: SimpleStreamOptions = {
-      ...streamOpts,
-      onResponse: async (response, m) => {
-        status = response.status;
-        retryAfter = response.headers?.['retry-after'];
-        try {
-          await callerOnResponse?.(response, m);
-        } catch (err) {
-          // callerOnResponse threw; this may be called from a fire-and-forget
-          // context (e.g. inside the inner StreamFn), so we catch here and push
-          // a synthetic error directly rather than letting the rejection escape.
-          out.push({
-            type: 'error',
-            reason: 'error',
-            error: syntheticErrorMessage(err instanceof Error ? err.message : String(err), 'error'),
-          });
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+      let status: number | undefined;
+      let retryAfter: string | undefined;
+      const attemptOpts: SimpleStreamOptions = {
+        ...streamOpts,
+        onResponse: async (response, m) => {
+          status = response.status;
+          retryAfter = response.headers?.['retry-after'];
+          try {
+            await callerOnResponse?.(response, m);
+          } catch (err) {
+            // callerOnResponse threw; this may be called from a fire-and-forget
+            // context (e.g. inside the inner StreamFn), so we catch here and push
+            // a synthetic error directly rather than letting the rejection escape.
+            out.push({
+              type: 'error',
+              reason: 'error',
+              error: syntheticErrorMessage(err instanceof Error ? err.message : String(err), 'error'),
+            });
+            out.end();
+          }
+        },
+      };
+
+      let pendingStart: AssistantMessageEvent | undefined;
+      let forwardedContent = false;
+
+      const scheduleRetryOrGiveUp = async (errorEvent: AssistantMessageEvent & { type: 'error' }): Promise<'retry' | 'done'> => {
+        if (errorEvent.reason === 'aborted' || forwardedContent || attempt >= MAX_ATTEMPTS || !isRetryable(status)) {
+          out.push(errorEvent);
           out.end();
+          return 'done';
         }
-      },
-    };
+        const delayMs = computeDelay(attempt, retryAfter);
+        opts.onRetry?.({ attempt: attempt + 1, maxAttempts: MAX_ATTEMPTS, delayMs, status });
+        const aborted = await interruptibleDelay(delayMs, signal);
+        if (aborted) {
+          out.push({ type: 'error', reason: 'aborted', error: syntheticErrorMessage('aborted during retry backoff', 'aborted') });
+          out.end();
+          return 'done';
+        }
+        return 'retry';
+      };
 
-    let pendingStart: AssistantMessageEvent | undefined;
-    let forwardedContent = false;
-
-    const scheduleRetryOrGiveUp = async (errorEvent: AssistantMessageEvent & { type: 'error' }): Promise<'retry' | 'done'> => {
-      if (errorEvent.reason === 'aborted' || forwardedContent || attempt >= MAX_ATTEMPTS || !isRetryable(status)) {
-        out.push(errorEvent);
-        out.end();
-        return 'done';
-      }
-      const delayMs = computeDelay(attempt, retryAfter);
-      opts.onRetry?.({ attempt: attempt + 1, maxAttempts: MAX_ATTEMPTS, delayMs, status });
-      const aborted = await interruptibleDelay(delayMs, signal);
-      if (aborted) {
-        out.push({ type: 'error', reason: 'aborted', error: syntheticErrorMessage('aborted during retry backoff', 'aborted') });
-        out.end();
-        return 'done';
-      }
-      return 'retry';
-    };
-
-    let stream: AssistantMessageEventStream;
-    try {
-      stream = await inner(model, context, attemptOpts);
-    } catch (err) {
-      // pi-ai providers push error events rather than throwing; this path is
-      // defensive against custom hooks.streamFn implementations.
-      const outcome = await scheduleRetryOrGiveUp({
-        type: 'error',
-        reason: 'error',
-        error: syntheticErrorMessage(err instanceof Error ? err.message : String(err), 'error'),
-      });
-      if (outcome === 'done') return;
-      continue;
-    }
-
-    let retrying = false;
-    for await (const event of stream) {
-      if (event.type === 'start' && !forwardedContent) {
-        pendingStart = event;
+      let stream: AssistantMessageEventStream;
+      try {
+        stream = await inner(model, context, attemptOpts);
+      } catch (err) {
+        // pi-ai providers push error events rather than throwing; this path is
+        // defensive against custom hooks.streamFn implementations.
+        const outcome = await scheduleRetryOrGiveUp({
+          type: 'error',
+          reason: 'error',
+          error: syntheticErrorMessage(err instanceof Error ? err.message : String(err), 'error'),
+        });
+        if (outcome === 'done') return;
         continue;
       }
-      if (event.type === 'error') {
-        const outcome = await scheduleRetryOrGiveUp(event);
-        if (outcome === 'done') return;
-        retrying = true;
-        break;
+
+      let retrying = false;
+      for await (const event of stream) {
+        if (event.type === 'start' && !forwardedContent) {
+          pendingStart = event;
+          continue;
+        }
+        if (event.type === 'error') {
+          const outcome = await scheduleRetryOrGiveUp(event);
+          if (outcome === 'done') return;
+          retrying = true;
+          break;
+        }
+        if (pendingStart) {
+          out.push(pendingStart);
+          pendingStart = undefined;
+        }
+        forwardedContent = true;
+        out.push(event);
+        if (event.type === 'done') {
+          out.end();
+          return;
+        }
       }
-      if (pendingStart) {
-        out.push(pendingStart);
-        pendingStart = undefined;
-      }
-      forwardedContent = true;
-      out.push(event);
-      if (event.type === 'done') {
+      if (!retrying) {
+        // Inner stream ended without done/error (contract violation) — surface it.
+        out.push({ type: 'error', reason: 'error', error: syntheticErrorMessage('inner stream ended without terminal event', 'error') });
         out.end();
         return;
       }
     }
-    if (!retrying) {
-      // Inner stream ended without done/error (contract violation) — surface it.
-      out.push({ type: 'error', reason: 'error', error: syntheticErrorMessage('inner stream ended without terminal event', 'error') });
-      out.end();
-      return;
-    }
-  }
   } catch (err) {
     // Last-resort guard: pump is fire-and-forget, so nothing upstream can
     // catch a rejection from a misbehaving caller onResponse or StreamFn.
