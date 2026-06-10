@@ -651,6 +651,52 @@ describe('Glob bridge tool', () => {
   });
 });
 
+describe('Grep bridge tool', () => {
+  async function fixture() {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-grep-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const FOO = 1;\nconst bar = 2;\n');
+    writeFileSync(path.join(dir, 'b.ts'), 'const foo = 3;\n');
+    return dir;
+  }
+
+  it('files_with_matches mode returns matching file paths only', async () => {
+    const dir = await fixture();
+    const grep = buildTools(dir, { enabled: ['Grep'] })[0] as any;
+    const res = await grep.execute('c1', { pattern: 'FOO', output_mode: 'files_with_matches' });
+    const parsed = JSON.parse(res.content[0].text);
+    rmSync(dir, { recursive: true, force: true });
+    expect(parsed.files).toEqual(['a.ts']);
+  });
+
+  it('count mode returns total match count', async () => {
+    const dir = await fixture();
+    const grep = buildTools(dir, { enabled: ['Grep'] })[0] as any;
+    const res = await grep.execute('c2', { pattern: 'const', output_mode: 'count' });
+    const parsed = JSON.parse(res.content[0].text);
+    rmSync(dir, { recursive: true, force: true });
+    expect(parsed.total).toBe(3);
+  });
+
+  it('case_insensitive matches both FOO and foo', async () => {
+    const dir = await fixture();
+    const grep = buildTools(dir, { enabled: ['Grep'] })[0] as any;
+    const res = await grep.execute('c3', { pattern: 'foo', case_insensitive: true, output_mode: 'files_with_matches' });
+    const parsed = JSON.parse(res.content[0].text);
+    rmSync(dir, { recursive: true, force: true });
+    expect(parsed.files.sort()).toEqual(['a.ts', 'b.ts']);
+  });
+
+  it('content mode (default) still returns structured line results', async () => {
+    const dir = await fixture();
+    const grep = buildTools(dir, { enabled: ['Grep'] })[0] as any;
+    const res = await grep.execute('c4', { pattern: 'bar' });
+    const parsed = JSON.parse(res.content[0].text);
+    rmSync(dir, { recursive: true, force: true });
+    expect(parsed.results.length).toBe(1);
+    expect(parsed.results[0].line).toBe(2);
+  });
+});
+
 describe('LS bridge tool', () => {
   it('lists entries alphabetically with a trailing slash on directories', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-ls-'));

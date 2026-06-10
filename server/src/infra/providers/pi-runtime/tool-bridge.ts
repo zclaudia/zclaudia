@@ -249,19 +249,21 @@ function createGrepBridgeTool(cwd: string): AgentTool<any> {
   return {
     name: 'Grep',
     label: 'Grep',
-    description: 'Search file contents with ripgrep using optional context, glob filtering, and structured output.',
+    description: 'Search file contents with ripgrep. output_mode: "content" (default, matching lines with optional context), "files_with_matches" (file paths), or "count" (total match count). Supports case_insensitive and a glob include filter.',
     parameters: {
       type: 'object',
       properties: {
         pattern: { type: 'string' },
         path: { type: 'string' },
-        include: { type: 'string' },
+        include: { type: 'string', description: 'Glob filter, e.g. *.ts' },
+        output_mode: { type: 'string', enum: ['content', 'files_with_matches', 'count'], default: 'content' },
+        case_insensitive: { type: 'boolean', default: false },
         context: { type: 'number', default: 0 },
         max_results: { type: 'number', default: 100 },
       },
       required: ['pattern'],
     } as any,
-    execute: async (toolCallId: string, params: unknown) => {
+    execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
       const args = toolParams(toolCallId, params);
       const pattern = String(args.pattern || '').trim();
       if (!pattern) return errorResult('missing_pattern', 'grep requires a pattern');
@@ -271,53 +273,53 @@ function createGrepBridgeTool(cwd: string): AgentTool<any> {
       } catch (err) {
         return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err), { pattern });
       }
+      const mode = args.output_mode === 'files_with_matches' || args.output_mode === 'count' ? args.output_mode : 'content';
+      const caseInsensitive = args.case_insensitive === true;
       const context = Math.max(0, Math.min(Number(args.context ?? 0) || 0, 20));
       const maxResults = Math.max(1, Math.min(Number(args.max_results ?? 100) || 100, 500));
-      const rgArgs = [
-        '--line-number',
-        '--no-heading',
-        '--color',
-        'never',
-        ...(context > 0 ? ['-C', String(context)] : []),
-        ...(typeof args.include === 'string' && args.include ? ['--glob', args.include] : []),
-        pattern,
-        searchRoot,
-      ];
+      const relPath = toWorkspaceRelative(cwd, searchRoot) || '.';
+      const include = typeof args.include === 'string' && args.include ? ['--glob', args.include] : [];
+      const ci = caseInsensitive ? ['-i'] : [];
+
       try {
-        const { stdout } = await execFileAsync('rg', rgArgs, { timeout: 30_000, maxBuffer: 1024 * 1024 });
+        if (mode === 'files_with_matches') {
+          const { lines, exitCode, stderr } = await runRipgrep(
+            ['--files-with-matches', '--color', 'never', ...ci, ...include, pattern, searchRoot],
+            { maxLines: maxResults, signal },
+          );
+          if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
+          const files = lines.map((f) => toWorkspaceRelative(cwd, f));
+          return textResult(JSON.stringify({ pattern, path: relPath, mode, files, total: files.length }, null, 2),
+            { ok: true, pattern, path: relPath, total: files.length });
+        }
+        if (mode === 'count') {
+          const { lines, exitCode, stderr } = await runRipgrep(
+            ['--count', '--no-messages', '--color', 'never', ...ci, ...include, pattern, searchRoot],
+            { maxLines: maxResults, signal },
+          );
+          if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
+          // each line is "path:count"
+          const counts = lines.map((l) => {
+            const idx = l.lastIndexOf(':');
+            return { file: toWorkspaceRelative(cwd, l.slice(0, idx)), count: Number(l.slice(idx + 1)) || 0 };
+          });
+          const total = counts.reduce((sum, c) => sum + c.count, 0);
+          return textResult(JSON.stringify({ pattern, path: relPath, mode, counts, total }, null, 2),
+            { ok: true, pattern, path: relPath, total });
+        }
+        // content mode
+        const { lines, exitCode, stderr } = await runRipgrep(
+          ['--line-number', '--no-heading', '--color', 'never', ...ci, ...(context > 0 ? ['-C', String(context)] : []), ...include, pattern, searchRoot],
+          { maxLines: maxResults * (context > 0 ? context * 2 + 1 : 1) + maxResults, signal },
+        );
+        if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
+        const stdout = lines.join('\n');
         const results = context > 0
-          ? parseRipgrepContextLines(cwd, stdout || '', maxResults)
-          : parseRipgrepLines(cwd, stdout || '', maxResults).map(row => ({ ...row, isMatch: true }));
-        return textResult(JSON.stringify({ pattern, path: toWorkspaceRelative(cwd, searchRoot) || '.', results, total: results.length }, null, 2), {
-          ok: true,
-          pattern,
-          path: toWorkspaceRelative(cwd, searchRoot) || '.',
-          total: results.length,
-          context,
-        });
+          ? parseRipgrepContextLines(cwd, stdout, maxResults)
+          : parseRipgrepLines(cwd, stdout, maxResults).map((row) => ({ ...row, isMatch: true }));
+        return textResult(JSON.stringify({ pattern, path: relPath, mode, results, total: results.length }, null, 2),
+          { ok: true, pattern, path: relPath, total: results.length, context });
       } catch (err) {
-        const maybeOutput = err as { code?: number; stdout?: string };
-        if (maybeOutput.code === 1) {
-          return textResult(JSON.stringify({ pattern, path: toWorkspaceRelative(cwd, searchRoot) || '.', results: [], total: 0 }, null, 2), {
-            ok: true,
-            pattern,
-            path: toWorkspaceRelative(cwd, searchRoot) || '.',
-            total: 0,
-            context,
-          });
-        }
-        if (maybeOutput.stdout) {
-          const results = context > 0
-            ? parseRipgrepContextLines(cwd, maybeOutput.stdout, maxResults)
-            : parseRipgrepLines(cwd, maybeOutput.stdout, maxResults).map(row => ({ ...row, isMatch: true }));
-          return textResult(JSON.stringify({ pattern, path: toWorkspaceRelative(cwd, searchRoot) || '.', results, total: results.length }, null, 2), {
-            ok: true,
-            pattern,
-            path: toWorkspaceRelative(cwd, searchRoot) || '.',
-            total: results.length,
-            context,
-          });
-        }
         return errorResult('grep_failed', err instanceof Error ? err.message : String(err), { pattern });
       }
     },
