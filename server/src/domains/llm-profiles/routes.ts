@@ -14,6 +14,7 @@ import { probeModel } from './models-probe.js';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
 
 const VALID_PROVIDER_TYPES: readonly string[] = LLM_PROVIDER_TYPES;
+const VALID_CACHE_RETENTION = ['none', 'short', 'long'];
 
 const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
 
@@ -325,7 +326,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
 
   router.post('/', (req: Request, res: Response) => {
     try {
-      const { name, providerType = 'anthropic', baseUrl, apiKey, compat, requestHeaders: rawRequestHeaders, models: rawModels, isDefault } = req.body;
+      const { name, providerType = 'anthropic', baseUrl, apiKey, compat, requestHeaders: rawRequestHeaders, models: rawModels, isDefault, cacheRetention } = req.body;
 
       if (!name) {
         res.status(400).json({
@@ -339,6 +340,14 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         res.status(400).json({
           success: false,
           error: { code: 'VALIDATION_ERROR', message: `Invalid provider type. Must be one of: ${VALID_PROVIDER_TYPES.join(', ')}` },
+        });
+        return;
+      }
+
+      if (cacheRetention != null && !VALID_CACHE_RETENTION.includes(cacheRetention)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: `Invalid cacheRetention. Must be one of: ${VALID_CACHE_RETENTION.join(', ')}` },
         });
         return;
       }
@@ -379,6 +388,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         requestHeaders,
         models: validatedModels,
         isDefault: Boolean(isDefault),
+        cacheRetention: cacheRetention ?? undefined,
       });
 
       res.status(201).json({ success: true, data: profile } as ApiResponse<LlmProfileConfig>);
@@ -403,6 +413,14 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
         return;
       }
 
+      if (body.cacheRetention != null && !VALID_CACHE_RETENTION.includes(body.cacheRetention)) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: `Invalid cacheRetention. Must be one of: ${VALID_CACHE_RETENTION.join(', ')}` },
+        });
+        return;
+      }
+
       if (body.isDefault === true) {
         repo.clearDefaultsExcept(req.params.id);
       }
@@ -413,6 +431,7 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       if (Object.prototype.hasOwnProperty.call(body, 'baseUrl')) patch.baseUrl = body.baseUrl ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'apiKey')) patch.apiKey = body.apiKey ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'compat')) patch.compat = body.compat ?? null;
+      if (Object.prototype.hasOwnProperty.call(body, 'cacheRetention')) patch.cacheRetention = body.cacheRetention ?? null;
       if (Object.prototype.hasOwnProperty.call(body, 'requestHeaders')) {
         try {
           const validated = validateRequestHeaders(body.requestHeaders);

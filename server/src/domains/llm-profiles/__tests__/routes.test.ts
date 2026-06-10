@@ -299,6 +299,65 @@ describe('llm-profiles routes', () => {
     });
   });
 
+  describe('cacheRetention validation', () => {
+    it('accepts a valid cacheRetention on create', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'c1',
+        providerType: 'anthropic',
+        cacheRetention: 'long',
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.data.cacheRetention).toBe('long');
+    });
+
+    it('rejects an invalid cacheRetention on create', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'c2',
+        providerType: 'anthropic',
+        cacheRetention: 'weekly',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('updates and clears cacheRetention via PUT', async () => {
+      const createRes = await request(app).post('/api/llm-profiles').send({
+        name: 'c3',
+        providerType: 'anthropic',
+        cacheRetention: 'short',
+      });
+      expect(createRes.status).toBe(201);
+      const id = createRes.body.data.id;
+
+      const updateRes = await request(app).put(`/api/llm-profiles/${id}`).send({
+        cacheRetention: 'none',
+      });
+      expect(updateRes.status).toBe(200);
+      expect(updateRes.body.data.cacheRetention).toBe('none');
+
+      const clearRes = await request(app).put(`/api/llm-profiles/${id}`).send({
+        cacheRetention: null,
+      });
+      expect(clearRes.status).toBe(200);
+      expect(clearRes.body.data.cacheRetention).toBeUndefined();
+    });
+
+    it('rejects an invalid cacheRetention on update', async () => {
+      const createRes = await request(app).post('/api/llm-profiles').send({
+        name: 'c4',
+        providerType: 'anthropic',
+      });
+      expect(createRes.status).toBe(201);
+      const id = createRes.body.data.id;
+
+      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
+        cacheRetention: 'forever',
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
   describe('POST /models/resolve-preview', () => {
     it('returns {value, source, matchedProvider} from the resolution chain without persisting anything', async () => {
       // claude-opus-4-7 is in pi-ai's registry under the `anthropic`
