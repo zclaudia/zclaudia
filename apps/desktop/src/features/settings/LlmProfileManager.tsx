@@ -830,15 +830,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         </button>
         {showAdvanced && (
           <div className="mt-2">
-            <label className="flex items-center gap-2 text-sm mb-2">
+            <div className="flex items-center gap-2 mb-2">
               <input
                 type="checkbox"
+                id="cacheMarkers"
                 checked={formCacheMarkers}
                 onChange={(e) => setFormCacheMarkers(e.target.checked)}
                 aria-label="Anthropic-style cache markers"
               />
-              Anthropic-style cache markers (enable when routing Claude through an OpenAI-compatible proxy)
-            </label>
+              <label htmlFor="cacheMarkers" className="text-sm">
+                Anthropic-style cache markers (enable when routing Claude through an OpenAI-compatible proxy)
+              </label>
+            </div>
             <textarea
               value={formCompat}
               onChange={(e) => {

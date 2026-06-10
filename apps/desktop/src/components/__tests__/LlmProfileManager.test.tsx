@@ -1273,7 +1273,7 @@ describe('ProviderManager', () => {
 
       // Expand Advanced and check the cache markers checkbox
       await clickAsync(screen.getByText(/Advanced \(compat\)/));
-      const cacheCheckbox = screen.getByLabelText('Anthropic-style cache markers');
+      const cacheCheckbox = document.getElementById('cacheMarkers') as HTMLInputElement;
       await clickAsync(cacheCheckbox);
 
       await clickAsync(screen.getByText('Update'));
@@ -1286,6 +1286,61 @@ describe('ProviderManager', () => {
           })
         );
       });
+    });
+
+    it('removes cacheControlFormat from compat when the cache-marker checkbox is unchecked', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'Cache Markers Profile',
+          providerType: 'anthropic' as const,
+          isDefault: false,
+          compat: { cacheControlFormat: 'anthropic' },
+          models: [{ modelId: 'claude-opus-4-7' }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('Cache Markers Profile')).toBeInTheDocument();
+      });
+
+      // Open edit form for the profile with existing cacheControlFormat
+      const editButtons = screen.getAllByTitle('Edit');
+      await clickAsync(editButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Update')).toBeInTheDocument();
+      });
+
+      // The Advanced section is automatically expanded because the profile has compat content
+      // The checkbox should be populated as checked since cacheControlFormat is 'anthropic'
+      const cacheCheckbox = document.getElementById('cacheMarkers') as HTMLInputElement;
+      expect(cacheCheckbox).toBeTruthy();
+      expect(cacheCheckbox.checked).toBe(true);
+
+      // Uncheck the checkbox
+      await clickAsync(cacheCheckbox);
+
+      // Submit the form
+      await clickAsync(screen.getByText('Update'));
+
+      // Assert that the updateLlmProfile call does NOT include cacheControlFormat in compat
+      await waitFor(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'p1',
+          expect.objectContaining({
+            compat: expect.not.objectContaining({ cacheControlFormat: expect.anything() }),
+          })
+        );
+      });
+
+      // Also verify it's undefined by checking the actual call
+      const callArgs = vi.mocked(api.updateLlmProfile).mock.calls[0];
+      expect(callArgs[1].compat?.cacheControlFormat).toBeUndefined();
     });
   });
 
