@@ -1,6 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -708,6 +708,68 @@ describe('Grep bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(parsed.truncated).toBe(true);
     expect(parsed.counts.length).toBe(2);
+  });
+});
+
+describe('Write bridge tool', () => {
+  it('creates a new file and reports type "create"', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const res = await write.execute('w1', { file_path: 'sub/new.txt', content: 'hello' });
+    const onDisk = readFileSync(path.join(dir, 'sub/new.txt'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.type).toBe('create');
+    expect(onDisk).toBe('hello');
+  });
+
+  it('rejects writing outside the workspace', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+    const res = await write.execute('w2', { file_path: '../escape.txt', content: 'x' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('path_outside_workspace');
+  });
+});
+
+describe('Edit bridge tool', () => {
+  it('replaces a unique occurrence', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const res = await edit.execute('e1', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk).toBe('const a = 2;\n');
+  });
+
+  it('errors when old_string is not unique and replace_all is false', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'x\nx\n');
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const res = await edit.execute('e2', { file_path: 'f.ts', old_string: 'x', new_string: 'y' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('not_unique');
+  });
+
+  it('replaces every occurrence with replace_all', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'x\nx\n');
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const res = await edit.execute('e3', { file_path: 'f.ts', old_string: 'x', new_string: 'y', replace_all: true });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.replaced).toBe(2);
+    expect(onDisk).toBe('y\ny\n');
+  });
+
+  it('errors when old_string is absent', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'abc\n');
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const res = await edit.execute('e4', { file_path: 'f.ts', old_string: 'zzz', new_string: 'q' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('not_found');
   });
 });
 
