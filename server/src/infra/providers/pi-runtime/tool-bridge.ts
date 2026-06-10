@@ -348,7 +348,7 @@ function createLsBridgeTool(cwd: string): AgentTool<any> {
       try {
         const dirStat = await stat(dirPath);
         if (!dirStat.isDirectory()) {
-          return errorResult('not_a_directory', `Path is not a directory: ${toWorkspaceRelative(cwd, dirPath) || '.'}`);
+          return errorResult('not_a_directory', `Path is not a directory: ${toWorkspaceRelative(cwd, dirPath) || '.'}`, { path: toWorkspaceRelative(cwd, dirPath) || '.' });
         }
         const entries = (await readdir(dirPath)).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
         const lines: string[] = [];
@@ -358,7 +358,7 @@ function createLsBridgeTool(cwd: string): AgentTool<any> {
           let suffix = '';
           try {
             if ((await stat(path.join(dirPath, entry))).isDirectory()) suffix = '/';
-          } catch { continue; }
+          } catch { /* un-stattable entry (e.g. dangling symlink) — list it without a suffix */ }
           lines.push(entry + suffix);
         }
         const relPath = toWorkspaceRelative(cwd, dirPath) || '.';
