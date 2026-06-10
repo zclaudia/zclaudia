@@ -21,8 +21,7 @@
   "dependencies": {
     "@earendil-works/pi-agent-core": "^0.78.0",
     "@earendil-works/pi-ai": "^0.78.0",
-    "@earendil-works/pi-coding-agent": "^0.78.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+"@modelcontextprotocol/sdk": "^1.29.0",
     "@zclaudia/protocol": "^0.2.0",
     "@zclaudia/shared": "workspace:*",
     "async-mutex": "^0.5.0",
