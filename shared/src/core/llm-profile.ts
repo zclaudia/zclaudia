@@ -15,10 +15,18 @@ export const LLM_PROVIDER_TYPES = [
 
 export type LlmProviderType = typeof LLM_PROVIDER_TYPES[number] | string;
 
+export type CacheRetentionSetting = 'none' | 'short' | 'long';
+
 export interface LlmProfileCompat {
   supportsDeveloperRole?: boolean;
   supportsReasoningEffort?: boolean;
   supportsStrictMode?: boolean;
+  /**
+   * Anthropic-style `cache_control` markers on openai-compat requests.
+   * Set to 'anthropic' when routing Claude models through an
+   * OpenAI-compatible proxy so prompt caching still works.
+   */
+  cacheControlFormat?: 'anthropic';
 }
 
 export interface LlmProfileModelEntry {
@@ -65,6 +73,12 @@ export interface LlmProfileConfig {
    */
   models?: LlmProfileModelEntry[];
   oauthCredentials?: CodexOAuthCredentials;
+  /**
+   * Prompt cache retention preference. Absent ⇒ pi-ai default ('short',
+   * 5-minute TTL). 'long' = 1h TTL (higher cache-write cost); 'none' =
+   * no cache_control markers (escape hatch for proxies that reject them).
+   */
+  cacheRetention?: CacheRetentionSetting;
   isDefault?: boolean;
   createdAt: number;
   updatedAt: number;
