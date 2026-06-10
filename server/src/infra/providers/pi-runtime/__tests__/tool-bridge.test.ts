@@ -695,6 +695,20 @@ describe('Grep bridge tool', () => {
     expect(parsed.results.length).toBe(1);
     expect(parsed.results[0].line).toBe(2);
   });
+
+  it('count mode surfaces truncated=true when results exceed max_results', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-grep-trunc-'));
+    // 3 files each containing the pattern "NEEDLE" once → rg --count yields 3 lines
+    writeFileSync(path.join(dir, 'f1.ts'), 'const NEEDLE = 1;\n');
+    writeFileSync(path.join(dir, 'f2.ts'), 'const NEEDLE = 2;\n');
+    writeFileSync(path.join(dir, 'f3.ts'), 'const NEEDLE = 3;\n');
+    const grep = buildTools(dir, { enabled: ['Grep'] })[0] as any;
+    const res = await grep.execute('c5', { pattern: 'NEEDLE', output_mode: 'count', max_results: 2 });
+    const parsed = JSON.parse(res.content[0].text);
+    rmSync(dir, { recursive: true, force: true });
+    expect(parsed.truncated).toBe(true);
+    expect(parsed.counts.length).toBe(2);
+  });
 });
 
 describe('LS bridge tool', () => {

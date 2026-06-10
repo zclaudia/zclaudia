@@ -70,8 +70,8 @@ function withConditionalSkillActivation(tool: AgentTool<any>, name: ToolName, cw
   if (!originalExecute) return tool;
   return {
     ...tool,
-    execute: async (toolCallId: string, params: unknown) => {
-      const result = await originalExecute(toolCallId, params);
+    execute: async (toolCallId: string, params: unknown, signal?: AbortSignal, onUpdate?: any) => {
+      const result = await originalExecute(toolCallId, params, signal, onUpdate);
       const paths = extractSkillActivationPaths(name, toolParams(toolCallId, params));
       if (paths.length > 0) activateConditionalSkillsForPaths(paths, cwd);
       activateConditionalSkillsForToolNames([name]);
@@ -283,17 +283,17 @@ function createGrepBridgeTool(cwd: string): AgentTool<any> {
 
       try {
         if (mode === 'files_with_matches') {
-          const { lines, exitCode, stderr } = await runRipgrep(
+          const { lines, truncated, exitCode, stderr } = await runRipgrep(
             ['--files-with-matches', '--color', 'never', ...ci, ...include, pattern, searchRoot],
             { maxLines: maxResults, signal },
           );
           if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
           const files = lines.map((f) => toWorkspaceRelative(cwd, f));
-          return textResult(JSON.stringify({ pattern, path: relPath, mode, files, total: files.length }, null, 2),
-            { ok: true, pattern, path: relPath, total: files.length });
+          return textResult(JSON.stringify({ pattern, path: relPath, mode, files, total: files.length, truncated }, null, 2),
+            { ok: true, pattern, path: relPath, total: files.length, truncated });
         }
         if (mode === 'count') {
-          const { lines, exitCode, stderr } = await runRipgrep(
+          const { lines, truncated, exitCode, stderr } = await runRipgrep(
             ['--count', '--no-messages', '--color', 'never', ...ci, ...include, pattern, searchRoot],
             { maxLines: maxResults, signal },
           );
@@ -304,11 +304,11 @@ function createGrepBridgeTool(cwd: string): AgentTool<any> {
             return { file: toWorkspaceRelative(cwd, l.slice(0, idx)), count: Number(l.slice(idx + 1)) || 0 };
           });
           const total = counts.reduce((sum, c) => sum + c.count, 0);
-          return textResult(JSON.stringify({ pattern, path: relPath, mode, counts, total }, null, 2),
-            { ok: true, pattern, path: relPath, total });
+          return textResult(JSON.stringify({ pattern, path: relPath, mode, counts, total, truncated }, null, 2),
+            { ok: true, pattern, path: relPath, total, truncated });
         }
         // content mode
-        const { lines, exitCode, stderr } = await runRipgrep(
+        const { lines, truncated, exitCode, stderr } = await runRipgrep(
           ['--line-number', '--no-heading', '--color', 'never', ...ci, ...(context > 0 ? ['-C', String(context)] : []), ...include, pattern, searchRoot],
           { maxLines: maxResults * (context > 0 ? context * 2 + 1 : 1) + maxResults, signal },
         );
@@ -317,8 +317,8 @@ function createGrepBridgeTool(cwd: string): AgentTool<any> {
         const results = context > 0
           ? parseRipgrepContextLines(cwd, stdout, maxResults)
           : parseRipgrepLines(cwd, stdout, maxResults).map((row) => ({ ...row, isMatch: true }));
-        return textResult(JSON.stringify({ pattern, path: relPath, mode, results, total: results.length }, null, 2),
-          { ok: true, pattern, path: relPath, total: results.length, context });
+        return textResult(JSON.stringify({ pattern, path: relPath, mode, results, total: results.length, truncated }, null, 2),
+          { ok: true, pattern, path: relPath, total: results.length, truncated, context });
       } catch (err) {
         return errorResult('grep_failed', err instanceof Error ? err.message : String(err), { pattern });
       }
