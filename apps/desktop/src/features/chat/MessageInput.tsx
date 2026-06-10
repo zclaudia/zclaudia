@@ -7,6 +7,7 @@ import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChatStore, type SessionDraft } from '../../stores/chatStore';
 import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
+import { downscaleImageFile } from '../attachments/downscale-image';
 
 export interface Attachment {
   id: string;
@@ -701,6 +702,9 @@ export function MessageInput({
   };
 
   const addFileAsAttachment = async (file: File): Promise<void> => {
+    if (file.type.startsWith('image/')) {
+      file = await downscaleImageFile(file);
+    }
     return new Promise((resolve) => {
       const reader = new FileReader();
       reader.onload = () => {
