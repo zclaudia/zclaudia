@@ -28,7 +28,7 @@ export interface RunOptions {
   /** User-selected mode id (matches one of `ProviderCapabilities.modes`).
    *  Adapter derives PCP `permissionMode` from this. */
   mode?: string;
-  systemPrompt?: string;  // Full system prompt sourced from agentProfile.systemPrompt by run-context (§4.6 full replacement)
+  systemPrompt?: string;  // Full system prompt assembled by run-context: agentProfile.systemPrompt (§4.6 full replacement of template persona) + workspace/context sections
   sessionTitle?: string;  // Optional session title for providers that support it
   serverPort?: number;    // Main server port for MCP bridge
   claudiaSessionId?: string;  // ZClaudia session ID (for interaction tool context)
