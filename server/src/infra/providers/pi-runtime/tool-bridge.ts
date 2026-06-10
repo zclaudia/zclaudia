@@ -14,6 +14,7 @@ import * as path from 'path';
 import { promisify } from 'util';
 
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
+import { runRipgrep } from './ripgrep-runner.js';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
@@ -999,7 +1000,7 @@ function createGlobTool(cwd: string): AgentTool<any> {
   return {
     name: 'Glob',
     label: 'Glob',
-    description: 'Find files by glob pattern under the workspace without invoking a shell command.',
+    description: 'Find files by glob pattern under the workspace, returned most-recently-modified first. Respects .gitignore.',
     parameters: {
       type: 'object',
       properties: {
@@ -1010,7 +1011,7 @@ function createGlobTool(cwd: string): AgentTool<any> {
       },
       required: ['pattern'],
     } as any,
-    execute: async (toolCallId: string, params: unknown) => {
+    execute: async (toolCallId: string, params: unknown, signal?: AbortSignal) => {
       const args = toolParams(toolCallId, params);
       const pattern = String(args.pattern || '').trim();
       if (!pattern) return errorResult('missing_pattern', 'Glob requires a pattern');
@@ -1021,38 +1022,33 @@ function createGlobTool(cwd: string): AgentTool<any> {
       } catch (err) {
         return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err), { pattern });
       }
+      const rgArgs = [
+        '--files',
+        '--sort=modified',
+        ...(args.include_hidden === true ? ['--hidden'] : []),
+        '--glob',
+        pattern,
+        searchRoot,
+      ];
       try {
-        const { stdout } = await execFileAsync('rg', [
-          '--files',
-          ...(args.include_hidden === true ? ['--hidden'] : []),
-          '--glob',
-          pattern,
-          searchRoot,
-        ], { timeout: 30_000, maxBuffer: 1024 * 1024 });
-        const results = (stdout || '')
-          .split('\n')
-          .filter(Boolean)
-          .map(file => toWorkspaceRelative(cwd, file))
-          .sort((a, b) => a.localeCompare(b))
-          .slice(0, maxResults);
-        return textResult(JSON.stringify({ pattern, path: toWorkspaceRelative(cwd, searchRoot) || '.', results, total: results.length }, null, 2), {
+        const { lines, truncated: streamTruncated, exitCode, stderr } = await runRipgrep(rgArgs, { maxLines: 10_000, signal });
+        if (exitCode === 2) {
+          return errorResult('glob_failed', stderr || 'ripgrep error', { pattern });
+        }
+        const relPath = toWorkspaceRelative(cwd, searchRoot) || '.';
+        // --sort=modified is oldest-first; reverse for newest-first, then cap.
+        const all = lines.map((file) => toWorkspaceRelative(cwd, file)).reverse();
+        const results = all.slice(0, maxResults);
+        const truncated = streamTruncated || all.length > maxResults;
+        return textResult(JSON.stringify({ pattern, path: relPath, results, total: results.length }, null, 2), {
           ok: true,
           pattern,
-          path: toWorkspaceRelative(cwd, searchRoot) || '.',
+          path: relPath,
           total: results.length,
+          truncated,
         });
       } catch (err) {
-        const maybeOutput = err as { code?: number };
-        if (maybeOutput.code === 1) {
-          return textResult(JSON.stringify({ pattern, path: toWorkspaceRelative(cwd, searchRoot) || '.', results: [], total: 0 }, null, 2), {
-            ok: true,
-            pattern,
-            path: toWorkspaceRelative(cwd, searchRoot) || '.',
-            total: 0,
-          });
-        }
-        const message = err instanceof Error ? err.message : String(err);
-        return errorResult('glob_failed', message, { pattern });
+        return errorResult('glob_failed', err instanceof Error ? err.message : String(err), { pattern });
       }
     },
   } as unknown as AgentTool<any>;

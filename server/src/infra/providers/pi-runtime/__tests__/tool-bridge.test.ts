@@ -567,7 +567,9 @@ describe('buildTools', () => {
     const parsed = JSON.parse(result.content[0].text);
 
     expect(result.details).toMatchObject({ ok: true, pattern: '**/*.ts', total: 2 });
-    expect(parsed.results).toEqual(['src/index.ts', 'src/nested/helper.ts']);
+    expect(parsed.results).toHaveLength(2);
+    expect(parsed.results).toContain('src/index.ts');
+    expect(parsed.results).toContain('src/nested/helper.ts');
   });
 
   it('grep returns structured matches with context and glob filtering', async () => {
@@ -629,6 +631,23 @@ describe('buildTools', () => {
         preview: 'export function targetSymbol() {',
       }),
     ]);
+  });
+});
+
+describe('Glob bridge tool', () => {
+  it('returns most-recently-modified files first and a truncated flag', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-glob-'));
+    writeFileSync(path.join(dir, 'old.ts'), 'a');
+    writeFileSync(path.join(dir, 'new.ts'), 'b');
+    const fs = await import('fs');
+    const future = new Date(Date.now() + 10_000);
+    fs.utimesSync(path.join(dir, 'new.ts'), future, future);
+    const glob = buildTools(dir, { enabled: ['Glob'] })[0] as any;
+    const res = await glob.execute('call-1', { pattern: '*.ts' });
+    const parsed = JSON.parse(res.content[0].text);
+    rmSync(dir, { recursive: true, force: true });
+    expect(parsed.results[0]).toBe('new.ts');
+    expect(res.details).toHaveProperty('truncated');
   });
 });
 
