@@ -896,6 +896,18 @@ describe('Read image files', () => {
     expect(result.details).toMatchObject({ ok: false, error: 'binary_file' });
     expect(result.content[0].text).toContain('Refusing to read binary file');
   });
+
+  it('mid-size images bypass text read size limit when vision is supported', async () => {
+    // Images between DEFAULT_READ_MAX_BYTES (512KB) and 5MB vision cap bypass the text-read size limit
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-read-img-mid-'));
+    writeFileSync(path.join(dir, 'mid.png'), Buffer.concat([Buffer.from(PNG_BASE64, 'base64'), Buffer.alloc(1024 * 1024)]));
+    const read = buildTools(dir, { enabled: ['Read'], supportsVision: true } as any)[0] as any;
+
+    const result = await read.execute('read-img-mid', { path: 'mid.png' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.content[0].type).toBe('image');
+  });
 });
 
 describe('LS bridge tool', () => {
