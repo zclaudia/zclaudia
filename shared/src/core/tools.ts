@@ -4,7 +4,6 @@ export const ALL_TOOL_NAMES = [
   'Edit',
   'Bash',
   'Grep',
-  'Find',
   'Glob',
   'LS',
   'TodoWrite',
@@ -123,7 +122,6 @@ export const LEGACY_TOOL_NAME_ALIASES: Readonly<Record<string, ToolName>> = {
   edit: 'Edit',
   bash: 'Bash',
   grep: 'Grep',
-  find: 'Find',
   ls: 'LS',
 };
 
@@ -135,7 +133,6 @@ export const LEGACY_TOOL_NAME_ALIASES: Readonly<Record<string, ToolName>> = {
 export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   'Read',
   'Grep',
-  'Find',
   'Glob',
   'LS',
   'TodoWrite',
@@ -198,17 +195,6 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     ref: { source: 'builtin', name: 'Grep' },
     label: 'Grep',
     description: 'Search file contents with ripgrep and structured results.',
-    setIds: ['core-coding'],
-    declaredReadOnly: true,
-    mutatesWorkspace: false,
-    requiresNetwork: false,
-    requiresUserInteraction: false,
-    riskLevel: 'low',
-  },
-  Find: {
-    ref: { source: 'builtin', name: 'Find' },
-    label: 'Find',
-    description: 'Find files and paths in the workspace.',
     setIds: ['core-coding'],
     declaredReadOnly: true,
     mutatesWorkspace: false,
@@ -376,7 +362,7 @@ export const BUILTIN_TOOL_SETS = {
   'core-coding': {
     id: 'core-coding',
     label: 'Core Coding',
-    tools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'Glob', 'LS'],
+    tools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob', 'LS'],
   },
   interaction: {
     id: 'interaction',
