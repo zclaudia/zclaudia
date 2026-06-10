@@ -786,6 +786,66 @@ describe('Edit bridge tool', () => {
   });
 });
 
+describe('Bash bridge tool', () => {
+  function bashTool(dir: string) {
+    return buildTools(dir, { enabled: ['Bash'] }).find((t: any) => t.name === 'Bash') as any;
+  }
+
+  it('returns a structured success result with exit code 0', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
+    const res = await bashTool(dir).execute('b1', { command: 'echo hello' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.exitCode).toBe(0);
+    expect(res.content[0].text).toContain('hello');
+  });
+
+  it('non-zero exit returns a normal result (not thrown) with ok:false and the exit code', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
+    const res = await bashTool(dir).execute('b2', { command: 'echo boom; exit 7' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(false);
+    expect(res.details.exitCode).toBe(7);
+    expect(res.content[0].text).toContain('boom');
+    expect(res.content[0].text).toContain('Exit code: 7');
+  });
+
+  it('runs in a workspace-relative subdir via the cwd param', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
+    mkdirSync(path.join(dir, 'sub'));
+    writeFileSync(path.join(dir, 'sub', 'marker.txt'), 'x');
+    const res = await bashTool(dir).execute('b3', { command: 'ls', cwd: 'sub' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.content[0].text).toContain('marker.txt');
+  });
+
+  it('rejects a cwd outside the workspace', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
+    const res = await bashTool(dir).execute('b4', { command: 'ls', cwd: '../..' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('path_outside_workspace');
+  });
+
+  it('errors when the command is empty', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
+    const res = await bashTool(dir).execute('b5', { command: '   ' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('missing_command');
+  });
+
+  it('writes full output to a temp file and reports the path when truncated', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
+    const res = await bashTool(dir).execute('b6', { command: 'seq 1 5000' });
+    const fullPath = res.details.fullOutputPath as string;
+    const onDisk = readFileSync(fullPath, 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.truncated).toBe(true);
+    expect(typeof fullPath).toBe('string');
+    expect(onDisk).toContain('1\n');
+    expect(onDisk.trim().endsWith('5000')).toBe(true);
+  });
+});
+
 describe('LS bridge tool', () => {
   it('lists entries alphabetically with a trailing slash on directories', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-ls-'));

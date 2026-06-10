@@ -8,12 +8,16 @@ import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 import { execFile } from 'child_process';
 import { readFile, readdir, stat, mkdir, writeFile } from 'fs/promises';
+import { existsSync } from 'fs';
 import * as path from 'path';
+import * as os from 'os';
+import { randomUUID } from 'crypto';
 import { promisify } from 'util';
 
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
 import { findActualString, countOccurrences, applyEdit } from './edit-match.js';
 import { runRipgrep } from './ripgrep-runner.js';
+import { runBash } from './bash-runner.js';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
@@ -476,6 +480,84 @@ function createEditBridgeTool(cwd: string): AgentTool<any> {
       } catch (err) {
         return errorResult('edit_failed', err instanceof Error ? err.message : String(err), { path: String(requested) });
       }
+    },
+  } as unknown as AgentTool<any>;
+}
+
+function createBashBridgeTool(cwd: string): AgentTool<any> {
+  const DEFAULT_TIMEOUT_SEC = 120;
+  const MAX_TIMEOUT_SEC = 600;
+  const UPDATE_THROTTLE_MS = 100;
+  return {
+    name: 'Bash',
+    label: 'Bash',
+    description: 'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. Default timeout 120s (max 600s).',
+    parameters: {
+      type: 'object',
+      properties: {
+        command: { type: 'string', description: 'The shell command to run' },
+        timeout: { type: 'number', description: 'Timeout in seconds (default 120, max 600)' },
+        cwd: { type: 'string', description: 'Workspace-relative working directory (default: workspace root)' },
+      },
+      required: ['command'],
+    } as any,
+    execute: async (toolCallId: string, params: unknown, signal?: AbortSignal, onUpdate?: (p: unknown) => void) => {
+      const args = toolParams(toolCallId, params);
+      const command = typeof args.command === 'string' ? args.command : '';
+      if (!command.trim()) return errorResult('missing_command', 'Bash requires a command');
+
+      let runCwd: string;
+      try {
+        runCwd = resolveInsideWorkspace(cwd, args.cwd);
+      } catch (err) {
+        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
+      }
+      if (!existsSync(runCwd)) {
+        return errorResult('cwd_not_found', `Working directory does not exist: ${toWorkspaceRelative(cwd, runCwd) || '.'}`);
+      }
+      const timeoutSec = Math.min(Math.max(1, Number(args.timeout ?? DEFAULT_TIMEOUT_SEC) || DEFAULT_TIMEOUT_SEC), MAX_TIMEOUT_SEC);
+
+      let lastEmit = 0;
+      const onChunk = onUpdate
+        ? (text: string) => {
+            const now = Date.now();
+            if (now - lastEmit >= UPDATE_THROTTLE_MS) {
+              lastEmit = now;
+              onUpdate({ content: [{ type: 'text', text }], details: undefined });
+            }
+          }
+        : undefined;
+
+      const result = await runBash({ command, cwd: runCwd, timeoutSec, signal, onChunk });
+
+      if (result.aborted) {
+        return textResult(result.output || '', { ok: false, aborted: true, exitCode: null });
+      }
+
+      let fullOutputPath: string | undefined;
+      if (result.truncated) {
+        const candidate = path.join(os.tmpdir(), `zclaudia-bash-${randomUUID()}.log`);
+        try { await writeFile(candidate, result.fullOutput, 'utf8'); fullOutputPath = candidate; }
+        catch { fullOutputPath = undefined; }
+      }
+
+      const footers: string[] = [];
+      if (result.truncated && fullOutputPath) footers.push(`Output truncated (showing tail). Full output: ${fullOutputPath}`);
+      if (result.timedOut) footers.push(`Command timed out after ${timeoutSec} seconds`);
+      else if (result.exitCode !== 0 && result.exitCode !== null) footers.push(`Exit code: ${result.exitCode}`);
+
+      let text = result.output;
+      if (footers.length) text = `${text ? text + '\n\n' : ''}[${footers.join('. ')}]`;
+      if (!text) text = '(no output)';
+
+      return textResult(text, {
+        ok: result.exitCode === 0 && !result.timedOut,
+        exitCode: result.exitCode,
+        truncated: result.truncated,
+        timedOut: result.timedOut,
+        ...(fullOutputPath ? { fullOutputPath } : {}),
+        durationMs: result.durationMs,
+      });
     },
   } as unknown as AgentTool<any>;
 }
@@ -1401,8 +1483,7 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   Read: (cwd) => createReadBridgeTool(cwd),
   Write: (cwd) => createWriteBridgeTool(cwd),
   Edit: (cwd) => createEditBridgeTool(cwd),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Bash: (cwd) => withToolName(createBashTool(cwd) as AgentTool<any>, 'Bash'),
+  Bash: (cwd) => createBashBridgeTool(cwd),
   Grep: (cwd) => createGrepBridgeTool(cwd),
   Glob: (cwd) => createGlobTool(cwd),
   LS: (cwd) => createLsBridgeTool(cwd),
