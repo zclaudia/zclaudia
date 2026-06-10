@@ -338,3 +338,93 @@ describe('history-rebuilder — compaction injection', () => {
     warn.mockRestore();
   });
 });
+
+// ── Image rehydration tests ────────────────────────────────────────────────
+
+describe('history-rebuilder — image rehydration', () => {
+  it('rebuilds image attachments into user message content', () => {
+    const db = createTestDb();
+    const sessionId = 's-img';
+    insertMsg(db, {
+      id: 'u1', sessionId, role: 'user', content: 'see image',
+      metadata: {
+        attachments: [{ fileId: 'f1', name: 'a.png', mimeType: 'image/png', type: 'image' }],
+      },
+      createdAt: 100, offset: 1,
+    });
+    insertMsg(db, { id: 'a1', sessionId, role: 'assistant', content: 'noted', createdAt: 200, offset: 2 });
+
+    const resolveImages = () => ({
+      images: [{ name: 'a.png', mimeType: 'image/png', data: 'QQ==' }],
+      notices: [],
+    });
+    const { messages } = rebuildHistory(db, sessionId, { resolveImages });
+    const user = messages.find((m) => m.role === 'user');
+    expect(user!.content).toEqual([
+      { type: 'text', text: 'see image' },
+      { type: 'image', data: 'QQ==', mimeType: 'image/png' },
+    ]);
+  });
+
+  it('falls back to a text placeholder when the file is gone', () => {
+    const db = createTestDb();
+    const sessionId = 's-img-gone';
+    insertMsg(db, {
+      id: 'u1', sessionId, role: 'user', content: 'see image',
+      metadata: {
+        attachments: [{ fileId: 'f1', name: 'a.png', mimeType: 'image/png', type: 'image' }],
+      },
+      createdAt: 100, offset: 1,
+    });
+    insertMsg(db, { id: 'a1', sessionId, role: 'assistant', content: 'noted', createdAt: 200, offset: 2 });
+
+    const resolveImages = () => ({
+      images: [],
+      notices: ['[Image attached: a.png — file unavailable]'],
+    });
+    const { messages } = rebuildHistory(db, sessionId, { resolveImages });
+    const user = messages.find((m) => m.role === 'user');
+    expect(user!.content).toBe('see image\n\n[Image attached: a.png — file unavailable]');
+  });
+
+  it('user rows without attachment metadata are untouched (string content)', () => {
+    const db = createTestDb();
+    const sessionId = 's-plain';
+    insertMsg(db, { id: 'u1', sessionId, role: 'user', content: 'plain message', createdAt: 100, offset: 1 });
+    insertMsg(db, { id: 'a1', sessionId, role: 'assistant', content: 'ok', createdAt: 200, offset: 2 });
+
+    const resolveImages = () => ({ images: [], notices: [] });
+    const { messages } = rebuildHistory(db, sessionId, { resolveImages });
+    const user = messages.find((m) => m.role === 'user');
+    expect(user!.content).toBe('plain message');
+  });
+
+  it('never throws when image resolution explodes', () => {
+    const db = createTestDb();
+    const sessionId = 's-explode';
+    insertMsg(db, {
+      id: 'u1', sessionId, role: 'user', content: 'boom',
+      metadata: {
+        attachments: [{ fileId: 'f1', name: 'x.png', mimeType: 'image/png', type: 'image' }],
+      },
+      createdAt: 100, offset: 1,
+    });
+    insertMsg(db, { id: 'a1', sessionId, role: 'assistant', content: 'ok', createdAt: 200, offset: 2 });
+
+    const resolveImages = (): never => { throw new Error('storage offline'); };
+    expect(() => rebuildHistory(db, sessionId, { resolveImages })).not.toThrow();
+    const { messages } = rebuildHistory(db, sessionId, { resolveImages });
+    const user = messages.find((m) => m.role === 'user');
+    expect(user!.content).toBe('boom');
+  });
+
+  it('existing callers without options compile and behave unchanged', () => {
+    const db = createTestDb();
+    insertMsg(db, { id: 'u1', sessionId: 's-compat', role: 'user', content: 'hi', createdAt: 100, offset: 1 });
+    insertMsg(db, { id: 'a1', sessionId: 's-compat', role: 'assistant', content: 'hello', createdAt: 200, offset: 2 });
+    // No options arg — should not throw and should return string content
+    const { messages } = rebuildHistory(db, 's-compat');
+    const user = messages.find((m) => m.role === 'user');
+    expect(user!.content).toBe('hi');
+  });
+});

@@ -5,6 +5,7 @@ import {
   MCP_INSTRUCTIONS_DELTA_METADATA_TYPE,
   type McpInstructionsDelta,
 } from '@zclaudia/shared/core/mcp';
+import type { MessageAttachment } from '@zclaudia/shared/core/message';
 
 export const HISTORY_LIMIT = 50;
 
@@ -40,6 +41,16 @@ interface ParsedMetadata {
   toolCalls?: ParsedToolCall[];
   thinkingBlocks?: ParsedThinkingBlock[];
   usage?: Usage;
+  attachments?: MessageAttachment[];
+}
+
+export interface RebuildImageOptions {
+  /** Resolve attachment refs to sendable images; injected by the adapter so
+   * the rebuilder stays storage-agnostic. Returns notices for failures. */
+  resolveImages?: (attachments: MessageAttachment[]) => {
+    images: Array<{ name: string; mimeType: string; data: string }>;
+    notices: string[];
+  };
 }
 
 export interface RebuiltHistory {
@@ -100,6 +111,7 @@ function renderMcpInstructionsDelta(delta: McpInstructionsDelta): string {
 export function rebuildHistory(
   db: Database.Database | undefined,
   sessionId: string | undefined,
+  imageOptions?: RebuildImageOptions,
 ): RebuiltHistory {
   if (!db || !sessionId) return { messages: [], dbIds: [] };
 
@@ -174,11 +186,29 @@ export function rebuildHistory(
     }
 
     if (row.role === 'user') {
-      messages.push({
-        role: 'user',
-        content: row.content,
-        timestamp: row.createdAt,
-      });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let content: string | any[] = row.content;
+      const userMeta = parseMetadata(row.metadata);
+      const attachments = userMeta?.attachments?.filter((a) => a.type === 'image') ?? [];
+      if (attachments.length > 0 && imageOptions?.resolveImages) {
+        try {
+          const { images, notices } = imageOptions.resolveImages(attachments);
+          if (images.length > 0) {
+            const text = notices.length > 0 ? `${row.content}\n\n${notices.join('\n')}` : row.content;
+            content = [
+              { type: 'text', text },
+              ...images.map((img) => ({ type: 'image' as const, data: img.data, mimeType: img.mimeType })),
+            ];
+          } else if (notices.length > 0) {
+            content = `${row.content}\n\n${notices.join('\n')}`;
+          }
+        } catch (err) {
+          // Image rehydration must never break history rebuild.
+          console.warn('[history-rebuilder] image rehydration failed:', err);
+        }
+      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      messages.push({ role: 'user', content, timestamp: row.createdAt } as any);
       dbIds.push(row.id);
       continue;
     }

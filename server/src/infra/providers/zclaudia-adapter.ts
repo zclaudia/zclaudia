@@ -23,6 +23,8 @@ import {
 import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
 import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
+import { resolveImageAttachments } from '../../application/conversation/runtime/resolve-image-attachments.js';
+import { getFileStore } from '../storage/fileStore.js';
 
 const PLAN_MODE_SYSTEM_PROMPT_SUFFIX =
   '\n\nYou are in PLAN mode. Produce a concrete plan for the user to review and approve. ' +
@@ -344,7 +346,16 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     let history: AgentMessage[] = [];
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history = rebuildHistory(options.db, options.claudiaSessionId).messages as any;
+      history = rebuildHistory(options.db, options.claudiaSessionId, {
+        resolveImages: (atts) => {
+          const resolved = resolveImageAttachments(atts, getFileStore());
+          if (supportsVision) return resolved;
+          return {
+            images: [],
+            notices: atts.map((a) => `[Image attached: ${a.name} — current model does not support vision]`),
+          };
+        },
+      }).messages as any;
     } catch (err) {
       console.error('[ZClaudiaAdapter] history load failed:', err);
       yield {
