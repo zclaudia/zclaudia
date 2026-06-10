@@ -218,7 +218,8 @@ export const MessageList = memo(function MessageList({
 
       const parsed = tryParseMessageInput(message.content);
       const textContent = parsed?.text ?? message.content;
-      const hasAttachments = (parsed?.attachments?.length ?? 0) > 0;
+      const hasAttachments = (parsed?.attachments?.length ?? 0) > 0
+        || (message.metadata?.attachments?.length ?? 0) > 0;
       return textContent.trim().length > 0 || hasAttachments;
     });
   }, [messages]);
@@ -784,7 +785,10 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
 
   const parsedInput = tryParseMessageInput(message.content);
   const textContent: string = parsedInput?.text ?? message.content;
-  const attachments: MessageAttachment[] = parsedInput?.attachments ?? [];
+  // New-format rows store plain text in content and attachment refs in metadata.attachments.
+  // Legacy rows store a JSON MessageInput envelope in content. Fall back to metadata when
+  // no legacy envelope is present so thumbnails survive a session reload.
+  const attachments: MessageAttachment[] = parsedInput?.attachments ?? message.metadata?.attachments ?? [];
 
   // Extract thinking blocks for assistant messages (rendered outside bubble for consistent width)
   const { thinking, content: mainContent } = useMemo(

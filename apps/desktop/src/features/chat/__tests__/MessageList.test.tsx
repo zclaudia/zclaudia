@@ -797,6 +797,57 @@ describe('MessageList', () => {
     expect(screen.getByText('photo.png')).toBeInTheDocument();
   });
 
+  // ── New-format messages: plain-text content + metadata.attachments ─────────
+
+  it('renders attachment thumbnails from metadata.attachments (new format after reload)', () => {
+    // New-format rows: plain text in content, attachment refs in metadata.attachments
+    const messages = [
+      makeMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: 'Here is my image',
+        metadata: {
+          attachments: [{ fileId: 'f2', name: 'screenshot.png', mimeType: 'image/png', type: 'image' }],
+        },
+      }),
+    ];
+    render(<MessageList messages={messages} />);
+    expect(screen.getByText('Here is my image')).toBeInTheDocument();
+    expect(screen.getByText('screenshot.png')).toBeInTheDocument();
+  });
+
+  it('keeps new-format user message with only metadata.attachments (no text) in list', () => {
+    // Empty text but attachment in metadata — should not be filtered out
+    const messages = [
+      makeMessage({
+        id: 'msg-1',
+        role: 'user',
+        content: '',
+        metadata: {
+          attachments: [{ fileId: 'f3', name: 'doc.pdf', mimeType: 'application/pdf', type: 'file' }],
+        },
+      }),
+    ];
+    render(<MessageList messages={messages} />);
+    const list = screen.getByTestId('message-list');
+    expect(list.children.length).toBe(1);
+    expect(screen.getByText('doc.pdf')).toBeInTheDocument();
+  });
+
+  it('legacy JSON-content attachment messages still render thumbnails', () => {
+    // Legacy format: JSON envelope in content (backward-compat check)
+    const content = JSON.stringify({
+      text: 'Legacy message',
+      attachments: [{ fileId: 'f4', name: 'old-photo.jpg', mimeType: 'image/jpeg', type: 'image' }],
+    });
+    const messages = [
+      makeMessage({ id: 'msg-1', role: 'user', content }),
+    ];
+    render(<MessageList messages={messages} />);
+    expect(screen.getByText('Legacy message')).toBeInTheDocument();
+    expect(screen.getByText('old-photo.jpg')).toBeInTheDocument();
+  });
+
   // ── Markdown rendering ────────────────────────────────────────────────────
 
   it('renders assistant messages via ReactMarkdown mock', () => {

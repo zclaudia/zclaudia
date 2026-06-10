@@ -64,6 +64,7 @@ const CONFIGS = [
       'src/components/**/*.test.tsx',
       'src/contexts/**/*.test.tsx',
       'src/hooks/**/*.test.ts',
+      'src/features/**/*.test.ts',
       'src/features/**/*.test.tsx',
     ],
     exclude: [
