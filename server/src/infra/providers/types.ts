@@ -52,6 +52,8 @@ export interface RunOptions {
   onAgentReady?: (handle: SteerHandle) => void;
   /** Called when pi emits `turn_start` (after the steering queue is drained with steeringMode:'all'). Application clears pendingSteers. */
   onSteerConsumed?: () => void;
+  /** Resolved image attachments for this prompt (base64, ≤5MB each). */
+  images?: Array<{ name: string; mimeType: string; data: string }>;
 }
 
 /** Agent runtime adapter interface. */

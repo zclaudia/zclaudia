@@ -101,6 +101,10 @@ vi.mock('../../../../utils/provider-cwd.js', () => ({
   resolveProviderCwd: vi.fn(({ requestedCwd }) => requestedCwd),
 }));
 
+vi.mock('../../../../infra/storage/fileStore.js', () => ({
+  getFileStore: () => ({ getFile: vi.fn(() => null) }),
+}));
+
 function createDb(): Database.Database {
   const db = new Database(':memory:');
   db.exec(`

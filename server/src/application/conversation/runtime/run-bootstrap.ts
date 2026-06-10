@@ -1,4 +1,5 @@
 import { newId } from '../../../utils/uuid.js';
+import { parseMessageInput } from './message-input.js';
 import type { ErrorMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
@@ -260,10 +261,18 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
   if (!message.resend) {
     userMessageId = newId();
     const userOffset = getNextOffset(db, message.sessionId);
+    const parsedInput = parseMessageInput(message.input);
     db.prepare(`
-      INSERT INTO messages (id, session_id, role, content, created_at, offset)
-      VALUES (?, ?, 'user', ?, ?, ?)
-    `).run(userMessageId, message.sessionId, message.input, Date.now(), userOffset);
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, 'user', ?, ?, ?, ?)
+    `).run(
+      userMessageId,
+      message.sessionId,
+      parsedInput.text,
+      parsedInput.attachments.length > 0 ? JSON.stringify({ attachments: parsedInput.attachments }) : null,
+      Date.now(),
+      userOffset,
+    );
   }
 
   // Wire broadcast: sends to ALL connected clients (originating + others).

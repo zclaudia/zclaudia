@@ -1,6 +1,7 @@
 import { pluginEvents } from '../../../infra/events/index.js';
 import { negotiateProfile } from '../../../infra/providers/pcp-negotiator.js';
 import type { ClaudeMessage, ProviderAdapter } from '../../../infra/providers/types.js';
+import type { ResolvedImage } from './resolve-image-attachments.js';
 import { buildRunContext } from './run-context.js';
 import { upsertAssistantMessage } from './run-lifecycle.js';
 import { PERIODIC_SAVE_INTERVAL_MS, type ActiveRun, type ConnectedClient } from '../transport/types.js';
@@ -26,6 +27,7 @@ interface LaunchProviderRunInput {
   db: ActiveRun['db'];
   enabledTools: ToolName[];
   forcedPlanBySession: boolean;
+  images: ResolvedImage[];
   message: RunStartMessage;
   modeValue: string;
   permissionCallback: (request: import('@zclaudia/shared/interaction/permissions').PermissionRequest) => Promise<PermissionDecision>;
@@ -57,6 +59,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     db,
     enabledTools,
     forcedPlanBySession,
+    images,
     message,
     modeValue,
     permissionCallback,
@@ -188,6 +191,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   });
   runOptions.externalToolState = activeRun.externalToolState;
   runOptions.skillState = activeRun.skillState;
+  runOptions.images = images.length > 0 ? images : undefined;
 
   // Wire mid-run steering callbacks. The closure captures `activeRun` directly
   // (not via activeRuns map) so registration is robust even if the run is

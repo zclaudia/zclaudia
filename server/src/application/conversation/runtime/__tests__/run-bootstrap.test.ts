@@ -66,6 +66,7 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       session_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      metadata TEXT,
       created_at INTEGER NOT NULL,
       offset INTEGER
     );
@@ -154,7 +155,7 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
   return db;
 }
 
-function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOptions = {}) {
+function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOptions = {}, input: string = 'hello') {
   const activeRuns = new Map();
   return initializeRunBootstrap({
     activeRuns,
@@ -170,7 +171,7 @@ function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOption
       type: 'run_start',
       clientRequestId: 'req-1',
       sessionId: 'session-1',
-      input: 'hello',
+      input,
       mode,
     },
     runId: 'run-1',
@@ -179,6 +180,35 @@ function bootstrap(providerType: string, mode: string, dbOptions: CreateDbOption
       setMeta: vi.fn(),
     } as any,
   });
+}
+
+function bootstrapWithDb(providerType: string, mode: string, input: string, dbOptions: CreateDbOptions = {}) {
+  const db = createDb(providerType, dbOptions);
+  const activeRuns = new Map();
+  const result = initializeRunBootstrap({
+    activeRuns,
+    client: {
+      id: 'client-1',
+      ws: {} as any,
+      isAlive: true,
+      isLocal: true,
+      authenticated: true,
+    },
+    db: db as any,
+    message: {
+      type: 'run_start',
+      clientRequestId: 'req-1',
+      sessionId: 'session-1',
+      input,
+      mode,
+    },
+    runId: 'run-1',
+    trace: {
+      log: vi.fn(),
+      setMeta: vi.fn(),
+    } as any,
+  });
+  return { result, db };
 }
 
 describe('initializeRunBootstrap mode/session policy', () => {
@@ -395,5 +425,50 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('nonexistent-llm-id'));
 
     warnSpy.mockRestore();
+  });
+});
+
+describe('initializeRunBootstrap message INSERT — parsed text + metadata', () => {
+  it('stores plain text in content and null metadata for plain-text input', () => {
+    const { result, db } = bootstrapWithDb('zclaudia', 'default', 'just a plain message');
+    expect(result?.userMessageId).toBeDefined();
+
+    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+      .get(result!.userMessageId!) as { content: string; metadata: string | null };
+
+    expect(row.content).toBe('just a plain message');
+    expect(row.metadata).toBeNull();
+  });
+
+  it('stores extracted text in content and attachments JSON in metadata for envelope input', () => {
+    const attachments = [
+      { fileId: 'file-1', name: 'photo.png', mimeType: 'image/png', type: 'image' as const },
+    ];
+    const envelopeInput = JSON.stringify({ text: 'look at this', attachments });
+
+    const { result, db } = bootstrapWithDb('zclaudia', 'default', envelopeInput);
+    expect(result?.userMessageId).toBeDefined();
+
+    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+      .get(result!.userMessageId!) as { content: string; metadata: string | null };
+
+    expect(row.content).toBe('look at this');
+    expect(row.metadata).not.toBeNull();
+
+    const meta = JSON.parse(row.metadata!) as { attachments: unknown[] };
+    expect(meta.attachments).toEqual(attachments);
+  });
+
+  it('stores null metadata for envelope input with empty attachments', () => {
+    const envelopeInput = JSON.stringify({ text: 'no files', attachments: [] });
+
+    const { result, db } = bootstrapWithDb('zclaudia', 'default', envelopeInput);
+    expect(result?.userMessageId).toBeDefined();
+
+    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+      .get(result!.userMessageId!) as { content: string; metadata: string | null };
+
+    expect(row.content).toBe('no files');
+    expect(row.metadata).toBeNull();
   });
 });

@@ -136,6 +136,7 @@ export async function handleRunStart(
       modeValue,
       permissionCallback,
       processedInput,
+      images,
     } = prepareProviderRun({
       activeRun,
       broadcastToOtherAuthenticatedClients,
@@ -168,6 +169,7 @@ export async function handleRunStart(
       db,
       enabledTools,
       forcedPlanBySession,
+      images,
       message,
       modeValue,
       permissionCallback,

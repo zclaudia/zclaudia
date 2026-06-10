@@ -61,6 +61,9 @@ export interface MessageMetadata {
   thinkingBlocks?: ThinkingBlock[];
   /** True when this user message was injected mid-run via steering (vs. normal user send). */
   steered?: boolean;
+  /** Attachment refs for user messages; images are lazily re-resolved from
+   * the file store when history is rebuilt. */
+  attachments?: MessageAttachment[];
   /**
    * Set on synthetic system messages that represent a compaction event in the timeline.
    * The renderer detects this and replaces the default system-message bubble with a

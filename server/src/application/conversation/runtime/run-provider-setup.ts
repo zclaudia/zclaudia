@@ -1,4 +1,7 @@
 import { processAtMentions } from '../../../utils/server-utils.js';
+import { parseMessageInput } from './message-input.js';
+import { resolveImageAttachments, type ResolvedImage } from './resolve-image-attachments.js';
+import { getFileStore } from '../../../infra/storage/fileStore.js';
 import { createPermissionCallback } from './run-permissions.js';
 import type { RunStartMessage, RunSessionRecord } from './run-bootstrap.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
@@ -38,6 +41,7 @@ export interface PreparedProviderRun {
   modeValue: string;
   permissionCallback: ReturnType<typeof createPermissionCallback>;
   processedInput: string;
+  images: ResolvedImage[];
 }
 
 export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProviderRun {
@@ -58,10 +62,13 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
     sessionType,
   } = input;
 
-  const processedInput = processAtMentions(message.input, session.root_path);
-  console.log('[@ Mention] Original input:', message.input);
-  if (processedInput !== message.input) {
-    console.log('[@ Mention] Processed input:', processedInput);
+  const parsedInput = parseMessageInput(message.input);
+  const { images, notices } = resolveImageAttachments(parsedInput.attachments, getFileStore());
+  const mentionProcessed = processAtMentions(parsedInput.text, session.root_path);
+  const processedInput = notices.length > 0 ? `${mentionProcessed}\n\n${notices.join('\n')}` : mentionProcessed;
+  console.log('[@ Mention] Original input:', parsedInput.text);
+  if (mentionProcessed !== parsedInput.text) {
+    console.log('[@ Mention] Processed input:', mentionProcessed);
   }
 
   const forcedPlanBySession = session.project_role === 'task' && session.plan_status === 'planning';
@@ -99,5 +106,6 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
     modeValue,
     permissionCallback,
     processedInput,
+    images,
   };
 }
