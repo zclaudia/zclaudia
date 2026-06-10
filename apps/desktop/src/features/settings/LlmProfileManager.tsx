@@ -182,6 +182,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
   const [formRequestHeaders, setFormRequestHeaders] = useState('');
   const [formRequestHeadersError, setFormRequestHeadersError] = useState<string | null>(null);
   const [formIsDefault, setFormIsDefault] = useState(false);
+  const [formCacheRetention, setFormCacheRetention] = useState<'default' | 'none' | 'short' | 'long'>('default');
+  const [formCacheMarkers, setFormCacheMarkers] = useState(false);
   const [formModels, setFormModels] = useState<ModelRowDraft[]>([]);
   const [formModelsSaveError, setFormModelsSaveError] = useState<string | null>(null);
   const [fetchingModels, setFetchingModels] = useState(false);
@@ -271,6 +273,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormRequestHeaders('');
     setFormRequestHeadersError(null);
     setFormIsDefault(false);
+    setFormCacheRetention('default');
+    setFormCacheMarkers(false);
     setFormModels([]);
     setFormModelsSaveError(null);
     setFetchModelsError(null);
@@ -293,6 +297,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setFormRequestHeaders(profile.requestHeaders ? JSON.stringify(profile.requestHeaders, null, 2) : '');
     setFormRequestHeadersError(null);
     setFormIsDefault(profile.isDefault || false);
+    setFormCacheRetention(profile.cacheRetention ?? 'default');
+    setFormCacheMarkers(profile.compat?.cacheControlFormat === 'anthropic');
     setFormModels(profile.models ? profile.models.map(entryToDraft) : []);
     setFormModelsSaveError(null);
     setFetchModelsError(null);
@@ -401,6 +407,13 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       }
       setFormCompatError(null);
 
+      // Checkbox state owns the cacheControlFormat key; the freeform compat JSON
+      // textarea keeps every other key as-is.
+      const compatMerged: Record<string, unknown> = { ...(compatObj ?? {}) };
+      if (formCacheMarkers) compatMerged.cacheControlFormat = 'anthropic';
+      else delete compatMerged.cacheControlFormat;
+      const compatOut = Object.keys(compatMerged).length > 0 ? compatMerged : undefined;
+
       // Models — block save if any row has an inline error (duplicate / empty
       // id / non-positive-integer override). Empty rows are silently dropped.
       // Row-level errors already surface inline; this banner just points the
@@ -436,15 +449,16 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       }
       setFormModelsSaveError(null);
 
-      const data = {
+      const cacheRetentionValue = formCacheRetention === 'default' ? null : formCacheRetention;
+      const baseData = {
         name: formName.trim(),
         providerType: formProviderType,
         baseUrl: formBaseUrl.trim() || undefined,
         apiKey: formApiKey.trim() || undefined,
-        compat: compatObj,
+        compat: compatOut as LlmProfileCompat | undefined,
         requestHeaders: requestHeadersObj,
         models: modelsArr,
-        isDefault: formIsDefault
+        isDefault: formIsDefault,
       };
 
       // Prefer explicit targetId (passed by callers that have a stable id even
@@ -455,9 +469,15 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       const updateTargetId = opts.targetId ?? editingProfile?.id;
       let saved: LlmProfileConfig;
       if (updateTargetId) {
-        saved = await api.updateLlmProfile(updateTargetId, data);
+        // PUT null clears the cacheRetention field on the server side.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        saved = await api.updateLlmProfile(updateTargetId, { ...baseData, cacheRetention: cacheRetentionValue } as any);
       } else {
-        saved = await api.createLlmProfile(data);
+        // POST ignores null server-side; only send a defined value.
+        saved = await api.createLlmProfile({
+          ...baseData,
+          ...(cacheRetentionValue !== null ? { cacheRetention: cacheRetentionValue } : {}),
+        });
       }
 
       await loadProfiles();
@@ -723,6 +743,24 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
               Stored on the server. Falls back to environment if omitted.
             </p>
           </div>
+
+          <div>
+            <label className="block text-sm font-medium text-muted-foreground mb-1">Prompt cache retention</label>
+            <select
+              value={formCacheRetention}
+              onChange={(e) => setFormCacheRetention(e.target.value as 'default' | 'none' | 'short' | 'long')}
+              aria-label="Prompt cache retention"
+              className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary"
+            >
+              <option value="default">Default (short, 5 min TTL)</option>
+              <option value="long">Long (1 hour TTL, higher write cost)</option>
+              <option value="none">Off (no cache_control markers)</option>
+              <option value="short">Short (explicit 5 min TTL)</option>
+            </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Anthropic prompt caching. "Off" is an escape hatch for proxies that reject cache_control.
+            </p>
+          </div>
         </>
       )}
 
@@ -792,6 +830,15 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         </button>
         {showAdvanced && (
           <div className="mt-2">
+            <label className="flex items-center gap-2 text-sm mb-2">
+              <input
+                type="checkbox"
+                checked={formCacheMarkers}
+                onChange={(e) => setFormCacheMarkers(e.target.checked)}
+                aria-label="Anthropic-style cache markers"
+              />
+              Anthropic-style cache markers (enable when routing Claude through an OpenAI-compatible proxy)
+            </label>
             <textarea
               value={formCompat}
               onChange={(e) => {

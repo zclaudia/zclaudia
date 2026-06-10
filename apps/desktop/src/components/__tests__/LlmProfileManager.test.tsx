@@ -1218,6 +1218,77 @@ describe('ProviderManager', () => {
     });
   });
 
+  describe('Prompt cache controls', () => {
+    it('sends cacheRetention when a non-default retention is picked', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      // Open edit form for existing profile p1
+      const editButtons = screen.getAllByTitle('Edit');
+      await clickAsync(editButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Update')).toBeInTheDocument();
+      });
+
+      // Add a model so the save gate passes
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+
+      // Change the cache retention select to 'long'
+      const cacheSelect = screen.getByLabelText('Prompt cache retention');
+      fireEvent.change(cacheSelect, { target: { value: 'long' } });
+
+      await clickAsync(screen.getByText('Update'));
+
+      await waitFor(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'p1',
+          expect.objectContaining({ cacheRetention: 'long' })
+        );
+      });
+    });
+
+    it('merges cacheControlFormat into compat when the cache-marker checkbox is on', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      // Open edit form for existing profile p1
+      const editButtons = screen.getAllByTitle('Edit');
+      await clickAsync(editButtons[0]);
+
+      await waitFor(() => {
+        expect(screen.getByText('Update')).toBeInTheDocument();
+      });
+
+      // Add a model so the save gate passes
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), { target: { value: 'm1' } });
+
+      // Expand Advanced and check the cache markers checkbox
+      await clickAsync(screen.getByText(/Advanced \(compat\)/));
+      const cacheCheckbox = screen.getByLabelText('Anthropic-style cache markers');
+      await clickAsync(cacheCheckbox);
+
+      await clickAsync(screen.getByText('Update'));
+
+      await waitFor(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'p1',
+          expect.objectContaining({
+            compat: expect.objectContaining({ cacheControlFormat: 'anthropic' }),
+          })
+        );
+      });
+    });
+  });
+
   describe('Resolved contextWindow hint (F3)', () => {
     // The ModelRow debounces resolve-preview by 300ms; waitFor's default
     // 1s timeout is enough but we use waitFor (not waitForFast) for these.
