@@ -31,7 +31,7 @@ export function runRipgrep(args: string[], options: RipgrepOptions): Promise<Rip
     let stderr = '';
     let settled = false;
 
-    const timer = setTimeout(() => { child.kill(); }, timeoutMs);
+    const timer = setTimeout(() => { truncated = true; child.kill(); }, timeoutMs);
     const onAbort = () => { child.kill(); };
     signal?.addEventListener('abort', onAbort, { once: true });
 

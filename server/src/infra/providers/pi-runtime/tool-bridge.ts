@@ -302,6 +302,7 @@ function createGrepBridgeTool(cwd: string): AgentTool<any> {
             const idx = l.lastIndexOf(':');
             return { file: toWorkspaceRelative(cwd, l.slice(0, idx)), count: Number(l.slice(idx + 1)) || 0 };
           });
+          // When truncated, `total` is a lower bound: only files seen before the maxResults cap are summed.
           const total = counts.reduce((sum, c) => sum + c.count, 0);
           return textResult(JSON.stringify({ pattern, path: relPath, mode, counts, total, truncated }, null, 2),
             { ok: true, pattern, path: relPath, total, truncated });

@@ -33,4 +33,13 @@ describe('runRipgrep', () => {
     expect(exitCode).toBe(1);
     expect(lines.length).toBe(0);
   });
+
+  it('marks truncated when the timeout fires before all lines are read', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-rg-timeout-'));
+    for (let i = 0; i < 5; i++) writeFileSync(join(dir, `f${i}.ts`), 'x\n');
+    // timeoutMs: 0 fires on the next tick, before spawn I/O delivers lines
+    const { truncated } = await runRipgrep(['--files', dir], { maxLines: 100, timeoutMs: 0 });
+    rmSync(dir, { recursive: true, force: true });
+    expect(truncated).toBe(true);
+  });
 });

@@ -771,6 +771,19 @@ describe('Edit bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('not_found');
   });
+
+  it('matches a straight-quote old_string against curly quotes in the file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    // file contains a curly double-quoted string
+    writeFileSync(path.join(dir, 'f.ts'), 'const msg = “hello”;\n');
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const res = await edit.execute('e5', { file_path: 'f.ts', old_string: 'const msg = "hello";', new_string: 'const msg = "world";' });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    // the curly-quoted region was replaced with the straight-quoted new_string
+    expect(onDisk).toBe('const msg = "world";\n');
+  });
 });
 
 describe('LS bridge tool', () => {
