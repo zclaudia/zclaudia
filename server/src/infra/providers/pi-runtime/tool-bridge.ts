@@ -2,7 +2,6 @@ import {
   createWriteTool,
   createEditTool,
   createBashTool,
-  createFindTool,
   createLsTool,
 } from '@earendil-works/pi-coding-agent';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
@@ -60,7 +59,7 @@ function toolParams(first: unknown, second: unknown): Record<string, unknown> {
 function extractSkillActivationPaths(toolName: ToolName, params: Record<string, unknown>): string[] {
   const value = (() => {
     if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit') return params.path ?? params.file_path;
-    if (toolName === 'Grep' || toolName === 'Glob' || toolName === 'LS' || toolName === 'Find') return params.path;
+    if (toolName === 'Grep' || toolName === 'Glob' || toolName === 'LS') return params.path;
     return undefined;
   })();
   return typeof value === 'string' && value.trim() ? [value.trim()] : [];
@@ -1256,8 +1255,6 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Bash: (cwd) => withToolName(createBashTool(cwd) as AgentTool<any>, 'Bash'),
   Grep: (cwd) => createGrepBridgeTool(cwd),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  Find: (cwd) => withToolName(createFindTool(cwd) as AgentTool<any>, 'Find'),
   Glob: (cwd) => createGlobTool(cwd),
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   LS: (cwd) => withToolName(createLsTool(cwd) as AgentTool<any>, 'LS'),

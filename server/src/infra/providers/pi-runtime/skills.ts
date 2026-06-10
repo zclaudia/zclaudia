@@ -451,7 +451,7 @@ async function loadSkill(state: SkillRuntimeState, ref: SkillRef, agentProfile?:
   }, null, 2), { ok: true, ref });
 }
 
-const READ_ONLY_SKILL_TOOLS: ToolName[] = ['Read', 'Grep', 'Glob', 'LS', 'Find'];
+const READ_ONLY_SKILL_TOOLS: ToolName[] = ['Read', 'Grep', 'Glob', 'LS'];
 const WEB_SKILL_TOOLS: ToolName[] = ['WebFetch', 'WebSearch'];
 const WORKSPACE_EDIT_SKILL_TOOLS: ToolName[] = ['Write', 'Edit'];
 const AGENT_DEFAULT_EXCLUDED_TOOLS = new Set<ToolName>([

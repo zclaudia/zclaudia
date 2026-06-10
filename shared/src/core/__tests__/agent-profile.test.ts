@@ -26,7 +26,7 @@ describe('AgentProfileConfig type shape', () => {
       llmProfileId: 'lp1',
       model: 'claude-sonnet-4-6',
       systemPrompt: 'You are a reviewer.',
-      enabledTools: ['read', 'grep', 'find', 'ls'],
+      enabledTools: ['read', 'grep', 'ls'],
       thinkingLevel: lvl,
       isDefault: true,
       createdAt: 0,
@@ -43,7 +43,6 @@ describe('ALL_TOOL_NAMES', () => {
       'AskUserQuestion',
       'Bash',
       'Edit',
-      'Find',
       'Glob',
       'Grep',
       'LS',
@@ -81,9 +80,9 @@ describe('isToolName guard', () => {
     expect(normalizeToolName('edit')).toBe('Edit');
     expect(normalizeToolName('bash')).toBe('Bash');
     expect(normalizeToolName('grep')).toBe('Grep');
-    expect(normalizeToolName('find')).toBe('Find');
     expect(normalizeToolName('ls')).toBe('LS');
     expect(normalizeToolName('WebFetch')).toBe('WebFetch');
+    expect(normalizeToolName('find')).toBeUndefined();
     expect(normalizeToolName('nonexistent')).toBeUndefined();
   });
 

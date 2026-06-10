@@ -27,10 +27,11 @@ describe('ensureDefaultAgentProfile', () => {
     expect(agents[0].isDefault).toBe(true);
     expect(agents[0].toolSelection).toEqual({
       sets: [{ source: 'builtin', id: 'core-coding' }],
+      providers: [],
       include: [],
       exclude: [],
     });
-    expect(agents[0].enabledTools).toEqual(['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'Glob', 'LS']);
+    expect(agents[0].enabledTools).toEqual(['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob', 'LS']);
     log.mockRestore();
   });
 

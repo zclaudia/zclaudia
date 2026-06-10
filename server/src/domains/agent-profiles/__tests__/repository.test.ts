@@ -104,7 +104,7 @@ describe('AgentProfileRepository', () => {
       include: [{ source: 'plugin', pluginId: 'jira', toolId: 'search' }],
       exclude: [{ source: 'builtin', name: 'Bash' }],
     });
-    expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Grep', 'Find', 'Glob', 'LS']);
+    expect(fetched!.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Grep', 'Glob', 'LS']);
     expect(fetched!.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
   });
 

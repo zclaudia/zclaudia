@@ -558,7 +558,7 @@ CREATE TABLE IF NOT EXISTS agent_profiles (
           llm_profile_id TEXT NOT NULL REFERENCES llm_profiles(id) ON DELETE RESTRICT,
           model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
           system_prompt TEXT NOT NULL DEFAULT '',
-          enabled_tools TEXT NOT NULL DEFAULT '["Read","Write","Edit","Bash","Grep","Find","Glob","LS"]',
+          enabled_tools TEXT NOT NULL DEFAULT '["Read","Write","Edit","Bash","Grep","Glob","LS"]',
           tool_selection TEXT,
           thinking_level TEXT,
           is_default INTEGER DEFAULT 0,

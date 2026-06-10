@@ -650,7 +650,6 @@ describe('ZClaudiaAdapter.run', () => {
     expect(init?.systemInfo?.tools).toEqual([
       'Read',
       'Grep',
-      'Find',
       'Glob',
       'LS',
       'TodoWrite',
@@ -670,7 +669,6 @@ describe('ZClaudiaAdapter.run', () => {
     expect(toolNames).toEqual([
       'Read',
       'Grep',
-      'Find',
       'Glob',
       'LS',
       'TodoWrite',

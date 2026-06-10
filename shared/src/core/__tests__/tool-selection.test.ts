@@ -24,7 +24,6 @@ describe('tool selection resolver', () => {
       'Edit',
       'Bash',
       'Grep',
-      'Find',
       'Glob',
       'LS',
     ]);
@@ -34,7 +33,6 @@ describe('tool selection resolver', () => {
       'builtin:Edit',
       'builtin:Bash',
       'builtin:Grep',
-      'builtin:Find',
       'builtin:Glob',
       'builtin:LS',
     ]);
