@@ -40,6 +40,7 @@ vi.mock('@earendil-works/pi-ai', () => {
       if (!KNOWN_PROVIDERS.includes(provider)) return [];
       return [buildEntry(provider, `registered-${provider}-model`)];
     }),
+    streamSimple: vi.fn(() => ({ async *[Symbol.asyncIterator]() {} })),
   };
 });
 
@@ -1302,5 +1303,72 @@ describe('ZClaudiaAdapter.run — steering wiring', () => {
     const cap = adapter.manifest.capabilities.find((c) => c.id === 'session.steer');
     expect(cap).toBeDefined();
     expect(cap?.supported).toBe(true);
+  });
+});
+
+describe('prompt cache wiring', () => {
+  const originalEnv = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+  afterEach(() => { process.env = { ...originalEnv }; });
+
+  it('wraps streamFn to inject cacheRetention from llm profile', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      llmProfileConfig: {
+        id: 'lp1', name: 'p1', providerType: 'anthropic',
+        cacheRetention: 'long',
+        createdAt: 0, updatedAt: 0,
+      } as any,
+    });
+
+    const opts = mockAgentInstances[0].constructorOpts;
+    expect(typeof opts.streamFn).toBe('function');
+    const { streamSimple } = await import('@earendil-works/pi-ai');
+    opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
+    expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
+      { id: 'm' },
+      { messages: [] },
+      expect.objectContaining({ temperature: 0, cacheRetention: 'long' }),
+    );
+  });
+
+  it('leaves streamFn unset when profile has no cacheRetention', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      llmProfileConfig: {
+        id: 'lp2', name: 'p2', providerType: 'anthropic',
+        createdAt: 0, updatedAt: 0,
+      } as any,
+    });
+
+    expect(mockAgentInstances[0].constructorOpts.streamFn).toBeUndefined();
+  });
+
+  it('passes the zclaudia session id to the Agent for cache routing', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      claudiaSessionId: 'sess-cache-1',
+    });
+
+    expect(mockAgentInstances[0].constructorOpts.sessionId).toBe('sess-cache-1');
   });
 });

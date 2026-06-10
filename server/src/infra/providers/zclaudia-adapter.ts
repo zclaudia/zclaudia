@@ -1,5 +1,5 @@
-import type { Usage } from '@earendil-works/pi-ai';
-import { Agent, type AgentEvent, type AgentMessage } from '@earendil-works/pi-agent-core';
+import { streamSimple, type Usage } from '@earendil-works/pi-ai';
+import { Agent, type AgentEvent, type AgentMessage, type StreamFn } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from './types.js';
@@ -436,10 +436,24 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       beforeToolCall: hooks.beforeToolCall,
       afterToolCall: hooks.afterToolCall,
       shouldStopAfterTurn: hooks.shouldStopAfterTurn,
+      // pi-ai uses this for session-scoped cache routing on providers that
+      // support it; the zclaudia session id is stable across runs.
+      sessionId: options.claudiaSessionId ?? sessionId,
     };
     if (modelInfo.getApiKey) agentOpts.getApiKey = modelInfo.getApiKey;
     if (hooks.transformContext) agentOpts.transformContext = hooks.transformContext;
-    if (hooks.streamFn) agentOpts.streamFn = hooks.streamFn;
+    // pi-agent-core's Agent does not forward cacheRetention to StreamOptions,
+    // so a per-profile preference has to ride in via a streamFn wrapper. When
+    // the profile doesn't set one, leave pi-ai's own default ('short', plus
+    // the PI_CACHE_RETENTION env knob) untouched.
+    const cacheRetention = options.llmProfileConfig?.cacheRetention;
+    if (cacheRetention) {
+      const inner: StreamFn = hooks.streamFn ?? streamSimple;
+      agentOpts.streamFn = ((model, context, streamOpts) =>
+        inner(model, context, { ...streamOpts, cacheRetention })) as StreamFn;
+    } else if (hooks.streamFn) {
+      agentOpts.streamFn = hooks.streamFn;
+    }
 
     const agent = new Agent(agentOpts);
 
