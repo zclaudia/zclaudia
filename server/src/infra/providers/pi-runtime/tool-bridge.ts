@@ -1024,7 +1024,7 @@ function createGlobTool(cwd: string): AgentTool<any> {
       }
       const rgArgs = [
         '--files',
-        '--sort=modified',
+        '--sortr=modified',
         ...(args.include_hidden === true ? ['--hidden'] : []),
         '--glob',
         pattern,
@@ -1036,8 +1036,8 @@ function createGlobTool(cwd: string): AgentTool<any> {
           return errorResult('glob_failed', stderr || 'ripgrep error', { pattern });
         }
         const relPath = toWorkspaceRelative(cwd, searchRoot) || '.';
-        // --sort=modified is oldest-first; reverse for newest-first, then cap.
-        const all = lines.map((file) => toWorkspaceRelative(cwd, file)).reverse();
+        // --sortr=modified returns newest-first directly; cap to maxResults.
+        const all = lines.map((file) => toWorkspaceRelative(cwd, file));
         const results = all.slice(0, maxResults);
         const truncated = streamTruncated || all.length > maxResults;
         return textResult(JSON.stringify({ pattern, path: relPath, results, total: results.length }, null, 2), {
