@@ -368,6 +368,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // 6. Construct Agent — wire tools + hooks from pi-runtime
     const tools = buildTools(options.cwd, {
       enabled: effectiveTools,
+      supportsVision,
       serverPort: options.serverPort,
       sessionId: options.claudiaSessionId,
       runId: options.runId,

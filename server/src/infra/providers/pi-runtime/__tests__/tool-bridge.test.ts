@@ -846,6 +846,58 @@ describe('Bash bridge tool', () => {
   });
 });
 
+describe('Read image files', () => {
+  const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  it('returns an image content block for image files when vision is supported', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-read-img-'));
+    writeFileSync(path.join(dir, 'pic.png'), Buffer.from(PNG_BASE64, 'base64'));
+    const read = buildTools(dir, { enabled: ['Read'], supportsVision: true } as any)[0] as any;
+
+    const result = await read.execute('read-img-1', { path: 'pic.png' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.content).toEqual([{ type: 'image', data: PNG_BASE64, mimeType: 'image/png' }]);
+    expect(result.details).toMatchObject({ ok: true, mimeType: 'image/png' });
+  });
+
+  it('returns a text notice when the model lacks vision', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-read-img-'));
+    writeFileSync(path.join(dir, 'pic.png'), Buffer.from(PNG_BASE64, 'base64'));
+    const read = buildTools(dir, { enabled: ['Read'] })[0] as any;
+
+    const result = await read.execute('read-img-2', { path: 'pic.png' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.content[0].type).toBe('text');
+    expect((result.content[0] as { text: string }).text).toContain('does not support vision');
+  });
+
+  it('returns a size notice for oversize images', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-read-img-'));
+    writeFileSync(path.join(dir, 'huge.png'), Buffer.alloc(5 * 1024 * 1024 + 1));
+    const read = buildTools(dir, { enabled: ['Read'], supportsVision: true } as any)[0] as any;
+
+    const result = await read.execute('read-img-3', { path: 'huge.png' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.content[0].type).toBe('text');
+    expect((result.content[0] as { text: string }).text).toContain('exceeds');
+  });
+
+  it('binary non-image files keep the existing binary_file protection', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-read-img-'));
+    writeFileSync(path.join(dir, 'data.bin'), Buffer.from([0, 1, 2, 0, 255]));
+    const read = buildTools(dir, { enabled: ['Read'], supportsVision: true } as any)[0] as any;
+
+    const result = await read.execute('read-img-4', { path: 'data.bin' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.details).toMatchObject({ ok: false, error: 'binary_file' });
+    expect(result.content[0].text).toContain('Refusing to read binary file');
+  });
+});
+
 describe('LS bridge tool', () => {
   it('lists entries alphabetically with a trailing slash on directories', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-ls-'));

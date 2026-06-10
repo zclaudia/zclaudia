@@ -27,8 +27,22 @@ export { ALL_TOOL_NAMES, type ToolName };
 
 const execFileAsync = promisify(execFile);
 
-type ToolContent = Array<{ type: 'text'; text: string }>;
+type TextBlock = { type: 'text'; text: string };
+type ImageBlock = { type: 'image'; data: string; mimeType: string };
+type ToolContent = Array<TextBlock | ImageBlock>;
 const DEFAULT_READ_MAX_BYTES = 512 * 1024;
+
+/** Image extensions the Read tool returns as vision content blocks. */
+const IMAGE_MIME_BY_EXT: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+};
+/** Mirrors the chat-attachment limit (Anthropic per-image cap); kept in sync
+ * with MAX_IMAGE_BYTES in application/conversation/runtime/resolve-image-attachments.ts. */
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 function textResult<TDetails extends Record<string, unknown> = Record<string, never>>(
   text: string,
@@ -173,7 +187,7 @@ function formatNumberedLines(lines: string[], startLine: number): string {
   return lines.map((line, index) => `${startLine + index}|${line}`).join('\n');
 }
 
-function createReadBridgeTool(cwd: string): AgentTool<any> {
+function createReadBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTool<any> {
   return {
     name: 'Read',
     label: 'Read',
@@ -205,6 +219,26 @@ function createReadBridgeTool(cwd: string): AgentTool<any> {
         if (!fileStat.isFile()) {
           return errorResult('not_a_file', `Path is not a file: ${requestedPath}`, { path: String(requestedPath) });
         }
+        const imageMime = IMAGE_MIME_BY_EXT[path.extname(filePath).toLowerCase()];
+        if (imageMime) {
+          const relPath = toWorkspaceRelative(cwd, filePath);
+          if (fileStat.size > MAX_IMAGE_BYTES) {
+            return textResult(`Image file ${relPath} (${imageMime}, ${fileStat.size} bytes) exceeds the 5MB vision limit.`, {
+              ok: false, path: relPath, size: fileStat.size, mimeType: imageMime,
+            });
+          }
+          if (!options?.supportsVision) {
+            return textResult(`Image file ${relPath} (${imageMime}, ${fileStat.size} bytes) — current model does not support vision.`, {
+              ok: false, path: relPath, size: fileStat.size, mimeType: imageMime,
+            });
+          }
+          const buffer = await readFile(filePath);
+          return {
+            content: [{ type: 'image' as const, data: buffer.toString('base64'), mimeType: imageMime }],
+            details: { ok: true, path: relPath, size: fileStat.size, mimeType: imageMime },
+          };
+        }
+
         if (fileStat.size > DEFAULT_READ_MAX_BYTES) {
           return errorResult('file_too_large', `File is too large to read in one call: ${requestedPath}`, {
             path: toWorkspaceRelative(cwd, filePath),
@@ -1477,7 +1511,7 @@ function createLspTool(cwd: string): AgentTool<any> {
 // in this MVP (use pi defaults). Future sub-projects can wire ToolBridgeOptions.<name>
 // through to the factory.
 const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions) => AgentTool<any>> = {
-  Read: (cwd) => createReadBridgeTool(cwd),
+  Read: (cwd, options) => createReadBridgeTool(cwd, options),
   Write: (cwd) => createWriteBridgeTool(cwd),
   Edit: (cwd) => createEditBridgeTool(cwd),
   Bash: (cwd) => createBashBridgeTool(cwd),
@@ -1519,6 +1553,8 @@ export interface ToolBridgeOptions {
   agentTaskExecutor?: TaskExecutor;
   /** Provider permission/interaction callback used by AskUserQuestion. */
   permissionCallback?: PermissionCallback;
+  /** Whether the active model accepts image content blocks (model.input includes 'image'). */
+  supportsVision?: boolean;
 }
 
 /**
