@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import type { McpOAuthConfig, McpOAuthCredentials, McpServerConfig } from '@zclaudia/shared/core/mcp';
+import { discoverMcpOAuthConfig } from './mcp-oauth-discovery.js';
 
 export type McpOAuthStartResult =
   | { sessionId: string; method: 'browser'; authUrl: string; expiresAt: number }
@@ -81,8 +82,8 @@ export class McpOAuthSessionManager {
     private readonly fetchFn?: typeof fetch,
   ) {}
 
-  startBrowserFlow(server: McpServerConfig, origin: string): McpOAuthStartResult {
-    const config = requireOAuthConfig(server);
+  async startBrowserFlow(server: McpServerConfig, origin: string): Promise<McpOAuthStartResult> {
+    const config = await this.resolveOAuthConfig(server, (cfg) => !!cfg.authorizationEndpoint && !!cfg.tokenEndpoint);
     if (!config.authorizationEndpoint || !config.tokenEndpoint) {
       throw new Error('OAuth authorizationEndpoint and tokenEndpoint are required for browser flow');
     }
@@ -122,7 +123,7 @@ export class McpOAuthSessionManager {
 
   async finishBrowserFlow(server: McpServerConfig, sessionId: string, code: string): Promise<void> {
     const session = this.requireSession(server.name, sessionId);
-    const config = requireOAuthConfig(server);
+    const config = await this.resolveOAuthConfig(server, (cfg) => !!cfg.tokenEndpoint);
     if (!config.tokenEndpoint || !session.codeVerifier || !session.redirectUri) {
       throw new Error('OAuth session is missing token exchange state');
     }
@@ -143,7 +144,7 @@ export class McpOAuthSessionManager {
   }
 
   async startDeviceCodeFlow(server: McpServerConfig): Promise<McpOAuthStartResult> {
-    const config = requireOAuthConfig(server);
+    const config = await this.resolveOAuthConfig(server, (cfg) => !!cfg.deviceAuthorizationEndpoint && !!cfg.tokenEndpoint);
     if (!config.deviceAuthorizationEndpoint || !config.tokenEndpoint) {
       throw new Error('OAuth deviceAuthorizationEndpoint and tokenEndpoint are required for device-code flow');
     }
@@ -181,7 +182,7 @@ export class McpOAuthSessionManager {
       abortController: controller,
     };
     this.sessions.set(sessionId, session);
-    void this.pollDeviceToken(server, session, device.device_code, Math.max(1, device.interval ?? 5));
+    void this.pollDeviceToken(server, session, device.device_code, Math.max(1, device.interval ?? 5), config);
 
     return {
       sessionId,
@@ -217,8 +218,9 @@ export class McpOAuthSessionManager {
     session: Session,
     deviceCode: string,
     intervalSeconds: number,
+    resolvedConfig?: McpOAuthConfig,
   ): Promise<void> {
-    const config = requireOAuthConfig(server);
+    const config = resolvedConfig ?? await this.resolveOAuthConfig(server, (cfg) => !!cfg.tokenEndpoint);
     try {
       while (session.status.state === 'pending' && !session.abortController.signal.aborted) {
         await new Promise((resolve) => setTimeout(resolve, intervalSeconds * 10));
@@ -234,7 +236,7 @@ export class McpOAuthSessionManager {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (/authorization_pending/i.test(message)) {
-        void this.pollDeviceToken(server, session, deviceCode, intervalSeconds);
+        void this.pollDeviceToken(server, session, deviceCode, intervalSeconds, config);
         return;
       }
       if (session.abortController.signal.aborted) return;
@@ -246,6 +248,15 @@ export class McpOAuthSessionManager {
     const session = this.sessions.get(sessionId);
     if (!session || session.serverName !== serverName) throw new Error('OAuth session not found or expired');
     return session;
+  }
+
+  private async resolveOAuthConfig(
+    server: McpServerConfig,
+    hasRequiredEndpoints: (config: McpOAuthConfig) => boolean,
+  ): Promise<McpOAuthConfig> {
+    const config = requireOAuthConfig(server);
+    if (hasRequiredEndpoints(config)) return config;
+    return discoverMcpOAuthConfig(config, server.url, (input, init) => this.fetch(input, init));
   }
 
   private async fetchToken(tokenEndpoint: string, params: Record<string, string | undefined>, signal: AbortSignal): Promise<McpOAuthCredentials> {

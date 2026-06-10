@@ -14,6 +14,8 @@ export interface SourcedSkill {
   source: SkillSource;
   /** Parsed from SKILL.md frontmatter `requires:` block. Pi does not surface these. */
   requirements?: SkillRequirements;
+  /** Additional frontmatter used for catalog display and runtime search. */
+  metadata?: SkillFrontmatterMetadata;
   /** Parsed from SKILL.md frontmatter execution policy fields. */
   execution?: SkillExecutionMetadata;
 }
@@ -22,6 +24,21 @@ export interface SkillExecutionMetadata {
   allowedModes?: SkillExecutionMode[];
   defaultMode?: SkillExecutionMode;
   forkToolPolicy?: SkillForkToolPolicy;
+}
+
+export interface SkillFrontmatterMetadata {
+  whenToUse?: string;
+  allowedTools?: string[];
+  paths?: string[];
+  arguments?: string[];
+  argumentHint?: string;
+  snippets?: string[];
+  shellSnippets?: string[];
+  hookTriggers?: {
+    tools?: string[];
+    paths?: string[];
+  };
+  userInvocable?: boolean;
 }
 
 export interface SkillLoadDiagnostic {
@@ -112,6 +129,81 @@ function extractExecutionMetadata(filePath: string): SkillExecutionMetadata | un
   }
 }
 
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return undefined;
+}
+
+function frontmatterStringArray(value: unknown): string[] | undefined {
+  if (typeof value === 'string') {
+    const parts = value.split(',').map((part) => part.trim()).filter(Boolean);
+    return parts.length > 0 ? parts : undefined;
+  }
+  if (!Array.isArray(value)) return undefined;
+  const parts = value.filter((item): item is string => typeof item === 'string' && !!item.trim()).map((item) => item.trim());
+  return parts.length > 0 ? [...new Set(parts)] : undefined;
+}
+
+function frontmatterArgumentNames(value: unknown): string[] | undefined {
+  const parts = frontmatterStringArray(value);
+  const names = parts?.flatMap((part) => part.split(/\s+/))
+    .map((part) => part.trim())
+    .filter((part) => part && !/^\d+$/.test(part));
+  return names && names.length > 0 ? [...new Set(names)] : undefined;
+}
+
+function frontmatterBoolean(value: unknown): boolean | undefined {
+  if (typeof value === 'boolean') return value;
+  if (typeof value !== 'string') return undefined;
+  if (/^(true|yes|1)$/i.test(value.trim())) return true;
+  if (/^(false|no|0)$/i.test(value.trim())) return false;
+  return undefined;
+}
+
+function frontmatterHookTriggers(value: unknown): SkillFrontmatterMetadata['hookTriggers'] | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const row = value as Record<string, unknown>;
+  const tools = frontmatterStringArray(row.tools ?? row.allowedTools ?? row.allowed_tools);
+  const paths = frontmatterStringArray(row.paths);
+  const out: NonNullable<SkillFrontmatterMetadata['hookTriggers']> = {};
+  if (tools) out.tools = tools;
+  if (paths) out.paths = paths;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
+function extractFrontmatterMetadata(filePath: string): SkillFrontmatterMetadata | undefined {
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    const parsed = matter(raw);
+    const data = (parsed.data ?? {}) as Record<string, unknown>;
+    const metadata: SkillFrontmatterMetadata = {};
+    const whenToUse = firstString(data.whenToUse, data.when_to_use, data.when);
+    const allowedTools = frontmatterStringArray(data.allowedTools ?? data.allowed_tools ?? data.tools);
+    const paths = frontmatterStringArray(data.paths);
+    const argumentNames = frontmatterArgumentNames(data.arguments);
+    const argumentHint = firstString(data.argumentHint, data.argument_hint, data['argument-hint']);
+    const snippets = frontmatterStringArray(data.snippets);
+    const shellSnippets = frontmatterStringArray(data.shellSnippets ?? data.shell_snippets ?? data['shell-snippets']);
+    const hookTriggers = frontmatterHookTriggers(data.hookTriggers ?? data.hook_triggers ?? data['hook-triggers']);
+    const userInvocable = frontmatterBoolean(data.userInvocable ?? data.user_invocable ?? data['user-invocable']);
+    if (whenToUse) metadata.whenToUse = whenToUse;
+    if (allowedTools) metadata.allowedTools = allowedTools;
+    if (paths) metadata.paths = paths;
+    if (argumentNames) metadata.arguments = argumentNames;
+    if (argumentHint) metadata.argumentHint = argumentHint;
+    if (snippets) metadata.snippets = snippets;
+    if (shellSnippets) metadata.shellSnippets = shellSnippets;
+    if (hookTriggers) metadata.hookTriggers = hookTriggers;
+    if (userInvocable !== undefined) metadata.userInvocable = userInvocable;
+    return Object.keys(metadata).length > 0 ? metadata : undefined;
+  } catch (err) {
+    console.warn(`[skill-loader] Failed to parse metadata for ${filePath}:`, err);
+    return undefined;
+  }
+}
+
 /**
  * Discover skills across source-tagged directories via pi `loadSourcedSkills`,
  * then enrich each skill with `requirements` parsed from its frontmatter
@@ -129,6 +221,7 @@ export async function loadAllSkills(
       skill,
       source,
       requirements: extractRequirements(skill.filePath),
+      metadata: extractFrontmatterMetadata(skill.filePath),
       execution: extractExecutionMetadata(skill.filePath),
     })),
     diagnostics: result.diagnostics.map((d) => ({

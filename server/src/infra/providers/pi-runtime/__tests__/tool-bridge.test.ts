@@ -8,6 +8,18 @@ import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
 
+const { activateConditionalSkillsForToolNamesMock } = vi.hoisted(() => ({
+  activateConditionalSkillsForToolNamesMock: vi.fn(),
+}));
+
+vi.mock('../../../../application/plugins/skill-tools.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../application/plugins/skill-tools.js')>();
+  return {
+    ...actual,
+    activateConditionalSkillsForToolNames: activateConditionalSkillsForToolNamesMock,
+  };
+});
+
 describe('buildTools', () => {
   const tempDirs: string[] = [];
 
@@ -15,7 +27,18 @@ describe('buildTools', () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
+    activateConditionalSkillsForToolNamesMock.mockReset();
     return Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
+  });
+
+  it('activates hook-triggered skills after matching tool execution', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-hook-tool-'));
+    tempDirs.push(root);
+    const bash = buildTools(root, { enabled: ['Bash'] })[0] as any;
+
+    await bash.execute('bash-1', { command: 'printf ok' });
+
+    expect(activateConditionalSkillsForToolNamesMock).toHaveBeenCalledWith(['Bash']);
   });
 
   it('returns core coding tools and first-batch agent tools by default', () => {

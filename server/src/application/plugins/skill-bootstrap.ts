@@ -12,7 +12,7 @@
  */
 
 import { loadAllSkills, type SkillSource } from './skill-loader.js';
-import { addPluginSkills, type PluginSkillReloader } from './skill-tools.js';
+import { addPluginSkills, addSkillLoadDiagnostics, type PluginSkillReloader } from './skill-tools.js';
 import type { ExecutionEnv } from '../../infra/execution-env.js';
 
 /** Minimal contract the bootstrap needs from PluginLoader. */
@@ -36,6 +36,7 @@ export async function loadAndCachePluginSkills(
   if (inputs.length === 0) return 0;
   const result = await loadAllSkills(env, inputs);
   addPluginSkills(result.skills);
+  addSkillLoadDiagnostics(result.diagnostics);
   for (const d of result.diagnostics) {
     console.warn(`[PluginSkills] ${d.code}: ${d.message} — ${d.path}`);
   }

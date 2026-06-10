@@ -5,6 +5,8 @@ const negotiateProfileMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
 const pluginEventsEmitMock = vi.fn(async () => {});
 const mcpListStatusesMock = vi.fn();
+const prepareDirectSkillInvocationMock = vi.fn();
+const executePreparedDirectSkillInvocationMock = vi.fn();
 
 vi.mock('../run-context.js', () => ({
   buildRunContext: buildRunContextMock,
@@ -28,6 +30,11 @@ vi.mock('../../../../utils/mcp-client-manager.js', () => ({
   mcpClientManager: {
     listStatuses: mcpListStatusesMock,
   },
+}));
+
+vi.mock('../../../../infra/providers/pi-runtime/skills.js', () => ({
+  prepareDirectSkillInvocation: prepareDirectSkillInvocationMock,
+  executePreparedDirectSkillInvocation: executePreparedDirectSkillInvocationMock,
 }));
 
 async function* providerStream() {
@@ -54,6 +61,8 @@ describe('ws/run-provider-launch', () => {
       capabilities: [{ id: 'edit', enabled: true, mode: 'native', reliability: 'high' }],
     });
     mcpListStatusesMock.mockReturnValue([]);
+    prepareDirectSkillInvocationMock.mockResolvedValue({ matched: false });
+    executePreparedDirectSkillInvocationMock.mockReset();
   });
 
   it('emits run_started, background status, negotiates profile, and starts periodic save', async () => {
@@ -274,5 +283,246 @@ describe('ws/run-provider-launch', () => {
       }),
     });
     expect(adapter.run).toHaveBeenCalled();
+  });
+
+  it('loads direct slash skill before provider launch and runs provider with skill args', async () => {
+    prepareDirectSkillInvocationMock.mockResolvedValueOnce({
+      matched: true,
+      ok: true,
+      ref: { source: 'workspace', id: 'release-notes' },
+      processedInput: 'ZOOM-1 Great feature',
+      message: 'Loaded skill /release-notes for this turn.',
+    });
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+    const activeRun = {
+      assistantMessageId: 'assistant-1',
+      pendingSteers: [],
+      skillState: { discoverableSkills: [], pinnedSkills: [], loadedSkills: [], loadedSkillContents: {} },
+    } as any;
+
+    await launchProviderRun({
+      activeRun,
+      adapter,
+      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: { prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn(() => []) })) } as any,
+      enabledTools: [],
+      forcedPlanBySession: false,
+      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: '/release-notes ZOOM-1 Great feature' },
+      modeValue: 'default',
+      permissionCallback: vi.fn(),
+      processedInput: '/release-notes ZOOM-1 Great feature',
+      providerConfig: { id: 'provider-1', providerType: 'zclaudia' } as any,
+      llmProfileId: 'provider-1',
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: vi.fn(),
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+        llm_profile_id: 'provider-1',
+        system_prompt: null,
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+    });
+
+    expect(prepareDirectSkillInvocationMock).toHaveBeenCalledWith(
+      activeRun.skillState,
+      '/release-notes ZOOM-1 Great feature',
+      expect.objectContaining({ agentProfile: expect.any(Object) }),
+    );
+    expect(adapter.run).toHaveBeenCalledWith(
+      'ZOOM-1 Great feature',
+      expect.any(Object),
+      expect.any(Function),
+    );
+  });
+
+  it('completes locally and skips provider for direct model-only skill denial', async () => {
+    prepareDirectSkillInvocationMock.mockResolvedValueOnce({
+      matched: true,
+      ok: false,
+      error: 'skill_not_user_invocable',
+      message: 'Skill model-only can only be invoked by the model.',
+      ref: { source: 'workspace', id: 'model-only' },
+    });
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+    const sendRunEvent = vi.fn();
+    const activeRun = {
+      assistantMessageId: 'assistant-1',
+      pendingSteers: [],
+      contentBlocks: [],
+      fullContent: '',
+      skillState: { discoverableSkills: [], pinnedSkills: [], loadedSkills: [], loadedSkillContents: {} },
+      phase: 'running',
+      phaseEmitter: { emit: vi.fn() },
+    } as any;
+
+    const result = await launchProviderRun({
+      activeRun,
+      adapter,
+      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: { prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn(() => []) })) } as any,
+      enabledTools: [],
+      forcedPlanBySession: false,
+      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: '/model-only' },
+      modeValue: 'default',
+      permissionCallback: vi.fn(),
+      processedInput: '/model-only',
+      providerConfig: { id: 'provider-1', providerType: 'zclaudia' } as any,
+      llmProfileId: 'provider-1',
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent,
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+        llm_profile_id: 'provider-1',
+        system_prompt: null,
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+    });
+
+    expect(adapter.run).not.toHaveBeenCalled();
+    expect(activeRun.fullContent).toContain('can only be invoked by the model');
+    expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
+    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'delta',
+      content: expect.stringContaining('can only be invoked by the model'),
+    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'run_completed',
+      runId: 'run-1',
+      sessionId: 'session-1',
+    }));
+    expect(result.providerRunner).toBeTruthy();
+  });
+
+  it('executes direct fork slash skill locally and skips provider launch', async () => {
+    prepareDirectSkillInvocationMock.mockResolvedValueOnce({
+      matched: true,
+      ok: true,
+      mode: 'fork',
+      ref: { source: 'workspace', id: 'security-audit' },
+      task: 'auth changes',
+      args: 'auth changes',
+      message: 'Running skill /security-audit.',
+    });
+    executePreparedDirectSkillInvocationMock.mockResolvedValueOnce({
+      ok: true,
+      mode: 'fork',
+      ref: { source: 'workspace', id: 'security-audit' },
+      result: 'Fork result: reviewed auth changes.',
+    });
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+    const sendRunEvent = vi.fn();
+    const activeRun = {
+      assistantMessageId: 'assistant-1',
+      pendingSteers: [],
+      contentBlocks: [],
+      fullContent: '',
+      skillState: { discoverableSkills: [], pinnedSkills: [], loadedSkills: [], loadedSkillContents: {} },
+      phase: 'running',
+      phaseEmitter: { emit: vi.fn() },
+    } as any;
+
+    await launchProviderRun({
+      activeRun,
+      adapter,
+      agentProfile: { id: 'agent-1', name: 'Agent', model: 'm', systemPrompt: '', enabledTools: [] } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: { prepare: vi.fn(() => ({ run: vi.fn(), get: vi.fn(), all: vi.fn(() => []) })) } as any,
+      enabledTools: ['Read', 'Grep', 'Write'],
+      forcedPlanBySession: false,
+      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: '/security-audit auth changes' },
+      modeValue: 'default',
+      permissionCallback: vi.fn(),
+      processedInput: '/security-audit auth changes',
+      providerConfig: { id: 'provider-1', providerType: 'zclaudia' } as any,
+      llmProfileId: 'provider-1',
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent,
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+        llm_profile_id: 'provider-1',
+        system_prompt: null,
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+    });
+
+    expect(adapter.run).not.toHaveBeenCalled();
+    expect(executePreparedDirectSkillInvocationMock).toHaveBeenCalledWith(
+      activeRun.skillState,
+      expect.objectContaining({ mode: 'fork', ref: { source: 'workspace', id: 'security-audit' } }),
+      expect.objectContaining({
+        cwd: '/tmp/project',
+        enabledTools: ['Read', 'Grep', 'Write'],
+        agentProfile: expect.any(Object),
+        llmProfileConfig: expect.any(Object),
+        permissionCallback: expect.any(Function),
+      }),
+    );
+    expect(activeRun.fullContent).toBe('Fork result: reviewed auth changes.');
+    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'delta',
+      content: 'Fork result: reviewed auth changes.',
+    }));
+    expect(sendRunEvent).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'run_completed',
+      runId: 'run-1',
+      sessionId: 'session-1',
+    }));
+    expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun, { indexMetadata: true });
   });
 });

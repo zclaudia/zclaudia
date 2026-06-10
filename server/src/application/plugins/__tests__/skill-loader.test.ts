@@ -59,6 +59,53 @@ describe('loadAllSkills', () => {
     expect(result.skills[0].requirements).toEqual({ binaries: ['git'], os: ['linux'] });
   });
 
+  it('parses richer skill frontmatter metadata', async () => {
+    const wsDir = path.join(tmpRoot, 'ws');
+    mkdirSync(wsDir);
+    writeSkill(
+      wsDir,
+      'rich',
+      [
+        'name: rich',
+        'description: Rich skill',
+        'when_to_use: Use for rich tasks',
+        'allowed_tools:',
+        '  - Read',
+        '  - Grep',
+        'paths:',
+        '  - src/**',
+        'arguments: ticket title',
+        'argument-hint: "<ticket> <title>"',
+        'snippets:',
+        '  - "Use conventional commits"',
+        'shell_snippets:',
+        '  - "pnpm test"',
+        'hook_triggers:',
+        '  tools: [Bash, Read]',
+        '  paths:',
+        '    - "src/**"',
+        'user_invocable: false',
+      ].join('\n'),
+    );
+    const env = createExecutionEnv(tmpRoot);
+    const result = await loadAllSkills(env, [{ path: wsDir, source: 'workspace' }]);
+
+    expect(result.skills[0].metadata).toEqual({
+      whenToUse: 'Use for rich tasks',
+      allowedTools: ['Read', 'Grep'],
+      paths: ['src/**'],
+      arguments: ['ticket', 'title'],
+      argumentHint: '<ticket> <title>',
+      snippets: ['Use conventional commits'],
+      shellSnippets: ['pnpm test'],
+      hookTriggers: {
+        tools: ['Bash', 'Read'],
+        paths: ['src/**'],
+      },
+      userInvocable: false,
+    });
+  });
+
   it('returns empty result for a missing dir (no throw)', async () => {
     const env = createExecutionEnv(tmpRoot);
     const result = await loadAllSkills(env, [

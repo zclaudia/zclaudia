@@ -1,6 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Database from 'better-sqlite3';
 import { loadMcpServersFromDb } from '../mcp-config.js';
+import { protectMcpOAuthCredentials } from '../../infra/services/mcp-oauth-credential-protector.js';
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -14,6 +15,7 @@ function createTestDb(): Database.Database {
       transport TEXT,
       url TEXT,
       headers TEXT,
+      headers_helper TEXT,
       oauth_config TEXT,
       oauth_credentials TEXT,
       enabled INTEGER DEFAULT 1
@@ -24,9 +26,17 @@ function createTestDb(): Database.Database {
 
 describe('mcp-config', () => {
   let db: Database.Database;
+  let originalCredentialKey: string | undefined;
 
   beforeEach(() => {
+    originalCredentialKey = process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY;
+    process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY = 'mcp-config-test-key';
     db = createTestDb();
+  });
+
+  afterEach(() => {
+    if (originalCredentialKey === undefined) delete process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY;
+    else process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY = originalCredentialKey;
   });
 
   it('returns empty object when no servers exist', () => {
@@ -107,8 +117,8 @@ describe('mcp-config', () => {
   it('loads remote MCP server transport, headers, OAuth config, and credentials', () => {
     db.prepare(`
       INSERT INTO mcp_servers (
-        name, command, enabled, transport, url, headers, oauth_config, oauth_credentials
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        name, command, enabled, transport, url, headers, headers_helper, oauth_config, oauth_credentials
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       'remote',
       '',
@@ -116,6 +126,7 @@ describe('mcp-config', () => {
       'streamable-http',
       'https://mcp.example.com/mcp',
       '{"X-Zoom-Region":"us01"}',
+      'node ./headers-helper.js',
       '{"enabled":true,"tokenEndpoint":"https://auth.example.com/token","clientId":"client","scopes":["repo"]}',
       '{"accessToken":"access-token","tokenType":"Bearer"}',
     );
@@ -127,6 +138,7 @@ describe('mcp-config', () => {
       command: '',
       url: 'https://mcp.example.com/mcp',
       headers: { 'X-Zoom-Region': 'us01' },
+      headersHelper: 'node ./headers-helper.js',
       oauthConfig: {
         enabled: true,
         tokenEndpoint: 'https://auth.example.com/token',
@@ -138,5 +150,35 @@ describe('mcp-config', () => {
         tokenType: 'Bearer',
       },
     });
+  });
+
+  it('decrypts protected remote MCP OAuth credentials when loading runtime config', () => {
+    const protectedCredentials = protectMcpOAuthCredentials({
+      accessToken: 'runtime-access-token',
+      refreshToken: 'runtime-refresh-token',
+      tokenType: 'Bearer',
+    });
+    db.prepare(`
+      INSERT INTO mcp_servers (
+        name, command, enabled, transport, url, oauth_credentials
+      ) VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+      'secure-remote',
+      '',
+      1,
+      'streamable-http',
+      'https://mcp.example.com/mcp',
+      protectedCredentials,
+    );
+
+    const result = loadMcpServersFromDb(db);
+
+    expect(result['secure-remote']).toEqual(expect.objectContaining({
+      oauthCredentials: expect.objectContaining({
+        accessToken: 'runtime-access-token',
+        refreshToken: 'runtime-refresh-token',
+        tokenType: 'Bearer',
+      }),
+    }));
   });
 });

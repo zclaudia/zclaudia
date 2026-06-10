@@ -33,6 +33,7 @@ interface McpServerStoreState {
     transport?: McpServerTransport;
     url?: string;
     headers?: Record<string, string>;
+    headersHelper?: string;
     oauthConfig?: McpOAuthConfig;
     oauthCredentials?: McpOAuthCredentials;
     enabled?: boolean;
@@ -48,6 +49,7 @@ interface McpServerStoreState {
     transport: McpServerTransport;
     url: string;
     headers: Record<string, string>;
+    headersHelper: string;
     oauthConfig: McpOAuthConfig;
     oauthCredentials: McpOAuthCredentials | null;
     enabled: boolean;

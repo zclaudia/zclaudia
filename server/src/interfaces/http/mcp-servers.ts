@@ -160,6 +160,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
         command: server.command,
         url: server.url || '',
         headers: server.headers,
+        headersHelper: server.headersHelper,
         oauthConfig: server.oauthConfig,
         oauthCredentials: server.oauthCredentials,
         onOAuthCredentials: (credentials: McpOAuthCredentials | null) => mcpServerService.updateOAuthCredentials(server.name, credentials),
@@ -320,7 +321,7 @@ export function createMcpServerRoutes(db: Database.Database): Router {
       const origin = `${req.protocol}://${req.get('host')}`;
       const data = method === 'device_code'
         ? await mcpOAuthSessions.startDeviceCodeFlow(server)
-        : mcpOAuthSessions.startBrowserFlow(server, origin);
+        : await mcpOAuthSessions.startBrowserFlow(server, origin);
       res.json({ success: true, data });
     } catch (error) {
       sendApiError(res, 400, 'MCP_OAUTH_START_FAILED', error instanceof Error ? error.message : String(error));

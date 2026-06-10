@@ -5,12 +5,16 @@ import Database from 'better-sqlite3';
 import { createMcpServerRoutes } from '../mcp-servers.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
+import { unprotectMcpOAuthCredentials } from '../../../infra/services/mcp-oauth-credential-protector.js';
 
 describe('mcp-servers routes', () => {
   let app: express.Express;
   let db: Database.Database;
+  let originalCredentialKey: string | undefined;
 
   beforeEach(() => {
+    originalCredentialKey = process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY;
+    process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY = 'mcp-http-routes-test-key';
     mcpInventoryCache.invalidate();
     db = new Database(':memory:');
     db.exec(`
@@ -28,6 +32,7 @@ describe('mcp-servers routes', () => {
         transport TEXT,
         url TEXT,
         headers TEXT,
+        headers_helper TEXT,
         oauth_config TEXT,
         oauth_credentials TEXT,
         created_at INTEGER,
@@ -41,6 +46,8 @@ describe('mcp-servers routes', () => {
   });
 
   afterEach(() => {
+    if (originalCredentialKey === undefined) delete process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY;
+    else process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY = originalCredentialKey;
     db.close();
   });
 
@@ -281,9 +288,9 @@ describe('mcp-servers routes', () => {
     it('passes OAuth persistence callback when refreshing remote MCP servers', async () => {
       db.prepare(`
         INSERT INTO mcp_servers (
-          id, name, command, enabled, source, transport, url, oauth_config, oauth_credentials, created_at, updated_at
+          id, name, command, enabled, source, transport, url, headers_helper, oauth_config, oauth_credentials, created_at, updated_at
         )
-        VALUES ('s1', 'remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', ?, ?, 1000, 1000)
+        VALUES ('s1', 'remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', 'node ./headers-helper.js', ?, ?, 1000, 1000)
       `).run(
         JSON.stringify({ enabled: true, tokenEndpoint: 'https://auth.example.com/token', clientId: 'client' }),
         JSON.stringify({ accessToken: 'old-token', refreshToken: 'refresh-token', tokenType: 'Bearer', expiresAt: 1 }),
@@ -300,6 +307,7 @@ describe('mcp-servers routes', () => {
       expect(mcpClientManager.refresh).toHaveBeenCalledWith('remote', expect.objectContaining({
         transport: 'streamable-http',
         url: 'https://mcp.example.com/mcp',
+        headersHelper: 'node ./headers-helper.js',
         oauthConfig: expect.objectContaining({ tokenEndpoint: 'https://auth.example.com/token' }),
         oauthCredentials: expect.objectContaining({ accessToken: 'old-token' }),
         onOAuthCredentials: expect.any(Function),
@@ -308,7 +316,9 @@ describe('mcp-servers routes', () => {
       const config = vi.mocked(mcpClientManager.refresh).mock.calls[0][1] as any;
       config.onOAuthCredentials({ accessToken: 'fresh-token', tokenType: 'Bearer' });
       const row = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?').get('remote') as { oauth_credentials: string };
-      expect(JSON.parse(row.oauth_credentials)).toEqual(expect.objectContaining({ accessToken: 'fresh-token' }));
+      expect(row.oauth_credentials).toMatch(/^zclaudia:v1:/);
+      expect(row.oauth_credentials).not.toContain('fresh-token');
+      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(expect.objectContaining({ accessToken: 'fresh-token' }));
     });
 
     it('returns cached inventory details with tool risk metadata after refresh', async () => {
@@ -409,7 +419,10 @@ describe('mcp-servers routes', () => {
       expect(callback.text).toContain('MCP authentication complete');
 
       const row = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?').get('remote') as { oauth_credentials: string };
-      expect(JSON.parse(row.oauth_credentials)).toEqual(expect.objectContaining({
+      expect(row.oauth_credentials).toMatch(/^zclaudia:v1:/);
+      expect(row.oauth_credentials).not.toContain('access-token');
+      expect(row.oauth_credentials).not.toContain('refresh-token');
+      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(expect.objectContaining({
         accessToken: 'access-token',
         refreshToken: 'refresh-token',
         tokenType: 'Bearer',
@@ -468,7 +481,9 @@ describe('mcp-servers routes', () => {
       expect(status.body.data.state).toBe('success');
 
       const row = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE name = ?').get('remote') as { oauth_credentials: string };
-      expect(JSON.parse(row.oauth_credentials)).toEqual(expect.objectContaining({
+      expect(row.oauth_credentials).toMatch(/^zclaudia:v1:/);
+      expect(row.oauth_credentials).not.toContain('device-access-token');
+      expect(unprotectMcpOAuthCredentials(row.oauth_credentials)).toEqual(expect.objectContaining({
         accessToken: 'device-access-token',
         tokenType: 'Bearer',
       }));

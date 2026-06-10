@@ -7,13 +7,15 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../services/api';
-import type { WorkspaceSkillInfo } from '../../services/api';
+import type { SkillLoadDiagnostic, WorkspaceSkillInfo } from '../../services/api';
 
 export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boolean }) {
   const [skills, setSkills] = useState<WorkspaceSkillInfo[]>([]);
+  const [diagnostics, setDiagnostics] = useState<SkillLoadDiagnostic[]>([]);
   const [externalDirs, setExternalDirs] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Skill editor state
   const [editingSkillId, setEditingSkillId] = useState<string | null>(null);
@@ -32,11 +34,12 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
     setIsLoading(true);
     setError(null);
     try {
-      const [skillList, dirs] = await Promise.all([
-        api.getWorkspaceSkills(),
+      const [skillResult, dirs] = await Promise.all([
+        api.getWorkspaceSkillsResult(),
         api.getExternalSkillDirs(),
       ]);
-      setSkills(skillList);
+      setSkills(skillResult.skills);
+      setDiagnostics(skillResult.diagnostics);
       setExternalDirs(dirs);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load skills');
@@ -137,6 +140,26 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
 
   const workspaceSkillCount = skills.filter((skill) => (skill.source ?? 'workspace') === 'workspace').length;
   const externalSkillCount = skills.length - workspaceSkillCount;
+  const filteredSkills = skills.filter((skill) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const haystack = [
+      skill.id,
+      skill.name,
+      skill.description,
+      skill.source ?? 'workspace',
+      skill.metadata?.whenToUse,
+      skill.metadata?.argumentHint,
+      ...(skill.metadata?.allowedTools ?? []),
+      ...(skill.metadata?.paths ?? []),
+      ...(skill.metadata?.arguments ?? []),
+      ...(skill.metadata?.snippets ?? []),
+      ...(skill.metadata?.shellSnippets ?? []),
+      ...(skill.metadata?.hookTriggers?.tools ?? []),
+      ...(skill.metadata?.hookTriggers?.paths ?? []),
+    ].filter(Boolean).join(' ').toLowerCase();
+    return haystack.includes(query);
+  });
 
   // Editing a skill — full-screen editor
   if (editingSkillId && !readOnly) {
@@ -193,8 +216,9 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
           <input
             type="text"
             placeholder="Search skills..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-secondary/50 border border-border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-            disabled
           />
         </div>
         {!readOnly && (
@@ -228,6 +252,25 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
           <p className="text-red-400 text-sm">{error}</p>
           <button onClick={() => setError(null)} className="text-xs text-red-400/70 hover:text-red-400 mt-1">dismiss</button>
+        </div>
+      )}
+
+      {diagnostics.length > 0 && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-amber-300 text-sm font-medium">Skill diagnostics</p>
+            <span className="text-xs text-amber-300/70">{diagnostics.length}</span>
+          </div>
+          <div className="space-y-1">
+            {diagnostics.slice(0, 4).map((diagnostic, index) => (
+              <div key={`${diagnostic.path}:${diagnostic.code}:${index}`} className="text-xs text-amber-100/90">
+                <span className="font-medium">{diagnostic.code}</span>
+                <span className="text-amber-100/60"> ({diagnostic.source}) </span>
+                <span>{diagnostic.message}</span>
+                <div className="font-mono text-amber-100/50 truncate">{diagnostic.path}</div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -286,14 +329,24 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
           <p className="text-muted-foreground text-sm">No skills configured</p>
           <p className="text-muted-foreground/70 text-xs mt-1">Add a skill or configure an external directory</p>
         </div>
+      ) : filteredSkills.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground text-sm">No skills match "{searchQuery}"</p>
+        </div>
       ) : (
         <div className="space-y-2">
-          {skills.map(skill => {
+          {filteredSkills.map(skill => {
             const skillId = skill.id;
             const source = skill.source ?? 'workspace';
             const isWorkspace = source === 'workspace';
             const displayName = skill.name || skillId;
             const displayDesc = skill.description || '';
+            const isEligible = skill.eligible !== false;
+            const requirementSummary = [
+              skill.requirements?.os?.length ? `os: ${skill.requirements.os.join(', ')}` : '',
+              skill.requirements?.binaries?.length ? `bin: ${skill.requirements.binaries.join(', ')}` : '',
+              skill.requirements?.env?.length ? `env: ${skill.requirements.env.join(', ')}` : '',
+            ].filter(Boolean).join(' | ');
 
             return (
               <div
@@ -304,7 +357,7 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-sm truncate">{displayName}</span>
                     <span className="px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-green-500/20 text-green-400">
-                      Discoverable
+                      {isEligible ? 'Eligible' : 'Blocked'}
                     </span>
                     <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium ${
                       isWorkspace ? 'bg-blue-500/10 text-blue-400' : 'bg-purple-500/10 text-purple-400'
@@ -313,6 +366,58 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">{displayDesc}</p>
+                  {skill.metadata?.whenToUse && (
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">When: {skill.metadata.whenToUse}</p>
+                  )}
+                  {(skill.metadata?.allowedTools?.length || skill.metadata?.paths?.length || skill.metadata?.arguments?.length || skill.metadata?.argumentHint || skill.metadata?.snippets?.length || skill.metadata?.shellSnippets?.length || skill.metadata?.hookTriggers?.tools?.length || skill.metadata?.hookTriggers?.paths?.length || requirementSummary) && (
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {skill.metadata?.argumentHint && (
+                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary">
+                          args {skill.metadata.argumentHint}
+                        </span>
+                      )}
+                      {skill.metadata?.arguments?.length && !skill.metadata.argumentHint ? (
+                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary">
+                          args {skill.metadata.arguments.join(' ')}
+                        </span>
+                      ) : null}
+                      {skill.metadata?.allowedTools?.map((tool) => (
+                        <span key={`tool:${tool}`} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground">
+                          {tool}
+                        </span>
+                      ))}
+                      {skill.metadata?.paths?.map((skillPath) => (
+                        <span key={`path:${skillPath}`} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground font-mono">
+                          {skillPath}
+                        </span>
+                      ))}
+                      {skill.metadata?.snippets?.map((snippet) => (
+                        <span key={`snippet:${snippet}`} className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary">
+                          snippet {snippet}
+                        </span>
+                      ))}
+                      {skill.metadata?.shellSnippets?.map((snippet) => (
+                        <span key={`shell:${snippet}`} className="px-1.5 py-0.5 rounded bg-secondary text-[10px] text-muted-foreground font-mono">
+                          shell {snippet}
+                        </span>
+                      ))}
+                      {skill.metadata?.hookTriggers?.tools?.map((tool) => (
+                        <span key={`hook-tool:${tool}`} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300">
+                          hook tool {tool}
+                        </span>
+                      ))}
+                      {skill.metadata?.hookTriggers?.paths?.map((skillPath) => (
+                        <span key={`hook-path:${skillPath}`} className="px-1.5 py-0.5 rounded bg-purple-500/10 text-[10px] text-purple-300 font-mono">
+                          hook path {skillPath}
+                        </span>
+                      ))}
+                      {requirementSummary && (
+                        <span className="px-1.5 py-0.5 rounded bg-amber-500/10 text-[10px] text-amber-300">
+                          requires {requirementSummary}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <p className="text-xs text-muted-foreground/50 font-mono mt-0.5">{source}/{skillId}</p>
                 </div>
                 {!readOnly && isWorkspace && (

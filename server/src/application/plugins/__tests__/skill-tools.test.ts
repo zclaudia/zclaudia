@@ -12,6 +12,9 @@ import {
   loadDiscoveredSkillContent,
   addPluginSkills,
   setDatabase,
+  activateConditionalSkillsForPaths,
+  activateConditionalSkillsForToolNames,
+  recordSkillUsage,
 } from '../skill-tools.js';
 import { createExecutionEnv } from '../../../infra/execution-env.js';
 import { workspaceService } from '../../services/workspace.js';
@@ -145,6 +148,66 @@ describe('skill-tools (pi-backed)', () => {
     }
   });
 
+  it('keeps path-conditional skills out of eligible catalog until a matching path activates them', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'frontend-review',
+      'name: frontend-review\ndescription: frontend checks\npaths:\n  - src/frontend/**',
+    );
+    writeSkill(WORKSPACE_SKILLS_DIR, 'always-on', 'name: always-on\ndescription: always');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    expect(getDiscoveredSkills().map((skill) => skill.id).sort()).toEqual(['always-on', 'frontend-review']);
+    expect(getEligibleDiscoveredSkills().map((skill) => skill.id)).toEqual(['always-on']);
+
+    const activated = activateConditionalSkillsForPaths(['/repo/src/frontend/App.tsx'], '/repo');
+
+    expect(activated).toEqual(['frontend-review']);
+    expect(getEligibleDiscoveredSkills().map((skill) => skill.id).sort()).toEqual(['always-on', 'frontend-review']);
+  });
+
+  it('keeps hook-triggered skills out of eligible catalog until a matching tool activates them', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'bash-helper',
+      [
+        'name: bash-helper',
+        'description: bash guidance',
+        'hook_triggers:',
+        '  tools: [Bash]',
+      ].join('\n'),
+    );
+    writeSkill(WORKSPACE_SKILLS_DIR, 'always-on', 'name: always-on\ndescription: always');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    expect(getEligibleDiscoveredSkills().map((skill) => skill.id)).toEqual(['always-on']);
+
+    const activated = activateConditionalSkillsForToolNames(['Read', 'Bash']);
+
+    expect(activated).toEqual(['bash-helper']);
+    expect(getEligibleDiscoveredSkills().map((skill) => skill.id).sort()).toEqual(['always-on', 'bash-helper']);
+  });
+
+  it('tracks skill usage and ranks discovered skills by frequent recent use', async () => {
+    writeSkill(WORKSPACE_SKILLS_DIR, 'alpha', 'name: alpha\ndescription: first');
+    writeSkill(WORKSPACE_SKILLS_DIR, 'beta', 'name: beta\ndescription: second');
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    recordSkillUsage({ source: 'workspace', id: 'alpha' }, 1000);
+    recordSkillUsage({ source: 'workspace', id: 'beta' }, 2000);
+    recordSkillUsage({ source: 'workspace', id: 'beta' }, 3000);
+
+    const discovered = getDiscoveredSkills();
+
+    expect(discovered.map((skill) => skill.id)).toEqual(['beta', 'alpha']);
+    expect(discovered[0].usage).toEqual({ count: 2, lastUsedAt: 3000 });
+    expect(discovered[1].usage).toEqual({ count: 1, lastUsedAt: 1000 });
+    expect(getEligibleDiscoveredSkills().map((skill) => skill.id)).toEqual(['beta', 'alpha']);
+  });
+
   it('projects nested skill execution metadata from SKILL.md frontmatter', async () => {
     writeSkill(
       WORKSPACE_SKILLS_DIR,
@@ -168,6 +231,49 @@ describe('skill-tools (pi-backed)', () => {
       defaultMode: 'fork',
       forkToolPolicy: 'web',
     });
+  });
+
+  it('projects requirements, eligibility, and richer metadata into discovered skills', async () => {
+    writeSkill(
+      WORKSPACE_SKILLS_DIR,
+      'rich',
+      [
+        'name: rich',
+        'description: rich skill',
+        'when_to_use: Use for rich work',
+        'allowed_tools: [Read, Grep]',
+        'paths: src/**, docs/**',
+        'snippets: Review carefully, Prefer focused diffs',
+        'shell_snippets:',
+        '  - pnpm test',
+        'hook_triggers:',
+        '  tools: [Bash]',
+        '  paths: [src/**]',
+        'user_invocable: false',
+        'requires:',
+        '  os:',
+        '    - win32',
+      ].join('\n'),
+    );
+    const env = createExecutionEnv(tmpRoot);
+    await loadAndCacheSkills(env);
+
+    expect(getDiscoveredSkills()[0]).toEqual(expect.objectContaining({
+      requirements: { os: ['win32'] },
+      eligible: process.platform === 'win32',
+      metadata: {
+        whenToUse: 'Use for rich work',
+        allowedTools: ['Read', 'Grep'],
+        paths: ['src/**', 'docs/**'],
+        snippets: ['Review carefully', 'Prefer focused diffs'],
+        shellSnippets: ['pnpm test'],
+        hookTriggers: {
+          tools: ['Bash'],
+          paths: ['src/**'],
+        },
+        userInvocable: false,
+      },
+    }));
   });
 
   it('projects flat skill execution metadata aliases and ignores invalid metadata', async () => {

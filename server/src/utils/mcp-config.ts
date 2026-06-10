@@ -2,10 +2,11 @@ import type Database from 'better-sqlite3';
 import type { McpOAuthConfig, McpOAuthCredentials, McpServerTransport } from '@zclaudia/shared/core/mcp';
 import {
   normalizeMcpHeaders,
+  normalizeMcpHeadersHelper,
   normalizeMcpOAuthConfig,
-  normalizeMcpOAuthCredentials,
   normalizeMcpServerTransport,
 } from '@zclaudia/shared/core/mcp';
+import { unprotectMcpOAuthCredentials } from '../infra/services/mcp-oauth-credential-protector.js';
 
 export interface McpStdioServerConfig {
   type?: 'stdio';
@@ -20,6 +21,7 @@ export interface McpRemoteServerConfig {
   command: string;
   url: string;
   headers?: Record<string, string>;
+  headersHelper?: string;
   oauthConfig?: McpOAuthConfig;
   oauthCredentials?: McpOAuthCredentials;
   onOAuthCredentials?: (credentials: McpOAuthCredentials | null) => void | Promise<void>;
@@ -36,6 +38,7 @@ interface McpServerRow {
   transport?: string | null;
   url?: string | null;
   headers?: string | null;
+  headers_helper?: string | null;
   oauth_config?: string | null;
   oauth_credentials?: string | null;
 }
@@ -49,7 +52,7 @@ export function loadMcpServersFromDb(
 ): Record<string, McpServerRuntimeConfig> {
   const rows = db.prepare(
     `SELECT name, command, args, env, provider_scope,
-            transport, url, headers, oauth_config, oauth_credentials
+            transport, url, headers, headers_helper, oauth_config, oauth_credentials
      FROM mcp_servers WHERE enabled = 1`
   ).all() as McpServerRow[];
 
@@ -73,8 +76,9 @@ export function loadMcpServersFromDb(
         command: row.command,
         url: row.url,
         ...(row.headers && { headers: normalizeMcpHeaders(JSON.parse(row.headers)) }),
+        ...(normalizeMcpHeadersHelper(row.headers_helper) && { headersHelper: normalizeMcpHeadersHelper(row.headers_helper) }),
         ...(row.oauth_config && { oauthConfig: normalizeMcpOAuthConfig(JSON.parse(row.oauth_config)) }),
-        ...(row.oauth_credentials && { oauthCredentials: normalizeMcpOAuthCredentials(JSON.parse(row.oauth_credentials)) }),
+        ...(row.oauth_credentials && { oauthCredentials: unprotectMcpOAuthCredentials(row.oauth_credentials) }),
       };
     } else {
       servers[row.name] = {

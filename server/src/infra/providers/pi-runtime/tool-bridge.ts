@@ -20,6 +20,7 @@ import { normalizeTodoItems } from '../../../application/conversation/interactio
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import { activateConditionalSkillsForPaths, activateConditionalSkillsForToolNames } from '../../../application/plugins/skill-tools.js';
 import { loadMcpServersFromDb } from '../../../utils/mcp-config.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import type { PermissionCallback } from '../types.js';
@@ -54,6 +55,30 @@ function toolParams(first: unknown, second: unknown): Record<string, unknown> {
   return candidate && typeof candidate === 'object'
     ? candidate as Record<string, unknown>
     : {};
+}
+
+function extractSkillActivationPaths(toolName: ToolName, params: Record<string, unknown>): string[] {
+  const value = (() => {
+    if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit') return params.path ?? params.file_path;
+    if (toolName === 'Grep' || toolName === 'Glob' || toolName === 'LS' || toolName === 'Find') return params.path;
+    return undefined;
+  })();
+  return typeof value === 'string' && value.trim() ? [value.trim()] : [];
+}
+
+function withConditionalSkillActivation(tool: AgentTool<any>, name: ToolName, cwd: string): AgentTool<any> {
+  const originalExecute = tool.execute;
+  if (!originalExecute) return tool;
+  return {
+    ...tool,
+    execute: async (toolCallId: string, params: unknown) => {
+      const result = await originalExecute(toolCallId, params);
+      const paths = extractSkillActivationPaths(name, toolParams(toolCallId, params));
+      if (paths.length > 0) activateConditionalSkillsForPaths(paths, cwd);
+      activateConditionalSkillsForToolNames([name]);
+      return result;
+    },
+  } as AgentTool<any>;
 }
 
 function truncateText(value: string, limit = 80_000): string {
@@ -1298,9 +1323,9 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
     }
     const override = overrides.get(name);
     if (override) {
-      result.push(withToolName(override, name, override.label ?? name));
+      result.push(withConditionalSkillActivation(withToolName(override, name, override.label ?? name), name, cwd));
     } else {
-      result.push(TOOL_FACTORIES[name](cwd, options));
+      result.push(withConditionalSkillActivation(TOOL_FACTORIES[name](cwd, options), name, cwd));
     }
   }
 

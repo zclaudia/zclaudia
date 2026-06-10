@@ -6,6 +6,7 @@ import type { SlashCommand, FileEntry } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChatStore, type SessionDraft } from '../../stores/chatStore';
+import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
 
 export interface Attachment {
   id: string;
@@ -44,6 +45,22 @@ interface MentionState {
   isLoading: boolean;
   hasError: boolean;
 }
+
+type SlashSuggestion =
+  | {
+      type: 'command';
+      value: string;
+      description: string;
+    }
+  | {
+      type: 'skill';
+      value: string;
+      description: string;
+      argumentHint?: string;
+      usageCount?: number;
+      source: string;
+      mode?: string;
+    };
 
 const initialMentionState: MentionState = {
   isActive: false,
@@ -110,6 +127,7 @@ export function MessageInput({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showCommands, setShowCommands] = useState(false);
   const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
+  const [workspaceSkills, setWorkspaceSkills] = useState<WorkspaceSkillInfo[]>([]);
   const [mentionState, setMentionState] = useState<MentionState>(initialMentionState);
   const [isComposing, setIsComposing] = useState(false); // Track IME composition state
   const [availableViewportHeight, setAvailableViewportHeight] = useState(getAvailableViewportHeight);
@@ -222,15 +240,54 @@ export function MessageInput({
     };
   }, [getAvailableViewportHeight]);
 
+  const loadWorkspaceSkills = useCallback(async () => {
+    try {
+      const result = await api.getWorkspaceSkillsResult();
+      setWorkspaceSkills(result.skills ?? []);
+    } catch {
+      setWorkspaceSkills([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    api.getWorkspaceSkillsResult()
+      .then((result) => {
+        if (!cancelled) setWorkspaceSkills(result.skills ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setWorkspaceSkills([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Filter commands based on input (memoized to avoid O(n) filter on every render)
-  const filteredCommands = useMemo(
-    () => value.startsWith('/')
-      ? commands.filter((cmd) =>
-          cmd.command.toLowerCase().startsWith(value.toLowerCase())
-        )
-      : [],
-    [value, commands]
-  );
+  const slashSuggestions = useMemo<SlashSuggestion[]>(() => {
+    if (!value.startsWith('/') || value.includes(' ')) return [];
+    const query = value.toLowerCase();
+    const commandSuggestions: SlashSuggestion[] = commands
+      .filter((cmd) => cmd.command.toLowerCase().startsWith(query))
+      .map((cmd) => ({
+        type: 'command',
+        value: cmd.command,
+        description: cmd.description,
+      }));
+    const skillSuggestions: SlashSuggestion[] = workspaceSkills
+      .filter((skill) => skill.eligible !== false && skill.metadata?.userInvocable !== false)
+      .filter((skill) => `/${skill.id}`.toLowerCase().startsWith(query))
+      .map((skill) => ({
+        type: 'skill',
+        value: `/${skill.id}`,
+        description: skill.metadata?.whenToUse || skill.description,
+        argumentHint: skill.metadata?.argumentHint || skill.metadata?.arguments?.join(' '),
+        usageCount: skill.usage?.count,
+        source: skill.source ?? 'workspace',
+        mode: skill.execution?.defaultMode,
+      }));
+    return [...skillSuggestions, ...commandSuggestions];
+  }, [value, commands, workspaceSkills]);
 
   // Detect @ mention in text
   const detectMention = useCallback((text: string, cursorPos: number): { triggerIndex: number; query: string } | null => {
@@ -351,13 +408,13 @@ export function MessageInput({
 
   // Show/hide command suggestions
   useEffect(() => {
-    if (value.startsWith('/') && filteredCommands.length > 0 && !value.includes(' ')) {
+    if (value.startsWith('/') && slashSuggestions.length > 0 && !value.includes(' ')) {
       setShowCommands(true);
       setSelectedCommandIndex(0);
     } else {
       setShowCommands(false);
     }
-  }, [value, filteredCommands.length]);
+  }, [value, slashSuggestions.length]);
 
   // Scroll selected command into view
   useEffect(() => {
@@ -546,7 +603,7 @@ export function MessageInput({
       if (e.key === 'ArrowDown' || ((e.ctrlKey || e.metaKey) && e.key === 'n')) {
         e.preventDefault();
         setSelectedCommandIndex((prev) =>
-          prev < filteredCommands.length - 1 ? prev + 1 : 0
+          prev < slashSuggestions.length - 1 ? prev + 1 : 0
         );
         return;
       }
@@ -554,15 +611,15 @@ export function MessageInput({
       if (e.key === 'ArrowUp' || ((e.ctrlKey || e.metaKey) && e.key === 'p')) {
         e.preventDefault();
         setSelectedCommandIndex((prev) =>
-          prev > 0 ? prev - 1 : filteredCommands.length - 1
+          prev > 0 ? prev - 1 : slashSuggestions.length - 1
         );
         return;
       }
       if (e.key === 'Tab' || e.key === 'Enter') {
         e.preventDefault();
-        const selectedCommand = filteredCommands[selectedCommandIndex];
-        if (selectedCommand) {
-          updateValue(selectedCommand.command + ' ');
+        const selectedSuggestion = slashSuggestions[selectedCommandIndex];
+        if (selectedSuggestion) {
+          updateValue(selectedSuggestion.value + ' ');
           setShowCommands(false);
         }
         return;
@@ -734,6 +791,9 @@ export function MessageInput({
       lastSubmissionRef.current = { key: submissionKey, at: Date.now() };
       clearDraftPersistence();
       onSend(trimmedValue, attachments.length > 0 ? attachments : undefined);
+      if (trimmedValue.startsWith('/')) {
+        void loadWorkspaceSkills();
+      }
       setValue('');
       clearDraft(sessionId);
       setAttachments([]);
@@ -741,8 +801,8 @@ export function MessageInput({
     }
   };
 
-  const selectCommand = (command: string) => {
-    updateValue(command + ' ');
+  const selectSlashSuggestion = (suggestion: SlashSuggestion) => {
+    updateValue(suggestion.value + ' ');
     setShowCommands(false);
     textareaRef.current?.focus();
   };
@@ -755,16 +815,34 @@ export function MessageInput({
           ref={commandListRef}
           className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-lg shadow-lg overflow-y-auto max-h-64 z-10"
         >
-          {filteredCommands.map((cmd, index) => (
+          {slashSuggestions.map((suggestion, index) => (
             <button
-              key={cmd.command}
-              onClick={() => selectCommand(cmd.command)}
+              key={`${suggestion.type}:${suggestion.value}`}
+              onClick={() => selectSlashSuggestion(suggestion)}
               className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-muted ${
                 index === selectedCommandIndex ? 'bg-muted' : ''
               }`}
             >
-              <span className="font-mono text-primary">{cmd.command}</span>
-              <span className="text-muted-foreground text-sm">{cmd.description}</span>
+              <span className="font-mono text-primary">{suggestion.value}</span>
+              <span className="text-muted-foreground text-sm truncate">{suggestion.description}</span>
+              {suggestion.type === 'skill' && (
+                <>
+                  {suggestion.argumentHint && (
+                    <span className="ml-auto text-xs text-muted-foreground font-mono">{suggestion.argumentHint}</span>
+                  )}
+                  <span className="text-[10px] uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                    skill{suggestion.usageCount ? ` · ${suggestion.usageCount}` : ''}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                    {suggestion.source}
+                  </span>
+                  {suggestion.mode && (
+                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                      {suggestion.mode}
+                    </span>
+                  )}
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -1065,7 +1143,7 @@ export function MessageInput({
       {/* Hint text — hidden on mobile to save space */}
       {!isMobile && (
         <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Type / for commands{projectRoot ? ', @ to reference files' : ''}</span>
+          <span>Type / for commands and skills{projectRoot ? ', @ to reference files' : ''}</span>
           <span>
             {advancedMode
               ? `${isMac ? 'Cmd' : 'Ctrl'}+Enter to send, Tab to indent`

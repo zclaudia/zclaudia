@@ -1,3 +1,4 @@
+import type { ApiResponse } from '@zclaudia/shared';
 import { fetchLocalApi } from './base';
 export interface WorkspaceSkillInfo {
   id: string;
@@ -5,12 +6,64 @@ export interface WorkspaceSkillInfo {
   description: string;
   path: string;
   source?: 'workspace' | 'external' | 'plugin';
+  eligible?: boolean;
+  requirements?: {
+    binaries?: string[];
+    env?: string[];
+    os?: string[];
+  };
+  metadata?: {
+    whenToUse?: string;
+    allowedTools?: string[];
+    paths?: string[];
+    arguments?: string[];
+    argumentHint?: string;
+    snippets?: string[];
+    shellSnippets?: string[];
+    hookTriggers?: {
+      tools?: string[];
+      paths?: string[];
+    };
+    userInvocable?: boolean;
+  };
+  execution?: {
+    allowedModes?: string[];
+    defaultMode?: string;
+    forkToolPolicy?: string;
+  };
+  usage?: {
+    count: number;
+    lastUsedAt: number;
+  };
+}
+
+export interface SkillLoadDiagnostic {
+  type: 'warning' | 'error';
+  code: string;
+  message: string;
+  path: string;
+  source: 'workspace' | 'external' | 'plugin';
+}
+
+export interface WorkspaceSkillsResult {
+  skills: WorkspaceSkillInfo[];
+  diagnostics: SkillLoadDiagnostic[];
 }
 
 export async function getWorkspaceSkills(): Promise<WorkspaceSkillInfo[]> {
-  const result = await fetchLocalApi<WorkspaceSkillInfo[]>('/api/workspace/skills');
+  const result = await getWorkspaceSkillsResult();
+  return result.skills;
+}
+
+export async function getWorkspaceSkillsResult(): Promise<WorkspaceSkillsResult> {
+  const result = await fetchLocalApi<WorkspaceSkillInfo[]>('/api/workspace/skills') as ApiResponse<WorkspaceSkillInfo[]> & {
+    diagnostics?: SkillLoadDiagnostic[];
+  };
   if (!result.success || !result.data) throw new Error(result.error?.message || 'Failed to load workspace skills');
-  return result.data;
+  return {
+    skills: result.data,
+    diagnostics: result.diagnostics ?? [],
+  };
 }
 
 export async function getWorkspaceSkill(skillId: string): Promise<{ id: string; content: string }> {

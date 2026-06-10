@@ -1,4 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import Database from 'better-sqlite3';
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
@@ -23,9 +26,17 @@ function createDb(): Database.Database {
 const NULL_JSON = null;
 
 describe('external progressive tools', () => {
+  const tempDirs: string[] = [];
+
   afterEach(() => {
     vi.restoreAllMocks();
     mcpInventoryCache.invalidate();
+    delete process.env.ZCLAUDIA_MCP_MAX_OUTPUT_CHARS;
+    delete process.env.ZCLAUDIA_MCP_OUTPUT_DIR;
+  });
+
+  afterEach(async () => {
+    await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
   });
 
   it('loads a concrete MCP tool with the inspected description and input schema', async () => {
@@ -240,6 +251,127 @@ describe('external progressive tools', () => {
       }),
     }));
     expect(result.content[0].text).toContain('Denied by MCP trust policy');
+  });
+
+  it('truncates oversized MCP text tool output before returning it to the model', async () => {
+    process.env.ZCLAUDIA_MCP_MAX_OUTPUT_CHARS = '16';
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      {
+        name: 'dump_logs',
+        description: 'Dump logs',
+        inputSchema: { type: 'object' },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+      } as any,
+    ]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'callTool').mockResolvedValue({
+      content: [{ type: 'text', text: 'abcdefghijklmnopqrstuvwxyz' }],
+      isError: false,
+    } as any);
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const toolsArray: AgentTool<any>[] = [];
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
+    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+
+    await load.execute('load-dump-logs', {
+      ref: { source: 'mcp', server: 'github', tool: 'dump_logs' },
+    });
+    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__dump_logs')!;
+    const result = await concrete.execute('call-dump-logs', {});
+
+    expect(result.content[0].text).toContain('abcdefghijklmnop\n\n[OUTPUT TRUNCATED: MCP text result exceeded 16 characters]');
+    expect(result.details).toEqual(expect.objectContaining({
+      outputTruncated: true,
+      originalOutputChars: 26,
+    }));
+  });
+
+  it('persists full oversized MCP text output to disk and returns the saved path', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'zclaudia-mcp-output-'));
+    tempDirs.push(outputDir);
+    process.env.ZCLAUDIA_MCP_OUTPUT_DIR = outputDir;
+    process.env.ZCLAUDIA_MCP_MAX_OUTPUT_CHARS = '16';
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([
+      {
+        name: 'dump_logs',
+        description: 'Dump logs',
+        inputSchema: { type: 'object' },
+        annotations: { readOnlyHint: true, openWorldHint: false },
+      } as any,
+    ]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'callTool').mockResolvedValue({
+      content: [{ type: 'text', text: 'abcdefghijklmnopqrstuvwxyz' }],
+      isError: false,
+    } as any);
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const toolsArray: AgentTool<any>[] = [];
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray });
+    const load = metaTools.find((tool) => tool.name === 'LoadExternalTool')!;
+
+    await load.execute('load-dump-logs', {
+      ref: { source: 'mcp', server: 'github', tool: 'dump_logs' },
+    });
+    const concrete = toolsArray.find((tool) => tool.name === 'mcp__github__dump_logs')!;
+    const result = await concrete.execute('call-dump-logs', {});
+
+    expect(result.details).toEqual(expect.objectContaining({
+      outputPersisted: true,
+      outputFiles: [expect.stringMatching(/dump_logs-\d+-0\.txt$/)],
+    }));
+    const savedPath = (result.details.outputFiles as string[])[0];
+    expect(savedPath.startsWith(outputDir)).toBe(true);
+    expect(await readFile(savedPath, 'utf8')).toBe('abcdefghijklmnopqrstuvwxyz');
+    expect(result.content[0].text).toContain(`Full output saved to ${savedPath}`);
+  });
+
+  it('persists MCP resource binary blobs to disk instead of returning base64 content', async () => {
+    const outputDir = await mkdtemp(path.join(tmpdir(), 'zclaudia-mcp-output-'));
+    tempDirs.push(outputDir);
+    process.env.ZCLAUDIA_MCP_OUTPUT_DIR = outputDir;
+    vi.spyOn(mcpClientManager, 'listTools').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'listResources').mockResolvedValue([
+      { uri: 'file://report.pdf', name: 'report.pdf', mimeType: 'application/pdf' },
+    ]);
+    vi.spyOn(mcpClientManager, 'listPrompts').mockResolvedValue([]);
+    vi.spyOn(mcpClientManager, 'readResource').mockResolvedValue({
+      contents: [{
+        uri: 'file://report.pdf',
+        mimeType: 'application/pdf',
+        blob: Buffer.from('%PDF data').toString('base64'),
+      }],
+    });
+    const state: ExternalToolRuntimeState = {
+      discoverableProviders: [{ source: 'mcp', serverId: 'github' }],
+      pinnedExternalTools: [],
+      loadedExternalTools: [],
+    };
+    const metaTools = buildExternalMetaTools({ db: createDb(), state, toolsArray: [] });
+    const read = metaTools.find((tool) => tool.name === 'ReadExternalResource')!;
+
+    const result = await read.execute('read-binary-resource', {
+      ref: { source: 'mcp-resource', server: 'github', uri: 'file://report.pdf' },
+    });
+
+    expect(result.content[0].text).toMatch(/^Binary content \(application\/pdf, 9 bytes\) saved to /);
+    expect(result.content[0].text).not.toContain(Buffer.from('%PDF data').toString('base64'));
+    expect(result.details).toEqual(expect.objectContaining({
+      outputPersisted: true,
+      outputFiles: [expect.stringMatching(/report\.pdf-\d+-0\.pdf$/)],
+    }));
+    const savedPath = (result.details.outputFiles as string[])[0];
+    expect(savedPath.startsWith(outputDir)).toBe(true);
+    expect(await readFile(savedPath, 'utf8')).toBe('%PDF data');
   });
 
   it('discovers authenticate pseudo-tool for MCP servers that need auth', async () => {

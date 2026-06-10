@@ -125,7 +125,7 @@ async function main() {
     }
 
     // Load workspace + external skills into the shared skill cache.
-    const { setDatabase: setSkillDb, loadAndCacheSkills } = await import('./application/plugins/skill-tools.js');
+    const { setDatabase: setSkillDb, loadAndCacheSkills, getSkillWatchDirs } = await import('./application/plugins/skill-tools.js');
     const { createExecutionEnv } = await import('./infra/execution-env.js');
     setSkillDb(serverContext.db);
     const skillEnv = createExecutionEnv(process.cwd());
@@ -141,6 +141,20 @@ async function main() {
     if (pluginSkillCount > 0) {
       console.log(`   Registered ${pluginSkillCount} plugin skill(s)`);
     }
+
+    const { startSkillChangeWatcher } = await import('./application/plugins/skill-change-watcher.js');
+    const skillWatcher = startSkillChangeWatcher({
+      watchPaths: [
+        ...getSkillWatchDirs(),
+        ...pluginLoader.getPluginSkillDirs().map((dir) => dir.path),
+      ],
+      refresh: async () => {
+        const { refreshSkillCache } = await import('./application/plugins/skill-tools.js');
+        const { pluginSkillReloader } = await import('./application/plugins/skill-bootstrap.js');
+        const count = await refreshSkillCache(skillEnv, pluginSkillReloader(pluginLoader));
+        console.log(`[SkillWatcher] refreshed ${count} skill(s)`);
+      },
+    });
 
     server.listen(PORT, HOST, async () => {
       const actualPort = (server.address() as import('net').AddressInfo).port;
@@ -205,6 +219,7 @@ async function main() {
 
       // Deactivate all plugins (cleanup schedulers, event listeners, etc.)
       await pluginLoader.deactivateAll();
+      skillWatcher.stop();
 
       // Stop all managed provider sub-processes
       await shutdownProviders();

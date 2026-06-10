@@ -44,6 +44,7 @@ export class McpInventoryCache {
       env: Object.entries('env' in config ? config.env ?? {} : {}).sort(([a], [b]) => a.localeCompare(b)),
       url: 'url' in config ? config.url : undefined,
       headers: Object.entries('headers' in config ? config.headers ?? {} : {}).sort(([a], [b]) => a.localeCompare(b)),
+      headersHelper: 'headersHelper' in config ? config.headersHelper : undefined,
       oauthConfig: 'oauthConfig' in config ? config.oauthConfig : undefined,
       oauthCredentials: 'oauthCredentials' in config ? config.oauthCredentials : undefined,
     });

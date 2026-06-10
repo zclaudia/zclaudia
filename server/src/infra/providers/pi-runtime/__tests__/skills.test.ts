@@ -4,15 +4,19 @@ import {
   buildSkillCatalog,
   buildSkillMetaTools,
   createSkillRuntimeState,
+  executePreparedDirectSkillInvocation,
+  prepareDirectSkillInvocation,
   resolveSkillExecutionPolicy,
 } from '../skills.js';
 
-const { loadDiscoveredSkillContentMock } = vi.hoisted(() => ({
+const { loadDiscoveredSkillContentMock, recordSkillUsageMock } = vi.hoisted(() => ({
   loadDiscoveredSkillContentMock: vi.fn(),
+  recordSkillUsageMock: vi.fn(),
 }));
 
 vi.mock('../../../../application/plugins/skill-tools.js', () => ({
   loadDiscoveredSkillContent: loadDiscoveredSkillContentMock,
+  recordSkillUsage: recordSkillUsageMock,
 }));
 
 function textFrom(result: unknown): string {
@@ -27,6 +31,7 @@ function jsonFrom(result: unknown): any {
 describe('progressive skill runtime', () => {
   beforeEach(() => {
     loadDiscoveredSkillContentMock.mockReset();
+    recordSkillUsageMock.mockReset();
   });
 
   it('resolves execution policy from source defaults and heuristics', () => {
@@ -182,6 +187,11 @@ describe('progressive skill runtime', () => {
         source: 'workspace',
         filePath: '/skills/design-spec/SKILL.md',
         dirPath: '/skills/design-spec',
+        metadata: {
+          whenToUse: 'Use when writing RFCs',
+          allowedTools: ['Read'],
+          paths: ['docs/**'],
+        },
       },
       {
         id: 'reviewer',
@@ -197,12 +207,18 @@ describe('progressive skill runtime', () => {
     const catalog = buildSkillCatalog(state);
     expect(catalog).toContain('design-spec');
     expect(catalog).toContain('defaultMode=');
+    expect(catalog).toContain('Use when writing RFCs');
+    expect(catalog).toContain('docs/**');
 
     const listResult = await metaTools.find((tool) => tool.name === 'ListSkills')!.execute('list-1', {});
     expect(textFrom(listResult)).toContain('design-spec');
     expect(jsonFrom(listResult).skills[0].executionPolicy).toEqual(expect.objectContaining({
       modes: expect.any(Array),
       defaultMode: expect.any(String),
+    }));
+    expect(jsonFrom(listResult).skills[0].metadata).toEqual(expect.objectContaining({
+      whenToUse: 'Use when writing RFCs',
+      allowedTools: ['Read'],
     }));
 
     const searchResult = await metaTools.find((tool) => tool.name === 'SearchSkills')!.execute('search-1', {
@@ -211,6 +227,11 @@ describe('progressive skill runtime', () => {
     const searchText = textFrom(searchResult);
     expect(searchText).toContain('reviewer');
     expect(searchText).not.toContain('design-spec');
+
+    const metadataSearchResult = await metaTools.find((tool) => tool.name === 'SearchSkills')!.execute('search-2', {
+      query: 'RFC',
+    });
+    expect(textFrom(metadataSearchResult)).toContain('design-spec');
 
     const inspectResult = await metaTools.find((tool) => tool.name === 'InspectSkill')!.execute('inspect-1', {
       ref: { source: 'workspace', id: 'design-spec' },
@@ -284,6 +305,162 @@ describe('progressive skill runtime', () => {
     expect(state.loadedSkillContents).toEqual({});
   });
 
+  it('invokes user-facing inline skills from slash-style input with argument substitution', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Release Notes\nWrite notes for $ticket: $title\nAll args: $ARGUMENTS');
+    const state = createSkillRuntimeState([
+      {
+        id: 'release-notes',
+        name: 'release-notes',
+        description: 'Write release notes',
+        source: 'workspace',
+        filePath: '/skills/release-notes/SKILL.md',
+        dirPath: '/skills/release-notes',
+        metadata: {
+          arguments: ['ticket', 'title'],
+          argumentHint: '<ticket> <title>',
+        },
+      },
+    ]);
+    const invokeSkill = buildSkillMetaTools({ state }).find((tool) => tool.name === 'InvokeSkill')!;
+
+    const result = await invokeSkill.execute('invoke-1', {
+      input: '/release-notes ZOOM-1 "Great Feature"',
+    });
+
+    expect(jsonFrom(result)).toEqual(expect.objectContaining({
+      ok: true,
+      mode: 'inline',
+      ref: { source: 'workspace', id: 'release-notes' },
+      args: 'ZOOM-1 "Great Feature"',
+    }));
+    expect(buildActiveSkillContext(state)).toContain('Write notes for ZOOM-1: Great Feature');
+    expect(buildActiveSkillContext(state)).toContain('All args: ZOOM-1 "Great Feature"');
+  });
+
+  it('prepares chat slash skill invocation by loading context and recording usage', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Release Notes\nWrite notes for $ticket: $title');
+    const state = createSkillRuntimeState([
+      {
+        id: 'release-notes',
+        name: 'release-notes',
+        description: 'Write release notes',
+        source: 'workspace',
+        filePath: '/skills/release-notes/SKILL.md',
+        dirPath: '/skills/release-notes',
+        metadata: {
+          arguments: ['ticket', 'title'],
+          argumentHint: '<ticket> <title>',
+        },
+      },
+    ]);
+
+    const result = await prepareDirectSkillInvocation(state, '/release-notes ZOOM-1 "Great Feature"');
+
+    expect(result).toEqual(expect.objectContaining({
+      matched: true,
+      ok: true,
+      ref: { source: 'workspace', id: 'release-notes' },
+      processedInput: 'ZOOM-1 "Great Feature"',
+    }));
+    expect(buildActiveSkillContext(state)).toContain('Write notes for ZOOM-1: Great Feature');
+    expect(recordSkillUsageMock).toHaveBeenCalledWith({ source: 'workspace', id: 'release-notes' });
+  });
+
+  it('prepares and executes direct fork skill invocation without loading active context', async () => {
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Audit\nReview $target carefully.');
+    const nestedAgents: any[] = [];
+    const agentFactory = (opts: any) => {
+      let listener: ((event: any) => void) | undefined;
+      const agent = {
+        initialState: opts.initialState,
+        subscribe: (fn: (event: any) => void) => {
+          listener = fn;
+          return () => { listener = undefined; };
+        },
+        prompt: vi.fn(async () => {
+          listener?.({
+            type: 'agent_end',
+            messages: [
+              {
+                role: 'assistant',
+                content: [{ type: 'text', text: 'Fork result: reviewed auth changes.' }],
+              },
+            ],
+          });
+        }),
+      };
+      nestedAgents.push(agent);
+      return agent;
+    };
+    const state = createSkillRuntimeState([
+      {
+        id: 'security-audit',
+        name: 'security-audit',
+        description: 'Audit and report',
+        source: 'workspace',
+        filePath: '/skills/security-audit/SKILL.md',
+        dirPath: '/skills/security-audit',
+        metadata: { arguments: ['target'] },
+        execution: {
+          allowedModes: ['fork'],
+          defaultMode: 'fork',
+          forkToolPolicy: 'read-only',
+        },
+      },
+    ]);
+
+    const prepared = await prepareDirectSkillInvocation(state, '/security-audit "auth changes"');
+    expect(prepared).toEqual(expect.objectContaining({
+      matched: true,
+      ok: true,
+      mode: 'fork',
+      ref: { source: 'workspace', id: 'security-audit' },
+      task: '"auth changes"',
+      args: '"auth changes"',
+    }));
+
+    const executed = await executePreparedDirectSkillInvocation(state, prepared, {
+      cwd: '/tmp/project',
+      enabledTools: ['Read', 'Grep', 'Write'],
+      agentFactory,
+    } as any);
+
+    expect(executed).toEqual(expect.objectContaining({
+      ok: true,
+      mode: 'fork',
+      result: 'Fork result: reviewed auth changes.',
+    }));
+    expect(buildActiveSkillContext(state)).toBe('');
+    expect(nestedAgents[0].initialState.systemPrompt).toContain('Review auth changes carefully.');
+    expect(recordSkillUsageMock).toHaveBeenCalledWith({ source: 'workspace', id: 'security-audit' });
+  });
+
+  it('rejects direct invocation for model-only skills', async () => {
+    const state = createSkillRuntimeState([
+      {
+        id: 'model-only',
+        name: 'model-only',
+        description: 'Only the model can invoke this',
+        source: 'workspace',
+        filePath: '/skills/model-only/SKILL.md',
+        dirPath: '/skills/model-only',
+        metadata: { userInvocable: false },
+      },
+    ]);
+    const invokeSkill = buildSkillMetaTools({ state }).find((tool) => tool.name === 'InvokeSkill')!;
+
+    const result = await invokeSkill.execute('invoke-denied', {
+      input: '/model-only please',
+    });
+
+    expect(jsonFrom(result)).toEqual(expect.objectContaining({
+      ok: false,
+      error: 'skill_not_user_invocable',
+      ref: { source: 'workspace', id: 'model-only' },
+    }));
+    expect(state.loadedSkills).toEqual([]);
+  });
+
   it('validates RunSkill input without mutating active skill context', async () => {
     const state = createSkillRuntimeState([
       {
@@ -324,7 +501,7 @@ describe('progressive skill runtime', () => {
   });
 
   it('executes RunSkill through a forked worker with read-only tools', async () => {
-    loadDiscoveredSkillContentMock.mockResolvedValue('# Security Audit\nReview the code for auth issues.');
+    loadDiscoveredSkillContentMock.mockResolvedValue('# Security Audit\nReview $target for auth issues.');
     const nestedAgents: any[] = [];
     const agentFactory = (opts: any) => {
       let listener: ((event: any) => void) | undefined;
@@ -357,6 +534,7 @@ describe('progressive skill runtime', () => {
         source: 'external',
         filePath: '/skills/security-audit/SKILL.md',
         dirPath: '/skills/security-audit',
+        metadata: { arguments: ['target'] },
       },
     ]);
     const metaTools = buildSkillMetaTools({
@@ -371,6 +549,7 @@ describe('progressive skill runtime', () => {
     const result = await metaTools.find((tool) => tool.name === 'RunSkill')!.execute('run-3', {
       ref: { source: 'external', id: 'security-audit' },
       task: 'Check authentication changes',
+      args: '"authentication changes"',
     });
 
     expect(jsonFrom(result)).toEqual(expect.objectContaining({
@@ -384,7 +563,7 @@ describe('progressive skill runtime', () => {
     }));
     expect(loadDiscoveredSkillContentMock).toHaveBeenCalledWith({ source: 'external', id: 'security-audit' });
     expect(nestedAgents).toHaveLength(1);
-    expect(nestedAgents[0].initialState.systemPrompt).toContain('# Security Audit');
+    expect(nestedAgents[0].initialState.systemPrompt).toContain('Review authentication changes for auth issues.');
     expect(nestedAgents[0].initialState.tools.map((tool: any) => tool.name).sort()).toEqual(['Grep', 'Read']);
     expect(state.loadedSkills).toEqual([]);
     expect(state.loadedSkillContents).toEqual({});

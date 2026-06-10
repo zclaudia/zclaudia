@@ -3,7 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { createWorkspaceRoutes } from '../workspace.js';
 import { workspaceService } from '../../../application/services/workspace.js';
-import { getExternalSkillDirs, refreshSkillCache, saveExternalSkillDirs } from '../../../application/plugins/skill-tools.js';
+import { getDiscoveredSkills, getExternalSkillDirs, getSkillLoadDiagnostics, refreshSkillCache, saveExternalSkillDirs } from '../../../application/plugins/skill-tools.js';
 
 vi.mock('../../../application/services/workspace.js', () => ({
   workspaceService: {
@@ -20,6 +20,8 @@ vi.mock('../../../application/services/workspace.js', () => ({
 
 vi.mock('../../../application/plugins/skill-tools.js', () => ({
   refreshSkillCache: vi.fn(),
+  getDiscoveredSkills: vi.fn(),
+  getSkillLoadDiagnostics: vi.fn(),
   getExternalSkillDirs: vi.fn(),
   saveExternalSkillDirs: vi.fn(),
 }));
@@ -42,6 +44,8 @@ describe('workspace routes', () => {
       tools: null,
     });
     vi.mocked(workspaceService.loadSkill).mockResolvedValue('# Skill');
+    vi.mocked(getDiscoveredSkills).mockReturnValue([]);
+    vi.mocked(getSkillLoadDiagnostics).mockReturnValue([]);
     vi.mocked(getExternalSkillDirs).mockReturnValue([]);
     vi.mocked(refreshSkillCache).mockResolvedValue(0);
   });
@@ -75,6 +79,52 @@ describe('workspace routes', () => {
         message: 'Skill not found: missing-skill',
       },
     });
+  });
+
+  it('lists skills with metadata, requirements, eligibility, and diagnostics', async () => {
+    vi.mocked(getDiscoveredSkills).mockReturnValue([
+      {
+        id: 'rich',
+        name: 'rich',
+        description: 'rich skill',
+        source: 'workspace',
+        filePath: '/workspace/skills/rich/SKILL.md',
+        dirPath: '/workspace/skills/rich',
+        eligible: false,
+        requirements: { os: ['win32'] },
+        metadata: {
+          whenToUse: 'Use for rich work',
+          allowedTools: ['Read'],
+          paths: ['src/**'],
+          userInvocable: false,
+        },
+        usage: { count: 2, lastUsedAt: 3000 },
+      },
+    ] as any);
+    vi.mocked(getSkillLoadDiagnostics).mockReturnValue([
+      { type: 'warning', code: 'INVALID_SKILL', message: 'Bad skill', path: '/bad/SKILL.md', source: 'workspace' },
+    ]);
+
+    const res = await request(app).get('/api/workspace/skills');
+
+    expect(res.status).toBe(200);
+    expect(res.body.data).toEqual([
+      expect.objectContaining({
+        id: 'rich',
+        eligible: false,
+        requirements: { os: ['win32'] },
+        metadata: {
+          whenToUse: 'Use for rich work',
+          allowedTools: ['Read'],
+          paths: ['src/**'],
+          userInvocable: false,
+        },
+        usage: { count: 2, lastUsedAt: 3000 },
+      }),
+    ]);
+    expect(res.body.diagnostics).toEqual([
+      expect.objectContaining({ code: 'INVALID_SKILL', message: 'Bad skill' }),
+    ]);
   });
 
   it('returns structured 400 for invalid skill id on save', async () => {

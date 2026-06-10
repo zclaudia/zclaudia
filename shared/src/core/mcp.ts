@@ -12,6 +12,7 @@ export interface McpServerConfig {
   transport?: McpServerTransport;
   url?: string;
   headers?: Record<string, string>;
+  headersHelper?: string;
   oauthConfig?: McpOAuthConfig;
   oauthCredentials?: McpOAuthCredentials;
   enabled: boolean;
@@ -27,6 +28,7 @@ export type McpServerTransport = 'stdio' | 'streamable-http' | 'sse';
 
 export interface McpOAuthConfig {
   enabled: boolean;
+  metadataUrl?: string;
   authorizationEndpoint?: string;
   tokenEndpoint?: string;
   deviceAuthorizationEndpoint?: string;
@@ -67,6 +69,11 @@ export function normalizeMcpHeaders(value: unknown): Record<string, string> | un
   return Object.keys(headers).length > 0 ? headers : undefined;
 }
 
+export function normalizeMcpHeadersHelper(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.trim()) return undefined;
+  return value.trim();
+}
+
 export function normalizeMcpOAuthConfig(value: unknown): McpOAuthConfig | undefined {
   if (!value || typeof value !== 'object') return undefined;
   const input = value as Record<string, unknown>;
@@ -75,6 +82,7 @@ export function normalizeMcpOAuthConfig(value: unknown): McpOAuthConfig | undefi
     : undefined;
   const config: McpOAuthConfig = {
     enabled: input.enabled === true,
+    metadataUrl: normalizeUrl(input.metadataUrl),
     authorizationEndpoint: normalizeUrl(input.authorizationEndpoint),
     tokenEndpoint: normalizeUrl(input.tokenEndpoint),
     deviceAuthorizationEndpoint: normalizeUrl(input.deviceAuthorizationEndpoint),

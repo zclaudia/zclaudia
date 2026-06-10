@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MessageInput } from '../MessageInput';
 import type { SlashCommand } from '@zclaudia/shared';
 
@@ -22,8 +22,12 @@ vi.mock('../../../stores/chatStore', () => ({
 }));
 
 // Mock api
+const { mockGetWorkspaceSkillsResult } = vi.hoisted(() => ({
+  mockGetWorkspaceSkillsResult: vi.fn(),
+}));
 vi.mock('../../../services/api', () => ({
   listDirectory: vi.fn().mockResolvedValue({ entries: [] }),
+  getWorkspaceSkillsResult: mockGetWorkspaceSkillsResult,
 }));
 
 // Mock commands for testing
@@ -44,6 +48,7 @@ describe('MessageInput', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetWorkspaceSkillsResult.mockResolvedValue({ skills: [], diagnostics: [] });
   });
 
   // ── Basic rendering ─────────────────────────────────────────────────────
@@ -70,12 +75,12 @@ describe('MessageInput', () => {
 
   it('renders hint text with slash command info', () => {
     render(<MessageInput {...defaultProps} />);
-    expect(screen.getByText('Type / for commands')).toBeInTheDocument();
+    expect(screen.getByText('Type / for commands and skills')).toBeInTheDocument();
   });
 
   it('renders hint text with file reference info when projectRoot is provided', () => {
     render(<MessageInput {...defaultProps} projectRoot="/my/project" />);
-    expect(screen.getByText('Type / for commands, @ to reference files')).toBeInTheDocument();
+    expect(screen.getByText('Type / for commands and skills, @ to reference files')).toBeInTheDocument();
   });
 
   it('renders paste hint text', () => {
@@ -387,6 +392,74 @@ describe('MessageInput', () => {
       fireEvent.change(textarea, { target: { value: '/' } });
       fireEvent.click(screen.getByText('/help'));
       expect((textarea as HTMLTextAreaElement).value).toContain('/help');
+    });
+
+    it('shows user-invocable workspace skills before commands using usage ranking', async () => {
+      mockGetWorkspaceSkillsResult.mockResolvedValue({
+        diagnostics: [],
+        skills: [
+          {
+            id: 'release-notes',
+            name: 'release-notes',
+            description: 'Write release notes',
+            path: '/skills/release-notes/SKILL.md',
+            source: 'workspace',
+            eligible: true,
+            metadata: { argumentHint: '<ticket> <title>' },
+            execution: { defaultMode: 'fork' },
+            usage: { count: 3, lastUsedAt: 3000 },
+          },
+          {
+            id: 'model-only',
+            name: 'model-only',
+            description: 'Hidden skill',
+            path: '/skills/model-only/SKILL.md',
+            source: 'workspace',
+            eligible: true,
+            metadata: { userInvocable: false },
+          },
+        ],
+      });
+      render(<MessageInput {...defaultProps} onCommand={vi.fn()} commands={mockCommands} />);
+      const textarea = screen.getByPlaceholderText(/Type a message/);
+
+      await waitFor(() => expect(mockGetWorkspaceSkillsResult).toHaveBeenCalled());
+      fireEvent.change(textarea, { target: { value: '/r' } });
+
+      expect(screen.getByText('/release-notes')).toBeInTheDocument();
+      expect(screen.getByText('<ticket> <title>')).toBeInTheDocument();
+      expect(screen.getByText('skill · 3')).toBeInTheDocument();
+      expect(screen.getByText('workspace')).toBeInTheDocument();
+      expect(screen.getByText('fork')).toBeInTheDocument();
+      expect(screen.queryByText('/model-only')).not.toBeInTheDocument();
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+      expect((textarea as HTMLTextAreaElement).value).toBe('/release-notes ');
+    });
+
+    it('refreshes workspace skills after sending a direct slash skill message', async () => {
+      const onSend = vi.fn();
+      mockGetWorkspaceSkillsResult.mockResolvedValue({
+        diagnostics: [],
+        skills: [
+          {
+            id: 'release-notes',
+            name: 'release-notes',
+            description: 'Write release notes',
+            path: '/skills/release-notes/SKILL.md',
+            source: 'workspace',
+            eligible: true,
+          },
+        ],
+      });
+      render(<MessageInput {...defaultProps} onSend={onSend} onCommand={vi.fn()} commands={mockCommands} />);
+      const textarea = screen.getByPlaceholderText(/Type a message/);
+      await waitFor(() => expect(mockGetWorkspaceSkillsResult).toHaveBeenCalledTimes(1));
+
+      fireEvent.change(textarea, { target: { value: '/release-notes ZOOM-1' } });
+      fireEvent.keyDown(textarea, { key: 'Enter' });
+
+      expect(onSend).toHaveBeenCalledWith('/release-notes ZOOM-1', undefined);
+      await waitFor(() => expect(mockGetWorkspaceSkillsResult).toHaveBeenCalledTimes(2));
     });
 
     it('handles plugin commands with colon', () => {

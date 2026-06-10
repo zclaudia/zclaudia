@@ -159,19 +159,55 @@ describe('McpClientManager', () => {
     } as any);
 
     expect(ctorMock).not.toHaveBeenCalled();
-    expect(remoteCtorMock).toHaveBeenCalledWith({
+    expect(remoteCtorMock).toHaveBeenCalledWith(expect.objectContaining({
+      serverName: 'remote-github',
       transport: 'streamable-http',
       url: 'https://mcp.example.com/mcp',
       headers: { 'X-Zoom-Region': 'us01' },
       oauthConfig: { enabled: true, tokenEndpoint: 'https://auth.example.com/token' },
       oauthCredentials: { accessToken: 'access-token', tokenType: 'Bearer' },
       onOAuthCredentials,
-    });
+    }));
     expect(remoteConnectMock).toHaveBeenCalledTimes(1);
     expect(manager.getStatus('remote-github')).toEqual(expect.objectContaining({
       state: 'connected',
       hasInstructions: true,
       instructions: 'Use remote GitHub MCP.',
+    }));
+  });
+
+  it('reconnects and retries once when a remote MCP session expires during tool call', async () => {
+    const sessionExpired = Object.assign(
+      new Error('Streamable HTTP error: Error POSTing to endpoint: {"error":{"code":-32001,"message":"Session not found"}}'),
+      { code: 404 },
+    );
+    callToolMock
+      .mockRejectedValueOnce(sessionExpired)
+      .mockResolvedValueOnce({
+        content: [{ type: 'text', text: 'retried ok' }],
+        isError: false,
+      });
+    const { McpClientManager } = await import('../mcp-client-manager.js');
+    const manager = new McpClientManager();
+    const config = {
+      transport: 'streamable-http',
+      url: 'https://mcp.example.com/mcp',
+    } as any;
+
+    await manager.connect('remote-github', config);
+    const result = await manager.callTool('remote-github', config, 'read_issue', { id: '1' });
+
+    expect(result).toEqual({
+      content: [{ type: 'text', text: 'retried ok' }],
+      isError: false,
+    });
+    expect(callToolMock).toHaveBeenCalledTimes(2);
+    expect(remoteCtorMock).toHaveBeenCalledTimes(2);
+    expect(remoteConnectMock).toHaveBeenCalledTimes(2);
+    expect(remoteDisconnectMock).toHaveBeenCalledTimes(1);
+    expect(manager.getStatus('remote-github')).toEqual(expect.objectContaining({
+      state: 'connected',
+      lastError: undefined,
     }));
   });
 });

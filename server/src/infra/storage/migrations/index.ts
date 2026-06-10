@@ -13,6 +13,7 @@ import { migration as m_010_agent_profile_skill_execution } from './010_agent_pr
 import { migration as m_011_mcp_server_trust_policy } from './011_mcp_server_trust_policy.js';
 import { migration as m_012_mcp_remote_oauth } from './012_mcp_remote_oauth.js';
 import { migration as m_013_agent_profile_plugin_ownership } from './013_agent_profile_plugin_ownership.js';
+import { migration as m_014_mcp_headers_helper } from './014_mcp_headers_helper.js';
 
 export type { Migration };
 
@@ -30,6 +31,7 @@ export const migrations: Migration[] = [
   m_011_mcp_server_trust_policy,
   m_012_mcp_remote_oauth,
   m_013_agent_profile_plugin_ownership,
+  m_014_mcp_headers_helper,
 ];
 
 /**

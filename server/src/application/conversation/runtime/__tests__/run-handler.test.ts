@@ -33,6 +33,10 @@ vi.mock('../run-lifecycle.js', () => ({
 
 vi.mock('../../../../application/plugins/skill-tools.js', () => ({
   buildSkillDirectoryHint: buildSkillDirectoryHintMock,
+  getEligibleDiscoveredSkills: vi.fn(() => []),
+  loadDiscoveredSkillContent: vi.fn(),
+  loadDiscoveredSkillContentSync: vi.fn(() => null),
+  recordSkillUsage: vi.fn(),
 }));
 
 const mockProviderRegistry = {
@@ -145,6 +149,7 @@ function createDb(): Database.Database {
       session_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
+      metadata TEXT,
       created_at INTEGER NOT NULL,
       offset INTEGER
     );

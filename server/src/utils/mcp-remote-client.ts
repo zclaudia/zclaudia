@@ -1,7 +1,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { execFile } from 'node:child_process';
 import type { McpOAuthConfig, McpOAuthCredentials } from '@zclaudia/shared/core/mcp';
+import { discoverMcpOAuthConfig } from '../domains/mcp/mcp-oauth-discovery.js';
 import type {
   McpPromptDefinition,
   McpPromptResult,
@@ -12,16 +14,24 @@ import type {
 } from './mcp-client.js';
 
 export interface RemoteMcpClientConfig {
+  serverName?: string;
   transport: 'streamable-http' | 'sse';
   url: string;
   headers?: Record<string, string>;
+  headersHelper?: string;
+  headersHelperRunner?: (command: string, context: { serverName?: string; url: string }) => Promise<Record<string, string>>;
   oauthConfig?: McpOAuthConfig;
   oauthCredentials?: McpOAuthCredentials;
   fetchFn?: typeof fetch;
   onOAuthCredentials?: (credentials: McpOAuthCredentials | null) => void | Promise<void>;
+  connectTimeoutMs?: number;
+  requestTimeoutMs?: number;
 }
 
 const REFRESH_SKEW_MS = 60_000;
+const DEFAULT_CONNECT_TIMEOUT_MS = 30_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 60_000;
+const HEADERS_HELPER_TIMEOUT_MS = 10_000;
 
 function shouldRefresh(credentials?: McpOAuthCredentials): boolean {
   return !!credentials?.refreshToken && typeof credentials.expiresAt === 'number' && credentials.expiresAt <= Date.now() + REFRESH_SKEW_MS;
@@ -58,12 +68,75 @@ function isTerminalRefreshError(message: string): boolean {
   return /\b(invalid_grant|refresh_token_expired|refresh_token_invalidated|refresh_token_reused)\b/i.test(message);
 }
 
-function requestHeaders(config: RemoteMcpClientConfig, credentials = config.oauthCredentials): Record<string, string> {
+function runHeadersHelper(command: string, context: { serverName?: string; url: string }): Promise<Record<string, string>> {
+  return new Promise((resolve, reject) => {
+    execFile(command, [], {
+      shell: true,
+      timeout: HEADERS_HELPER_TIMEOUT_MS,
+      env: {
+        ...process.env,
+        ZCLAUDIA_MCP_SERVER_NAME: context.serverName ?? '',
+        ZCLAUDIA_MCP_SERVER_URL: context.url,
+      },
+    }, (error, stdout) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim()) as unknown;
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('headersHelper must return a JSON object');
+        }
+        const headers: Record<string, string> = {};
+        for (const [key, value] of Object.entries(parsed)) {
+          if (typeof value !== 'string') throw new Error(`headersHelper value for ${key} must be a string`);
+          headers[key] = value;
+        }
+        resolve(headers);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+async function requestHeaders(config: RemoteMcpClientConfig, credentials = config.oauthCredentials): Promise<Record<string, string>> {
   const headers = { ...(config.headers ?? {}) };
+  if (config.headersHelper) {
+    const dynamicHeaders = await (config.headersHelperRunner ?? runHeadersHelper)(config.headersHelper, {
+      serverName: config.serverName,
+      url: config.url,
+    });
+    Object.assign(headers, dynamicHeaders);
+  }
   if (credentials?.accessToken) {
     headers.Authorization = `${credentials.tokenType || 'Bearer'} ${credentials.accessToken}`;
   }
   return headers;
+}
+
+function withRequestTimeout(config: RemoteMcpClientConfig): typeof fetch {
+  const baseFetch = config.fetchFn ?? globalThis.fetch;
+  const timeoutMs = config.requestTimeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
+  return async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]): Promise<Response> => {
+    const method = (init?.method ?? 'GET').toUpperCase();
+    if (method === 'GET') return baseFetch(input, init);
+
+    const controller = new AbortController();
+    const upstreamSignal = init?.signal;
+    const abortFromUpstream = () => controller.abort(upstreamSignal?.reason);
+    if (upstreamSignal?.aborted) controller.abort(upstreamSignal.reason);
+    else upstreamSignal?.addEventListener('abort', abortFromUpstream, { once: true });
+
+    const timeout = setTimeout(() => controller.abort(new Error(`Remote MCP request timed out after ${timeoutMs}ms`)), timeoutMs);
+    try {
+      return await baseFetch(input, { ...init, signal: controller.signal });
+    } finally {
+      clearTimeout(timeout);
+      upstreamSignal?.removeEventListener('abort', abortFromUpstream);
+    }
+  };
 }
 
 export class RemoteMcpClient {
@@ -76,13 +149,14 @@ export class RemoteMcpClient {
   async connect(): Promise<void> {
     if (this.connected) return;
     const oauthCredentials = await this.resolveOAuthCredentials();
-    const headers = requestHeaders(this.config, oauthCredentials);
+    const headers = await requestHeaders(this.config, oauthCredentials);
     const requestInit = Object.keys(headers).length > 0 ? { headers } : undefined;
+    const fetch = withRequestTimeout(this.config);
     this.client = new Client({ name: 'zclaudia-mcp-client', version: '0.1.0' }, { capabilities: {} });
     this.transportInstance = this.config.transport === 'sse'
-      ? new SSEClientTransport(new URL(this.config.url), { requestInit })
-      : new StreamableHTTPClientTransport(new URL(this.config.url), { requestInit });
-    await this.client.connect(this.transportInstance);
+      ? new SSEClientTransport(new URL(this.config.url), { requestInit, fetch })
+      : new StreamableHTTPClientTransport(new URL(this.config.url), { requestInit, fetch });
+    await this.withConnectTimeout(this.client.connect(this.transportInstance));
     this.connected = true;
   }
 
@@ -156,8 +230,32 @@ export class RemoteMcpClient {
     return this.client;
   }
 
+  private async withConnectTimeout<T>(promise: Promise<T>): Promise<T> {
+    const timeoutMs = this.config.connectTimeoutMs ?? DEFAULT_CONNECT_TIMEOUT_MS;
+    let timeout: NodeJS.Timeout | undefined;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise<T>((_, reject) => {
+          timeout = setTimeout(() => reject(new Error(`Remote MCP connection timed out after ${timeoutMs}ms`)), timeoutMs);
+        }),
+      ]);
+    } catch (error) {
+      this.connected = false;
+      await this.transportInstance?.close();
+      this.transportInstance = null;
+      this.client = null;
+      throw error;
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+  }
+
   private async resolveOAuthCredentials(): Promise<McpOAuthCredentials | undefined> {
     if (!shouldRefresh(this.config.oauthCredentials)) return this.config.oauthCredentials;
+    if (this.config.oauthConfig?.enabled && !this.config.oauthConfig.tokenEndpoint) {
+      this.config.oauthConfig = await discoverMcpOAuthConfig(this.config.oauthConfig, this.config.url, this.config.fetchFn ?? globalThis.fetch);
+    }
     const tokenEndpoint = this.config.oauthConfig?.tokenEndpoint;
     const refreshToken = this.config.oauthCredentials?.refreshToken;
     if (!tokenEndpoint || !refreshToken) return this.config.oauthCredentials;

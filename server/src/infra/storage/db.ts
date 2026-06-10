@@ -4,6 +4,7 @@ import os from 'os';
 import fs from 'fs';
 import { migrations } from './migrations/index.js';
 import { ensureDefaultAgentProfile } from '../../domains/agent-profiles/ensure-default-agent-profile.js';
+import { backfillProtectedMcpOAuthCredentials } from '../services/mcp-oauth-credential-protector.js';
 
 const DB_DIR = process.env.ZCLAUDIA_DATA_DIR
   ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
@@ -23,6 +24,7 @@ export function initDatabase(): Database.Database {
 
   // Run migrations
   runMigrations(db);
+  backfillProtectedMcpOAuthCredentials(db);
 
   // Sanity-check that schema is current — catches stale dev DBs that were
   // created before the providers→llm_profiles rename. Since `001_initial_schema`

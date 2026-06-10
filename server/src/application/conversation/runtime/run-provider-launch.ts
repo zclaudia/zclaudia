@@ -13,6 +13,8 @@ import type { ToolName } from '@zclaudia/shared/core/tools';
 import type { PermissionDecision } from '../../../infra/providers/types.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import { persistMcpInstructionsDeltaForSession } from './mcp-instructions-delta.js';
+import { executePreparedDirectSkillInvocation, prepareDirectSkillInvocation } from '../../../infra/providers/pi-runtime/skills.js';
+import { setPhase } from './active-run-phase.js';
 
 interface LaunchProviderRunInput {
   activeRun: ActiveRun;
@@ -121,6 +123,51 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
 
   persistMcpInstructionsDeltaForSession(db as import('better-sqlite3').Database, message.sessionId);
 
+  let effectiveInput = processedInput;
+  const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, { agentProfile });
+  if (directSkill.matched) {
+    if (!directSkill.ok) {
+      return completeRunLocally({
+        activeRun,
+        content: directSkill.message,
+        message,
+        runId,
+        sendRunEvent,
+      });
+    }
+    if (directSkill.mode === 'fork') {
+      if (!activeRun.skillState) {
+        return completeRunLocally({
+          activeRun,
+          content: 'Skill runtime state is unavailable for direct skill invocation.',
+          message,
+          runId,
+          sendRunEvent,
+        });
+      }
+      const forkResult = await executePreparedDirectSkillInvocation(activeRun.skillState, directSkill, {
+        cwd,
+        db: db as import('better-sqlite3').Database,
+        enabledTools,
+        llmProfileConfig: providerConfig,
+        agentProfile,
+        permissionCallback,
+      });
+      return completeRunLocally({
+        activeRun,
+        content: forkResult.ok ? forkResult.result : forkResult.message,
+        message,
+        runId,
+        sendRunEvent,
+      });
+    }
+    effectiveInput = directSkill.processedInput;
+    trace.log('server_norm', 'direct_skill_invoked', {
+      skillId: directSkill.ref.id,
+      skillSource: directSkill.ref.source,
+    }, directSkill.message);
+  }
+
   const { runOptions } = await buildRunContext({
     adapter,
     agentProfile,
@@ -163,7 +210,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     cwd,
   }, `provider runner ${providerType}`);
 
-  const providerRunner = adapter.run(processedInput, runOptions, permissionCallback);
+  const providerRunner = adapter.run(effectiveInput, runOptions, permissionCallback);
 
   activeRun.providerType = providerType;
   const runState = adapter.getRunState?.(runOptions) || {};
@@ -178,4 +225,34 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   }, PERIODIC_SAVE_INTERVAL_MS);
 
   return { providerRunner };
+}
+
+function completeRunLocally(input: {
+  activeRun: ActiveRun;
+  content: string;
+  message: RunStartMessage;
+  runId: string;
+  sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
+}): { providerRunner: AsyncIterable<ClaudeMessage> } {
+  const { activeRun, content, message, runId, sendRunEvent } = input;
+  activeRun.fullContent = content;
+  activeRun.contentBlocks.push({ type: 'text', content });
+  sendRunEvent({
+    type: 'delta',
+    runId,
+    sessionId: message.sessionId,
+    content,
+  });
+  upsertAssistantMessage(activeRun, { indexMetadata: true });
+  sendRunEvent({
+    type: 'run_completed',
+    runId,
+    sessionId: message.sessionId,
+  });
+  setPhase(activeRun, 'completed');
+  return { providerRunner: emptyProviderStream() };
+}
+
+async function* emptyProviderStream(): AsyncIterable<ClaudeMessage> {
+  return;
 }

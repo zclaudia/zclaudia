@@ -1,5 +1,8 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type {
   ExternalToolProviderRef,
   McpPromptRef,
@@ -164,10 +167,77 @@ function loadMcpTrustPolicy(db: Database.Database | undefined, server: string): 
 
 const PROVIDER_CATALOG_MAX_ROWS = 20;
 const PROVIDER_CATALOG_DESC_MAX = 120;
+const DEFAULT_MCP_MAX_OUTPUT_CHARS = 80_000;
+const MCP_OUTPUT_TRUNCATED_MARKER = '[OUTPUT TRUNCATED: MCP text result exceeded';
 
 function truncateForCatalog(text: string, max = PROVIDER_CATALOG_DESC_MAX): string {
   const normalized = text.replace(/\s+/g, ' ').trim();
   return normalized.length > max ? `${normalized.slice(0, max - 3)}...` : normalized;
+}
+
+function maxMcpOutputChars(): number {
+  const parsed = Number(process.env.ZCLAUDIA_MCP_MAX_OUTPUT_CHARS);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DEFAULT_MCP_MAX_OUTPUT_CHARS;
+}
+
+function mcpOutputDir(): string {
+  return process.env.ZCLAUDIA_MCP_OUTPUT_DIR || path.join(tmpdir(), 'zclaudia-mcp-output');
+}
+
+function sanitizeOutputName(value: string): string {
+  const base = value.split(/[\\/]/).pop() || 'mcp-output';
+  return base.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'mcp-output';
+}
+
+function extensionForMimeType(mimeType?: string): string {
+  const normalized = (mimeType || '').split(';')[0].trim().toLowerCase();
+  if (normalized === 'application/pdf') return 'pdf';
+  if (normalized === 'application/json') return 'json';
+  if (normalized === 'text/markdown') return 'md';
+  if (normalized === 'text/plain') return 'txt';
+  if (normalized === 'text/csv') return 'csv';
+  if (normalized === 'image/png') return 'png';
+  if (normalized === 'image/jpeg') return 'jpg';
+  if (normalized === 'image/gif') return 'gif';
+  if (normalized === 'image/webp') return 'webp';
+  return 'bin';
+}
+
+async function persistMcpOutput(
+  name: string,
+  index: number,
+  data: string | Buffer,
+  extension: string,
+): Promise<string> {
+  const dir = mcpOutputDir();
+  await mkdir(dir, { recursive: true });
+  const filePath = path.join(dir, `${sanitizeOutputName(name)}-${Date.now()}-${index}.${extension}`);
+  await writeFile(filePath, data);
+  return filePath;
+}
+
+async function truncateMcpTextContent(content: ToolContent, name: string): Promise<{
+  content: ToolContent;
+  outputTruncated: boolean;
+  originalOutputChars?: number;
+  outputFiles: string[];
+}> {
+  const max = maxMcpOutputChars();
+  let outputTruncated = false;
+  let originalOutputChars: number | undefined;
+  const outputFiles: string[] = [];
+  const truncated = await Promise.all(content.map(async (item, index) => {
+    if (item.type !== 'text' || typeof item.text !== 'string' || item.text.length <= max) return item;
+    outputTruncated = true;
+    originalOutputChars = Math.max(originalOutputChars ?? 0, item.text.length);
+    const outputPath = await persistMcpOutput(name, index, item.text, 'txt');
+    outputFiles.push(outputPath);
+    return {
+      ...item,
+      text: `${item.text.slice(0, max)}\n\n${MCP_OUTPUT_TRUNCATED_MARKER} ${max} characters]\nFull output saved to ${outputPath}`,
+    };
+  }));
+  return { content: truncated, outputTruncated, originalOutputChars, outputFiles };
 }
 
 async function getMcpInventory(
@@ -272,14 +342,21 @@ export function createConcreteMcpTool(
           });
         }
         const result = await mcpClientManager.callTool(ref.server, config, ref.tool, (params as Record<string, unknown>) || {});
+        const output = await truncateMcpTextContent(result.content as ToolContent, ref.tool);
         return {
-          content: result.content as any,
+          content: output.content as any,
           details: {
             ok: !result.isError,
             server: ref.server,
             tool: ref.tool,
             isError: !!result.isError,
             permissionSummary,
+            ...(output.outputTruncated && {
+              outputTruncated: true,
+              originalOutputChars: output.originalOutputChars,
+              outputPersisted: output.outputFiles.length > 0,
+              outputFiles: output.outputFiles,
+            }),
           },
         };
       } catch (err) {
@@ -503,22 +580,41 @@ async function readExternalResource(
   if (!ref || ref.source !== 'mcp-resource' || !ref.server || !ref.uri) {
     return textResult('ReadExternalResource requires an MCP resource ref', { ok: false, error: 'invalid_ref' });
   }
+  const resourceUri = ref.uri;
   if (!isDiscoverableMcp(state, ref.server)) {
     return textResult(`MCP server is not discoverable: ${ref.server}`, { ok: false, error: 'provider_not_discoverable' });
   }
   const servers = safeLoadMcpServers(db);
   const config = servers[ref.server];
   if (!config) return textResult(`MCP server is not configured or disabled: ${ref.server}`, { ok: false, error: 'server_unavailable' });
-  const result = await mcpClientManager.readResource(ref.server, config, ref.uri);
+  const result = await mcpClientManager.readResource(ref.server, config, resourceUri);
+  const outputFiles: string[] = [];
+  const content = await Promise.all(result.contents.map(async (item, index) => {
+    if (item.text) {
+      return { type: 'text' as const, text: item.text };
+    }
+    if (item.blob) {
+      const bytes = Buffer.from(item.blob, 'base64');
+      const ext = extensionForMimeType(item.mimeType);
+      const outputPath = await persistMcpOutput(item.uri || resourceUri, index, bytes, ext);
+      outputFiles.push(outputPath);
+      return {
+        type: 'text' as const,
+        text: `Binary content (${item.mimeType || 'application/octet-stream'}, ${bytes.length} bytes) saved to ${outputPath}`,
+      };
+    }
+    return { type: 'text' as const, text: '' };
+  }));
   return {
-    content: result.contents.map((item) => ({
-      type: 'text' as const,
-      text: item.text ?? (item.blob ? `[base64 blob content: ${item.blob.length} bytes]` : ''),
-    })),
+    content,
     details: {
       ok: true,
       server: ref.server,
-      uri: ref.uri,
+      uri: resourceUri,
+      ...(outputFiles.length > 0 && {
+        outputPersisted: true,
+        outputFiles,
+      }),
       contents: result.contents.map(({ uri, mimeType, text, blob }) => ({
         uri,
         mimeType,

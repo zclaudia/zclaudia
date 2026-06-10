@@ -162,8 +162,10 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
   const [formArgs, setFormArgs] = useState('');
   const [formEnvPairs, setFormEnvPairs] = useState<{ key: string; value: string }[]>([]);
   const [formHeaderPairs, setFormHeaderPairs] = useState<{ key: string; value: string }[]>([]);
+  const [formHeadersHelper, setFormHeadersHelper] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formOAuthEnabled, setFormOAuthEnabled] = useState(false);
+  const [formOAuthMetadataUrl, setFormOAuthMetadataUrl] = useState('');
   const [formOAuthAuthorizationEndpoint, setFormOAuthAuthorizationEndpoint] = useState('');
   const [formOAuthTokenEndpoint, setFormOAuthTokenEndpoint] = useState('');
   const [formOAuthDeviceEndpoint, setFormOAuthDeviceEndpoint] = useState('');
@@ -190,8 +192,10 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
     setFormArgs('');
     setFormEnvPairs([]);
     setFormHeaderPairs([]);
+    setFormHeadersHelper('');
     setFormDescription('');
     setFormOAuthEnabled(false);
+    setFormOAuthMetadataUrl('');
     setFormOAuthAuthorizationEndpoint('');
     setFormOAuthTokenEndpoint('');
     setFormOAuthDeviceEndpoint('');
@@ -224,8 +228,10 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
         ? Object.entries(server.headers).map(([key, value]) => ({ key, value }))
         : []
     );
+    setFormHeadersHelper(server.headersHelper || '');
     setFormDescription(server.description || '');
     setFormOAuthEnabled(server.oauthConfig?.enabled ?? false);
+    setFormOAuthMetadataUrl(server.oauthConfig?.metadataUrl ?? '');
     setFormOAuthAuthorizationEndpoint(server.oauthConfig?.authorizationEndpoint ?? '');
     setFormOAuthTokenEndpoint(server.oauthConfig?.tokenEndpoint ?? '');
     setFormOAuthDeviceEndpoint(server.oauthConfig?.deviceAuthorizationEndpoint ?? '');
@@ -253,9 +259,13 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
     const headers = formHeaderPairs.filter(p => p.key.trim()).length > 0
       ? Object.fromEntries(formHeaderPairs.filter(p => p.key.trim()).map(p => [p.key, p.value]))
       : undefined;
+    const headersHelper = formTransport !== 'stdio' && formHeadersHelper.trim()
+      ? formHeadersHelper.trim()
+      : undefined;
     const oauthConfig = formOAuthEnabled
       ? {
         enabled: true,
+        metadataUrl: formOAuthMetadataUrl.trim() || undefined,
         authorizationEndpoint: formOAuthAuthorizationEndpoint.trim() || undefined,
         tokenEndpoint: formOAuthTokenEndpoint.trim() || undefined,
         deviceAuthorizationEndpoint: formOAuthDeviceEndpoint.trim() || undefined,
@@ -283,6 +293,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
           args: args || [],
           env: env || {},
           headers: headers || {},
+          headersHelper,
           oauthConfig,
           description: formDescription.trim() || undefined,
           providerScope: formScope.length > 0 ? formScope : undefined,
@@ -298,6 +309,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
           args: formTransport === 'stdio' ? args : undefined,
           env: formTransport === 'stdio' ? env : undefined,
           headers,
+          headersHelper,
           oauthConfig,
           description: formDescription.trim() || undefined,
           providerScope: formScope.length > 0 ? formScope : undefined,
@@ -309,7 +321,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
     } catch (err) {
       setFormError(err instanceof Error ? err.message : String(err));
     }
-  }, [formName, formTransport, formCommand, formUrl, formArgs, formEnvPairs, formHeaderPairs, formDescription, formOAuthEnabled, formOAuthAuthorizationEndpoint, formOAuthTokenEndpoint, formOAuthDeviceEndpoint, formOAuthClientId, formOAuthClientSecret, formOAuthScopes, formScope, formTrustLevel, formTrustReadOnlyHint, formDefaultRiskAction, formRiskActions, editingId, addServer, editServer, resetForm]);
+  }, [formName, formTransport, formCommand, formUrl, formArgs, formEnvPairs, formHeaderPairs, formHeadersHelper, formDescription, formOAuthEnabled, formOAuthMetadataUrl, formOAuthAuthorizationEndpoint, formOAuthTokenEndpoint, formOAuthDeviceEndpoint, formOAuthClientId, formOAuthClientSecret, formOAuthScopes, formScope, formTrustLevel, formTrustReadOnlyHint, formDefaultRiskAction, formRiskActions, editingId, addServer, editServer, resetForm]);
 
   const handleDelete = useCallback(async (id: string, name: string) => {
     if (!confirm(`Delete MCP server "${name}"?`)) return;
@@ -671,6 +683,22 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
       )}
 
       {formTransport !== 'stdio' && (
+        <div>
+          <label className="block text-xs text-muted-foreground mb-1">Headers Helper</label>
+          <input
+            type="text"
+            value={formHeadersHelper}
+            onChange={e => setFormHeadersHelper(e.target.value)}
+            placeholder="Command that prints JSON headers, e.g. node ./headers-helper.js"
+            className="w-full px-3 py-1.5 text-sm bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
+          />
+          <p className="text-[10px] text-muted-foreground mt-1">
+            Runs before remote MCP connect. It must print a JSON object whose values are strings.
+          </p>
+        </div>
+      )}
+
+      {formTransport !== 'stdio' && (
         <div className="rounded-lg border border-border/50 bg-background/30 p-3 space-y-3">
           <label className="flex items-center gap-2 text-xs text-muted-foreground">
             <input
@@ -684,6 +712,13 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
           </label>
           {formOAuthEnabled && (
             <div className="grid gap-2 md:grid-cols-2">
+              <input
+                type="text"
+                value={formOAuthMetadataUrl}
+                onChange={e => setFormOAuthMetadataUrl(e.target.value)}
+                placeholder="https://auth.example.com/.well-known/oauth-authorization-server"
+                className="px-3 py-1.5 text-xs bg-secondary/50 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono md:col-span-2"
+              />
               <input
                 type="text"
                 value={formOAuthAuthorizationEndpoint}
@@ -983,6 +1018,11 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
                     {(server.transport === 'streamable-http' || server.transport === 'sse') && server.url && (
                       <p className="text-[10px] text-muted-foreground/80 font-mono truncate mt-0.5" title={server.url}>
                         {server.url}
+                      </p>
+                    )}
+                    {(server.transport === 'streamable-http' || server.transport === 'sse') && server.headersHelper && (
+                      <p className="text-[10px] text-muted-foreground/80 font-mono truncate mt-0.5" title={server.headersHelper}>
+                        Headers helper: {server.headersHelper}
                       </p>
                     )}
                     {oauthStatus && (

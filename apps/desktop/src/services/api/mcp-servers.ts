@@ -28,6 +28,7 @@ export async function createMcpServer(config: {
   transport?: McpServerTransport;
   url?: string;
   headers?: Record<string, string>;
+  headersHelper?: string;
   oauthConfig?: McpOAuthConfig;
   oauthCredentials?: McpOAuthCredentials;
   enabled?: boolean;
@@ -53,6 +54,7 @@ export async function updateMcpServer(id: string, config: Partial<{
   transport: McpServerTransport;
   url: string;
   headers: Record<string, string>;
+  headersHelper: string;
   oauthConfig: McpOAuthConfig;
   oauthCredentials: McpOAuthCredentials | null;
   enabled: boolean;

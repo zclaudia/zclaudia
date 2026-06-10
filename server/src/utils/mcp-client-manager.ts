@@ -38,6 +38,21 @@ function authRequiredMessage(error: unknown): string {
   return `MCP server requires authentication before tools can be used. ${message}`;
 }
 
+function isMcpSessionExpiredError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? (error as { code?: unknown }).code
+    : undefined;
+  return (
+    (code === 404 || /\b404\b/.test(message))
+    && (
+      message.includes('"code":-32001')
+      || message.includes('"code": -32001')
+      || /session not found/i.test(message)
+    )
+  );
+}
+
 export class McpClientManager {
   private clients = new Map<string, CachedClient>();
   /** Deduplicates concurrent getClient() calls for the same server. */
@@ -54,6 +69,7 @@ export class McpClientManager {
       env: sortedEnv,
       url: 'url' in config ? config.url : undefined,
       headers: sortedHeaders,
+      headersHelper: 'headersHelper' in config ? config.headersHelper : undefined,
       oauthConfig: 'oauthConfig' in config ? config.oauthConfig : undefined,
       oauthCredentials: 'oauthCredentials' in config ? config.oauthCredentials : undefined,
     });
@@ -105,9 +121,11 @@ export class McpClientManager {
     let client: McpClient | RemoteMcpClient;
     if ('url' in config && (config.transport === 'streamable-http' || config.transport === 'sse')) {
       client = new RemoteMcpClient({
+        serverName,
         transport: config.transport,
         url: config.url,
         headers: config.headers,
+        headersHelper: config.headersHelper,
         oauthConfig: config.oauthConfig,
         oauthCredentials: config.oauthCredentials,
         onOAuthCredentials: config.onOAuthCredentials,
@@ -207,8 +225,7 @@ export class McpClientManager {
     toolName: string,
     args: Record<string, unknown>,
   ): Promise<McpToolResult> {
-    const client = await this.getClient(serverName, config);
-    return client.callTool(toolName, args);
+    return this.withSessionRetry(serverName, config, async (client) => client.callTool(toolName, args));
   }
 
   /**
@@ -218,16 +235,14 @@ export class McpClientManager {
     serverName: string,
     config: McpServerRuntimeConfig,
   ): Promise<McpToolDefinition[]> {
-    const client = await this.getClient(serverName, config);
-    return client.listTools();
+    return this.withSessionRetry(serverName, config, async (client) => client.listTools());
   }
 
   async listResources(
     serverName: string,
     config: McpServerRuntimeConfig,
   ): Promise<McpResourceDefinition[]> {
-    const client = await this.getClient(serverName, config);
-    return client.listResources();
+    return this.withSessionRetry(serverName, config, async (client) => client.listResources());
   }
 
   async readResource(
@@ -235,16 +250,14 @@ export class McpClientManager {
     config: McpServerRuntimeConfig,
     uri: string,
   ): Promise<McpResourceResult> {
-    const client = await this.getClient(serverName, config);
-    return client.readResource(uri);
+    return this.withSessionRetry(serverName, config, async (client) => client.readResource(uri));
   }
 
   async listPrompts(
     serverName: string,
     config: McpServerRuntimeConfig,
   ): Promise<McpPromptDefinition[]> {
-    const client = await this.getClient(serverName, config);
-    return client.listPrompts();
+    return this.withSessionRetry(serverName, config, async (client) => client.listPrompts());
   }
 
   async getPrompt(
@@ -253,8 +266,7 @@ export class McpClientManager {
     name: string,
     args?: Record<string, unknown>,
   ): Promise<McpPromptResult> {
-    const client = await this.getClient(serverName, config);
-    return client.getPrompt(name, args);
+    return this.withSessionRetry(serverName, config, async (client) => client.getPrompt(name, args));
   }
 
   /**
@@ -268,6 +280,29 @@ export class McpClientManager {
   private resetIdleTimer(name: string, entry: CachedClient): void {
     clearTimeout(entry.idleTimer);
     entry.idleTimer = setTimeout(() => this.evict(name), IDLE_TIMEOUT_MS);
+  }
+
+  private async withSessionRetry<T>(
+    serverName: string,
+    config: McpServerRuntimeConfig,
+    operation: (client: McpClient | RemoteMcpClient) => Promise<T>,
+  ): Promise<T> {
+    const client = await this.getClient(serverName, config);
+    try {
+      return await operation(client);
+    } catch (error) {
+      if (!isMcpSessionExpiredError(error)) throw error;
+      mcpInventoryCache.invalidate(serverName);
+      await this.evict(serverName);
+      this.markStatus(serverName, {
+        state: 'connecting',
+        lastError: undefined,
+        authRequired: false,
+        authMessage: undefined,
+      });
+      const freshClient = await this.getClient(serverName, config);
+      return operation(freshClient);
+    }
   }
 
   private async evict(name: string): Promise<void> {

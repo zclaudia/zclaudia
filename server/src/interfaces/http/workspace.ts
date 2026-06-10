@@ -10,7 +10,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import { workspaceService } from '../../application/services/workspace.js';
-import { refreshSkillCache, getDiscoveredSkills, getExternalSkillDirs, saveExternalSkillDirs } from '../../application/plugins/skill-tools.js';
+import { refreshSkillCache, getDiscoveredSkills, getExternalSkillDirs, getSkillLoadDiagnostics, saveExternalSkillDirs } from '../../application/plugins/skill-tools.js';
 import { pluginSkillReloader } from '../../application/plugins/skill-bootstrap.js';
 import { pluginLoader } from '../../application/plugins/loader.js';
 import { createExecutionEnv } from '../../infra/execution-env.js';
@@ -92,10 +92,16 @@ router.get('/skills', async (req: Request, res: Response) => {
       description: skill.description,
       path: skill.filePath,
       source: skill.source,
+      eligible: skill.eligible,
+      requirements: skill.requirements,
+      metadata: skill.metadata,
+      execution: skill.execution,
+      usage: skill.usage,
     }));
     res.json({
       success: true,
       data: skills,
+      diagnostics: getSkillLoadDiagnostics(),
     });
   } catch (error) {
     console.error('[Workspace API] Error listing skills:', error);

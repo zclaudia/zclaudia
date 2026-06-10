@@ -19,6 +19,7 @@ function createTestDb(): Database.Database {
       transport TEXT,
       url TEXT,
       headers TEXT,
+      headers_helper TEXT,
       oauth_config TEXT,
       oauth_credentials TEXT,
       created_at INTEGER,
@@ -30,12 +31,17 @@ function createTestDb(): Database.Database {
 
 describe('McpServerService', () => {
   let db: Database.Database;
+  let originalCredentialKey: string | undefined;
 
   beforeEach(() => {
+    originalCredentialKey = process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY;
+    process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY = 'mcp-server-service-test-key';
     db = createTestDb();
   });
 
   afterEach(() => {
+    if (originalCredentialKey === undefined) delete process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY;
+    else process.env.ZCLAUDIA_MCP_CREDENTIAL_KEY = originalCredentialKey;
     db.close();
   });
 
@@ -119,6 +125,7 @@ describe('McpServerService', () => {
       transport: 'streamable-http',
       url: 'https://mcp.example.com/mcp',
       headers: { 'X-Zoom-Region': 'us01' },
+      headersHelper: 'node ./headers-helper.js',
       oauthConfig: {
         enabled: true,
         authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
@@ -143,6 +150,7 @@ describe('McpServerService', () => {
       transport: 'streamable-http',
       url: 'https://mcp.example.com/mcp',
       headers: { 'X-Zoom-Region': 'us01' },
+      headersHelper: 'node ./headers-helper.js',
       oauthConfig: expect.objectContaining({
         enabled: true,
         authorizationEndpoint: 'https://auth.example.com/oauth/authorize',
@@ -165,8 +173,10 @@ describe('McpServerService', () => {
       accessToken: 'access-token',
       refreshToken: 'refresh-token',
     }));
+    expect(service.updateServer(created.id, { description: 'keep helper' }).headersHelper).toBe('node ./headers-helper.js');
 
     const updated = service.updateServer(created.id, {
+      headersHelper: null,
       oauthCredentials: null,
       oauthConfig: {
         enabled: true,
@@ -178,10 +188,72 @@ describe('McpServerService', () => {
     } as any);
 
     expect(updated.oauthCredentials).toBeUndefined();
+    expect(updated.headersHelper).toBeUndefined();
     expect(updated.oauthConfig).toEqual({
       enabled: true,
       tokenEndpoint: 'https://auth.example.com/oauth/token',
       scopes: ['repo'],
     });
+  });
+
+  it('encrypts MCP OAuth credentials at rest while preserving service reads', () => {
+    const service = new McpServerService(db, () => 1234);
+
+    const created = service.createServer({
+      name: 'secure-remote',
+      transport: 'streamable-http',
+      url: 'https://mcp.example.com/mcp',
+      oauthCredentials: {
+        accessToken: 'access-token-at-rest',
+        refreshToken: 'refresh-token-at-rest',
+        tokenType: 'Bearer',
+        expiresAt: 2000,
+      },
+    } as any);
+
+    const raw = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?').get(created.id) as { oauth_credentials: string };
+    expect(raw.oauth_credentials).toMatch(/^zclaudia:v1:/);
+    expect(raw.oauth_credentials).not.toContain('access-token-at-rest');
+    expect(raw.oauth_credentials).not.toContain('refresh-token-at-rest');
+
+    expect(service.listServers().find((server) => server.id === created.id)?.oauthCredentials).toEqual(expect.objectContaining({
+      accessToken: 'access-token-at-rest',
+      refreshToken: 'refresh-token-at-rest',
+      tokenType: 'Bearer',
+      expiresAt: 2000,
+    }));
+
+    service.updateOAuthCredentials('secure-remote', {
+      accessToken: 'fresh-access-token-at-rest',
+      refreshToken: 'fresh-refresh-token-at-rest',
+      tokenType: 'Bearer',
+    });
+    const refreshed = db.prepare('SELECT oauth_credentials FROM mcp_servers WHERE id = ?').get(created.id) as { oauth_credentials: string };
+    expect(refreshed.oauth_credentials).toMatch(/^zclaudia:v1:/);
+    expect(refreshed.oauth_credentials).not.toContain('fresh-access-token-at-rest');
+    expect(refreshed.oauth_credentials).not.toContain('fresh-refresh-token-at-rest');
+    expect(service.findEnabledServerByName('secure-remote')?.oauthCredentials).toEqual(expect.objectContaining({
+      accessToken: 'fresh-access-token-at-rest',
+      refreshToken: 'fresh-refresh-token-at-rest',
+    }));
+  });
+
+  it('continues reading legacy plaintext MCP OAuth credentials', () => {
+    db.prepare(`
+      INSERT INTO mcp_servers (
+        id, name, command, enabled, source, transport, url, oauth_credentials, created_at, updated_at
+      ) VALUES ('legacy', 'legacy-remote', '', 1, 'user', 'streamable-http', 'https://mcp.example.com/mcp', ?, 1000, 1000)
+    `).run(JSON.stringify({
+      accessToken: 'legacy-access-token',
+      refreshToken: 'legacy-refresh-token',
+      tokenType: 'Bearer',
+    }));
+    const service = new McpServerService(db, () => 1234);
+
+    expect(service.findEnabledServerByName('legacy-remote')?.oauthCredentials).toEqual(expect.objectContaining({
+      accessToken: 'legacy-access-token',
+      refreshToken: 'legacy-refresh-token',
+      tokenType: 'Bearer',
+    }));
   });
 });

@@ -8,12 +8,13 @@ import type {
 } from '@zclaudia/shared/core/mcp';
 import {
   normalizeMcpHeaders,
+  normalizeMcpHeadersHelper,
   normalizeMcpOAuthConfig,
-  normalizeMcpOAuthCredentials,
   normalizeMcpServerTransport,
   normalizeMcpServerTrustPolicy,
 } from '@zclaudia/shared/core/mcp';
 import { newId } from '../../utils/uuid.js';
+import { protectMcpOAuthCredentials, unprotectMcpOAuthCredentials } from './mcp-oauth-credential-protector.js';
 
 export interface McpServerRow {
   id: string;
@@ -29,6 +30,7 @@ export interface McpServerRow {
   transport?: string | null;
   url?: string | null;
   headers?: string | null;
+  headers_helper?: string | null;
   oauth_config?: string | null;
   oauth_credentials?: string | null;
   created_at: number;
@@ -43,6 +45,7 @@ interface CreateMcpServerInput {
   transport?: McpServerTransport;
   url?: string;
   headers?: Record<string, string>;
+  headersHelper?: string;
   oauthConfig?: McpOAuthConfig;
   oauthCredentials?: McpOAuthCredentials;
   enabled?: boolean;
@@ -59,6 +62,7 @@ interface UpdateMcpServerInput {
   transport?: McpServerTransport;
   url?: string | null;
   headers?: Record<string, string> | null;
+  headersHelper?: string | null;
   oauthConfig?: McpOAuthConfig | null;
   oauthCredentials?: McpOAuthCredentials | null;
   enabled?: boolean;
@@ -87,6 +91,7 @@ function rowToConfig(row: McpServerRow): McpServerConfig {
     transport: normalizeMcpServerTransport(row.transport),
     url: row.url || undefined,
     headers: parseHeaders(row.headers),
+    headersHelper: normalizeMcpHeadersHelper(row.headers_helper),
     oauthConfig: parseOAuthConfig(row.oauth_config),
     oauthCredentials: parseOAuthCredentials(row.oauth_credentials),
     enabled: row.enabled === 1,
@@ -118,12 +123,7 @@ function parseOAuthConfig(raw: string | null | undefined): McpOAuthConfig | unde
 }
 
 function parseOAuthCredentials(raw: string | null | undefined): McpOAuthCredentials | undefined {
-  if (!raw) return undefined;
-  try {
-    return normalizeMcpOAuthCredentials(JSON.parse(raw));
-  } catch {
-    return undefined;
-  }
+  return unprotectMcpOAuthCredentials(raw);
 }
 
 function parseTrustPolicy(raw: string | null | undefined): McpServerTrustPolicy | undefined {
@@ -151,8 +151,7 @@ function stringifyOAuthConfig(value: unknown): string | null {
 }
 
 function stringifyOAuthCredentials(value: unknown): string | null {
-  const normalized = normalizeMcpOAuthCredentials(value);
-  return normalized ? JSON.stringify(normalized) : null;
+  return protectMcpOAuthCredentials(value);
 }
 
 export class McpServerService {
@@ -165,7 +164,7 @@ export class McpServerService {
     const rows = this.db.prepare(`
       SELECT id, name, command, args, env, enabled, description,
              source, provider_scope, trust_policy, transport, url, headers,
-             oauth_config, oauth_credentials, created_at, updated_at
+             headers_helper, oauth_config, oauth_credentials, created_at, updated_at
       FROM mcp_servers ORDER BY name ASC
     `).all() as McpServerRow[];
 
@@ -193,9 +192,9 @@ export class McpServerService {
       INSERT INTO mcp_servers (
         id, name, command, args, env, enabled, description, source,
         provider_scope, trust_policy, transport, url, headers,
-        oauth_config, oauth_credentials, created_at, updated_at
+        headers_helper, oauth_config, oauth_credentials, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'user', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'user', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       input.name,
@@ -209,6 +208,7 @@ export class McpServerService {
       transport,
       input.url || null,
       stringifyHeaders(input.headers),
+      normalizeMcpHeadersHelper(input.headersHelper) ?? null,
       stringifyOAuthConfig(input.oauthConfig),
       stringifyOAuthCredentials(input.oauthCredentials),
       now,
@@ -241,6 +241,7 @@ export class McpServerService {
         transport = CASE WHEN ? THEN ? ELSE transport END,
         url = CASE WHEN ? THEN ? ELSE url END,
         headers = CASE WHEN ? THEN ? ELSE headers END,
+        headers_helper = CASE WHEN ? THEN ? ELSE headers_helper END,
         oauth_config = CASE WHEN ? THEN ? ELSE oauth_config END,
         oauth_credentials = CASE WHEN ? THEN ? ELSE oauth_credentials END,
         updated_at = ?
@@ -260,6 +261,8 @@ export class McpServerService {
       input.url !== undefined ? (input.url || null) : null,
       input.headers !== undefined ? 1 : 0,
       input.headers !== undefined ? stringifyHeaders(input.headers) : null,
+      input.headersHelper !== undefined ? 1 : 0,
+      input.headersHelper !== undefined ? (normalizeMcpHeadersHelper(input.headersHelper) ?? null) : null,
       input.oauthConfig !== undefined ? 1 : 0,
       input.oauthConfig !== undefined ? stringifyOAuthConfig(input.oauthConfig) : null,
       input.oauthCredentials !== undefined ? 1 : 0,
@@ -314,7 +317,7 @@ export class McpServerService {
     const row = this.db.prepare(`
       SELECT id, name, command, args, env, enabled, description,
              source, provider_scope, trust_policy, transport, url, headers,
-             oauth_config, oauth_credentials, created_at, updated_at
+             headers_helper, oauth_config, oauth_credentials, created_at, updated_at
       FROM mcp_servers WHERE id = ?
     `).get(id) as McpServerRow | undefined;
 
