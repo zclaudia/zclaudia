@@ -269,8 +269,12 @@ describe('chatStore', () => {
       expect(usage).toEqual({
         inputTokens: 100,
         outputTokens: 50,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         latestInputTokens: 100,
         latestOutputTokens: 50,
+        latestCacheReadTokens: 0,
+        latestCacheWriteTokens: 0,
       });
     });
 
@@ -282,8 +286,12 @@ describe('chatStore', () => {
       expect(usage).toEqual({
         inputTokens: 300,
         outputTokens: 125,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         latestInputTokens: 200,
         latestOutputTokens: 75,
+        latestCacheReadTokens: 0,
+        latestCacheWriteTokens: 0,
       });
     });
 
@@ -294,14 +302,22 @@ describe('chatStore', () => {
       expect(useChatStore.getState().sessionUsage['session-1']).toEqual({
         inputTokens: 100,
         outputTokens: 50,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         latestInputTokens: 100,
         latestOutputTokens: 50,
+        latestCacheReadTokens: 0,
+        latestCacheWriteTokens: 0,
       });
       expect(useChatStore.getState().sessionUsage['session-2']).toEqual({
         inputTokens: 200,
         outputTokens: 75,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         latestInputTokens: 200,
         latestOutputTokens: 75,
+        latestCacheReadTokens: 0,
+        latestCacheWriteTokens: 0,
       });
     });
 
@@ -315,8 +331,12 @@ describe('chatStore', () => {
       expect(useChatStore.getState().sessionUsage['session-2']).toEqual({
         inputTokens: 200,
         outputTokens: 75,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         latestInputTokens: 200,
         latestOutputTokens: 75,
+        latestCacheReadTokens: 0,
+        latestCacheWriteTokens: 0,
       });
     });
   });
