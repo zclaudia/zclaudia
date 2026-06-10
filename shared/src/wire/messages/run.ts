@@ -171,6 +171,24 @@ export interface RunFailedMessage {
   restoreDraft?: string;
 }
 
+/**
+ * Emitted while a run's LLM request is in retry backoff (pre-first-token
+ * failure: 429/529/5xx/network). Cleared client-side by any subsequent
+ * stream event or terminal run event.
+ */
+export interface RunRetryingMessage {
+  type: 'run_retrying';
+  runId: string;
+  sessionId: string;
+  /** Upcoming attempt number (2..maxAttempts). */
+  attempt: number;
+  maxAttempts: number;
+  delayMs: number;
+  /** HTTP status that triggered the retry; absent for connection-level failures. */
+  status?: number;
+  seq?: number;
+}
+
 export interface KillLeakedProcessesMessage {
   type: 'kill_leaked_processes';
 }

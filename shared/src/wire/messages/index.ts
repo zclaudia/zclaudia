@@ -147,7 +147,7 @@ import type {
 import type {
   RunStartedMessage, SessionCreatedMessage,
   DeltaMessage, ToolUseMessage, ToolResultMessage, ToolActivityMessage,
-  ModeChangeMessage, RunCompletedMessage, RunFailedMessage,
+  ModeChangeMessage, RunCompletedMessage, RunFailedMessage, RunRetryingMessage,
   MessageAppendedMessage,
   BackgroundTaskUpdateMessage, BackgroundPermissionPendingMessage,
   TaskNotificationMessage, TaskProgressMessage, TaskStatusNotificationMessage,
@@ -221,6 +221,7 @@ export type ServerMessage =
   | ModeChangeMessage
   | RunCompletedMessage
   | RunFailedMessage
+  | RunRetryingMessage
   | CompactionCompletedEvent
   | MessageAppendedMessage
   | PermissionRequestMessage
