@@ -281,19 +281,20 @@ describe('ws/run-handler', () => {
     expect(assembleContextMock).toHaveBeenCalledWith(
       'agent',
       expect.objectContaining({
+        baseSystemPrompt: 'agent system prompt',
         workspacePrompt: 'workspace prompt',
         skillDirectoryHint: 'skill directory',
       }),
     );
     const [, ctxArgs] = assembleContextMock.mock.calls[0] as [string, Record<string, unknown>];
     expect(ctxArgs.activeSkillsContent).toBeUndefined();
-    // RunOptions.systemPrompt is now sourced solely from agentProfile.systemPrompt
-    // (full replacement per agent-profiles spec §4.6); the context-engine output is
-    // intentionally not used as systemPrompt anymore.
+    // RunOptions.systemPrompt is the context-engine merge: agentProfile.systemPrompt
+    // (full replacement of the template persona per agent-profiles spec §4.6) with
+    // workspace/context sections appended after it.
     expect(providerRunMock).toHaveBeenCalledWith(
       'please review this change',
       expect.objectContaining({
-        systemPrompt: 'agent system prompt',
+        systemPrompt: 'assembled system prompt',
         agentProfile: expect.objectContaining({ id: 'agent-1', systemPrompt: 'agent system prompt' }),
         enabledTools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'LS'],
       }),

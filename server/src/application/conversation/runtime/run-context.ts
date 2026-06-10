@@ -124,15 +124,16 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     : modeValue;
 
   const template = ((message as Record<string, unknown>)._contextTemplate || (sessionType === 'agent' ? 'agent' : 'coding')) as ContextTemplate;
-  // Call assemble() for side effects: skill-discovery hint emission and workspace
-  // tracing hooks that downstream tooling may consume. Return value is intentionally
-  // discarded — systemPrompt now comes from agentProfile.systemPrompt per §4.6
-  // (full replacement). When a merge transform is added (e.g. AGENTS.md injection)
-  // this call becomes load-bearing.
-  createContextEngine().assemble(template, {
+  // Merge transform: agentProfile.systemPrompt fully replaces the template's
+  // built-in persona (§4.6) and leads the prompt; workspace/project instructions
+  // (SOUL.md/AGENTS.md/TOOLS.md/CLAUDE.md) and run context fragments are appended
+  // after it. Every fragment is deterministic per session (no timestamps), so the
+  // prompt-cache prefix stays stable across runs.
+  const systemPrompt = createContextEngine().assemble(template, {
     sessionId: message.sessionId,
     projectId: session.project_id,
     cwd,
+    baseSystemPrompt: agentProfile.systemPrompt,
     workspacePrompt,
     skillDirectoryHint,
     systemContext: message.systemContext,
@@ -149,7 +150,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       sessionId: sdkSessionId,
       env: filePushEnv,
       mode: message.mode || 'default',
-      systemPrompt: agentProfile.systemPrompt,
+      systemPrompt,
       sessionTitle: session.name || undefined,
       serverPort: serverPort || undefined,
       claudiaSessionId: message.sessionId,

@@ -24,6 +24,7 @@ Guidelines:
 
 function assembleCodingTemplate(input: AssemblyInput): string {
   return [
+    input.baseSystemPrompt,
     input.workspacePrompt,
     input.skillDirectoryHint,
     input.systemContext,
@@ -37,7 +38,7 @@ function assembleCodingTemplate(input: AssemblyInput): string {
 
 function assembleAgentTemplate(input: AssemblyInput): string {
   return [
-    AGENT_SYSTEM_PROMPT,
+    input.baseSystemPrompt || AGENT_SYSTEM_PROMPT,
     input.systemContext,
     input.workspacePrompt,
     input.skillDirectoryHint,
@@ -65,7 +66,7 @@ Guidelines:
 
 function assembleSupervisionTemplate(input: AssemblyInput): string {
   return [
-    SUPERVISION_SYSTEM_PROMPT,
+    input.baseSystemPrompt || SUPERVISION_SYSTEM_PROMPT,
     input.systemContext,
     input.workspacePrompt,
     input.skillDirectoryHint,
@@ -94,7 +95,7 @@ Guidelines:
 
 function assembleReviewTemplate(input: AssemblyInput): string {
   return [
-    REVIEW_SYSTEM_PROMPT,
+    input.baseSystemPrompt || REVIEW_SYSTEM_PROMPT,
     input.systemContext,
     input.workspacePrompt,
     input.skillDirectoryHint,
@@ -105,7 +106,7 @@ function assembleReviewTemplate(input: AssemblyInput): string {
 
 function assembleDebugTemplate(input: AssemblyInput): string {
   return [
-    DEBUG_SYSTEM_PROMPT,
+    input.baseSystemPrompt || DEBUG_SYSTEM_PROMPT,
     input.systemContext,
     input.workspacePrompt,
     input.skillDirectoryHint,
