@@ -1,4 +1,4 @@
-import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, ProviderCapabilities, SlashCommand, ContextWindowSource } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, ProviderCapabilities, SlashCommand, ContextWindowSource, CacheRetentionSetting } from '@zclaudia/shared';
 import { fetchApi, fetchLocalApi, activeServerSupports } from './base';
 import { apiCall, apiCallVoid } from './unwrap';
 
@@ -51,6 +51,7 @@ export async function createLlmProfile(data: {
   env?: Record<string, string>;
   requestHeaders?: Record<string, string>;
   models?: LlmProfileModelEntry[];
+  cacheRetention?: CacheRetentionSetting | null;
   isDefault?: boolean;
 }): Promise<LlmProfileConfig> {
   return apiCall<LlmProfileConfig>('/api/llm-profiles', {
@@ -61,7 +62,8 @@ export async function createLlmProfile(data: {
 
 export async function updateLlmProfile(
   id: string,
-  data: Partial<LlmProfileConfig>
+  // `cacheRetention: null` is meaningful on PUT: it clears the stored value.
+  data: Omit<Partial<LlmProfileConfig>, 'cacheRetention'> & { cacheRetention?: CacheRetentionSetting | null }
 ): Promise<LlmProfileConfig> {
   return apiCall<LlmProfileConfig>(`/api/llm-profiles/${id}`, {
     method: 'PUT',

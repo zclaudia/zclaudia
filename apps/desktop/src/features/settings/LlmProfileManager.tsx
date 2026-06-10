@@ -470,8 +470,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       let saved: LlmProfileConfig;
       if (updateTargetId) {
         // PUT null clears the cacheRetention field on the server side.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        saved = await api.updateLlmProfile(updateTargetId, { ...baseData, cacheRetention: cacheRetentionValue } as any);
+        saved = await api.updateLlmProfile(updateTargetId, { ...baseData, cacheRetention: cacheRetentionValue });
       } else {
         // POST ignores null server-side; only send a defined value.
         saved = await api.createLlmProfile({
