@@ -87,6 +87,8 @@ interface ChatState {
   sessionUsage: Record<string, {
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens: number;
+    cacheWriteTokens: number;
     contextWindow?: number;
     /**
      * Which layer in the resolution chain supplied `contextWindow`. Surfaced
@@ -104,6 +106,8 @@ interface ChatState {
     contextWindowMatchedProvider?: string;
     latestInputTokens?: number;
     latestOutputTokens?: number;
+    latestCacheReadTokens?: number;
+    latestCacheWriteTokens?: number;
   }>;
   // Permission policy override per session (user-selected policy, null = use project default)
   permissionOverrides: Record<string, Partial<UnifiedPermissionPolicy> | null>;
@@ -604,6 +608,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
           usageNext[sessionId] = {
             inputTokens: 0,
             outputTokens: 0,
+            cacheReadTokens: 0,
+            cacheWriteTokens: 0,
             contextWindow: info.contextWindow,
             contextWindowSource: info.contextWindowSource,
             contextWindowMatchedProvider: info.contextWindowMatchedProvider,
@@ -643,18 +649,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Usage tracking
   addSessionUsage: (sessionId, usage) =>
     set((state) => {
-      const existing = state.sessionUsage[sessionId] || { inputTokens: 0, outputTokens: 0 };
+      const existing = state.sessionUsage[sessionId] || { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
       return {
         sessionUsage: {
           ...state.sessionUsage,
           [sessionId]: {
             inputTokens: existing.inputTokens + usage.input,
             outputTokens: existing.outputTokens + usage.output,
+            cacheReadTokens: (existing.cacheReadTokens ?? 0) + (usage.cacheRead ?? 0),
+            cacheWriteTokens: (existing.cacheWriteTokens ?? 0) + (usage.cacheWrite ?? 0),
             contextWindow: existing.contextWindow,
             contextWindowSource: existing.contextWindowSource,
             contextWindowMatchedProvider: existing.contextWindowMatchedProvider,
             latestInputTokens: usage.input,
             latestOutputTokens: usage.output,
+            latestCacheReadTokens: usage.cacheRead ?? 0,
+            latestCacheWriteTokens: usage.cacheWrite ?? 0,
           },
         },
       };

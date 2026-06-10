@@ -527,9 +527,29 @@ describe('chatStore', () => {
       expect(useChatStore.getState().sessionUsage['sess-2']).toEqual({
         inputTokens: 200,
         outputTokens: 100,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
         latestInputTokens: 200,
         latestOutputTokens: 100,
+        latestCacheReadTokens: 0,
+        latestCacheWriteTokens: 0,
       });
+    });
+
+    const uc = (input: number, output: number, cacheRead: number, cacheWrite: number): UsageInfo => ({
+      input, output, cacheRead, cacheWrite, totalTokens: input + output,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    });
+
+    it('accumulates cache tokens and tracks latest snapshot', () => {
+      useChatStore.getState().addSessionUsage('sess-1', uc(100, 50, 1000, 200));
+      useChatStore.getState().addSessionUsage('sess-1', uc(10, 5, 2000, 0));
+
+      const usage = useChatStore.getState().sessionUsage['sess-1'];
+      expect(usage.cacheReadTokens).toBe(3000);
+      expect(usage.cacheWriteTokens).toBe(200);
+      expect(usage.latestCacheReadTokens).toBe(2000);
+      expect(usage.latestCacheWriteTokens).toBe(0);
     });
   });
 
