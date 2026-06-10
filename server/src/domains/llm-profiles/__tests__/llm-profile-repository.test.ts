@@ -79,6 +79,7 @@ describe('cacheRetention', () => {
     const created = repo.create({ name: 'p', providerType: 'anthropic', cacheRetention: 'short', isDefault: false });
     repo.update(created.id, { cacheRetention: 'none' });
     expect(repo.findById(created.id)?.cacheRetention).toBe('none');
+    // null is outside the public type; proves clearing writes DB NULL and reads back as undefined
     repo.update(created.id, { cacheRetention: null as never });
     expect(repo.findById(created.id)?.cacheRetention).toBeUndefined();
   });

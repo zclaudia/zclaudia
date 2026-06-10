@@ -5,4 +5,5 @@ export const migration: Migration = {
   sql: `
 ALTER TABLE llm_profiles ADD COLUMN cache_retention TEXT;
   `,
+  idempotent: true,
 };

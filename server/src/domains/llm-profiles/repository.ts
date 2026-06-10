@@ -95,7 +95,7 @@ export class LlmProfileRepository extends BaseRepository<
         data.requestHeaders ? JSON.stringify(data.requestHeaders) : null,
         data.models !== undefined ? JSON.stringify(data.models) : null,
         data.oauthCredentials ? JSON.stringify(data.oauthCredentials) : null,
-        data.cacheRetention ?? null,
+        data.cacheRetention || null,
         data.isDefault ? 1 : 0,
         now,
         now,
