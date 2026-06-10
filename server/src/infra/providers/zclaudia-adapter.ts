@@ -51,7 +51,7 @@ const manifest: PCPProviderManifest = {
     { id: 'interaction.form', supported: false, degradation: 'fallback_to_text' },
     { id: 'interaction.approval', supported: true, mode: 'native', reliability: 'strict' },
     { id: 'interaction.todo', supported: false, degradation: 'fallback_to_text' },
-    { id: 'input.image', supported: false, degradation: 'fallback_to_notice' },
+    { id: 'input.image', supported: true, mode: 'native', reliability: 'strict' },
     { id: 'input.text_file', supported: false, degradation: 'fallback_to_notice' },
     { id: 'input.binary_file', supported: false, degradation: 'fallback_to_notice' },
     { id: 'permission.mode', supported: true, mode: 'emulated', reliability: 'display_only' },
@@ -253,12 +253,15 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     //    user-declared contextWindow / maxTokens / displayName override the
     //    pi-ai registry / openai-compat defaults (T3 of llm-profile-models).
     let modelInfo: BuiltModel;
+    let supportsVision = false;
     try {
       const modelId = options.agentProfile?.model;
       const modelEntry = modelId
         ? options.llmProfileConfig?.models?.find((m) => m.modelId === modelId)
         : undefined;
       modelInfo = buildModel(options.llmProfileConfig, modelId, modelEntry);
+      const modelInput = (modelInfo.model as { input?: string[] }).input;
+      supportsVision = Array.isArray(modelInput) && modelInput.includes('image');
     } catch (err) {
       // Emit a minimal init so the client has a sessionId, then the error.
       yield {
@@ -536,7 +539,19 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     });
 
     // 8. Run prompt; close queue on completion or push error on rejection
-    agent.prompt(input)
+    const resolvedImages = options.images ?? [];
+    let promptInput = input;
+    let promptImages: Array<{ type: 'image'; data: string; mimeType: string }> | undefined;
+    if (resolvedImages.length > 0 && supportsVision) {
+      promptImages = resolvedImages.map((img) => ({ type: 'image' as const, data: img.data, mimeType: img.mimeType }));
+    } else if (resolvedImages.length > 0) {
+      // Vision degradation: the conversation continues with a textual stand-in
+      // per image instead of failing the run on a text-only model.
+      promptInput = `${input}\n\n${resolvedImages
+        .map((img) => `[Image attached: ${img.name} — current model does not support vision]`)
+        .join('\n')}`;
+    }
+    agent.prompt(promptInput, promptImages)
       .then(() => { queue.close(); })
       .catch(err => {
         const errorMsg: ClaudeMessage = {

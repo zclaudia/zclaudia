@@ -18,7 +18,7 @@ vi.mock('@earendil-works/pi-ai', async () => {
   const actual = await vi.importActual<typeof import('@earendil-works/pi-ai')>('@earendil-works/pi-ai');
   const KNOWN_PROVIDERS = ['anthropic', 'openai', 'deepseek'];
   function buildEntry(provider: string, model: string) {
-    return { provider, id: model, contextWindow: 200000, maxTokens: 8000 };
+    return { provider, id: model, contextWindow: 200000, maxTokens: 8000, input: ['text', 'image'] };
   }
   return {
     getModel: vi.fn((provider: string, model: string) => {
@@ -59,7 +59,7 @@ const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
     initialState: { systemPrompt: string; model: unknown; messages: unknown[]; tools?: unknown[] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     constructorOpts: any;
-    promptCalls: Array<{ input: string }>;
+    promptCalls: Array<{ input: string; images?: unknown[] }>;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     steerCalls: any[];
   }>,
@@ -90,8 +90,8 @@ vi.mock('@earendil-works/pi-agent-core', () => {
       this.listener = listener;
       return () => { this.listener = undefined; };
     }
-    async prompt(input: string): Promise<void> {
-      this.slot.promptCalls.push({ input });
+    async prompt(input: string, images?: unknown[]): Promise<void> {
+      this.slot.promptCalls.push({ input, images });
       const script = scriptQueue.shift() ?? { events: [] };
       // Yield once so the adapter's for-await loop has started consuming.
       await Promise.resolve();
@@ -1583,4 +1583,68 @@ describe('stream retry wiring', () => {
       retryInfo: expect.objectContaining({ attempt: 2, maxAttempts: 5, status: 429 }),
     });
   }, 10_000);
+});
+
+describe('vision gating', () => {
+  const originalEnv = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it('passes images to agent.prompt when the model supports vision', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'what is this', {
+      images: [{ name: 'a.png', mimeType: 'image/png', data: 'QQ==' }],
+    });
+
+    const call = mockAgentInstances[0].promptCalls[0];
+    expect(call.images).toEqual([{ type: 'image', data: 'QQ==', mimeType: 'image/png' }]);
+    expect(call.input).not.toContain('does not support vision');
+  });
+
+  it('degrades images to text notices for non-vision models', async () => {
+    // Override getModel to return a text-only entry for this run
+    const piAi = await import('@earendil-works/pi-ai');
+    vi.mocked(piAi.getModel).mockImplementationOnce((provider: string, model: string) => {
+      if (provider === 'unknown') throw new Error(`unknown provider: ${provider}`);
+      return { provider, id: model, contextWindow: 200000, maxTokens: 8000, input: ['text'] } as never;
+    });
+
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'what is this', {
+      images: [{ name: 'a.png', mimeType: 'image/png', data: 'QQ==' }],
+    });
+
+    const call = mockAgentInstances[0].promptCalls[0];
+    expect(call.images).toBeUndefined();
+    expect(call.input).toContain('[Image attached: a.png — current model does not support vision]');
+  });
+
+  it('plain runs without images behave exactly as before', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hello', {});
+
+    const call = mockAgentInstances[0].promptCalls[0];
+    expect(call.images).toBeUndefined();
+  });
 });
