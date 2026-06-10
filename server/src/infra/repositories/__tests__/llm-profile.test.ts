@@ -118,8 +118,10 @@ describe('LlmProfileRepository', () => {
       expect(params[7]).toBeNull();
       // oauth_credentials is the 9th param (index 8) — null when omitted
       expect(params[8]).toBeNull();
-      // is_default is the 10th param (index 9)
-      expect(params[9]).toBe(1);
+      // cache_retention is the 10th param (index 9) — null when omitted
+      expect(params[9]).toBeNull();
+      // is_default is the 11th param (index 10)
+      expect(params[10]).toBe(1);
     });
 
     it('uses default provider type when not specified', () => {
@@ -139,8 +141,8 @@ describe('LlmProfileRepository', () => {
       const { params: paramsTrue } = repository.createQuery(dataTrue);
       const { params: paramsFalse } = repository.createQuery(dataFalse);
 
-      expect(paramsTrue[9]).toBe(1);
-      expect(paramsFalse[9]).toBe(0);
+      expect(paramsTrue[10]).toBe(1);
+      expect(paramsFalse[10]).toBe(0);
     });
 
     it('generates UUID for id', () => {
@@ -156,9 +158,9 @@ describe('LlmProfileRepository', () => {
       const { params } = repository.createQuery(data);
       const after = Date.now();
 
-      expect(params[10]).toBeGreaterThanOrEqual(before);
-      expect(params[10]).toBeLessThanOrEqual(after);
-      expect(params[11]).toBe(params[10]);
+      expect(params[11]).toBeGreaterThanOrEqual(before);
+      expect(params[11]).toBeLessThanOrEqual(after);
+      expect(params[12]).toBe(params[11]);
     });
   });
 
