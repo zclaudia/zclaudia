@@ -97,7 +97,7 @@ describe('AgentManager', () => {
       llmProfileId: 'llm-1',
       model: 'claude-sonnet-4-5',
       systemPrompt: 'You are a coding agent.',
-      enabledTools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Find', 'Glob', 'LS'],
+      enabledTools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob', 'LS'],
       toolSelection: {
         sets: [{ source: 'builtin', id: 'core-coding' }],
         providers: [],
@@ -223,7 +223,7 @@ describe('AgentManager', () => {
     expect(screen.getByText('System Prompt')).toBeInTheDocument();
     expect(screen.getByText('Tool Sets')).toBeInTheDocument();
     expect(screen.getByText('Core Coding')).toBeInTheDocument();
-    expect(screen.getByText('8 tools')).toBeInTheDocument();
+    expect(screen.getByText('7 tools')).toBeInTheDocument();
     expect(screen.queryByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeNull();
     await clickAsync(screen.getByLabelText('expand tool set core-coding'));
     expect(screen.getByText('Read')).toBeInTheDocument();
@@ -278,13 +278,12 @@ describe('AgentManager', () => {
               { source: 'builtin', name: 'Write' },
               { source: 'builtin', name: 'Edit' },
               { source: 'builtin', name: 'Grep' },
-              { source: 'builtin', name: 'Find' },
               { source: 'builtin', name: 'Glob' },
               { source: 'builtin', name: 'LS' },
             ],
             exclude: [],
           },
-          enabledTools: ['Read', 'Write', 'Edit', 'Grep', 'Find', 'Glob', 'LS'],
+          enabledTools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'LS'],
           thinkingLevel: 'low',
           isDefault: true,
         })

@@ -23,8 +23,12 @@ vi.mock('../../stores/chatStore', () => ({
 }));
 
 // Mock api
+const { mockGetWorkspaceSkillsResult } = vi.hoisted(() => ({
+  mockGetWorkspaceSkillsResult: vi.fn(),
+}));
 vi.mock('../../services/api', () => ({
   listDirectory: vi.fn().mockResolvedValue({ entries: [] }),
+  getWorkspaceSkillsResult: mockGetWorkspaceSkillsResult,
 }));
 
 // Mock commands for testing
@@ -47,6 +51,7 @@ describe('MessageInput', () => {
     vi.clearAllMocks();
     vi.useRealTimers();
     mockIsMobile = false;
+    mockGetWorkspaceSkillsResult.mockResolvedValue({ skills: [], diagnostics: [] });
   });
 
   // ── Basic rendering ─────────────────────────────────────────────────────
@@ -73,7 +78,7 @@ describe('MessageInput', () => {
 
   it('renders hint text', () => {
     render(<MessageInput {...defaultProps} />);
-    expect(screen.getByText('Type / for commands')).toBeInTheDocument();
+    expect(screen.getByText('Type / for commands and skills')).toBeInTheDocument();
     expect(screen.getByText(/Paste images with (Cmd|Ctrl)\+V/)).toBeInTheDocument();
   });
 
