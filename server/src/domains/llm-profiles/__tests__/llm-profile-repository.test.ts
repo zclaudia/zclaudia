@@ -60,3 +60,32 @@ describe('LlmProfileRepository — models field', () => {
     expect(read?.models).toEqual([{ modelId: 'a', contextWindow: 100 }]);
   });
 });
+
+describe('cacheRetention', () => {
+  let db: Database.Database;
+  let repo: LlmProfileRepository;
+
+  beforeEach(() => {
+    db = createTestDb();
+    repo = new LlmProfileRepository(db);
+  });
+
+  it('round-trips cacheRetention through create and findById', () => {
+    const created = repo.create({ name: 'p', providerType: 'anthropic', cacheRetention: 'long', isDefault: false });
+    expect(repo.findById(created.id)?.cacheRetention).toBe('long');
+  });
+
+  it('updates and clears cacheRetention', () => {
+    const created = repo.create({ name: 'p', providerType: 'anthropic', cacheRetention: 'short', isDefault: false });
+    repo.update(created.id, { cacheRetention: 'none' });
+    expect(repo.findById(created.id)?.cacheRetention).toBe('none');
+    repo.update(created.id, { cacheRetention: null as never });
+    expect(repo.findById(created.id)?.cacheRetention).toBeUndefined();
+  });
+
+  it('maps unknown stored values to undefined (forward-compat)', () => {
+    const created = repo.create({ name: 'p', providerType: 'anthropic', isDefault: false });
+    db.prepare('UPDATE llm_profiles SET cache_retention = ? WHERE id = ?').run('weekly', created.id);
+    expect(repo.findById(created.id)?.cacheRetention).toBeUndefined();
+  });
+});

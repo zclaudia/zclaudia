@@ -1,6 +1,6 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
+import type { LlmProfileConfig, LlmProfileCompat, LlmProfileModelEntry, CacheRetentionSetting } from '@zclaudia/shared/core/llm-profile';
 import { newId } from '../../utils/uuid.js';
 
 export class LlmProfileRepository extends BaseRepository<
@@ -23,10 +23,15 @@ export class LlmProfileRepository extends BaseRepository<
       requestHeaders: row.request_headers ? JSON.parse(row.request_headers) : undefined,
       models: row.models != null ? this.parseModels(row.models) : undefined,
       oauthCredentials: row.oauth_credentials ? this.parseOAuthCredentials(row.oauth_credentials) : undefined,
+      cacheRetention: this.parseCacheRetention(row.cache_retention),
       isDefault: row.is_default === 1,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
+  }
+
+  private parseCacheRetention(raw: unknown): CacheRetentionSetting | undefined {
+    return raw === 'none' || raw === 'short' || raw === 'long' ? raw : undefined;
   }
 
   private parseCompat(raw: string): LlmProfileCompat | undefined {
@@ -77,8 +82,8 @@ export class LlmProfileRepository extends BaseRepository<
 
     return {
       sql: `
-        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, models, oauth_credentials, is_default, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, request_headers, models, oauth_credentials, cache_retention, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -90,6 +95,7 @@ export class LlmProfileRepository extends BaseRepository<
         data.requestHeaders ? JSON.stringify(data.requestHeaders) : null,
         data.models !== undefined ? JSON.stringify(data.models) : null,
         data.oauthCredentials ? JSON.stringify(data.oauthCredentials) : null,
+        data.cacheRetention ?? null,
         data.isDefault ? 1 : 0,
         now,
         now,
@@ -132,6 +138,10 @@ export class LlmProfileRepository extends BaseRepository<
     if (data.oauthCredentials !== undefined) {
       updates.push('oauth_credentials = ?');
       params.push(data.oauthCredentials === null ? null : JSON.stringify(data.oauthCredentials));
+    }
+    if (data.cacheRetention !== undefined) {
+      updates.push('cache_retention = ?');
+      params.push(data.cacheRetention || null);
     }
     if (data.isDefault !== undefined) {
       updates.push('is_default = ?');
