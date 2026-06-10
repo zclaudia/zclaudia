@@ -17,6 +17,7 @@ import {
   buildActiveSkillContext,
   buildSkillCatalog,
   buildSkillMetaTools,
+  withStreamRetry,
   type BuiltModel,
 } from './pi-runtime/index.js';
 import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
@@ -420,6 +421,10 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       ? baseSystemPrompt + PLAN_MODE_SYSTEM_PROMPT_SUFFIX
       : baseSystemPrompt;
 
+    // Queue is created before agentOpts so the onRetry callback can push
+    // retry_scheduled messages without a forward reference to the queue.
+    const queue = new AsyncQueue<ClaudeMessage>();
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const agentOpts: any = {
       initialState: {
@@ -446,15 +451,23 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // so a per-profile preference has to ride in via a streamFn wrapper. When
     // the profile doesn't set one, leave pi-ai's own default ('short', plus
     // the PI_CACHE_RETENTION env knob) untouched.
-    // 'none' is deliberately truthy here: it rides the wrapper to actively disable cache_control markers (pi-ai treats it as opt-out, not default).
+    // 'none' is deliberately truthy here: it rides the wrapper to actively
+    // disable cache_control markers (pi-ai treats it as opt-out, not default).
     const cacheRetention = options.llmProfileConfig?.cacheRetention;
-    if (cacheRetention) {
-      const inner: StreamFn = hooks.streamFn ?? streamSimple;
-      agentOpts.streamFn = ((model, context, streamOpts) =>
-        inner(model, context, { ...streamOpts, cacheRetention })) as StreamFn;
-    } else if (hooks.streamFn) {
-      agentOpts.streamFn = hooks.streamFn;
-    }
+    const baseStreamFn: StreamFn = hooks.streamFn ?? streamSimple;
+    const cachedStreamFn: StreamFn = cacheRetention
+      ? (((m, c, o) => baseStreamFn(m, c, { ...o, cacheRetention })) as StreamFn)
+      : baseStreamFn;
+    // Retry wrapping is unconditional: pre-first-token transient failures
+    // (429/529/5xx/network) back off and retry instead of failing the run.
+    agentOpts.streamFn = withStreamRetry(cachedStreamFn, {
+      onRetry: (info) => {
+        queue.push({
+          type: 'retry_scheduled',
+          retryInfo: info,
+        } as ClaudeMessage);
+      },
+    });
 
     const agent = new Agent(agentOpts);
 
@@ -467,7 +480,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // 7. Subscribe → translate → queue
     // `agent_start` is intentionally not translated by translateEvent; init is
     // emitted manually above as a run-bootstrap concern.
-    const queue = new AsyncQueue<ClaudeMessage>();
+    // (queue is created above agentOpts so the onRetry callback can reference it)
     // Listener MUST stay synchronous: we rely on `result` being pushed to the queue
     // before `agent.prompt(input).then(close)` settles. Making this async would
     // break the init → ... → result → close ordering guarantee.

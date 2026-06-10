@@ -566,6 +566,21 @@ export function handleProviderEvent({
       break;
     }
 
+    case 'retry_scheduled': {
+      if (msg.retryInfo) {
+        sendRunEvent({
+          type: 'run_retrying',
+          runId,
+          sessionId: activeRun.sessionId,
+          attempt: msg.retryInfo.attempt,
+          maxAttempts: msg.retryInfo.maxAttempts,
+          delayMs: msg.retryInfo.delayMs,
+          ...(msg.retryInfo.status !== undefined ? { status: msg.retryInfo.status } : {}),
+        });
+      }
+      break;
+    }
+
     case 'error': {
       const rawProviderError = (msg.error || 'Provider error') as string;
       const authHint = activeRun.providerType

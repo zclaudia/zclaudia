@@ -14,7 +14,8 @@ import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
 // existing assertions about contextWindow=200_000 still hold; getProviders
 // returns the known providers so cross-provider sweep can iterate; getModels
 // returns the entry only when the provider+id pair would have hit getModel.
-vi.mock('@earendil-works/pi-ai', () => {
+vi.mock('@earendil-works/pi-ai', async () => {
+  const actual = await vi.importActual<typeof import('@earendil-works/pi-ai')>('@earendil-works/pi-ai');
   const KNOWN_PROVIDERS = ['anthropic', 'openai', 'deepseek'];
   function buildEntry(provider: string, model: string) {
     return { provider, id: model, contextWindow: 200000, maxTokens: 8000 };
@@ -40,7 +41,15 @@ vi.mock('@earendil-works/pi-ai', () => {
       if (!KNOWN_PROVIDERS.includes(provider)) return [];
       return [buildEntry(provider, `registered-${provider}-model`)];
     }),
-    streamSimple: vi.fn(() => ({ async *[Symbol.asyncIterator]() {} })),
+    // Re-export the real createAssistantMessageEventStream so retry-stream.ts
+    // (which is a real module in the import graph) works correctly in tests.
+    createAssistantMessageEventStream: actual.createAssistantMessageEventStream,
+    streamSimple: vi.fn(() => {
+      const stream = actual.createAssistantMessageEventStream();
+      stream.push({ type: 'done', reason: 'stop', message: { role: 'assistant', content: [], stopReason: 'stop' } } as never);
+      stream.end();
+      return stream;
+    }),
   };
 });
 
@@ -1341,7 +1350,7 @@ describe('prompt cache wiring', () => {
     );
   });
 
-  it('leaves streamFn unset when profile has no cacheRetention', async () => {
+  it('wraps streamFn without cacheRetention injection when profile has none', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },
@@ -1355,7 +1364,16 @@ describe('prompt cache wiring', () => {
       } as any,
     });
 
-    expect(mockAgentInstances[0].constructorOpts.streamFn).toBeUndefined();
+    // streamFn is now always set (retry wrapper is unconditional).
+    expect(typeof mockAgentInstances[0].constructorOpts.streamFn).toBe('function');
+    const { streamSimple } = await import('@earendil-works/pi-ai');
+    mockAgentInstances[0].constructorOpts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
+    await vi.waitFor(() => {
+      expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
+        expect.anything(), expect.anything(),
+        expect.not.objectContaining({ cacheRetention: expect.anything() }),
+      );
+    });
   });
 
   it('passes the zclaudia session id to the Agent for cache routing', async () => {
@@ -1396,5 +1414,83 @@ describe('prompt cache wiring', () => {
       { messages: [] },
       expect.objectContaining({ temperature: 0, cacheRetention: 'none' }),
     );
+  });
+});
+
+describe('stream retry wiring', () => {
+  const originalEnv = { ...process.env };
+  beforeEach(() => {
+    process.env = { ...originalEnv };
+    mockAgentInstances.length = 0;
+    scriptQueue.length = 0;
+  });
+  afterEach(() => { process.env = { ...originalEnv }; });
+
+  it('always wraps streamFn (even without cacheRetention)', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      llmProfileConfig: {
+        id: 'lp-no-cache', name: 'p', providerType: 'anthropic',
+        createdAt: 0, updatedAt: 0,
+      } as any,
+    });
+
+    expect(typeof mockAgentInstances[0].constructorOpts.streamFn).toBe('function');
+  });
+
+  it('injects cacheRetention through the retry wrapper when configured', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      llmProfileConfig: {
+        id: 'lp-cache', name: 'p', providerType: 'anthropic',
+        cacheRetention: 'long',
+        createdAt: 0, updatedAt: 0,
+      } as any,
+    });
+
+    const opts = mockAgentInstances[0].constructorOpts;
+    const { streamSimple } = await import('@earendil-works/pi-ai');
+    opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
+    await vi.waitFor(() => {
+      expect(vi.mocked(streamSimple)).toHaveBeenCalledWith(
+        expect.anything(), expect.anything(),
+        expect.objectContaining({ cacheRetention: 'long' }),
+      );
+    });
+  });
+
+  it('does not inject cacheRetention when profile has none', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const adapter = new ZClaudiaAdapter();
+    await collect(adapter, 'hi', {
+      llmProfileConfig: {
+        id: 'lp-no-cache2', name: 'p', providerType: 'anthropic',
+        createdAt: 0, updatedAt: 0,
+      } as any,
+    });
+
+    const opts = mockAgentInstances[0].constructorOpts;
+    const { streamSimple } = await import('@earendil-works/pi-ai');
+    vi.mocked(streamSimple).mockClear();
+    opts.streamFn({ id: 'm' }, { messages: [] }, { temperature: 0 });
+    await vi.waitFor(() => {
+      expect(vi.mocked(streamSimple)).toHaveBeenCalled();
+    });
+    const callOpts = vi.mocked(streamSimple).mock.calls[0][2];
+    expect(callOpts).not.toHaveProperty('cacheRetention');
   });
 });

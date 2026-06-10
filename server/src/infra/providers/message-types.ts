@@ -67,7 +67,15 @@ export interface ClaudeMessage {
     | 'task_notification'
     | 'tool_activity'
     | 'mode_transition'
-    | 'thinking_delta';
+    | 'thinking_delta'
+    | 'retry_scheduled';
+  /** Populated when type === 'retry_scheduled'. */
+  retryInfo?: {
+    attempt: number;
+    maxAttempts: number;
+    delayMs: number;
+    status?: number;
+  };
   sessionId?: string;
   content?: string;
   systemInfo?: SystemInfo;
