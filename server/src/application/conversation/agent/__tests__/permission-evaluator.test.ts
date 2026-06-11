@@ -598,12 +598,36 @@ describe('PermissionEvaluator', () => {
       expect(evaluator.evaluate('Bash', { command: 'ls' }, 'ls', policy, makeContext())).toBe('approve');
     });
 
-    it('custom rules take priority over global guards', () => {
+    it('custom rules do NOT bypass global guards (guards run first)', () => {
+      // A broad allow rule cannot bypass the sensitive-file or outside-workspace guards.
+      // With the new evaluation order (guards before custom rules), the guard fires first.
       const policy = makePolicy({
         customRules: [{ toolName: 'Write', action: 'approve' }],
         globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: true },
       });
-      expect(evaluator.evaluate('Write', { file_path: '/tmp/.env' }, '', policy)).toBe('approve');
+      expect(evaluator.evaluate('Write', { file_path: '/tmp/.env' }, '', policy, makeContext())).toBe('escalate');
+    });
+  });
+
+  // ------------------------------------------
+  // Evaluation order: guards before custom rules
+  // ------------------------------------------
+  describe('evaluation order: guards before custom rules', () => {
+    it('a broad allow rule cannot bypass the sensitive-file guard', () => {
+      const policy = makePolicy({
+        customRules: [{ toolName: 'Read', pattern: '^.*$', action: 'approve' }],
+        globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
+      });
+      const result = new PermissionEvaluator().evaluate('Read', { file_path: '/repo/.env' }, '', policy, makeContext());
+      expect(result).toBe('escalate');
+    });
+
+    it('custom rules still fire for non-guarded targets', () => {
+      const policy = makePolicy({
+        customRules: [{ toolName: 'Bash', pattern: '^git(\\s.*)?$', action: 'approve' }],
+        profile: makeProfile({ shellSafe: 'ask' }),
+      });
+      expect(new PermissionEvaluator().evaluate('Bash', { command: 'git status' }, 'git status', policy, makeContext())).toBe('approve');
     });
   });
 

@@ -434,17 +434,17 @@ export function getMatchedPermissionRule(
     return 'Always escalate';
   }
 
-  const customResult = evaluateCustomRules(toolName, detail, policy.customRules || []);
-  if (customResult === 'escalate') {
-    return 'Custom rule';
-  }
-
   if (policy.globalGuards.blockSensitiveFiles && targetsSensitiveFile(toolName, toolInput, detail)) {
     return 'Sensitive file access';
   }
 
   if (policy.globalGuards.blockOutsideWorkspace && targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)) {
     return 'Outside workspace access';
+  }
+
+  const customResult = evaluateCustomRules(toolName, detail, policy.customRules || []);
+  if (customResult === 'escalate') {
+    return 'Custom rule';
   }
 
   const category = classify(toolName, toolInput, detail);
@@ -488,8 +488,10 @@ function evaluateCustomRules(toolName: string, detail: string, rules: AgentPermi
  *
  * Evaluation order:
  *   1. escalateAlways list
- *   2. Custom rules (first match wins)
- *   3. Global guards (sensitive files / outside workspace → escalate)
+ *   2. Global guards (sensitive files / outside workspace → escalate)
+ *      Guards are not bypassable by allow rules; the user can still approve
+ *      (and promote a rule) from the escalation prompt.
+ *   3. Custom rules (first match wins)
  *   4. Classify tool → category → look up profile → action
  */
 export class PermissionEvaluator {
@@ -509,18 +511,18 @@ export class PermissionEvaluator {
       return 'escalate';
     }
 
-    // 2. Custom rules (first match wins)
-    const customResult = evaluateCustomRules(toolName, detail, policy.customRules || []);
-    if (customResult !== 'continue') {
-      return customResult;
-    }
-
-    // 3. Global guards → escalate (user can override)
+    // 2. Global guards → escalate (not bypassable by allow rules)
     if (policy.globalGuards.blockSensitiveFiles && targetsSensitiveFile(toolName, toolInput, detail)) {
       return 'escalate';
     }
     if (policy.globalGuards.blockOutsideWorkspace && targetsOutsideWorkspace(toolName, toolInput, detail, rootPath)) {
       return 'escalate';
+    }
+
+    // 3. Custom rules (first match wins)
+    const customResult = evaluateCustomRules(toolName, detail, policy.customRules || []);
+    if (customResult !== 'continue') {
+      return customResult;
     }
 
     // 4. Category-based evaluation
