@@ -77,3 +77,34 @@ export function persistProjectAllowedOutsideWorkspaceRoots(
     stmt.run(projectId, root, now, now);
   }
 }
+
+/** Remember-key namespace for Phase B1 session network grants. */
+const SANDBOX_NETWORK_KEY_PREFIX = 'sandbox:network:';
+
+/** Load the session's granted sandbox network domains (Phase B1). */
+export function loadSessionSandboxDomains(
+  db: PermissionMemoryDb,
+  sessionId: string
+): string[] {
+  const rows = db.prepare(
+    "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
+  ).all(sessionId);
+  return rows
+    .map((row) => (row.remember_key as string).slice(SANDBOX_NETWORK_KEY_PREFIX.length))
+    .filter((host) => host.length > 0);
+}
+
+/** Persist a session network grant (Phase B1). Idempotent per (session, host). */
+export function persistSessionSandboxDomain(
+  db: PermissionMemoryDb,
+  sessionId: string,
+  host: string
+): void {
+  const now = Date.now();
+  db.prepare(`
+    INSERT INTO permission_memories (session_id, remember_key, decision, created_at, updated_at)
+    VALUES (?, ?, 'allow', ?, ?)
+    ON CONFLICT(session_id, remember_key)
+    DO UPDATE SET decision = 'allow', updated_at = excluded.updated_at
+  `).run(sessionId, SANDBOX_NETWORK_KEY_PREFIX + host, now, now);
+}
