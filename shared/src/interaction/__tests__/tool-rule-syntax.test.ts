@@ -53,6 +53,15 @@ describe('formatToolRule (round-trip)', () => {
   it('falls back to /regex/ display for foreign regexes', () => {
     expect(formatToolRule({ toolName: 'Bash', pattern: '^docker (run|exec)' })).toBe('Bash(/^docker (run|exec)/)');
   });
+
+  it('does not decompile foreign escape sequences to wrong globs', () => {
+    expect(formatToolRule({ toolName: 'Bash', pattern: '^git\\scommit$' })).toBe('Bash(/^git\\scommit$/)');
+    expect(formatToolRule({ toolName: 'Bash', pattern: '^git\\tcommit$' })).toBe('Bash(/^git\\tcommit$/)');
+  });
+
+  it('still decompiles compiler-escaped specials', () => {
+    expect(formatToolRule({ toolName: 'Read', pattern: '^.*\\.env$' })).toBe('Read(*.env)');
+  });
 });
 
 describe('suggestRuleForRequest', () => {

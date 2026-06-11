@@ -59,6 +59,13 @@ export function parseToolRule(text: string): ToolRuleParseResult {
 /** Characters our compiler can emit unescaped inside a glob body. */
 const GLOB_LITERAL_RE = /[A-Za-z0-9_\-\s/:=@,~'"#%&!]/;
 
+/** Characters that compileGlob itself escapes; only these are valid `\X` sequences in compiler-produced patterns. */
+const COMPILER_ESCAPED = new Set(['.', '+', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\']);
+
+/**
+ * Attempt to decompile a regex source back to a glob pattern. Only decompiles
+ * patterns produced by compileGlob; any construct compileGlob cannot emit returns null.
+ */
 function tryRegexToGlob(source: string): string | null {
   if (!source.startsWith('^')) return null;
   let body = source.slice(1);
@@ -77,6 +84,7 @@ function tryRegexToGlob(source: string): string | null {
     if (ch === '\\') {
       const next = body[i + 1];
       if (next === undefined) return null;
+      if (!COMPILER_ESCAPED.has(next)) return null; // foreign escape sequence
       out += next;
       i++;
     } else if (ch === '.') {
