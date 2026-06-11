@@ -1095,8 +1095,8 @@ describe('Monitor stops command tasks', () => {
 
     const res = await monitor.execute('mb2', { action: 'stop', task_id: taskId });
     await new Promise(r => setTimeout(r, 300));
-    const parsed = JSON.parse(res.content[0].text);
     rmSync(dir, { recursive: true, force: true });
+    const parsed = JSON.parse(res.content[0].text);
     expect(parsed.ok).toBe(true);
     expect(parsed.status).toBe('stopped');
     expect(pidAlive(pid)).toBe(false);

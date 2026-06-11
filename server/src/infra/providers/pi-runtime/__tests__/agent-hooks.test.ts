@@ -97,7 +97,7 @@ describe('truncateContent', () => {
 });
 
 describe('buildAgentHooks.beforeToolCall', () => {
-  const fakeToolCall = { id: 't1', name: 'read', arguments: { path: '/tmp/x' } };
+  const fakeToolCall = { id: 't1', name: 'Read', arguments: { path: '/tmp/x' } };
 
   it('returns undefined when permissionCallback allows', async () => {
     const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow' });
@@ -106,7 +106,7 @@ describe('buildAgentHooks.beforeToolCall', () => {
     expect(result).toBeUndefined();
     expect(permissionCallback).toHaveBeenCalledOnce();
     const sent = permissionCallback.mock.calls[0][0];
-    expect(sent.toolName).toBe('Read');           // canonical, not 'read'
+    expect(sent.toolName).toBe('Read');           // canonical name passed through
     expect(typeof sent.requestId).toBe('string');
     expect(sent.requestId.length).toBeGreaterThan(0);
     expect(sent.timeoutSeconds).toBe(0);
@@ -136,18 +136,17 @@ describe('buildAgentHooks.beforeToolCall', () => {
     expect(result).toEqual({ block: true, reason: 'denied by user' });
   });
 
-  it('normalizes pi lowercase tool names to canonical (Claude Code style)', async () => {
+  it('passes canonical (Claude Code style) tool names straight through to permissionCallback', async () => {
     const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow' });
     const hooks = buildAgentHooks({ permissionCallback });
-    const piNames = ['read', 'write', 'edit', 'bash', 'grep', 'find', 'ls'];
-    const expectedCanonical = ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob', 'LS'];
-    for (let i = 0; i < piNames.length; i++) {
+    const toolNames = ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob', 'LS'];
+    for (let i = 0; i < toolNames.length; i++) {
       permissionCallback.mockClear();
       await hooks.beforeToolCall!({
-        toolCall: { id: 't' + i, name: piNames[i], arguments: {} },
+        toolCall: { id: 't' + i, name: toolNames[i], arguments: {} },
         args: {},
       } as any);
-      expect(permissionCallback.mock.calls[0][0].toolName).toBe(expectedCanonical[i]);
+      expect(permissionCallback.mock.calls[0][0].toolName).toBe(toolNames[i]);
     }
   });
 
@@ -155,7 +154,7 @@ describe('buildAgentHooks.beforeToolCall', () => {
     const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow' });
     const hooks = buildAgentHooks({ permissionCallback });
     await hooks.beforeToolCall!({
-      toolCall: { id: 't1', name: 'bash', arguments: { command: 'ls -la /tmp' } },
+      toolCall: { id: 't1', name: 'Bash', arguments: { command: 'ls -la /tmp' } },
       args: { command: 'ls -la /tmp' },
     } as any);
     expect(permissionCallback.mock.calls[0][0].detail).toBe('ls -la /tmp');

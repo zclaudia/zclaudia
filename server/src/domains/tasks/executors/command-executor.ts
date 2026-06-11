@@ -103,7 +103,8 @@ export class CommandTaskExecutor implements TaskExecutor {
         // already transitioned by the exit watch — fine
       }
     }
-    return { status: 'stopped' };
+    const after = this.repo.findById(taskId);
+    return { status: after?.status ?? 'stopped', result: after?.result };
   }
 
   async wait(taskId: string, options?: { timeoutMs?: number }): Promise<TaskExecutorUpdate> {

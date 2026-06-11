@@ -87,7 +87,7 @@ describe('CommandTaskExecutor', () => {
     service.startTask(task.id, { executorRef: started.executorRef });
     await wait(700); // let it complete
     expect(repo.findById(task.id)!.status).toBe('completed');
-    await expect(executor.stop(task.id, 'late stop')).resolves.toEqual({ status: 'stopped' });
+    await expect(executor.stop(task.id, 'late stop')).resolves.toMatchObject({ status: 'completed' });
     expect(repo.findById(task.id)!.status).toBe('completed'); // unchanged
   });
 
