@@ -121,7 +121,7 @@ export function shouldSkipTokenAsTextArgument(tokens: ShellToken[], index: numbe
 
 export function shouldIgnoreOutsideWorkspaceExecutable(tokens: ShellToken[], index: number): boolean {
   const token = tokens[index]?.value;
-  if (!token?.startsWith('/')) return false;
+  if (!token?.startsWith('/') && !token?.startsWith('./')) return false;
 
   const firstCommandIndex = tokens.findIndex((candidate) => candidate.value && !candidate.value.includes('='));
   if (firstCommandIndex !== index) return false;
@@ -133,13 +133,20 @@ export function shouldIgnoreOutsideWorkspaceExecutable(tokens: ShellToken[], ind
 // Path Extraction & Workspace Validation
 // ============================================
 
+/** Returns true when a token looks like a path argument (absolute, relative `./`, or bare dotfile). */
+function isPathLikeToken(value: string): boolean {
+  return value.startsWith('/')   // absolute: /etc/hosts
+    || value.startsWith('./')    // relative: ./config/.env
+    || (value.startsWith('.') && value.length > 1 && !value.startsWith('..'));  // bare dotfile: .env, .env.local
+}
+
 export function extractPathsFromCommand(command: string): string[] {
   const paths = new Set<string>();
   for (const segment of splitCompoundCommand(command)) {
     const tokens = tokenizeShellWords(segment);
     for (let i = 0; i < tokens.length; i += 1) {
       const token = tokens[i];
-      if (!token.value.startsWith('/')) continue;
+      if (!isPathLikeToken(token.value)) continue;
       if (shouldSkipTokenAsTextArgument(tokens, i)) continue;
       if (shouldIgnoreOutsideWorkspaceExecutable(tokens, i)) continue;
       paths.add(token.value);

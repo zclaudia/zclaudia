@@ -92,6 +92,9 @@ check_build_tools() {
     warn "Native build tools may be needed for better-sqlite3: ${missing[*]}"
     warn "If install fails, run: sudo apt install -y python3 make gcc g++"
   fi
+
+  # Bash sandbox (defense-in-depth): bubblewrap + socat required on Linux (network is always proxied).
+  apt-get install -y bubblewrap socat || echo "WARN: bubblewrap/socat not installed — Bash sandbox will degrade to unsandboxed"
 }
 
 install_deps() {

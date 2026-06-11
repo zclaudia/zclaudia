@@ -441,6 +441,19 @@ describe('PermissionEvaluator', () => {
       expect(evaluator.evaluate('Bash', { command: 'cat /home/user/project/.env' }, 'cat /home/user/project/.env', policy, makeContext())).toBe('escalate');
     });
 
+    // §12-3: .env classifier coverage — relative path forms must also be flagged
+    it('flags .env reads via Bash as sensitive (relative path forms)', () => {
+      const policy = makePolicy({
+        globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
+      });
+      // bare dotfile: cat .env
+      expect(evaluator.evaluate('Bash', { command: 'cat .env' }, 'cat .env', policy, makeContext())).toBe('escalate');
+      // relative path: cat ./config/.env
+      expect(evaluator.evaluate('Bash', { command: 'cat ./config/.env' }, 'cat ./config/.env', policy, makeContext())).toBe('escalate');
+      // source builtin: source .env
+      expect(evaluator.evaluate('Bash', { command: 'source .env' }, 'source .env', policy, makeContext())).toBe('escalate');
+    });
+
     it('should escalate Bash touching outside workspace', () => {
       const policy = makePolicy({
         globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
