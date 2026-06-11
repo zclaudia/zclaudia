@@ -19,19 +19,22 @@ const NETWORK_FAILURE_PATTERNS: RegExp[] = [
   /curl:\s*\(\d+\)/i,
   /could(?:n'?t| not) resolve host/i,
   /connection (?:timed out|refused|reset)/i,
-  /\b(?:ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNRESET)\b/,
+  /\b(?:ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|ECONNRESET|ENETUNREACH)\b/,
   /wget:.*(?:unable to resolve|failed|timed out)/i,
 ];
 
 function extractHosts(command: string): string[] {
   const hosts: string[] = [];
-  const urlRe = /\bhttps?:\/\/([^/\s'"`)]+)/gi;
+  // Capture only authority-legal characters after the scheme (userinfo/host/port).
+  // This stops at the first path/query/fragment/shell delimiter (/ ? # ; , space quotes).
+  const urlRe = /\bhttps?:\/\/([A-Za-z0-9._~%:@-]+)/gi;
   let m: RegExpExecArray | null;
   while ((m = urlRe.exec(command)) !== null) {
     let host = m[1];
     const at = host.lastIndexOf('@');
     if (at >= 0) host = host.slice(at + 1); // strip user:pw@
     host = host.replace(/:\d+$/, '');        // strip :port
+    host = host.replace(/\.+$/, '');         // strip trailing dot(s)
     if (host) hosts.push(host.toLowerCase());
   }
   return hosts;

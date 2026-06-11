@@ -21,6 +21,8 @@ describe('detectSandboxDenial', () => {
       .toBeNull();
   });
 
+  // By design the detector reports ALL un-allowed hosts referenced in the command,
+  // not only the one named in stderr (stderr names no host reliably).
   it('collects all un-allowed hosts from a compound command', () => {
     const out = 'curl: (6) Could not resolve host: a.example.com';
     const result = detectSandboxDenial('curl https://a.example.com && curl https://b.example.com', out, ALLOWED);
@@ -36,6 +38,25 @@ describe('detectSandboxDenial', () => {
   it('strips port and userinfo from extracted hosts', () => {
     const out = 'curl: (7) Failed to connect';
     expect(detectSandboxDenial('curl https://user:pw@evil.example.com:8443/x', out, ALLOWED))
+      .toEqual({ hosts: ['evil.example.com'] });
+  });
+
+  it('does not over-capture trailing shell syntax into the host', () => {
+    const out = 'curl: (28) Connection timed out';
+    // github.com is allowed; the ";echo done" must not bleed into the host and cause a false positive.
+    expect(detectSandboxDenial('curl https://github.com;echo done', out, new Set(['github.com'])))
+      .toBeNull();
+  });
+
+  it('stops host extraction at a query string', () => {
+    const out = 'curl: (7) Failed to connect';
+    expect(detectSandboxDenial('curl https://evil.example.com?foo=1', out, new Set(['github.com'])))
+      .toEqual({ hosts: ['evil.example.com'] });
+  });
+
+  it('detects a Node.js error-code network failure (ECONNREFUSED)', () => {
+    const out = 'Error: connect ECONNREFUSED 10.0.0.1:443';
+    expect(detectSandboxDenial('node -e "fetch(\'https://evil.example.com\')"', out, new Set(['github.com'])))
       .toEqual({ hosts: ['evil.example.com'] });
   });
 });
