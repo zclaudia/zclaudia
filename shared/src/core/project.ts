@@ -2,6 +2,7 @@
 
 import type { UnifiedPermissionPolicy } from '../interaction/permissions.js';
 import type { ProjectAgent } from '../features/supervision.js';
+import type { UserHookDefinition } from '../interaction/user-hooks.js';
 
 export type ProjectType = 'chat_only' | 'code';
 
@@ -14,6 +15,8 @@ export interface Project {
   systemPrompt?: string;
   permissionPolicy?: PermissionPolicy;
   agentPermissionOverride?: Partial<UnifiedPermissionPolicy>;  // Project-level override of global agent policy
+  /** Project-level hooks; run IN ADDITION to global hooks (additive, not replace). */
+  hooksOverride?: UserHookDefinition[];
   isInternal?: boolean;  // Internal projects (e.g. Agent Assistant) are hidden from user-facing lists
   reviewLlmProfileId?: string;  // LlmProfile used for Local PR reviews
   permissionWorkflowOverrideId?: string;  // Project-level permission escalation workflow override

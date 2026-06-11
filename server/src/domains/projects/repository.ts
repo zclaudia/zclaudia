@@ -22,6 +22,7 @@ export class ProjectRepository extends BaseRepository<
       systemPrompt: row.system_prompt || undefined,
       permissionPolicy: row.permission_policy ? JSON.parse(row.permission_policy) : undefined,
       agentPermissionOverride: row.agent_permission_override ? JSON.parse(row.agent_permission_override) : undefined,
+      hooksOverride: row.hooks_override ? JSON.parse(row.hooks_override) : undefined,
       isInternal: row.is_internal === 1,
       reviewLlmProfileId: row.review_llm_profile_id || undefined,
       permissionWorkflowOverrideId: row.permission_workflow_override_id || undefined,
@@ -97,6 +98,10 @@ export class ProjectRepository extends BaseRepository<
     if (data.agentPermissionOverride !== undefined) {
       updates.push('agent_permission_override = ?');
       params.push(data.agentPermissionOverride ? JSON.stringify(data.agentPermissionOverride) : null);
+    }
+    if (data.hooksOverride !== undefined) {
+      updates.push('hooks_override = ?');
+      params.push(data.hooksOverride ? JSON.stringify(data.hooksOverride) : null);
     }
     if (data.agent !== undefined) {
       updates.push('agent = ?');

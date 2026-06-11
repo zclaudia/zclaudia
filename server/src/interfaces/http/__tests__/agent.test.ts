@@ -18,6 +18,7 @@ function createTestDb(): Database.Database {
       llm_profile_id TEXT,
       permission_workflow_override_id TEXT,
       permission_policy TEXT,
+      hooks TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );

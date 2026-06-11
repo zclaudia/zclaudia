@@ -77,6 +77,7 @@ export interface AgentConfig {
   llmProfileId: string | null;
   permissionWorkflowOverrideId: string | null;
   permissionPolicy: string | null;
+  hooks?: string | null;
 }
 
 export async function getAgentConfig(): Promise<AgentConfig> {
@@ -93,6 +94,7 @@ export async function updateAgentConfig(config: {
   llmProfileId?: string | null;
   permissionWorkflowOverrideId?: string | null;
   permissionPolicy?: string | null;
+  hooks?: string | null;
 }): Promise<AgentConfig> {
   const { fetchLocalApi } = await import('./base');
   const result = await fetchLocalApi<AgentConfig>('/api/agent/config', {

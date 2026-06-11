@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import type { Project } from '@zclaudia/shared/core/project';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
+import { parseUserHooks } from '@zclaudia/shared/interaction/user-hooks';
 import { ProjectRepository } from './repository.js';
 import { ProjectWorktreeService, ProjectNotFoundError, ProjectRootPathMissingError } from './worktree-service.js';
 import { createGitRoutes } from './git-routes.js';
@@ -121,6 +122,19 @@ export function createProjectRoutes(
         });
         return;
       }
+
+      // Validate hooksOverride if present and non-null
+      if (patch.hooksOverride != null) {
+        const { warnings } = parseUserHooks(patch.hooksOverride);
+        if (warnings.length > 0) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: warnings.join('; ') },
+          });
+          return;
+        }
+      }
+
       const updatedProjectState = {
         ...existing,
         ...nextState,

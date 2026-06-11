@@ -15,6 +15,7 @@ import { migration as m_012_mcp_remote_oauth } from './012_mcp_remote_oauth.js';
 import { migration as m_013_agent_profile_plugin_ownership } from './013_agent_profile_plugin_ownership.js';
 import { migration as m_014_mcp_headers_helper } from './014_mcp_headers_helper.js';
 import { migration as m_015_llm_profile_cache_retention } from './015_llm_profile_cache_retention.js';
+import { migration as m_016_user_hooks } from './016_user_hooks.js';
 
 export type { Migration };
 
@@ -34,6 +35,7 @@ export const migrations: Migration[] = [
   m_013_agent_profile_plugin_ownership,
   m_014_mcp_headers_helper,
   m_015_llm_profile_cache_retention,
+  m_016_user_hooks,
 ];
 
 /**

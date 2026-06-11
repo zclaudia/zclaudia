@@ -4,7 +4,7 @@ type ProjectStateFields = Pick<
   Project,
   'name' | 'type' | 'defaultAgentProfileId' | 'rootPath' | 'systemPrompt' |
   'reviewLlmProfileId' | 'permissionWorkflowOverrideId' | 'agent' | 'permissionPolicy' | 'agentPermissionOverride' |
-  'sortOrder'
+  'sortOrder' | 'hooksOverride'
 >;
 
 type ProjectPatch = {
@@ -111,6 +111,7 @@ export function buildProjectPatch(body: Record<string, unknown>): ProjectPatch {
   if (hasOwn(body, 'reviewLlmProfileId')) patch.reviewLlmProfileId = body.reviewLlmProfileId == null ? null : String(body.reviewLlmProfileId);
   if (hasOwn(body, 'permissionWorkflowOverrideId')) patch.permissionWorkflowOverrideId = body.permissionWorkflowOverrideId == null ? null : String(body.permissionWorkflowOverrideId);
   if (hasOwn(body, 'agent')) patch.agent = (body.agent ?? null) as Project['agent'] | null;
+  if (hasOwn(body, 'hooksOverride')) patch.hooksOverride = (body.hooksOverride ?? null) as Project['hooksOverride'] | null;
 
   return patch;
 }
@@ -131,6 +132,7 @@ export function applyProjectPatch(
     permissionWorkflowOverrideId: patch.permissionWorkflowOverrideId === undefined ? existing.permissionWorkflowOverrideId : patch.permissionWorkflowOverrideId ?? undefined,
     agent: patch.agent === undefined ? existing.agent : patch.agent ?? undefined,
     sortOrder: existing.sortOrder,
+    hooksOverride: patch.hooksOverride === undefined ? existing.hooksOverride : patch.hooksOverride ?? undefined,
   };
 
   assertRequiredProjectFields(nextState);

@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import { newId } from '../../utils/uuid.js';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { normalizeToUnifiedPolicy } from '@zclaudia/shared/interaction/permissions';
+import { parseUserHooks } from '@zclaudia/shared/interaction/user-hooks';
 import { toolRegistry } from '../../application/plugins/tool-registry.js';
 import { getDiscoveredSkills } from '../../application/plugins/skill-tools.js';
 import { CONTEXT_TEMPLATES } from '../../application/conversation/context/types.js';
@@ -16,6 +17,7 @@ interface AgentConfig {
   llmProfileId: string | null;
   permissionWorkflowOverrideId: string | null;
   permissionPolicy: string | null;
+  hooks: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -28,6 +30,7 @@ interface AgentConfigRow {
   llm_profile_id: string | null;
   permission_workflow_override_id: string | null;
   permission_policy: string | null;
+  hooks: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -46,6 +49,7 @@ function rowToConfig(row: AgentConfigRow): AgentConfig {
     llmProfileId: row.llm_profile_id,
     permissionWorkflowOverrideId: row.permission_workflow_override_id,
     permissionPolicy: row.permission_policy,
+    hooks: row.hooks ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -238,7 +242,7 @@ export function createAgentRoutes(db: Database.Database): Router {
   // PUT /api/agent/config — Update agent configuration
   router.put('/config', (req: Request, res: Response) => {
     try {
-      const { enabled, permissionPolicy, llmProfileId, permissionWorkflowOverrideId } = req.body;
+      const { enabled, permissionPolicy, llmProfileId, permissionWorkflowOverrideId, hooks } = req.body;
       const now = Date.now();
       const serializedPermissionPolicy = permissionPolicy !== undefined
         ? (typeof permissionPolicy === 'string' ? permissionPolicy : JSON.stringify(permissionPolicy))
@@ -274,6 +278,35 @@ export function createAgentRoutes(db: Database.Database): Router {
         }
       }
 
+      // Validate hooks if provided and non-null
+      // `undefined` = field omitted (keep existing), `null` = explicit clear, otherwise serialize
+      const serializedHooks: string | null | undefined = hooks === undefined
+        ? undefined
+        : hooks === null
+          ? null
+          : (typeof hooks === 'string' ? hooks : JSON.stringify(hooks));
+
+      if (serializedHooks !== undefined && serializedHooks !== null) {
+        let parsedHooks: unknown;
+        try {
+          parsedHooks = JSON.parse(serializedHooks);
+        } catch {
+          res.status(400).json({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: 'hooks must be valid JSON' },
+          });
+          return;
+        }
+        const { warnings } = parseUserHooks(parsedHooks);
+        if (warnings.length > 0) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: warnings.join('; ') },
+          });
+          return;
+        }
+      }
+
       db.prepare(`
         UPDATE agent_config SET
           enabled = COALESCE(?, enabled),
@@ -283,6 +316,10 @@ export function createAgentRoutes(db: Database.Database): Router {
             WHEN ? = 1 THEN ?
             ELSE permission_workflow_override_id
           END,
+          hooks = CASE
+            WHEN ? = 1 THEN ?
+            ELSE hooks
+          END,
           updated_at = ?
         WHERE id = 1
       `).run(
@@ -291,6 +328,8 @@ export function createAgentRoutes(db: Database.Database): Router {
         llmProfileId !== undefined ? llmProfileId : null,
         permissionWorkflowOverrideId !== undefined ? 1 : 0,
         permissionWorkflowOverrideId !== undefined ? permissionWorkflowOverrideId : null,
+        serializedHooks !== undefined ? 1 : 0,
+        serializedHooks !== undefined ? serializedHooks : null,
         now
       );
 

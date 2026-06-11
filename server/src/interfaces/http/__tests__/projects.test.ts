@@ -24,6 +24,7 @@ function createTestDb(): Database.Database {
       system_prompt TEXT,
       permission_policy TEXT,
       agent_permission_override TEXT,
+      hooks_override TEXT,
       agent TEXT,
       context_sync_status TEXT NOT NULL DEFAULT 'synced',
       review_llm_profile_id TEXT,
