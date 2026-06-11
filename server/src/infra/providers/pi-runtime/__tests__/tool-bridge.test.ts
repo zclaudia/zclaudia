@@ -9,6 +9,7 @@ import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { CommandTaskExecutor, pidAlive } from '../../../../domains/tasks/executors/command-executor.js';
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
+import * as sandbox from '../sandbox.js';
 
 const { activateConditionalSkillsForToolNamesMock } = vi.hoisted(() => ({
   activateConditionalSkillsForToolNamesMock: vi.fn(),
@@ -1100,5 +1101,39 @@ describe('Monitor stops command tasks', () => {
     expect(parsed.ok).toBe(true);
     expect(parsed.status).toBe('stopped');
     expect(pidAlive(pid)).toBe(false);
+  });
+});
+
+describe('Bash sandbox wiring (foreground)', () => {
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('regular mode + sandbox unavailable → fail-open, command still runs', async () => {
+    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: false });
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
+    const bash = buildTools(dir, { enabled: ['Bash'] }).find((t: any) => t.name === 'Bash') as any;
+    const res = await bash.execute('s1', { command: 'echo openok' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.content[0].text).toContain('openok');
+  });
+
+  it('plan/read-only mode + sandbox unavailable → fail-closed (errorResult, no run)', async () => {
+    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: false });
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
+    const bash = buildTools(dir, { enabled: ['Bash'], sandboxReadOnly: true }).find((t: any) => t.name === 'Bash') as any;
+    const res = await bash.execute('s2', { command: 'echo shouldnotrun' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('sandbox_unavailable_plan_mode');
+    expect(res.content[0].text).not.toContain('shouldnotrun');
+  });
+
+  it('sandboxed → runs via the wrapped argv', async () => {
+    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: true, argv: ['sh', '-c', 'echo VIAARGV'], env: process.env });
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
+    const bash = buildTools(dir, { enabled: ['Bash'] }).find((t: any) => t.name === 'Bash') as any;
+    const res = await bash.execute('s3', { command: 'echo original' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.content[0].text).toContain('VIAARGV');
+    expect(res.content[0].text).not.toContain('original');
   });
 });

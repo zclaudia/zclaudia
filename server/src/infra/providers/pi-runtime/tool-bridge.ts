@@ -15,6 +15,7 @@ import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shar
 import { findActualString, countOccurrences, applyEdit } from './edit-match.js';
 import { runRipgrep } from './ripgrep-runner.js';
 import { runBash } from './bash-runner.js';
+import * as sandbox from './sandbox.js';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
@@ -587,6 +588,12 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         }
       }
 
+      const wrap = await sandbox.wrapCommand(command, { workspaceRoot: cwd, readOnly: options?.sandboxReadOnly === true, signal });
+      if (!wrap.sandboxed && options?.sandboxReadOnly === true) {
+        return errorResult('sandbox_unavailable_plan_mode', 'Read-only Bash requires the sandbox, which is not active for this command');
+      }
+      const sandboxArg = wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined;
+
       const timeoutSec = Math.min(Math.max(1, Number(args.timeout ?? DEFAULT_TIMEOUT_SEC) || DEFAULT_TIMEOUT_SEC), MAX_TIMEOUT_SEC);
 
       let lastEmit = 0;
@@ -600,7 +607,7 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
           }
         : undefined;
 
-      const result = await runBash({ command, cwd: runCwd, timeoutSec, signal, onChunk });
+      const result = await runBash({ command, cwd: runCwd, timeoutSec, signal, onChunk, sandbox: sandboxArg });
 
       if (result.aborted) {
         return textResult(result.output || '', { ok: false, aborted: true, exitCode: null });
@@ -629,6 +636,7 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         timedOut: result.timedOut,
         ...(fullOutputPath ? { fullOutputPath } : {}),
         durationMs: result.durationMs,
+        sandboxed: wrap.sandboxed,
       });
     },
   } as unknown as AgentTool<any>;
@@ -1649,6 +1657,9 @@ export interface ToolBridgeOptions {
   permissionCallback?: PermissionCallback;
   /** Whether the active model accepts image content blocks (model.input includes 'image'). */
   supportsVision?: boolean;
+  /** Plan mode read-only sandbox, set by the adapter — spec §6.
+   * When true, Bash fails closed if the sandbox is unavailable. */
+  sandboxReadOnly?: boolean;
 }
 
 /**
