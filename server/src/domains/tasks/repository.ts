@@ -119,6 +119,17 @@ export class TaskRepository {
     return row ? this.mapTask(row) : null;
   }
 
+  listByTypeAndStatuses(type: TaskType, statuses: TaskStatus[], sessionId?: string): TaskRecord[] {
+    if (statuses.length === 0) return [];
+    const placeholders = statuses.map(() => '?').join(', ');
+    const sql = sessionId
+      ? `SELECT * FROM tasks WHERE type = ? AND status IN (${placeholders}) AND session_id = ?`
+      : `SELECT * FROM tasks WHERE type = ? AND status IN (${placeholders})`;
+    const params = sessionId ? [type, ...statuses, sessionId] : [type, ...statuses];
+    const rows = this.db.prepare(sql).all(...params) as TaskRow[];
+    return rows.map((row) => this.mapTask(row));
+  }
+
   update(id: string, input: UpdateTaskInput): TaskRecord {
     const existing = this.findById(id);
     if (!existing) throw new Error(`Task not found: ${id}`);
