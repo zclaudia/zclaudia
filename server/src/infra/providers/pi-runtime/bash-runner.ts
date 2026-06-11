@@ -25,7 +25,7 @@ const DEFAULT_MAX_LINES = 2000;
 const DEFAULT_MAX_BYTES = 50 * 1024;
 const STDIO_GRACE_MS = 100;
 
-function resolveShell(): { shell: string; args: string[] } {
+export function resolveShell(): { shell: string; args: string[] } {
   if (process.platform === 'win32') {
     const candidates = [
       process.env.ProgramFiles ? `${process.env.ProgramFiles}\\Git\\bin\\bash.exe` : undefined,
