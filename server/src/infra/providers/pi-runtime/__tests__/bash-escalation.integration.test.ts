@@ -46,4 +46,40 @@ describe('Bash escalate-on-denial (integration, sandbox-gated)', () => {
     expect(asked).toBeGreaterThanOrEqual(1);
     expect(loadSessionSandboxDomains(db, 's1')).toContain('denied.example.com');
   });
+
+  it('does not re-prompt for a domain already granted via the session seed', async () => {
+    if (!isSandboxAvailable()) return;
+    const db = makeDb();
+    let asked = 0;
+    const tools = buildTools(process.cwd(), {
+      sessionId: 's1',
+      db,
+      sandboxAllowedDomains: ['denied.example.com'],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      permissionCallback: (async () => { asked++; return { behavior: 'allow' }; }) as any,
+    });
+    const bash = tools.find((t) => t.name === 'Bash')!;
+    await bash.execute('call1', { command: 'curl -sS https://denied.example.com -o /dev/null' });
+    // The seeded domain is on the allow-list, so detectSandboxDenial filters it out → no escalation prompt.
+    expect(asked).toBe(0);
+  });
+
+  it('batches multiple un-allowed hosts into a single prompt and persists all of them', async () => {
+    if (!isSandboxAvailable()) return;
+    const db = makeDb();
+    let asked = 0;
+    let promptedHosts: string[] = [];
+    const bash = getBash(db, async (req: any) => {
+      asked++;
+      promptedHosts = req.toolInput.hosts;
+      return { behavior: 'allow' };
+    });
+    await bash.execute('call1', {
+      command: 'curl -sS https://a.denied.example -o /dev/null; curl -sS https://b.denied.example -o /dev/null',
+    });
+    expect(asked).toBe(1); // one batched prompt, not one per host
+    expect(promptedHosts).toEqual(expect.arrayContaining(['a.denied.example', 'b.denied.example']));
+    const persisted = loadSessionSandboxDomains(db, 's1');
+    expect(persisted).toEqual(expect.arrayContaining(['a.denied.example', 'b.denied.example']));
+  });
 });

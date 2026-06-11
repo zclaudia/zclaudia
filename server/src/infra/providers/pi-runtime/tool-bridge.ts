@@ -566,7 +566,11 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         for (const host of denial.hosts) {
           grantedDomains.add(host);
           if (options?.db && options?.sessionId) {
-            persistSessionSandboxDomain(options.db, options.sessionId, host);
+            try {
+              persistSessionSandboxDomain(options.db, options.sessionId, host);
+            } catch (err) {
+              console.warn('[sandbox] failed to persist session network grant; continuing:', err);
+            }
           }
         }
         wrap = await sandbox.wrapCommand(command, {
@@ -575,9 +579,10 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
           extraAllowedDomains: [...grantedDomains],
           signal,
         });
+        if (!wrap.sandboxed) break; // re-wrap degraded; do not re-run unsandboxed
         result = await runBash({
           command, cwd: runCwd, timeoutSec, signal, onChunk,
-          sandbox: wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined,
+          sandbox: { argv: wrap.argv!, env: wrap.env! },
         });
       }
 
