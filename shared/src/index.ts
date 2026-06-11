@@ -53,6 +53,7 @@ export * from './features/notification-feed.js';
 export * from './interaction/permissions.js';
 export * from './interaction/forms.js';
 export * from './interaction/tool-rule-syntax.js';
+export * from './interaction/user-hooks.js';
 
 // File browser types
 export * from './files.js';
