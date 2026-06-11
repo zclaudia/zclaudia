@@ -554,6 +554,7 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         const allowedNow = new Set<string>([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]);
         const denial = detectSandboxDenial(command, result.fullOutput, allowedNow);
         if (!denial) break;
+        if (!sandbox.sandboxViolationsLikelyForCommand(command)) break; // macOS spoof guard; degrades open
         const decision = await options!.permissionCallback!({
           requestId: `${toolCallId}:sandbox-net:${iteration}`,
           toolName: SANDBOX_NETWORK_ESCALATION_TOOL,

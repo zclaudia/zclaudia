@@ -78,7 +78,7 @@ let initPromise: Promise<void> | undefined;
 export async function ensureSandboxInitialized(): Promise<void> {
   if (!isSandboxAvailable()) return;
   if (!initPromise) {
-    initPromise = SandboxManager.initialize(baseConfig()).catch((err) => {
+    initPromise = SandboxManager.initialize(baseConfig(), undefined, true).catch((err) => {
       console.warn('[sandbox] initialize failed; degrading to unavailable:', err);
       cached = false;
       initPromise = undefined;
@@ -124,5 +124,25 @@ export async function wrapCommand(command: string, opts: WrapOptions): Promise<W
   } catch (err) {
     console.warn('[sandbox] wrapCommand failed; degrading for this command:', err);
     return { sandboxed: false };
+  }
+}
+
+/**
+ * Phase B1 spoof guard: returns true if the runtime recorded a sandbox
+ * violation for this command (corroborating a real block). Best-effort and
+ * macOS-only — returns true (no veto) when the violation store is unavailable,
+ * so callers degrade to copy-only mitigation rather than failing closed.
+ */
+export function sandboxViolationsLikelyForCommand(command: string): boolean {
+  if (!isSandboxAvailable()) return true;
+  try {
+    const store = SandboxManager.getSandboxViolationStore?.();
+    if (!store) return true;
+    if (typeof store.getViolationsForCommand === 'function') {
+      return store.getViolationsForCommand(command).length > 0 || store.getTotalCount() > 0;
+    }
+    return true;
+  } catch {
+    return true;
   }
 }
