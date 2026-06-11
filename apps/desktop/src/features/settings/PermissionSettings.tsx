@@ -13,12 +13,14 @@ import type {
   GlobalGuards,
   AIReviewConfig,
   Workflow,
+  UserHookDefinition,
 } from '@zclaudia/shared';
 import {
   DEFAULT_UNIFIED_POLICY,
   normalizeToUnifiedPolicy,
 } from '@zclaudia/shared';
 import { ToolRuleList } from '../../components/permission/ToolRuleList';
+import { HookList } from '../../components/permission/HookList';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
 
@@ -170,6 +172,7 @@ export function PermissionSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hookList, setHookList] = useState<UserHookDefinition[]>([]);
 
   const loadPolicy = useCallback(async () => {
     setLoading(true);
@@ -194,6 +197,21 @@ export function PermissionSettings() {
         setPolicy(normalizeToUnifiedPolicy(raw));
       } else {
         setPolicy(DEFAULT_UNIFIED_POLICY);
+      }
+
+      if (config.hooks) {
+        try {
+          const rawHooks = JSON.parse(config.hooks);
+          if (Array.isArray(rawHooks)) {
+            setHookList(rawHooks as UserHookDefinition[]);
+          } else {
+            setHookList([]);
+          }
+        } catch {
+          setHookList([]);
+        }
+      } else {
+        setHookList([]);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load');
@@ -263,6 +281,18 @@ export function PermissionSettings() {
   const resetDefaults = useCallback(() => {
     savePolicy(DEFAULT_UNIFIED_POLICY);
   }, [savePolicy]);
+
+  const saveHooks = useCallback(async (next: UserHookDefinition[]) => {
+    setSaving(true);
+    try {
+      await updateAgentConfig({ hooks: next.length > 0 ? JSON.stringify(next) : null });
+      setHookList(next);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save hooks');
+    } finally {
+      setSaving(false);
+    }
+  }, []);
 
   if (loading) {
     return (
@@ -334,6 +364,18 @@ export function PermissionSettings() {
           />
         </div>
       )}
+
+      {/* Hooks */}
+      <div>
+        <h3 className="text-sm font-medium mb-1">Hooks</h3>
+        <p className="text-[10px] text-muted-foreground mb-2">
+          Shell commands that run before/after tool calls. Exit code 2 from a PreToolUse hook blocks the call.
+        </p>
+        <HookList
+          hooks={hookList}
+          onChange={(next) => { void saveHooks(next); }}
+        />
+      </div>
 
       {/* AI Review */}
       {policy.enabled && (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { Project, LlmProfileConfig, UnifiedPermissionPolicy, PermissionCategory, CategoryAction, CategoryProfile, Workflow } from '@zclaudia/shared';
+import type { Project, LlmProfileConfig, UnifiedPermissionPolicy, PermissionCategory, CategoryAction, CategoryProfile, Workflow, UserHookDefinition } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -12,6 +12,7 @@ import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { Select } from '../../components/ui/Select';
 import { listAllWorkflows } from '../workflows/api';
 import { ToolRuleList } from '../../components/permission/ToolRuleList';
+import { HookList } from '../../components/permission/HookList';
 
 const CATEGORY_LABELS: Record<PermissionCategory, { label: string; description: string }> = {
   fileRead: { label: 'File Read', description: 'Read, Glob, Grep, WebFetch' },
@@ -87,6 +88,9 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
   const [hasOverride, setHasOverride] = useState(false);
   const [permOverride, setPermOverride] = useState<Partial<UnifiedPermissionPolicy>>({});
 
+  // Hooks state (project-level additive hooks)
+  const [projHooks, setProjHooks] = useState<UserHookDefinition[]>([]);
+
   const effectiveAgent = supervisorAgent ?? project?.agent;
   const isProjectWorkspaceEnabled = Boolean(effectiveAgent && effectiveAgent.phase !== 'archived');
 
@@ -141,6 +145,8 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
       setHasOverride(false);
       setPermOverride({});
     }
+
+    setProjHooks(project.hooksOverride ?? []);
   }, [
     project?.id,
     project?.name,
@@ -150,6 +156,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
     project?.permissionWorkflowOverrideId,
     project?.systemPrompt,
     project?.agentPermissionOverride,
+    project?.hooksOverride,
   ]);
 
   // Keep supervisor toggle state consistent with backend source of truth.
@@ -232,6 +239,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
         permissionWorkflowOverrideId: permissionWorkflowOverrideId || undefined,
         systemPrompt: systemPrompt.trim() || undefined,
         agentPermissionOverride: hasOverride ? permOverride : undefined,
+        hooksOverride: projHooks.length > 0 ? projHooks : undefined,
       };
 
       await api.updateProject(project.id, updates);
@@ -509,6 +517,13 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Hooks (project-level additive) */}
+          <div className="border-t border-border pt-4">
+            <label className="block text-sm font-medium text-muted-foreground">Hooks</label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">Project hooks run in addition to global hooks.</p>
+            <HookList hooks={projHooks} onChange={setProjHooks} />
           </div>
 
           {/* Project Workspace */}
