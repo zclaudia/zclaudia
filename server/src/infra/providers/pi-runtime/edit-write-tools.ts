@@ -91,13 +91,14 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
       if (typeof args.content !== 'string') {
         return errorResult('missing_content', 'Write requires string content');
       }
+      const content = args.content;
       let filePath: string;
       try {
         filePath = resolveInsideWorkspace(cwd, requested);
       } catch (err) {
         return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
       }
-      const contentGuard = validateMutationContent(filePath, args.content);
+      const contentGuard = validateMutationContent(filePath, content);
       if (contentGuard) {
         return errorResult(contentGuard.code, contentGuard.message, { path: toWorkspaceRelative(cwd, filePath) });
       }
@@ -119,13 +120,13 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
         const relPath = toWorkspaceRelative(cwd, filePath);
         const backup = originalContent !== null ? await recordFileBackup(relPath, originalContent) : undefined;
         const updatedContentForDisk = originalContent !== null
-          ? applyLineEndingStyle(args.content, lineEndingFor(originalContent))
-          : args.content;
+          ? applyLineEndingStyle(content, lineEndingFor(originalContent))
+          : content;
         await writeTextFileAtomic(filePath, updatedContentForDisk, originalMetadata);
-        await options?.readFileState?.recordWrite(filePath, args.content);
+        await options?.readFileState?.recordWrite(filePath, content);
         const diff = originalContent !== null
-          ? buildFileDiff(relPath, originalContent, args.content)
-          : buildFileDiff(relPath, '', args.content);
+          ? buildFileDiff(relPath, originalContent, content)
+          : buildFileDiff(relPath, '', content);
         const writeType = existed ? 'update' : 'create';
         const lifecycleInput = {
           operation: 'write',
@@ -133,7 +134,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
           path: relPath,
           absolutePath: filePath,
           originalContent,
-          updatedContent: args.content,
+          updatedContent: content,
           diff: diff.diff,
           ...(diff.firstChangedLine !== undefined ? { firstChangedLine: diff.firstChangedLine } : {}),
         } as const;
@@ -151,7 +152,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
           firstChangedLine: diff.firstChangedLine,
           structuredPatch: diff.structuredPatch,
           lineChanges: diff.lineChanges,
-          ...buildContentDetailFields(originalContent, args.content),
+          ...buildContentDetailFields(originalContent, content),
           ...(backup ? { backup } : {}),
           ...(lifecycle ? { lifecycle } : {}),
         });
@@ -229,6 +230,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
       if (typeof args.new_string !== 'string') {
         return errorResult('missing_strings', 'Edit requires new_string');
       }
+      const newString = args.new_string;
+      const oldString = typeof args.old_string === 'string' ? args.old_string : '';
       const replaceAll = args.replace_all === true;
       let filePath: string;
       try {
@@ -236,7 +239,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
       } catch (err) {
         return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
       }
-      const replacementGuard = validateMutationContent(filePath, args.new_string);
+      const replacementGuard = validateMutationContent(filePath, newString);
       if (replacementGuard) {
         return errorResult(replacementGuard.code, replacementGuard.message, { path: toWorkspaceRelative(cwd, filePath) });
       }
@@ -264,9 +267,9 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         if (readCheck && !readCheck.ok) {
           return errorResult(readCheck.code, readCheck.message, { path: toWorkspaceRelative(cwd, filePath) });
         }
-        const actual = isHashlineEdit ? null : findActualString(original, args.old_string);
+        const actual = isHashlineEdit ? null : findActualString(original, oldString);
         if (isHashlineEdit) {
-          const updated = replaceHashlineLine(original, String(args.hashline_line), args.new_string);
+          const updated = replaceHashlineLine(original, String(args.hashline_line), newString);
           if (updated === undefined) {
             return errorResult('hashline_mismatch', 'hashline_line was not found in the current file', {
               path: toWorkspaceRelative(cwd, filePath),
@@ -312,7 +315,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             occurrences,
           });
         }
-        const updated = applyEdit(original, actual, args.new_string, replaceAll);
+        const updated = applyEdit(original, actual, newString, replaceAll);
         const relPath = toWorkspaceRelative(cwd, filePath);
         const diff = buildFileDiff(relPath, original, updated);
         if (args.preview_only === true) {

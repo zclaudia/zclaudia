@@ -244,11 +244,14 @@ export function createAgentRoutes(db: Database.Database): Router {
     try {
       const { enabled, permissionPolicy, llmProfileId, permissionWorkflowOverrideId, hooks } = req.body;
       const now = Date.now();
-      const serializedPermissionPolicy = permissionPolicy !== undefined
-        ? (typeof permissionPolicy === 'string' ? permissionPolicy : JSON.stringify(permissionPolicy))
-        : null;
+      // `undefined` = field omitted (keep existing), `null` = explicit clear, otherwise serialize
+      const serializedPermissionPolicy: string | null | undefined = permissionPolicy === undefined
+        ? undefined
+        : permissionPolicy === null
+          ? null
+          : (typeof permissionPolicy === 'string' ? permissionPolicy : JSON.stringify(permissionPolicy));
 
-      if (serializedPermissionPolicy !== null) {
+      if (serializedPermissionPolicy !== undefined && serializedPermissionPolicy !== null) {
         const normalizedPolicy = normalizeToUnifiedPolicy(JSON.parse(serializedPermissionPolicy));
         const providerValidationError = validateAIReviewProviderId(db, normalizedPolicy.aiReview.analysisLlmProfileId);
         if (providerValidationError) {
@@ -310,7 +313,10 @@ export function createAgentRoutes(db: Database.Database): Router {
       db.prepare(`
         UPDATE agent_config SET
           enabled = COALESCE(?, enabled),
-          permission_policy = ?,
+          permission_policy = CASE
+            WHEN ? = 1 THEN ?
+            ELSE permission_policy
+          END,
           llm_profile_id = COALESCE(?, llm_profile_id),
           permission_workflow_override_id = CASE
             WHEN ? = 1 THEN ?
@@ -324,7 +330,8 @@ export function createAgentRoutes(db: Database.Database): Router {
         WHERE id = 1
       `).run(
         enabled !== undefined ? (enabled ? 1 : 0) : null,
-        serializedPermissionPolicy,
+        serializedPermissionPolicy !== undefined ? 1 : 0,
+        serializedPermissionPolicy !== undefined ? serializedPermissionPolicy : null,
         llmProfileId !== undefined ? llmProfileId : null,
         permissionWorkflowOverrideId !== undefined ? 1 : 0,
         permissionWorkflowOverrideId !== undefined ? permissionWorkflowOverrideId : null,

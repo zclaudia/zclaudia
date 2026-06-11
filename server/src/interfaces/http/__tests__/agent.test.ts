@@ -311,7 +311,7 @@ describe('agent routes', () => {
       expect(res.body.data.permissionPolicy).toBe(policyStr);
     });
 
-    it('sets permissionPolicy to stringified null when sent as null', async () => {
+    it('clears permissionPolicy when sent as null', async () => {
       // First set a policy
       db.prepare("UPDATE agent_config SET permission_policy = '{\"x\":1}' WHERE id = 1").run();
 
@@ -321,23 +321,37 @@ describe('agent routes', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      // typeof null is 'object', so route does JSON.stringify(null) => "null"
-      expect(res.body.data.permissionPolicy).toBe('null');
+      expect(res.body.data.permissionPolicy).toBeNull();
+      const row = db.prepare('SELECT permission_policy FROM agent_config WHERE id = 1').get() as any;
+      expect(row.permission_policy).toBeNull();
     });
 
-    it('clears permissionPolicy when field is omitted from request', async () => {
+    it('preserves permissionPolicy when field is omitted from request', async () => {
       // First set a policy
       db.prepare("UPDATE agent_config SET permission_policy = '{\"x\":1}' WHERE id = 1").run();
 
-      // When permissionPolicy is not in the body (undefined), it passes null to COALESCE
-      // But the UPDATE uses a direct ? (not COALESCE) for permission_policy, so it becomes NULL
       const res = await request(app)
         .put('/api/agent/config')
         .send({ enabled: true });
 
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
-      expect(res.body.data.permissionPolicy).toBeNull();
+      expect(res.body.data.permissionPolicy).toBe('{"x":1}');
+    });
+
+    it('preserves permissionPolicy when only llmProfileId is updated', async () => {
+      db.prepare("UPDATE agent_config SET permission_policy = '{\"x\":1}' WHERE id = 1").run();
+
+      const res = await request(app)
+        .put('/api/agent/config')
+        .send({ llmProfileId: 'new-provider' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.llmProfileId).toBe('new-provider');
+      expect(res.body.data.permissionPolicy).toBe('{"x":1}');
+      const row = db.prepare('SELECT permission_policy FROM agent_config WHERE id = 1').get() as any;
+      expect(row.permission_policy).toBe('{"x":1}');
     });
 
     it('updates multiple fields at once', async () => {
