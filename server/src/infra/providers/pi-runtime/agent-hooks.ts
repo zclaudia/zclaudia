@@ -77,6 +77,7 @@ export interface AgentHooksInput {
   userHooks?: UserHookDefinition[];
   /** Workspace root for hook execution. */
   cwd?: string;
+  /** Session id forwarded to hook processes via the stdin payload. */
   sessionId?: string;
 }
 

@@ -301,6 +301,7 @@ describe('user hooks integration', () => {
     const seen = fs.readFileSync(capture, 'utf8');
     expect(seen).toContain('git push');         // hook saw the original
     expect(seen).not.toContain('SECRETPASS');   // hook never saw the credential
+    fs.rmSync(capture, { force: true });
   });
 
   it('PostToolUse exit-2 stderr is appended to the tool result content', async () => {
