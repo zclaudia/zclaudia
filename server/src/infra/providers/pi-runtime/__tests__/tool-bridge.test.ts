@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -992,6 +992,18 @@ describe('Bash background execution', () => {
     const res = await bash.execute('bg2', { command: 'sleep 5', run_in_background: true });
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('missing_db_context');
+  });
+
+  it('plan/read-only mode refuses run_in_background (no workspace write)', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bgplan-'));
+    const target = path.join(dir, 'pwned.txt');
+    const bash = buildTools(dir, { enabled: ['Bash'], sandboxReadOnly: true, db }).find((t: any) => t.name === 'Bash') as any;
+    const res = await bash.execute('bgp1', { command: `echo PWNED > "${target}"`, run_in_background: true });
+    await new Promise(r => setTimeout(r, 300));
+    const existed = existsSync(target);
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('background_not_allowed_plan_mode');
+    expect(existed).toBe(false);
   });
 });
 

@@ -562,6 +562,9 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
       }
 
       if (args.run_in_background === true) {
+        if (options?.sandboxReadOnly === true) {
+          return errorResult('background_not_allowed_plan_mode', 'Background commands are not available in plan mode (read-only).');
+        }
         const db = options?.db;
         if (!db) return errorResult('missing_db_context', 'Background execution requires database context');
         const repo = new TaskRepository(db);
