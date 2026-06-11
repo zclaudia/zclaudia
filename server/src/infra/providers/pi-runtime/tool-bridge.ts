@@ -19,6 +19,7 @@ import { normalizeTodoItems } from '../../../application/conversation/interactio
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
+import { CommandTaskExecutor, commandTaskLogPath } from '../../../domains/tasks/executors/command-executor.js';
 import { activateConditionalSkillsForPaths, activateConditionalSkillsForToolNames } from '../../../application/plugins/skill-tools.js';
 import { loadMcpServersFromDb } from '../../../utils/mcp-config.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
@@ -515,20 +516,21 @@ function createEditBridgeTool(cwd: string): AgentTool<any> {
   } as unknown as AgentTool<any>;
 }
 
-function createBashBridgeTool(cwd: string): AgentTool<any> {
+function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTool<any> {
   const DEFAULT_TIMEOUT_SEC = 120;
   const MAX_TIMEOUT_SEC = 600;
   const UPDATE_THROTTLE_MS = 100;
   return {
     name: 'Bash',
     label: 'Bash',
-    description: 'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. Default timeout 120s (max 600s).',
+    description: 'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. Default timeout 120s (max 600s). Set run_in_background:true for long-running commands (dev servers, watchers).',
     parameters: {
       type: 'object',
       properties: {
         command: { type: 'string', description: 'The shell command to run' },
         timeout: { type: 'number', description: 'Timeout in seconds (default 120, max 600)' },
         cwd: { type: 'string', description: 'Workspace-relative working directory (default: workspace root)' },
+        run_in_background: { type: 'boolean', default: false, description: 'Run the command as a detached background task. Returns a taskId immediately; poll output with TaskOutput, stop with Monitor. timeout is ignored in background mode.' },
       },
       required: ['command'],
     } as any,
@@ -546,6 +548,34 @@ function createBashBridgeTool(cwd: string): AgentTool<any> {
       if (!existsSync(runCwd)) {
         return errorResult('cwd_not_found', `Working directory does not exist: ${toWorkspaceRelative(cwd, runCwd) || '.'}`);
       }
+
+      if (args.run_in_background === true) {
+        const db = options?.db;
+        if (!db) return errorResult('missing_db_context', 'Background execution requires database context');
+        const repo = new TaskRepository(db);
+        const service = new TaskService(repo);
+        const executor = new CommandTaskExecutor(repo);
+        const task = service.createTask({
+          type: 'command',
+          sessionId: options?.sessionId,
+          runId: options?.runId,
+          parentToolUseId: toolCallId,
+          title: truncateText(command, 80),
+          metadata: { command, cwd: runCwd },
+        });
+        try {
+          const started = await executor.start(task);
+          service.startTask(task.id, { executorRef: started.executorRef });
+          return textResult(
+            `Started background task ${task.id}. Poll with TaskOutput({ task_id: "${task.id}" }); stop with Monitor({ action: "stop", task_id: "${task.id}" }).`,
+            { ok: true, background: true, taskId: task.id, pid: started.executorRef?.pid, logPath: commandTaskLogPath(task.id) },
+          );
+        } catch (err) {
+          try { service.failTask(task.id, { error: err instanceof Error ? err.message : String(err) }); } catch { /* best-effort */ }
+          return errorResult('background_start_failed', err instanceof Error ? err.message : String(err));
+        }
+      }
+
       const timeoutSec = Math.min(Math.max(1, Number(args.timeout ?? DEFAULT_TIMEOUT_SEC) || DEFAULT_TIMEOUT_SEC), MAX_TIMEOUT_SEC);
 
       let lastEmit = 0;
@@ -1514,7 +1544,7 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   Read: (cwd, options) => createReadBridgeTool(cwd, options),
   Write: (cwd) => createWriteBridgeTool(cwd),
   Edit: (cwd) => createEditBridgeTool(cwd),
-  Bash: (cwd) => createBashBridgeTool(cwd),
+  Bash: (cwd, options) => createBashBridgeTool(cwd, options),
   Grep: (cwd) => createGrepBridgeTool(cwd),
   Glob: (cwd) => createGlobTool(cwd),
   LS: (cwd) => createLsBridgeTool(cwd),

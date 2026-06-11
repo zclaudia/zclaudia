@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
@@ -7,6 +7,7 @@ import Database from 'better-sqlite3';
 import { buildTools, ALL_TOOL_NAMES, type ToolName } from '../tool-bridge.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
+import { CommandTaskExecutor } from '../../../../domains/tasks/executors/command-executor.js';
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
 
 const { activateConditionalSkillsForToolNamesMock } = vi.hoisted(() => ({
@@ -940,5 +941,55 @@ describe('LS bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).not.toBe(true);
     expect(res.details.error).toBe('not_a_directory');
+  });
+});
+
+describe('Bash background execution', () => {
+  let db: Database.Database;
+  let dataDir: string;
+  let prevDataDir: string | undefined;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+
+    dataDir = mkdtempSync(path.join(tmpdir(), 'zc-bashbg-data-'));
+    prevDataDir = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+  });
+
+  afterEach(() => {
+    if (prevDataDir === undefined) {
+      delete process.env.ZCLAUDIA_DATA_DIR;
+    } else {
+      process.env.ZCLAUDIA_DATA_DIR = prevDataDir;
+    }
+    rmSync(dataDir, { recursive: true, force: true });
+    db.close();
+  });
+
+  it('returns immediately with a taskId and the process runs detached', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashbg-'));
+    const bash = buildTools(dir, { enabled: ['Bash'], db }).find((t: any) => t.name === 'Bash') as any;
+    const start = Date.now();
+    const res = await bash.execute('bg1', { command: 'sleep 5', run_in_background: true });
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeLessThan(1500);
+    expect(res.details.ok).toBe(true);
+    expect(res.details.background).toBe(true);
+    expect(typeof res.details.taskId).toBe('string');
+    expect(typeof res.details.pid).toBe('number');
+    // cleanup: kill it so the suite doesn't leak a sleep process
+    await new CommandTaskExecutor(new TaskRepository(db)).stop(res.details.taskId);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('errors with missing_db_context when no db is available', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashbg-'));
+    const bash = buildTools(dir, { enabled: ['Bash'] }).find((t: any) => t.name === 'Bash') as any;
+    const res = await bash.execute('bg2', { command: 'sleep 5', run_in_background: true });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('missing_db_context');
   });
 });
