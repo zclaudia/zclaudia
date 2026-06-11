@@ -36,6 +36,7 @@ import { TaskRepository } from '../domains/tasks/repository.js';
 import { createAgentTaskRunner } from './orchestration/agent-task-runner.js';
 import { SessionRepository } from '../domains/sessions/index.js';
 import type { TaskExecutor } from '../domains/tasks/executors/types.js';
+import { ensureSandboxInitialized } from '../infra/providers/pi-runtime/sandbox.js';
 
 export interface BootstrapDeps {
   db: ReturnType<typeof initDatabase>;
@@ -208,6 +209,8 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   });
 
   registerInteractionDomain({ activeRuns, clients });
+
+  void ensureSandboxInitialized().catch((err) => console.warn('[sandbox] startup init failed:', err));
 
   return {
     supervisorService,

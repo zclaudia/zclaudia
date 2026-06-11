@@ -1,11 +1,19 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
-import { __testables, ZClaudiaAdapter } from '../zclaudia-adapter.js';
+import { __testables, resolvePlanModeTools, ZClaudiaAdapter } from '../zclaudia-adapter.js';
 import type { RunOptions, ClaudeMessage, SteerHandle } from '../types.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
+
+// Mock sandbox so resolvePlanModeTools tests can control isSandboxAvailable()
+// without touching real system dependencies (sysbox/bwrap presence checks).
+vi.mock('../pi-runtime/sandbox.js', () => ({
+  isSandboxAvailable: vi.fn(() => false),
+  ensureSandboxInitialized: vi.fn(() => Promise.resolve()),
+  __resetSandboxCacheForTests: vi.fn(),
+}));
 
 // Mock pi-ai's registry helpers so tests don't hit the real model registry.
 // The new buildModel calls getModel for same-provider lookup, then
@@ -298,6 +306,28 @@ describe('buildModel', () => {
     process.env.OPENAI_BASE_URL = 'https://api.deepseek.com/v1';
     const { model } = buildModel();
     expect(model.reasoning).toBe(true);
+  });
+});
+
+describe('resolvePlanModeTools', () => {
+  const ALL = ['Read', 'Grep', 'Glob', 'LS', 'Bash', 'Write', 'Edit'] as ToolName[];
+
+  it('plan mode includes Bash when sandbox available', () => {
+    expect(resolvePlanModeTools(ALL, true, true)).toContain('Bash');
+  });
+
+  it('plan mode excludes Bash when sandbox unavailable', () => {
+    expect(resolvePlanModeTools(ALL, true, false)).not.toContain('Bash');
+  });
+
+  it('plan mode still excludes non-read-only tools (Write/Edit)', () => {
+    const r = resolvePlanModeTools(ALL, true, true);
+    expect(r).not.toContain('Write');
+    expect(r).not.toContain('Edit');
+  });
+
+  it('non-plan mode returns tools unchanged', () => {
+    expect(resolvePlanModeTools(ALL, false, true)).toEqual(ALL);
   });
 });
 

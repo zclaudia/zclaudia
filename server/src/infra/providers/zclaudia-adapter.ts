@@ -22,6 +22,7 @@ import {
 } from './pi-runtime/index.js';
 import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
 import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
+import { isSandboxAvailable } from './pi-runtime/sandbox.js';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
 import { resolveImageAttachments } from '../../application/conversation/runtime/resolve-image-attachments.js';
 import { getFileStore } from '../storage/fileStore.js';
@@ -229,6 +230,26 @@ export function translateEvent(
   }
 }
 
+/**
+ * Resolve the effective tool set for a run.
+ *
+ * In plan mode the agent is restricted to read-only tools. When the sandbox is
+ * available, Bash is also allowed (it will be invoked with sandboxReadOnly:true
+ * so writes are blocked at the OS level). Non-plan mode passes the requested
+ * tools through unchanged.
+ */
+export function resolvePlanModeTools(
+  requestedTools: ToolName[],
+  isPlanMode: boolean,
+  sandboxAvailable: boolean,
+): ToolName[] {
+  if (!isPlanMode) return requestedTools;
+  const allowed = sandboxAvailable
+    ? new Set<ToolName>([...READ_ONLY_TOOL_NAMES, 'Bash'])
+    : new Set<ToolName>(READ_ONLY_TOOL_NAMES);
+  return requestedTools.filter((t) => allowed.has(t));
+}
+
 export const __testables = { AsyncQueue, buildModel, translateEvent, extractErrorStop };
 
 export class ZClaudiaAdapter implements ProviderAdapter {
@@ -308,9 +329,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         const normalized = normalizeToolName(tool);
         return normalized ? [normalized] : [];
       });
-    const effectiveTools: ToolName[] = isPlanMode
-      ? requestedTools.filter((t) => READ_ONLY_TOOL_NAMES.includes(t))
-      : requestedTools;
+    const effectiveTools: ToolName[] = resolvePlanModeTools(requestedTools, isPlanMode, isSandboxAvailable());
     const externalToolNames = options.externalToolState
       ? [
         ...options.externalToolState.loadedExternalTools.flatMap((ref) => (
@@ -376,6 +395,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       db: options.db,
       agentTaskExecutor: options.agentTaskExecutor,
       permissionCallback: onPermission,
+      sandboxReadOnly: isPlanMode,
     });
     if (options.externalToolState) {
       for (const ref of options.externalToolState.loadedExternalTools) {
