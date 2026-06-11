@@ -100,4 +100,17 @@ describe('runBash', () => {
     expect(result.stderrOutput).not.toContain('out');
     expect(result.fullOutput).toContain('out');
   });
+
+  it('caps stderr capture at 64KB while allowing command to succeed', async () => {
+    const dir = TMP();
+    const result = await runBash({
+      command: "python3 -c \"import sys; sys.stderr.write('e' * 100000)\" ; exit 0",
+      cwd: dir,
+      timeoutSec: 10
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.exitCode).toBe(0);
+    expect(result.stderrOutput.length).toBeLessThanOrEqual(66 * 1024); // ~64KB cap + some allowance
+    expect(result.fullOutput.length).toBeGreaterThan(99000); // fullOutput has essentially all of it
+  });
 });

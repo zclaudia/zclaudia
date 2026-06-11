@@ -90,4 +90,12 @@ describe('runPostToolUseHooks', () => {
     ], inv({ event: 'PostToolUse' }));
     expect(extras).toEqual(['tests now failing']);
   });
+
+  it('failing hook does not prevent later collection', async () => {
+    const extras = await runPostToolUseHooks([
+      { event: 'PostToolUse', command: 'exit 1' },
+      { event: 'PostToolUse', command: 'echo ok >&2; exit 2' },
+    ], inv({ event: 'PostToolUse' }));
+    expect(extras).toEqual(['ok']);
+  });
 });

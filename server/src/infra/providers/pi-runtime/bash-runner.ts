@@ -25,13 +25,14 @@ export interface BashRunResult {
   timedOut: boolean;
   aborted: boolean;
   durationMs: number;
-  /** stderr captured separately (merged output unchanged). */
+  /** stderr captured separately (merged output unchanged), capped at 64KB. */
   stderrOutput: string;
 }
 
 const DEFAULT_MAX_LINES = 2000;
 const DEFAULT_MAX_BYTES = 50 * 1024;
 const STDIO_GRACE_MS = 100;
+const STDERR_CAPTURE_LIMIT = 64 * 1024;
 
 export function resolveShell(): { shell: string; args: string[] } {
   if (process.platform === 'win32') {
@@ -156,6 +157,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
 
     let full = '';
     const stderrChunks: string[] = [];
+    let stderrBytes = 0;
     let timedOut = false;
     let aborted = false;
 
@@ -163,7 +165,10 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     child.stdout?.on('data', onData);
     child.stderr?.on('data', (chunk: Buffer) => {
       const text = chunk.toString('utf8');
-      stderrChunks.push(text);
+      if (stderrBytes < STDERR_CAPTURE_LIMIT) {
+        stderrChunks.push(text);
+        stderrBytes += Buffer.byteLength(text, 'utf8');
+      }
       full += text;
       onChunk?.(full);
     });
