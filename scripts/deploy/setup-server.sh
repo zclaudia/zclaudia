@@ -94,7 +94,11 @@ check_build_tools() {
   fi
 
   # Bash sandbox (defense-in-depth): bubblewrap + socat required on Linux (network is always proxied).
-  apt-get install -y bubblewrap socat || echo "WARN: bubblewrap/socat not installed — Bash sandbox will degrade to unsandboxed"
+  if [[ $EUID -ne 0 ]]; then
+    sudo apt-get install -y bubblewrap socat || echo "WARN: bubblewrap/socat not installed — Bash sandbox will degrade to unsandboxed"
+  else
+    apt-get install -y bubblewrap socat || echo "WARN: bubblewrap/socat not installed — Bash sandbox will degrade to unsandboxed"
+  fi
 }
 
 install_deps() {

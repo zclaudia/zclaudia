@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import type {
   CategoryProfile,
   EvaluationContext,
@@ -475,6 +478,19 @@ describe('PermissionEvaluator', () => {
       });
       const command = 'cat "/etc/hosts"';
       expect(evaluator.evaluate('Bash', { command }, command, policy, makeContext())).toBe('escalate');
+    });
+
+    // §fix: relative Bash paths must resolve against workspace root, not process.cwd()
+    it('does not flag in-workspace relative Bash paths as outside-workspace', () => {
+      const root = process.platform === 'win32' ? 'C:\\ws' : '/ws';
+      const policy = makePolicy({
+        globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
+        profile: makeProfile({ shellSafe: 'auto-approve' }),
+      });
+      // in-workspace relative path → NOT outside workspace → approve
+      expect(evaluator.evaluate('Bash', { command: 'cat ./src/app.ts' }, 'cat ./src/app.ts', policy, { rootPath: root, sessionType: 'regular' })).toBe('approve');
+      // absolute path outside the workspace → IS outside workspace → escalate
+      expect(evaluator.evaluate('Bash', { command: 'cat /etc/passwd' }, 'cat /etc/passwd', policy, { rootPath: root, sessionType: 'regular' })).toBe('escalate');
     });
 
     it('should detect outside workspace paths passed through echo into xargs', () => {

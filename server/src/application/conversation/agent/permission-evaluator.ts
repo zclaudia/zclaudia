@@ -171,8 +171,11 @@ export function getOutsideWorkspacePaths(
     const command = extractBashCommand(toolInput, detail);
     if (command) {
       for (const p of extractPathsFromCommand(command)) {
-        if (!isPathWithinRoot(p, rootPath)) {
-          paths.push(path.resolve(p));
+        // Bash commands run cwd'd to the workspace root, so resolve relative
+        // paths against rootPath (not process.cwd()) before the within-root test.
+        const abs = path.isAbsolute(p) ? p : path.resolve(rootPath, p);
+        if (!isPathWithinRoot(abs, rootPath)) {
+          paths.push(abs);
         }
       }
     }
@@ -293,7 +296,12 @@ function targetsOutsideWorkspace(toolName: string, toolInput: unknown, detail: s
   if (isBashLikeTool(toolName)) {
     const command = extractBashCommand(toolInput, detail);
     if (command) {
-      return extractPathsFromCommand(command).some(p => !isPathWithinRoot(p, rootPath));
+      return extractPathsFromCommand(command).some(p => {
+        // Bash commands run cwd'd to the workspace root, so resolve relative
+        // paths against rootPath (not process.cwd()) before the within-root test.
+        const abs = path.isAbsolute(p) ? p : path.resolve(rootPath, p);
+        return !isPathWithinRoot(abs, rootPath);
+      });
     }
   }
   return false;
