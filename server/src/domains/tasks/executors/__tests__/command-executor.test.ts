@@ -1,4 +1,4 @@
-import { beforeEach, afterEach, describe, it, expect } from 'vitest';
+import { beforeEach, afterEach, describe, it, expect, vi } from 'vitest';
 import { mkdtempSync, rmSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -8,6 +8,7 @@ import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../repository.js';
 import { TaskService } from '../../task-service.js';
 import { CommandTaskExecutor, commandTaskLogPath, pidAlive } from '../command-executor.js';
+import * as sandbox from '../../../../infra/providers/pi-runtime/sandbox.js';
 
 let db: Database.Database;
 let dataDir: string;
@@ -127,5 +128,23 @@ describe('CommandTaskExecutor', () => {
     expect(repo.findById(dead.id)!.status).toBe('stopped');
     expect(repo.findById(live.id)!.status).toBe('running');
     await executor.stop(live.id);
+  });
+
+  it('spawns the sandbox-wrapped argv when sandbox is available', async () => {
+    const markerPath = join(dataDir, 'bgmarker.txt');
+    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({
+      sandboxed: true,
+      argv: ['sh', '-c', `echo BG_SANDBOXED > "${markerPath}"`],
+      env: process.env,
+    });
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const task = service.createTask({ type: 'command', metadata: { command: 'echo original', cwd: dataDir } });
+    const started = await executor.start(task);
+    service.startTask(task.id, { executorRef: started.executorRef });
+    await new Promise(r => setTimeout(r, 700));
+    expect(readFileSync(markerPath, 'utf8')).toContain('BG_SANDBOXED');
+    vi.restoreAllMocks();
   });
 });

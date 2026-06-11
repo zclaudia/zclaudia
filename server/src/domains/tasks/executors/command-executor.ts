@@ -4,6 +4,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
 import { resolveShell, killProcessTree } from '../../../infra/providers/pi-runtime/bash-runner.js';
+import * as sandbox from '../../../infra/providers/pi-runtime/sandbox.js';
 import { TaskRepository } from '../repository.js';
 import { TaskService } from '../task-service.js';
 import type { TaskExecutor, TaskExecutorUpdate } from './types.js';
@@ -49,15 +50,20 @@ export class CommandTaskExecutor implements TaskExecutor {
     if (!command) throw new Error('command task requires metadata.command');
     const cwd = typeof meta.cwd === 'string' && meta.cwd ? meta.cwd : process.cwd();
 
+    const wrap = await sandbox.wrapCommand(command, { workspaceRoot: cwd });
+
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
     const fd = openSync(logPath, 'a');
     let child;
     try {
       const { shell, args } = resolveShell();
-      child = spawn(shell, [...args, command], {
+      const spawnFile = wrap.sandboxed ? wrap.argv![0] : shell;
+      const spawnArgs = wrap.sandboxed ? wrap.argv!.slice(1) : [...args, command];
+      const spawnEnv = wrap.sandboxed ? wrap.env! : process.env;
+      child = spawn(spawnFile, spawnArgs, {
         cwd,
-        env: process.env,
+        env: spawnEnv,
         detached: process.platform !== 'win32',
         stdio: ['ignore', fd, fd],
         windowsHide: true,
