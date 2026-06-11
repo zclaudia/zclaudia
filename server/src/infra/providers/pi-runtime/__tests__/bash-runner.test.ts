@@ -75,4 +75,29 @@ describe('runBash', () => {
     expect(r.output).toContain('SANDBOXED_PATH');
     expect(r.output).not.toContain('THIS_SHOULD_NOT_RUN');
   });
+
+  it('feeds stdin to the child process', async () => {
+    const dir = TMP();
+    const result = await runBash({ command: 'cat -', cwd: dir, timeoutSec: 10, stdin: 'hello stdin' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.exitCode).toBe(0);
+    expect(result.fullOutput).toContain('hello stdin');
+  });
+
+  it('merges extraEnv over process.env', async () => {
+    const dir = TMP();
+    const result = await runBash({ command: 'echo "$ZC_TEST_VAR"', cwd: dir, timeoutSec: 10, extraEnv: { ZC_TEST_VAR: 'zc-42' } });
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.fullOutput).toContain('zc-42');
+  });
+
+  it('captures stderr separately in stderrOutput', async () => {
+    const dir = TMP();
+    const result = await runBash({ command: 'echo out; echo err >&2; exit 2', cwd: dir, timeoutSec: 10 });
+    rmSync(dir, { recursive: true, force: true });
+    expect(result.exitCode).toBe(2);
+    expect(result.stderrOutput).toContain('err');
+    expect(result.stderrOutput).not.toContain('out');
+    expect(result.fullOutput).toContain('out');
+  });
 });

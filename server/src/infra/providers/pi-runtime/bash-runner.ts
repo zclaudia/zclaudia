@@ -11,6 +11,10 @@ export interface BashRunOptions {
   maxBytes?: number;              // default 50*1024
   /** When set, spawn this sandbox-wrapped argv directly (shell:false) instead of `shell -c command`. */
   sandbox?: { argv: string[]; env: NodeJS.ProcessEnv };
+  /** Write this to the child's stdin then close it. Default: stdin ignored. */
+  stdin?: string;
+  /** Extra env vars merged over process.env (non-sandbox path only). */
+  extraEnv?: Record<string, string>;
 }
 
 export interface BashRunResult {
@@ -21,6 +25,8 @@ export interface BashRunResult {
   timedOut: boolean;
   aborted: boolean;
   durationMs: number;
+  /** stderr captured separately (merged output unchanged). */
+  stderrOutput: string;
 }
 
 const DEFAULT_MAX_LINES = 2000;
@@ -118,36 +124,49 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
 
   return new Promise((resolve) => {
     if (signal?.aborted) {
-      resolve({ exitCode: null, output: '', fullOutput: '', truncated: false, timedOut: false, aborted: true, durationMs: 0 });
+      resolve({ exitCode: null, output: '', fullOutput: '', truncated: false, timedOut: false, aborted: true, durationMs: 0, stderrOutput: '' });
       return;
     }
+    const stdinMode = opts.stdin !== undefined ? 'pipe' : 'ignore';
     let child;
     if (opts.sandbox) {
       child = spawn(opts.sandbox.argv[0], opts.sandbox.argv.slice(1), {
         cwd,
         env: opts.sandbox.env,
         detached: process.platform !== 'win32',
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [stdinMode, 'pipe', 'pipe'],
         windowsHide: true,
       });
     } else {
       const { shell, args } = resolveShell();
       child = spawn(shell, [...args, command], {
         cwd,
-        env: process.env,
+        env: opts.extraEnv ? { ...process.env, ...opts.extraEnv } : process.env,
         detached: process.platform !== 'win32',
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: [stdinMode, 'pipe', 'pipe'],
         windowsHide: true,
       });
     }
 
+    if (opts.stdin !== undefined && child.stdin) {
+      child.stdin.on('error', () => { /* EPIPE when child exits early — harmless */ });
+      child.stdin.write(opts.stdin);
+      child.stdin.end();
+    }
+
     let full = '';
+    const stderrChunks: string[] = [];
     let timedOut = false;
     let aborted = false;
 
     const onData = (chunk: Buffer) => { full += chunk.toString('utf8'); onChunk?.(full); };
     child.stdout?.on('data', onData);
-    child.stderr?.on('data', onData);
+    child.stderr?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString('utf8');
+      stderrChunks.push(text);
+      full += text;
+      onChunk?.(full);
+    });
 
     let timer: NodeJS.Timeout | undefined;
     if (timeoutSec > 0) {
@@ -160,7 +179,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       if (timer) clearTimeout(timer);
       if (signal) signal.removeEventListener('abort', onAbort);
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
-      resolve({ exitCode, output: display, fullOutput: full, truncated, timedOut, aborted, durationMs: Date.now() - startedAt });
+      resolve({ exitCode, output: display, fullOutput: full, truncated, timedOut, aborted, durationMs: Date.now() - startedAt, stderrOutput: stderrChunks.join('') });
     };
 
     waitForChild(child).then(finish).catch((err) => {
