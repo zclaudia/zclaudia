@@ -81,17 +81,26 @@ export function persistProjectAllowedOutsideWorkspaceRoots(
 /** Remember-key namespace for Phase B1 session network grants. */
 const SANDBOX_NETWORK_KEY_PREFIX = 'sandbox:network:';
 
-/** Load the session's granted sandbox network domains (Phase B1). */
+/**
+ * Load the session's granted sandbox network domains (Phase B1).
+ * Defensive: a DB error (e.g. an incomplete/missing `permission_memories` table)
+ * must not crash an agent run — degrade to "no grants".
+ */
 export function loadSessionSandboxDomains(
   db: PermissionMemoryDb,
   sessionId: string
 ): string[] {
-  const rows = db.prepare(
-    "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
-  ).all(sessionId);
-  return rows
-    .map((row) => (row.remember_key as string).slice(SANDBOX_NETWORK_KEY_PREFIX.length))
-    .filter((host) => host.length > 0);
+  try {
+    const rows = db.prepare(
+      "SELECT remember_key FROM permission_memories WHERE session_id = ? AND remember_key LIKE 'sandbox:network:%' AND decision = 'allow'"
+    ).all(sessionId);
+    return rows
+      .map((row) => (row.remember_key as string).slice(SANDBOX_NETWORK_KEY_PREFIX.length))
+      .filter((host) => host.length > 0);
+  } catch (err) {
+    console.warn('[sandbox] failed to load session network grants; treating as none:', err);
+    return [];
+  }
 }
 
 /** Persist a session network grant (Phase B1). Idempotent per (session, host). */
