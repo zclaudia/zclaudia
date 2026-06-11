@@ -1534,6 +1534,11 @@ function createMonitorTool(sessionId?: string, runId?: string, db?: Database.Dat
       }
       if (action === 'stop') {
         try {
+          if (task.type === 'command') {
+            const executor = new CommandTaskExecutor(repo);
+            const update = await executor.stop(task.id, typeof args.reason === 'string' ? args.reason : undefined);
+            return jsonResult({ ok: true, taskId: task.id, status: update.status });
+          }
           const stopped = service.stopTask(task.id, {
             error: typeof args.reason === 'string' ? args.reason : undefined,
           });

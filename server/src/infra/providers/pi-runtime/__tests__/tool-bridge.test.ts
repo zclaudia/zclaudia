@@ -7,7 +7,7 @@ import Database from 'better-sqlite3';
 import { buildTools, ALL_TOOL_NAMES, type ToolName } from '../tool-bridge.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
-import { CommandTaskExecutor } from '../../../../domains/tasks/executors/command-executor.js';
+import { CommandTaskExecutor, pidAlive } from '../../../../domains/tasks/executors/command-executor.js';
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
 
 const { activateConditionalSkillsForToolNamesMock } = vi.hoisted(() => ({
@@ -1056,5 +1056,49 @@ describe('TaskOutput for command tasks', () => {
     expect(res.content[0].text.trim().split('\n')).toEqual(['l2', 'l3']);
     expect(['completed', 'running']).toContain(res.details.status);
     rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('Monitor stops command tasks', () => {
+  let db: Database.Database;
+  let dataDir: string;
+  let prevDataDir: string | undefined;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+
+    dataDir = mkdtempSync(path.join(tmpdir(), 'zc-monbg-data-'));
+    prevDataDir = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+  });
+
+  afterEach(() => {
+    if (prevDataDir === undefined) {
+      delete process.env.ZCLAUDIA_DATA_DIR;
+    } else {
+      process.env.ZCLAUDIA_DATA_DIR = prevDataDir;
+    }
+    rmSync(dataDir, { recursive: true, force: true });
+    db.close();
+  });
+
+  it('kills the process tree, not just the DB record', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-monbg-'));
+    const tools = buildTools(dir, { enabled: ['Bash', 'Monitor'], db });
+    const bash = tools.find((t: any) => t.name === 'Bash') as any;
+    const monitor = tools.find((t: any) => t.name === 'Monitor') as any;
+    const started = await bash.execute('mb1', { command: 'sleep 30', run_in_background: true });
+    const { taskId, pid } = started.details;
+    expect(pidAlive(pid)).toBe(true);
+
+    const res = await monitor.execute('mb2', { action: 'stop', task_id: taskId });
+    await new Promise(r => setTimeout(r, 300));
+    const parsed = JSON.parse(res.content[0].text);
+    rmSync(dir, { recursive: true, force: true });
+    expect(parsed.ok).toBe(true);
+    expect(parsed.status).toBe('stopped');
+    expect(pidAlive(pid)).toBe(false);
   });
 });
