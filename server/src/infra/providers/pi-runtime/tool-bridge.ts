@@ -20,6 +20,8 @@ import { buildHashlineEntries, formatHashlineOutput, hashlineTag } from './hashl
 import { runRipgrep } from './ripgrep-runner.js';
 import { runBash } from './bash-runner.js';
 import * as sandbox from './sandbox.js';
+import { detectSandboxDenial, SANDBOX_NETWORK_ESCALATION_TOOL, MAX_ESCALATION_ITERATIONS } from './sandbox-denial.js';
+import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
@@ -452,6 +454,13 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
   const DEFAULT_TIMEOUT_SEC = 120;
   const MAX_TIMEOUT_SEC = 600;
   const UPDATE_THROTTLE_MS = 100;
+  // Session-granted domains, shared across all Bash calls in this run; seeded from DB (prior turns).
+  const grantedDomains = new Set<string>(options?.sandboxAllowedDomains ?? []);
+  const buildEscalationDetail = (hosts: string[]): string => {
+    const plural = hosts.length > 1;
+    return `This command tried to reach ${plural ? 'domains' : 'a domain'} not on the network allow-list: ${hosts.join(', ')}. `
+      + `Approving allows ${plural ? 'them' : 'it'} for this session and re-runs the entire command — make sure the command is safe to repeat.`;
+  };
   return {
     name: 'Bash',
     label: 'Bash',
@@ -511,12 +520,6 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         }
       }
 
-      const wrap = await sandbox.wrapCommand(command, { workspaceRoot: cwd, readOnly: options?.sandboxReadOnly === true, signal });
-      if (!wrap.sandboxed && options?.sandboxReadOnly === true) {
-        return errorResult('sandbox_unavailable_plan_mode', 'Read-only Bash requires the sandbox, which is not active for this command');
-      }
-      const sandboxArg = wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined;
-
       const timeoutSec = Math.min(Math.max(1, Number(args.timeout ?? DEFAULT_TIMEOUT_SEC) || DEFAULT_TIMEOUT_SEC), MAX_TIMEOUT_SEC);
 
       let lastEmit = 0;
@@ -530,7 +533,53 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
           }
         : undefined;
 
-      const result = await runBash({ command, cwd: runCwd, timeoutSec, signal, onChunk, sandbox: sandboxArg });
+      let wrap = await sandbox.wrapCommand(command, {
+        workspaceRoot: cwd,
+        readOnly: options?.sandboxReadOnly === true,
+        extraAllowedDomains: [...grantedDomains],
+        signal,
+      });
+      if (!wrap.sandboxed && options?.sandboxReadOnly === true) {
+        return errorResult('sandbox_unavailable_plan_mode', 'Read-only Bash requires the sandbox, which is not active for this command');
+      }
+      let result = await runBash({
+        command, cwd: runCwd, timeoutSec, signal, onChunk,
+        sandbox: wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined,
+      });
+
+      // Phase B1: escalate-on-denial (network only). Foreground + sandboxed + a permission channel.
+      const canEscalate = wrap.sandboxed && options?.sandboxReadOnly !== true && !!options?.permissionCallback;
+      for (let iteration = 0; canEscalate && iteration < MAX_ESCALATION_ITERATIONS; iteration++) {
+        if (result.aborted || result.exitCode === 0) break;
+        const allowedNow = new Set<string>([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]);
+        const denial = detectSandboxDenial(command, result.fullOutput, allowedNow);
+        if (!denial) break;
+        const decision = await options!.permissionCallback!({
+          requestId: `${toolCallId}:sandbox-net:${iteration}`,
+          toolName: SANDBOX_NETWORK_ESCALATION_TOOL,
+          toolInput: { command, hosts: denial.hosts },
+          detail: buildEscalationDetail(denial.hosts),
+          timeoutSeconds: 0,
+          timeoutBehavior: 'deny',
+        });
+        if (decision.behavior !== 'allow') break;
+        for (const host of denial.hosts) {
+          grantedDomains.add(host);
+          if (options?.db && options?.sessionId) {
+            persistSessionSandboxDomain(options.db, options.sessionId, host);
+          }
+        }
+        wrap = await sandbox.wrapCommand(command, {
+          workspaceRoot: cwd,
+          readOnly: options?.sandboxReadOnly === true,
+          extraAllowedDomains: [...grantedDomains],
+          signal,
+        });
+        result = await runBash({
+          command, cwd: runCwd, timeoutSec, signal, onChunk,
+          sandbox: wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined,
+        });
+      }
 
       if (result.aborted) {
         return textResult(result.output || '', { ok: false, aborted: true, exitCode: null });
