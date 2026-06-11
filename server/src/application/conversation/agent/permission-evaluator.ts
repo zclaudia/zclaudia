@@ -429,9 +429,16 @@ export function getMatchedPermissionRule(
   if (!policy.enabled) return null;
 
   const rootPath = context?.rootPath || process.cwd();
+  const customRules = policy.customRules || [];
 
   if (policy.escalateAlways?.includes(toolName)) {
     return 'Always escalate';
+  }
+
+  // Deny-action custom rules checked before guards (deny is strongest)
+  const denyResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action === 'deny'));
+  if (denyResult === 'deny') {
+    return 'Custom rule';
   }
 
   if (policy.globalGuards.blockSensitiveFiles && targetsSensitiveFile(toolName, toolInput, detail)) {
@@ -442,7 +449,8 @@ export function getMatchedPermissionRule(
     return 'Outside workspace access';
   }
 
-  const customResult = evaluateCustomRules(toolName, detail, policy.customRules || []);
+  // Remaining custom rules (approve / escalate / continue)
+  const customResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action !== 'deny'));
   if (customResult === 'escalate') {
     return 'Custom rule';
   }
@@ -488,11 +496,13 @@ function evaluateCustomRules(toolName: string, detail: string, rules: AgentPermi
  *
  * Evaluation order:
  *   1. escalateAlways list
- *   2. Global guards (sensitive files / outside workspace → escalate)
- *      Guards are not bypassable by allow rules; the user can still approve
- *      (and promote a rule) from the escalation prompt.
- *   3. Custom rules (first match wins)
- *   4. Classify tool → category → look up profile → action
+ *   2. Deny-action custom rules (first match wins)
+ *      Deny rules are strongest — they are never weakened to a prompt by a guard.
+ *   3. Global guards (sensitive files / outside workspace → escalate)
+ *      Guards stop allow/escalate rules from bypassing protection; they cannot
+ *      override an explicit deny.
+ *   4. Remaining custom rules — approve / escalate / continue (first match wins)
+ *   5. Classify tool → category → look up profile → action
  */
 export class PermissionEvaluator {
   evaluate(
@@ -505,13 +515,20 @@ export class PermissionEvaluator {
     if (!policy.enabled) return 'escalate';
 
     const rootPath = context?.rootPath || process.cwd();
+    const customRules = policy.customRules || [];
 
     // 1. escalateAlways
     if (policy.escalateAlways?.includes(toolName)) {
       return 'escalate';
     }
 
-    // 2. Global guards → escalate (not bypassable by allow rules)
+    // 2. Deny-action custom rules — strongest signal, never weakened by a guard
+    const denyResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action === 'deny'));
+    if (denyResult === 'deny') {
+      return 'deny';
+    }
+
+    // 3. Global guards → escalate (stop allow rules from bypassing protection)
     if (policy.globalGuards.blockSensitiveFiles && targetsSensitiveFile(toolName, toolInput, detail)) {
       return 'escalate';
     }
@@ -519,13 +536,13 @@ export class PermissionEvaluator {
       return 'escalate';
     }
 
-    // 3. Custom rules (first match wins)
-    const customResult = evaluateCustomRules(toolName, detail, policy.customRules || []);
+    // 4. Remaining custom rules — approve / escalate / continue (first match wins)
+    const customResult = evaluateCustomRules(toolName, detail, customRules.filter(r => r.action !== 'deny'));
     if (customResult !== 'continue') {
       return customResult;
     }
 
-    // 4. Category-based evaluation
+    // 5. Category-based evaluation
     const category = classify(toolName, toolInput, detail);
     const action = resolveProfile(policy, context)[category];
 

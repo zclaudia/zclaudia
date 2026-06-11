@@ -629,6 +629,23 @@ describe('PermissionEvaluator', () => {
       });
       expect(new PermissionEvaluator().evaluate('Bash', { command: 'git status' }, 'git status', policy, makeContext())).toBe('approve');
     });
+
+    it('an explicit deny rule still hard-denies even when a guard also matches', () => {
+      const policy = makePolicy({
+        customRules: [{ toolName: 'Bash', action: 'deny' }],
+        globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
+      });
+      expect(new PermissionEvaluator().evaluate('Bash', { command: 'cat /repo/.env' }, 'cat /repo/.env', policy, makeContext())).toBe('deny');
+    });
+
+    it('allow rules still cannot bypass guards (unchanged)', () => {
+      // Re-assert the existing shape: Read ^.*$ approve + .env → escalate (guard wins over allow)
+      const policy = makePolicy({
+        customRules: [{ toolName: 'Read', pattern: '^.*$', action: 'approve' }],
+        globalGuards: { blockSensitiveFiles: true, blockOutsideWorkspace: false },
+      });
+      expect(new PermissionEvaluator().evaluate('Read', { file_path: '/repo/.env' }, '', policy, makeContext())).toBe('escalate');
+    });
   });
 
   // ------------------------------------------
