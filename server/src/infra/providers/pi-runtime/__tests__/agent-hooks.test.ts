@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { buildAgentHooks, truncateContent, DEFAULT_OUTPUT_LIMIT_BYTES } from '../agent-hooks.js';
 
 describe('truncateContent', () => {
@@ -248,5 +251,74 @@ describe('buildAgentHooks placeholders', () => {
     const hooks = buildAgentHooks({ permissionCallback: vi.fn() });
     expect(hooks.transformContext).toBeUndefined();
     expect(hooks.streamFn).toBeUndefined();
+  });
+});
+
+describe('user hooks integration', () => {
+  const allow = () => vi.fn().mockResolvedValue({ behavior: 'allow' });
+  const bashCall = { toolCall: { id: 't1', name: 'Bash', arguments: { command: 'git push' } }, args: { command: 'git push' } };
+
+  it('PreToolUse exit-2 hook blocks the tool call with stderr reason', async () => {
+    const hooks = buildAgentHooks({
+      permissionCallback: allow(),
+      userHooks: [{ event: 'PreToolUse', matcher: 'Bash(git *)', command: 'echo "use the release script" >&2; exit 2' }],
+      cwd: process.cwd(),
+    });
+    const result = await hooks.beforeToolCall!(bashCall as any);
+    expect(result).toEqual({ block: true, reason: 'use the release script' });
+  });
+
+  it('user hooks do not run when permission denies (ordering)', async () => {
+    const marker = path.join(os.tmpdir(), `zc-hook-${process.pid}-${Math.random().toString(36).slice(2)}`);
+    const hooks = buildAgentHooks({
+      permissionCallback: vi.fn().mockResolvedValue({ behavior: 'deny', message: 'no' }),
+      userHooks: [{ event: 'PreToolUse', command: `touch "${marker}"` }],
+      cwd: process.cwd(),
+    });
+    const result = await hooks.beforeToolCall!(bashCall as any);
+    expect(result).toEqual({ block: true, reason: 'no' });
+    expect(fs.existsSync(marker)).toBe(false);
+  });
+
+  it('non-matching hooks leave the call untouched', async () => {
+    const hooks = buildAgentHooks({
+      permissionCallback: allow(),
+      userHooks: [{ event: 'PreToolUse', matcher: 'Read', command: 'exit 2' }],
+      cwd: process.cwd(),
+    });
+    expect(await hooks.beforeToolCall!(bashCall as any)).toBeUndefined();
+  });
+
+  it('hooks receive ORIGINAL args, not the credential-rewritten updatedInput', async () => {
+    const capture = path.join(os.tmpdir(), `zc-hook-cap-${process.pid}-${Math.random().toString(36).slice(2)}.json`);
+    const hooks = buildAgentHooks({
+      permissionCallback: vi.fn().mockResolvedValue({ behavior: 'allow', updatedInput: { command: 'echo SECRETPASS | sudo -S x' } }),
+      userHooks: [{ event: 'PreToolUse', command: `cat - > "${capture}"` }],
+      cwd: process.cwd(),
+    });
+    const result = await hooks.beforeToolCall!(bashCall as any);
+    expect(result).toEqual({ args: { command: 'echo SECRETPASS | sudo -S x' } }); // updatedInput still applied to the TOOL
+    const seen = fs.readFileSync(capture, 'utf8');
+    expect(seen).toContain('git push');         // hook saw the original
+    expect(seen).not.toContain('SECRETPASS');   // hook never saw the credential
+  });
+
+  it('PostToolUse exit-2 stderr is appended to the tool result content', async () => {
+    const hooks = buildAgentHooks({
+      permissionCallback: allow(),
+      userHooks: [{ event: 'PostToolUse', command: 'echo "lint failed on changed file" >&2; exit 2' }],
+      cwd: process.cwd(),
+    });
+    const result = await hooks.afterToolCall!({
+      toolCall: { id: 't1', name: 'Bash', arguments: { command: 'git push' } },
+      args: { command: 'git push' },
+      result: { content: [{ type: 'text', text: 'pushed' }], details: {} },
+      isError: false,
+      context: {} as any,
+    } as any);
+    expect(result?.content).toEqual([
+      { type: 'text', text: 'pushed' },
+      { type: 'text', text: '[hook] lint failed on changed file' },
+    ]);
   });
 });

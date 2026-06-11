@@ -13,6 +13,11 @@ vi.mock('../run-permissions.js', () => ({
   createPermissionCallback: vi.fn(() => vi.fn()),
 }));
 
+// Stub resolveUserHooks — returns empty by default; tests don't need real hook resolution
+vi.mock('../resolve-user-hooks.js', () => ({
+  resolveUserHooks: vi.fn(() => []),
+}));
+
 // ---------- helpers ----------
 
 function makeInput(messageInput: string) {

@@ -44,6 +44,7 @@ interface LaunchProviderRunInput {
   sessionType: 'regular' | 'background' | 'agent';
   trace: TraceRecorder;
   userMessageId?: string;
+  userHooks?: import('@zclaudia/shared/interaction/user-hooks').UserHookDefinition[];
 }
 
 export async function launchProviderRun(input: LaunchProviderRunInput): Promise<{
@@ -76,6 +77,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     sessionType,
     trace,
     userMessageId,
+    userHooks,
   } = input;
 
   if (adapter.manifest) {
@@ -192,6 +194,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   runOptions.externalToolState = activeRun.externalToolState;
   runOptions.skillState = activeRun.skillState;
   runOptions.images = images.length > 0 ? images : undefined;
+  runOptions.userHooks = userHooks && userHooks.length > 0 ? userHooks : undefined;
 
   // Wire mid-run steering callbacks. The closure captures `activeRun` directly
   // (not via activeRuns map) so registration is robust even if the run is

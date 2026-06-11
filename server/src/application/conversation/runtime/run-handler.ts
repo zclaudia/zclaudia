@@ -137,6 +137,7 @@ export async function handleRunStart(
       permissionCallback,
       processedInput,
       images,
+      userHooks,
     } = prepareProviderRun({
       activeRun,
       broadcastToOtherAuthenticatedClients,
@@ -186,6 +187,7 @@ export async function handleRunStart(
       sessionType,
       trace,
       userMessageId,
+      userHooks,
     });
 
     await consumeProviderStream({

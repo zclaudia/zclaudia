@@ -3,12 +3,14 @@ import { parseMessageInput } from './message-input.js';
 import { resolveImageAttachments, type ResolvedImage } from './resolve-image-attachments.js';
 import { getFileStore } from '../../../infra/storage/fileStore.js';
 import { createPermissionCallback } from './run-permissions.js';
+import { resolveUserHooks } from './resolve-user-hooks.js';
 import type { RunStartMessage, RunSessionRecord } from './run-bootstrap.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 
 interface PrepareProviderRunInput {
   activeRun: ActiveRun;
@@ -42,6 +44,7 @@ export interface PreparedProviderRun {
   permissionCallback: ReturnType<typeof createPermissionCallback>;
   processedInput: string;
   images: ResolvedImage[];
+  userHooks: UserHookDefinition[];
 }
 
 export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProviderRun {
@@ -101,11 +104,15 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
     permissionWorkflowResolver: input.permissionWorkflowResolver!,
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const userHooks = resolveUserHooks(db as any, session.project_id);
+
   return {
     forcedPlanBySession,
     modeValue,
     permissionCallback,
     processedInput,
     images,
+    userHooks,
   };
 }

@@ -3,6 +3,8 @@ import { newId } from '../../../utils/uuid.js';
 import type { AgentLoopConfig, StreamFn } from '@earendil-works/pi-agent-core';
 import { truncateHead, truncateTail, DEFAULT_MAX_LINES, type TruncationResult } from '@earendil-works/pi-agent-core';
 import type { PermissionCallback } from '../types.js';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
+import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
 
 export const DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
@@ -71,6 +73,11 @@ export interface AgentHooksInput {
   /** Stream function for the agent loop. Note: pi accepts this as a separate argument to
    *  agentLoop(), not as part of AgentLoopConfig. We pass it through for callers to wire. */
   streamFn?: StreamFn;
+  /** Declarative user hooks (resolved per run); absent = none. */
+  userHooks?: UserHookDefinition[];
+  /** Workspace root for hook execution. */
+  cwd?: string;
+  sessionId?: string;
 }
 
 export interface AgentHooksOutput {
@@ -159,6 +166,20 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       if (decision.behavior === 'deny') {
         return { block: true, reason: decision.message ?? 'denied by user' };
       }
+      if (input.userHooks?.length) {
+        // Hooks see the ORIGINAL model-supplied args — decision.updatedInput
+        // may embed decrypted credentials (sudo rewrite) that must never
+        // reach user hook processes.
+        const outcome = await runPreToolUseHooks(input.userHooks, {
+          event: 'PreToolUse',
+          toolName,
+          toolInput: args,
+          detail: buildToolDetail(toolName, args),
+          cwd: input.cwd ?? process.cwd(),
+          sessionId: input.sessionId,
+        }, input.abortSignal);
+        if (outcome.blocked) return { block: true, reason: outcome.reason };
+      }
       if (decision.updatedInput !== undefined) {
         return { args: decision.updatedInput };
       }
@@ -167,15 +188,33 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     afterToolCall: async (ctx: any) => {
-      const { result, toolCall } = ctx;
+      const { result, toolCall, args } = ctx;
       if (!result?.content) return undefined;
       const toolName: string = toolCall?.name ?? '';
-      const truncated = truncateContent(result.content, toolName, limit);
-      if (!truncated.didTruncate) return undefined;
+      let content = result.content;
+      let hookAppended = false;
+      if (input.userHooks?.length) {
+        const extras = await runPostToolUseHooks(input.userHooks, {
+          event: 'PostToolUse',
+          toolName,
+          toolInput: args,
+          detail: buildToolDetail(toolName, args),
+          cwd: input.cwd ?? process.cwd(),
+          sessionId: input.sessionId,
+        }, input.abortSignal);
+        if (extras.length > 0) {
+          content = [...content, ...extras.map((text: string) => ({ type: 'text', text: `[hook] ${text}` }))];
+          hookAppended = true;
+        }
+      }
+      const truncated = truncateContent(content, toolName, limit);
+      if (!truncated.didTruncate && !hookAppended) return undefined;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        content: truncated.content as any,
-        details: { ...(result.details ?? {}), truncated: true, originalSize: truncated.originalSize },
+        content: (truncated.didTruncate ? truncated.content : content) as any,
+        details: truncated.didTruncate
+          ? { ...(result.details ?? {}), truncated: true, originalSize: truncated.originalSize }
+          : result.details,
       };
     },
 

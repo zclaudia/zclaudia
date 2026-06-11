@@ -436,6 +436,9 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     }
     const hooks = buildAgentHooks({
       permissionCallback: onPermission ?? (async () => ({ behavior: 'deny', message: 'no permission callback provided' })),
+      userHooks: options.userHooks,
+      cwd: options.cwd,
+      sessionId: options.claudiaSessionId,
     });
 
     const externalProviderCatalog = options.externalToolState

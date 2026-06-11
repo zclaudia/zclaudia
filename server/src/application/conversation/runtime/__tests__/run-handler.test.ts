@@ -125,7 +125,13 @@ function createDb(): Database.Database {
       id TEXT PRIMARY KEY,
       llm_profile_id TEXT,
       root_path TEXT,
-      system_prompt TEXT
+      system_prompt TEXT,
+      hooks_override TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS agent_config (
+      id INTEGER PRIMARY KEY,
+      hooks TEXT
     );
 
     CREATE TABLE sessions (

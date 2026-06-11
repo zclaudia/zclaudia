@@ -54,6 +54,8 @@ export interface RunOptions {
   onSteerConsumed?: () => void;
   /** Resolved image attachments for this prompt (base64, ≤5MB each). */
   images?: Array<{ name: string; mimeType: string; data: string }>;
+  /** Resolved user hooks for PreToolUse / PostToolUse lifecycle. */
+  userHooks?: import('@zclaudia/shared/interaction/user-hooks').UserHookDefinition[];
 }
 
 /** Agent runtime adapter interface. */
