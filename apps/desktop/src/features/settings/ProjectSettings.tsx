@@ -11,6 +11,7 @@ import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
 import { Select } from '../../components/ui/Select';
 import { listAllWorkflows } from '../workflows/api';
+import { ToolRuleList } from '../../components/permission/ToolRuleList';
 
 const CATEGORY_LABELS: Record<PermissionCategory, { label: string; description: string }> = {
   fileRead: { label: 'File Read', description: 'Read, Glob, Grep, WebFetch' },
@@ -495,6 +496,16 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
                       </div>
                     );
                   })}
+                </div>
+                <div className="mt-3">
+                  <p className="text-xs font-medium text-muted-foreground mb-1">
+                    Tool Rules
+                    <span className="ml-1 font-normal">(project rules replace global rules entirely)</span>
+                  </p>
+                  <ToolRuleList
+                    rules={permOverride.customRules ?? []}
+                    onChange={(customRules) => setPermOverride((prev) => ({ ...prev, customRules }))}
+                  />
                 </div>
               </div>
             )}

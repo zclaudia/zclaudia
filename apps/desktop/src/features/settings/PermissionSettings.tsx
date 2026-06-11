@@ -18,6 +18,7 @@ import {
   DEFAULT_UNIFIED_POLICY,
   normalizeToUnifiedPolicy,
 } from '@zclaudia/shared';
+import { ToolRuleList } from '../../components/permission/ToolRuleList';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
 
@@ -317,6 +318,20 @@ export function PermissionSettings() {
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Tool Rules */}
+      {policy.enabled && (
+        <div>
+          <h3 className="text-sm font-medium mb-1">Tool Rules</h3>
+          <p className="text-[10px] text-muted-foreground mb-2">
+            Fine-grained per-tool rules like <code className="font-mono">Bash(git *)</code>. Deny outranks guards; Allow cannot bypass sensitive-file protection.
+          </p>
+          <ToolRuleList
+            rules={policy.customRules}
+            onChange={(customRules) => savePolicy({ ...policy, customRules })}
+          />
         </div>
       )}
 
