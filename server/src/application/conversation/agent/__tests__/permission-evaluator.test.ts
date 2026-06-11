@@ -921,6 +921,37 @@ describe('outside workspace allowlist', () => {
     const allowedRoots = loadProjectAllowedOutsideWorkspaceRoots(db as any, 'project-1');
     expect([...allowedRoots]).toEqual(['/private/tmp/app']);
   });
+
+  // Bash subprocess cwd is the workspace root, not the server's process.cwd().
+  // Workspace-relative tokens must resolve against rootPath, not process.cwd().
+  describe('workspace-relative Bash tokens resolve against rootPath', () => {
+    const realRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'zclaudia-ws-'));
+
+    it('does not flag in-workspace relative paths', () => {
+      expect(getOutsideWorkspacePaths('Bash', { command: 'cat ./src/app.ts' }, '', realRoot)).toEqual([]);
+      expect(getOutsideWorkspacePaths('Bash', { command: 'cat .env' }, '', realRoot)).toEqual([]);
+    });
+
+    it('still flags absolute paths outside the workspace', () => {
+      expect(getOutsideWorkspacePaths('Bash', { command: 'cat /etc/hosts' }, '', realRoot))
+        .toEqual(['/etc/hosts']);
+    });
+
+    it('still flags relative paths that escape the workspace', () => {
+      expect(getOutsideWorkspacePaths('Bash', { command: 'cat ./../../etc/passwd' }, '', realRoot))
+        .toEqual([path.resolve(realRoot, './../../etc/passwd')]);
+    });
+
+    it('evaluator approves in-workspace relative path and escalates absolute escape', () => {
+      const evaluator = new PermissionEvaluator();
+      const policy = makePolicy({
+        globalGuards: { blockSensitiveFiles: false, blockOutsideWorkspace: true },
+      });
+      const ctx = { rootPath: realRoot, sessionType: 'regular' as const };
+      expect(evaluator.evaluate('Bash', { command: 'cat ./src/app.ts' }, 'cat ./src/app.ts', policy, ctx)).toBe('approve');
+      expect(evaluator.evaluate('Bash', { command: 'cat /etc/hosts' }, 'cat /etc/hosts', policy, ctx)).toBe('escalate');
+    });
+  });
 });
 
 // ============================================
