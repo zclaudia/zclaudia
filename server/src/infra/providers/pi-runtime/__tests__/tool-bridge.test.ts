@@ -993,3 +993,68 @@ describe('Bash background execution', () => {
     expect(res.details.error).toBe('missing_db_context');
   });
 });
+
+describe('TaskOutput for command tasks', () => {
+  let db: Database.Database;
+  let dataDir: string;
+  let prevDataDir: string | undefined;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+
+    dataDir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-data-'));
+    prevDataDir = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+  });
+
+  afterEach(() => {
+    if (prevDataDir === undefined) {
+      delete process.env.ZCLAUDIA_DATA_DIR;
+    } else {
+      process.env.ZCLAUDIA_DATA_DIR = prevDataDir;
+    }
+    rmSync(dataDir, { recursive: true, force: true });
+    db.close();
+  });
+
+  it('reads the log incrementally with output_offset/nextOffset', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
+    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db });
+    const bash = tools.find((t: any) => t.name === 'Bash') as any;
+    const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
+    const started = await bash.execute('to1', { command: 'echo first-line; sleep 30', run_in_background: true });
+    const taskId = started.details.taskId as string;
+    await new Promise(r => setTimeout(r, 500));
+
+    const r1 = await taskOutput.execute('to2', { task_id: taskId });
+    expect(r1.details.ok).toBe(true);
+    expect(r1.content[0].text).toContain('first-line');
+    expect(r1.details.nextOffset).toBeGreaterThan(0);
+    expect(r1.details.status).toBe('running');
+    expect(r1.details.eof).toBe(true);
+
+    const r2 = await taskOutput.execute('to3', { task_id: taskId, output_offset: r1.details.nextOffset });
+    expect(r2.content[0].text).toBe('');
+    expect(r2.details.eof).toBe(true);
+
+    await new CommandTaskExecutor(new TaskRepository(db)).stop(taskId); // no leaked sleep
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('tail_lines returns the last N lines', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
+    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db });
+    const bash = tools.find((t: any) => t.name === 'Bash') as any;
+    const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
+    const started = await bash.execute('to4', { command: "printf 'l1\\nl2\\nl3\\n'", run_in_background: true });
+    const taskId = started.details.taskId as string;
+    await new Promise(r => setTimeout(r, 700));
+
+    const res = await taskOutput.execute('to5', { task_id: taskId, tail_lines: 2 });
+    expect(res.content[0].text.trim().split('\n')).toEqual(['l2', 'l3']);
+    expect(['completed', 'running']).toContain(res.details.status);
+    rmSync(dir, { recursive: true, force: true });
+  });
+});

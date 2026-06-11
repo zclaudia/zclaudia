@@ -5,7 +5,7 @@ import { lookup } from 'dns/promises';
 import { isIP } from 'net';
 import { execFile } from 'child_process';
 import { readFile, readdir, stat, mkdir, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
+import { existsSync, openSync, closeSync, readSync, statSync } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { randomUUID } from 'crypto';
@@ -19,7 +19,7 @@ import { normalizeTodoItems } from '../../../application/conversation/interactio
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
-import { CommandTaskExecutor, commandTaskLogPath } from '../../../domains/tasks/executors/command-executor.js';
+import { CommandTaskExecutor, commandTaskLogPath, pidAlive } from '../../../domains/tasks/executors/command-executor.js';
 import { activateConditionalSkillsForPaths, activateConditionalSkillsForToolNames } from '../../../application/plugins/skill-tools.js';
 import { loadMcpServersFromDb } from '../../../utils/mcp-config.js';
 import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
@@ -98,6 +98,17 @@ function withConditionalSkillActivation(tool: AgentTool<any>, name: ToolName, cw
 function truncateText(value: string, limit = 80_000): string {
   if (value.length <= limit) return value;
   return `${value.slice(0, limit)}\n... [truncated ${value.length - limit} chars]`;
+}
+
+function readLogWindow(filePath: string, offset: number, length: number): string {
+  const fd = openSync(filePath, 'r');
+  try {
+    const buf = Buffer.alloc(length);
+    const bytes = readSync(fd, buf, 0, length, offset);
+    return buf.subarray(0, bytes).toString('utf8');
+  } finally {
+    closeSync(fd);
+  }
 }
 
 function resolveInsideWorkspace(cwd: string, requestedPath: unknown): string {
@@ -1393,6 +1404,8 @@ function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
         task_id: { type: 'string' },
         taskId: { type: 'string' },
         include_events: { type: 'boolean', default: true },
+        output_offset: { type: 'number', description: 'For command tasks: byte offset to read the log from (use the previous nextOffset)' },
+        tail_lines: { type: 'number', description: 'For command tasks: return only the last N lines (takes precedence over output_offset)' },
       },
       required: ['task_id'],
     } as any,
@@ -1407,6 +1420,52 @@ function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
       const repo = new TaskRepository(db);
       const task = repo.findById(taskId.trim());
       if (!task) return errorResult('task_not_found', `Task not found: ${taskId}`, { taskId });
+
+      if (task.type === 'command') {
+        // Lazy liveness finalize for re-adopted tasks: running + dead pid → completed, exit code unknown.
+        let current = task;
+        const pid = task.executorRef?.pid;
+        if (task.status === 'running' && typeof pid === 'number' && !pidAlive(pid)) {
+          try {
+            current = new TaskService(repo).completeTask(task.id, { text: 'Process exited (exit code unknown; observed after restart)' });
+          } catch {
+            current = repo.findById(task.id) ?? task;
+          }
+        }
+        const logPath = commandTaskLogPath(task.id);
+        const CAP = 50 * 1024;
+        const requestedOffset = Math.max(0, Number(args.output_offset ?? 0) || 0);
+        let output = '';
+        let size = 0;
+        try {
+          size = statSync(logPath).size;
+          const tailLines = args.tail_lines !== undefined ? Math.max(1, Number(args.tail_lines) || 1) : undefined;
+          if (tailLines !== undefined) {
+            const start = Math.max(0, size - CAP);
+            output = readLogWindow(logPath, start, size - start);
+            const hadTrailingNewline = output.endsWith('\n');
+            const lines = output.split('\n');
+            if (lines.length && lines[lines.length - 1] === '') lines.pop();
+            output = lines.slice(-tailLines).join('\n') + (hadTrailingNewline ? '\n' : '');
+          } else {
+            const offset = Math.min(requestedOffset, size);
+            const len = Math.min(size - offset, CAP);
+            output = len > 0 ? readLogWindow(logPath, offset, len) : '';
+          }
+        } catch { /* no log yet — empty output */ }
+        const eof = args.tail_lines !== undefined || size <= requestedOffset + Buffer.byteLength(output, 'utf8');
+        const exitCodeMatch = current.result?.error?.match(/exit code (\d+)/);
+        return textResult(output, {
+          ok: true,
+          taskId: current.id,
+          status: current.status,
+          ...(current.status === 'completed' && !current.result?.text?.includes('unknown') ? { exitCode: 0 } : {}),
+          ...(exitCodeMatch ? { exitCode: Number(exitCodeMatch[1]) } : {}),
+          nextOffset: size,
+          eof,
+        });
+      }
+
       const includeEvents = args.include_events !== false;
       const events = includeEvents ? repo.listEvents(task.id) : [];
       return textResult(JSON.stringify({ task, events }, null, 2), {
