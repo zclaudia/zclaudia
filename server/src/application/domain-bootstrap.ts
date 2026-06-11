@@ -31,6 +31,8 @@ import { recordActivity } from './conversation/memory/activity-log.js';
 import { registerPlatformRoutes } from './bootstrap/platform-routes.js';
 import { TaskExecutorRegistry } from '../domains/tasks/executors/registry.js';
 import { AgentTaskExecutor } from '../domains/tasks/executors/agent-executor.js';
+import { CommandTaskExecutor } from '../domains/tasks/executors/command-executor.js';
+import { TaskRepository } from '../domains/tasks/repository.js';
 import { createAgentTaskRunner } from './orchestration/agent-task-runner.js';
 import { SessionRepository } from '../domains/sessions/index.js';
 import type { TaskExecutor } from '../domains/tasks/executors/types.js';
@@ -185,6 +187,10 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     sessionExists: (id) => !!sessionRepo.findById(id),
   }));
   taskExecutorRegistry.register(agentTaskExecutor);
+
+  const commandTaskExecutor = new CommandTaskExecutor(new TaskRepository(db));
+  taskExecutorRegistry.register(commandTaskExecutor);
+  commandTaskExecutor.reconcile();
 
   pluginEvents.on('run.completed', (event: any) => {
     try {

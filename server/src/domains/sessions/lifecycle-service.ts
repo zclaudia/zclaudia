@@ -5,6 +5,8 @@ import type { EventData } from '../../infra/events/index.js';
 import type { Session, SessionType } from '@zclaudia/shared/core/session';
 import { pluginEvents } from '../../infra/events/index.js';
 import { SessionRepository } from './repository.js';
+import { TaskRepository } from '../tasks/repository.js';
+import { CommandTaskExecutor } from '../tasks/executors/command-executor.js';
 import {
   assertValidSessionState,
   buildUnlockedSessionState,
@@ -136,6 +138,17 @@ export class SessionLifecycleService {
         stmt.run(now, now, id);
       }
     })();
+
+    // Stop background command tasks owned by the archived sessions (best-effort; must not fail archiving).
+    try {
+      const taskRepo = new TaskRepository(this.db);
+      const commandExecutor = new CommandTaskExecutor(taskRepo);
+      for (const id of sessionIds) {
+        for (const task of taskRepo.listByTypeAndStatuses('command', ['queued', 'running'], id)) {
+          void commandExecutor.stop(task.id, 'Session archived').catch(() => { /* best-effort */ });
+        }
+      }
+    } catch { /* best-effort */ }
 
     for (const id of sessionIds) {
       const session = this.repo.findById(id);
