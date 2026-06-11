@@ -86,3 +86,38 @@ export async function ensureSandboxInitialized(): Promise<void> {
   }
   return initPromise;
 }
+
+export interface WrapOptions {
+  workspaceRoot: string;   // session project root (NOT the per-call cwd subdir)
+  readOnly?: boolean;
+  signal?: AbortSignal;
+}
+export interface WrapResult {
+  argv?: string[];
+  env?: NodeJS.ProcessEnv;
+  sandboxed: boolean;
+}
+
+export async function wrapCommand(command: string, opts: WrapOptions): Promise<WrapResult> {
+  if (!isSandboxAvailable()) return { sandboxed: false };
+  try {
+    await ensureSandboxInitialized();
+    if (!isSandboxAvailable()) return { sandboxed: false }; // init may have downgraded
+    const tmpDir = os.tmpdir();
+    const customConfig: Partial<SandboxRuntimeConfig> = {
+      filesystem: {
+        allowWrite: opts.readOnly ? [tmpDir] : [opts.workspaceRoot, tmpDir],
+        denyRead: SENSITIVE_DENY_READ,
+        denyWrite: [],
+        allowRead: SENSITIVE_ALLOW_BACK,
+      },
+      network: { allowedDomains: DEFAULT_ALLOWED_DOMAINS, deniedDomains: [] },
+    };
+    const wrapped = await SandboxManager.wrapWithSandboxArgv(command, undefined, customConfig, opts.signal);
+    // env is already the full process.env — use as-is (spike-confirmed; do NOT merge).
+    return { argv: wrapped.argv, env: wrapped.env, sandboxed: true };
+  } catch (err) {
+    console.warn('[sandbox] wrapCommand failed; degrading for this command:', err);
+    return { sandboxed: false };
+  }
+}
