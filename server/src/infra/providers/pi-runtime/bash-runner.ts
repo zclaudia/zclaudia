@@ -9,6 +9,8 @@ export interface BashRunOptions {
   onChunk?: (accumulatedText: string) => void;  // called per output chunk; tool layer throttles
   maxLines?: number;              // default 2000
   maxBytes?: number;              // default 50*1024
+  /** When set, spawn this sandbox-wrapped argv directly (shell:false) instead of `shell -c command`. */
+  sandbox?: { argv: string[]; env: NodeJS.ProcessEnv };
 }
 
 export interface BashRunResult {
@@ -119,14 +121,25 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       resolve({ exitCode: null, output: '', fullOutput: '', truncated: false, timedOut: false, aborted: true, durationMs: 0 });
       return;
     }
-    const { shell, args } = resolveShell();
-    const child = spawn(shell, [...args, command], {
-      cwd,
-      env: process.env,
-      detached: process.platform !== 'win32',
-      stdio: ['ignore', 'pipe', 'pipe'],
-      windowsHide: true,
-    });
+    let child;
+    if (opts.sandbox) {
+      child = spawn(opts.sandbox.argv[0], opts.sandbox.argv.slice(1), {
+        cwd,
+        env: opts.sandbox.env,
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+    } else {
+      const { shell, args } = resolveShell();
+      child = spawn(shell, [...args, command], {
+        cwd,
+        env: process.env,
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+    }
 
     let full = '';
     let timedOut = false;

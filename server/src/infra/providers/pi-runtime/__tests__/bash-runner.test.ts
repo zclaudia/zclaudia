@@ -61,4 +61,18 @@ describe('runBash', () => {
     expect(r.output).toBe('d\ne\n');
     expect(r.fullOutput).toBe('a\nb\nc\nd\ne\n');
   });
+
+  it('spawns the provided sandbox argv directly instead of shell -c', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'zc-bash-sb-'));
+    const r = await runBash({
+      command: 'THIS_SHOULD_NOT_RUN',
+      cwd: dir,
+      timeoutSec: 10,
+      sandbox: { argv: ['sh', '-c', 'echo SANDBOXED_PATH'], env: process.env },
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(r.exitCode).toBe(0);
+    expect(r.output).toContain('SANDBOXED_PATH');
+    expect(r.output).not.toContain('THIS_SHOULD_NOT_RUN');
+  });
 });
