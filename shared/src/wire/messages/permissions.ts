@@ -16,6 +16,9 @@ export interface PermissionDecisionMessage {
   feedback?: string;
   /** RSA-OAEP encrypted credential (base64). Used for sudo password etc. */
   encryptedCredential?: string;
+  /** Rule text (e.g. `Bash(git push *)`) to persist as a project-level allow
+   * rule alongside an allow decision. Mutually exclusive with `remember`. */
+  promoteRule?: string;
 }
 
 // Prompt answer routed back to the originating backend (Client → Server)

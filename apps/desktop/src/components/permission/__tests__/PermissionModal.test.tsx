@@ -133,7 +133,7 @@ describe('PermissionModal', () => {
       <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
     );
 
-    const checkbox = screen.getByRole('checkbox');
+    const checkbox = screen.getAllByRole('checkbox')[0];
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
 
@@ -147,7 +147,7 @@ describe('PermissionModal', () => {
       <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
     );
 
-    const checkbox = screen.getByRole('checkbox');
+    const checkbox = screen.getAllByRole('checkbox')[0];
     fireEvent.click(checkbox);
 
     fireEvent.click(screen.getByText('Deny'));
@@ -161,7 +161,7 @@ describe('PermissionModal', () => {
     );
 
     // Check the remember checkbox
-    const checkbox = screen.getByRole('checkbox');
+    const checkbox = screen.getAllByRole('checkbox')[0];
     fireEvent.click(checkbox);
     expect(checkbox).toBeChecked();
 
@@ -174,7 +174,7 @@ describe('PermissionModal', () => {
     );
 
     // Checkbox should be reset
-    expect(screen.getByRole('checkbox')).not.toBeChecked();
+    expect(screen.getAllByRole('checkbox')[0]).not.toBeChecked();
   });
 
   it('resets countdown when request changes', () => {
@@ -405,5 +405,76 @@ describe('PermissionModal', () => {
     );
 
     expect(screen.getByPlaceholderText('Your credential')).toHaveValue('');
+  });
+
+  // ============================================
+  // Always-allow / promoteRule tests
+  // ============================================
+
+  it('shows an editable suggested rule when always-allow is checked', () => {
+    render(
+      <PermissionModal
+        request={{ ...defaultRequest, toolName: 'Bash', detail: 'git push origin main' }}
+        onDecision={mockOnDecision}
+      />
+    );
+    fireEvent.click(screen.getByLabelText(/always allow/i));
+    expect(screen.getByDisplayValue('Bash(git push *)')).toBeInTheDocument();
+  });
+
+  it('passes promoteRule on allow when always-allow is checked', () => {
+    render(
+      <PermissionModal
+        request={{ ...defaultRequest, toolName: 'Bash', detail: 'git push origin main' }}
+        onDecision={mockOnDecision}
+      />
+    );
+    fireEvent.click(screen.getByLabelText(/always allow/i));
+    fireEvent.click(screen.getByText('Allow'));
+    expect(mockOnDecision).toHaveBeenCalledWith('req-1', true, false, undefined, undefined, 'Bash(git push *)');
+  });
+
+  it('always-allow and remember are mutually exclusive — always-allow unchecks remember', () => {
+    render(
+      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
+    );
+    const checkboxes = screen.getAllByRole('checkbox');
+    const rememberCheckbox = checkboxes[0];
+    // Check remember first
+    fireEvent.click(rememberCheckbox);
+    expect(rememberCheckbox).toBeChecked();
+    // Then check always-allow — remember should be unchecked
+    fireEvent.click(screen.getByLabelText(/always allow/i));
+    expect(rememberCheckbox).not.toBeChecked();
+  });
+
+  it('always-allow and remember are mutually exclusive — remember unchecks always-allow', () => {
+    render(
+      <PermissionModal request={defaultRequest} onDecision={mockOnDecision} />
+    );
+    // Check always-allow first
+    const alwaysAllowCheckbox = screen.getByLabelText(/always allow/i);
+    fireEvent.click(alwaysAllowCheckbox);
+    expect(alwaysAllowCheckbox).toBeChecked();
+    // Then check remember — always-allow should be unchecked
+    const checkboxes = screen.getAllByRole('checkbox');
+    const rememberCheckbox = checkboxes.find((c) => c !== alwaysAllowCheckbox)!;
+    fireEvent.click(rememberCheckbox);
+    expect(alwaysAllowCheckbox).not.toBeChecked();
+  });
+
+  it('invalid edited rule disables Allow', () => {
+    render(
+      <PermissionModal
+        request={{ ...defaultRequest, toolName: 'Bash', detail: 'git push origin main' }}
+        onDecision={mockOnDecision}
+      />
+    );
+    fireEvent.click(screen.getByLabelText(/always allow/i));
+    const ruleInput = screen.getByDisplayValue('Bash(git push *)');
+    fireEvent.change(ruleInput, { target: { value: 'Bash(broken' } });
+    expect(screen.getByText('Allow')).toBeDisabled();
+    // Inline error visible
+    expect(screen.getByText(/missing closing parenthesis/i)).toBeInTheDocument();
   });
 });

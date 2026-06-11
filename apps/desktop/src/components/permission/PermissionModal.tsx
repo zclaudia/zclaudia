@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { parseToolRule, suggestRuleForRequest } from '@zclaudia/shared';
 import { PermissionDetailView } from './PermissionDetailView';
 
 interface PermissionRequest {
@@ -16,13 +17,15 @@ interface PermissionRequest {
 interface PermissionModalProps {
   request: PermissionRequest | null;
   queueSize?: number;
-  onDecision: (requestId: string, allow: boolean, remember?: boolean, credential?: string, feedback?: string) => void;
+  onDecision: (requestId: string, allow: boolean, remember?: boolean, credential?: string, feedback?: string, promoteRule?: string) => void;
 }
 
 export function PermissionModal({ request, queueSize = 0, onDecision }: PermissionModalProps) {
   const [remainingTime, setRemainingTime] = useState(0);
   const [remember, setRemember] = useState(false);
   const [credential, setCredential] = useState('');
+  const [promoteAlways, setPromoteAlways] = useState(false);
+  const [promoteRuleText, setPromoteRuleText] = useState('');
   const credentialInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -30,6 +33,8 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
 
     setRemember(false);
     setCredential('');
+    setPromoteAlways(false);
+    setPromoteRuleText('');
 
     // timeoutSec = 0 means no timeout (wait indefinitely like official Claude client)
     if (request.timeoutSec === 0) {
@@ -65,11 +70,27 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
 
   if (!request) return null;
 
+  const promoteRuleValid = !promoteAlways || parseToolRule(promoteRuleText).ok;
+  const promoteRuleError = promoteAlways && !parseToolRule(promoteRuleText).ok
+    ? (parseToolRule(promoteRuleText) as { ok: false; error: string }).error
+    : undefined;
+
   const handleAllow = () => {
+    const ruleArg = promoteAlways ? promoteRuleText : undefined;
     if (request.requiresCredential) {
-      onDecision(request.requestId, true, remember, credential || undefined);
+      if (ruleArg !== undefined) {
+        onDecision(request.requestId, true, remember, credential || undefined, undefined, ruleArg);
+      } else if (credential) {
+        onDecision(request.requestId, true, remember, credential);
+      } else {
+        onDecision(request.requestId, true, remember);
+      }
     } else {
-      onDecision(request.requestId, true, remember);
+      if (ruleArg !== undefined) {
+        onDecision(request.requestId, true, remember, undefined, undefined, ruleArg);
+      } else {
+        onDecision(request.requestId, true, remember);
+      }
     }
   };
 
@@ -230,18 +251,65 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
         </div>
 
         {/* Remember checkbox */}
-        <div className="px-5 py-3 flex-shrink-0">
+        <div className="px-5 pt-3 pb-1 flex-shrink-0">
           <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
             <input
               type="checkbox"
               checked={remember}
-              onChange={(e) => setRemember(e.target.checked)}
+              onChange={(e) => {
+                setRemember(e.target.checked);
+                if (e.target.checked) {
+                  setPromoteAlways(false);
+                  setPromoteRuleText('');
+                }
+              }}
               className="w-5 h-5 rounded-md border-input bg-background text-primary focus:ring-primary"
             />
             <span className="text-sm text-foreground">
               Remember this decision for this session
             </span>
           </label>
+        </div>
+
+        {/* Always-allow checkbox */}
+        <div className="px-5 pb-3 flex-shrink-0">
+          <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
+            <input
+              type="checkbox"
+              aria-label="Always allow in this project"
+              checked={promoteAlways}
+              onChange={(e) => {
+                setPromoteAlways(e.target.checked);
+                if (e.target.checked) {
+                  setRemember(false);
+                  setPromoteRuleText(suggestRuleForRequest(request.toolName, request.detail));
+                } else {
+                  setPromoteRuleText('');
+                }
+              }}
+              className="w-5 h-5 rounded-md border-input bg-background text-primary focus:ring-primary"
+            />
+            <span className="text-sm text-foreground">
+              Always allow in this project
+            </span>
+          </label>
+          {promoteAlways && (
+            <div className="mt-1 ml-8">
+              <input
+                type="text"
+                value={promoteRuleText}
+                onChange={(e) => setPromoteRuleText(e.target.value)}
+                className={`w-full px-3 py-1.5 bg-input border rounded-lg text-sm font-mono text-foreground focus:outline-none focus:ring-1 ${
+                  promoteRuleError
+                    ? 'border-destructive focus:border-destructive focus:ring-destructive'
+                    : 'border-border focus:border-primary focus:ring-primary'
+                }`}
+              />
+              {promoteRuleError && (
+                <p className="text-[11px] text-destructive mt-1">{promoteRuleError}</p>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -254,7 +322,7 @@ export function PermissionModal({ request, queueSize = 0, onDecision }: Permissi
           </button>
           <button
             onClick={handleAllow}
-            disabled={request.requiresCredential && !credential}
+            disabled={(request.requiresCredential && !credential) || !promoteRuleValid}
             className="flex-1 px-4 py-3 bg-success hover:bg-success/80 active:bg-success/70 text-success-foreground rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {request.requiresCredential ? 'Allow with Credential' : 'Allow'}

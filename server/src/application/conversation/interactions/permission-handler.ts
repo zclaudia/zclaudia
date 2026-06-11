@@ -9,6 +9,7 @@ import {
   persistSessionRememberedDecision
 } from '../agent/permission-evaluator.js';
 import { writePermissionLog } from '../agent/permission-log-writer.js';
+import { promoteRuleToProjectOverride } from '../agent/permission-rule-promotion.js';
 import { broadcastRunMessage } from '../transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
@@ -37,6 +38,7 @@ export function handlePermissionDecision(
     remember?: boolean;
     feedback?: string;
     encryptedCredential?: string;
+    promoteRule?: string;
   },
   activeRuns: Map<string, ActiveRun>,
   connectedClients: Map<string, ConnectedClient>,
@@ -121,6 +123,17 @@ export function handlePermissionDecision(
         console.log(`[Permission] Remembered ${message.allow ? 'allow' : 'deny'} for key "${rememberKey}"`);
       }
 
+      // Promote to a persistent project-level allow rule. Policy is re-read
+      // from the DB on every permission request, so the write takes effect on
+      // the very next tool call — no cache invalidation needed.
+      let rulePromoted = false;
+      if (message.allow && message.promoteRule) {
+        rulePromoted = promoteRuleToProjectOverride(run.db, run.projectId, message.promoteRule);
+        if (rulePromoted) {
+          console.log(`[Permission] Promoted rule "${message.promoteRule}" to project ${run.projectId}`);
+        }
+      }
+
       const decision: PermissionDecision = {
         behavior: message.allow ? 'allow' : 'deny',
         message: message.allow
@@ -136,7 +149,7 @@ export function handlePermissionDecision(
         pending.originalRequest?.toolName ?? 'unknown',
         pending.originalRequest?.detail ?? '',
         message.allow ? 'allow' : 'deny',
-        !!message.remember,
+        !!message.remember || rulePromoted,
       );
       pending.resolve(decision);
 
