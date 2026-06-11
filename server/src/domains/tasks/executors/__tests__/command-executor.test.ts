@@ -78,6 +78,32 @@ describe('CommandTaskExecutor', () => {
     expect(repo.findById(task.id)!.status).toBe('stopped');
   });
 
+  it('stop on an already-completed task is a quiet no-op', async () => {
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const task = service.createTask({ type: 'command', metadata: { command: 'echo done', cwd: dataDir } });
+    const started = await executor.start(task);
+    service.startTask(task.id, { executorRef: started.executorRef });
+    await wait(700); // let it complete
+    expect(repo.findById(task.id)!.status).toBe('completed');
+    await expect(executor.stop(task.id, 'late stop')).resolves.toEqual({ status: 'stopped' });
+    expect(repo.findById(task.id)!.status).toBe('completed'); // unchanged
+  });
+
+  it('async spawn failure (nonexistent cwd) fails the task via the error watch', async () => {
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const task = service.createTask({ type: 'command', metadata: { command: 'echo hi', cwd: join(dataDir, 'no-such-dir') } });
+    const started = await executor.start(task);
+    service.startTask(task.id, { executorRef: started.executorRef });
+    await wait(500);
+    const after = repo.findById(task.id)!;
+    expect(after.status).toBe('failed');
+    expect(after.result?.error).toContain('spawn error');
+  });
+
   it('start rejects a task without metadata.command', async () => {
     const repo = new TaskRepository(db);
     const service = new TaskService(repo);

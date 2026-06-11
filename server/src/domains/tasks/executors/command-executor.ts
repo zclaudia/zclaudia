@@ -52,15 +52,19 @@ export class CommandTaskExecutor implements TaskExecutor {
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
     const fd = openSync(logPath, 'a');
-    const { shell, args } = resolveShell();
-    const child = spawn(shell, [...args, command], {
-      cwd,
-      env: process.env,
-      detached: process.platform !== 'win32',
-      stdio: ['ignore', fd, fd],
-      windowsHide: true,
-    });
-    closeSync(fd);
+    let child;
+    try {
+      const { shell, args } = resolveShell();
+      child = spawn(shell, [...args, command], {
+        cwd,
+        env: process.env,
+        detached: process.platform !== 'win32',
+        stdio: ['ignore', fd, fd],
+        windowsHide: true,
+      });
+    } finally {
+      closeSync(fd);
+    }
     child.unref();
     child.on('error', (err) => this.finalize(task.id, null, `spawn error: ${err.message}`));
     child.on('exit', (code) => this.finalize(task.id, code));
