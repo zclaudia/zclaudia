@@ -12,7 +12,11 @@ import { randomUUID } from 'crypto';
 import { promisify } from 'util';
 
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
-import { findActualString, countOccurrences, applyEdit } from './edit-match.js';
+import { createReadFileStateStore, type ReadFileStateStore } from './read-file-state.js';
+import { createEditBridgeTool as createFileEditBridgeTool, createWriteBridgeTool as createFileWriteBridgeTool } from './edit-write-tools.js';
+import type { DiagnosticsMode, WriteDiagnosticsProvider, WriteLifecycleHooks } from './write-lifecycle.js';
+import { decodeTextBuffer } from './text-io.js';
+import { buildHashlineEntries, formatHashlineOutput, hashlineTag } from './hashline.js';
 import { runRipgrep } from './ripgrep-runner.js';
 import { runBash } from './bash-runner.js';
 import * as sandbox from './sandbox.js';
@@ -33,7 +37,6 @@ type TextBlock = { type: 'text'; text: string };
 type ImageBlock = { type: 'image'; data: string; mimeType: string };
 type ToolContent = Array<TextBlock | ImageBlock>;
 const DEFAULT_READ_MAX_BYTES = 512 * 1024;
-
 /** Image extensions the Read tool returns as vision content blocks. */
 const IMAGE_MIME_BY_EXT: Record<string, string> = {
   '.png': 'image/png',
@@ -260,13 +263,14 @@ function createReadBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
           });
         }
         const buffer = await readFile(filePath);
-        if (isBinaryBuffer(buffer)) {
+        const decoded = decodeTextBuffer(buffer);
+        if (decoded.encoding === 'utf8' && !decoded.hasBom && isBinaryBuffer(buffer)) {
           return errorResult('binary_file', `Refusing to read binary file: ${requestedPath}`, {
             path: toWorkspaceRelative(cwd, filePath),
             size: fileStat.size,
           });
         }
-        const text = buffer.toString('utf8');
+        const text = decoded.content;
         const lines = text.split(/\r?\n/);
         if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
         const totalLines = lines.length;
@@ -274,7 +278,20 @@ function createReadBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         const limit = Math.max(1, Math.min(Number(args.limit ?? 200) || 200, 2000));
         const selected = lines.slice(offset - 1, offset - 1 + limit);
         const relPath = toWorkspaceRelative(cwd, filePath);
-        return textResult(formatNumberedLines(selected, offset), {
+        const hashlineEntries = args.hashline === true ? buildHashlineEntries(selected) : undefined;
+        await options?.readFileState?.recordRead(filePath, {
+          content: text,
+          offset,
+          limit,
+          totalLines,
+          returnedLines: selected.length,
+          timestamp: fileStat.mtimeMs,
+        });
+        return textResult(
+          args.hashline === true
+            ? formatHashlineOutput(relPath, text, hashlineEntries ?? [])
+            : formatNumberedLines(selected, offset),
+          {
           ok: true,
           path: relPath,
           offset,
@@ -282,6 +299,13 @@ function createReadBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
           totalLines,
           returnedLines: selected.length,
           size: fileStat.size,
+          ...(args.hashline === true ? {
+            hashline: {
+              path: relPath,
+              tag: hashlineTag(text),
+              lines: hashlineEntries,
+            },
+          } : {}),
         });
       } catch (err) {
         return errorResult('read_failed', err instanceof Error ? err.message : String(err), {
@@ -419,110 +443,6 @@ function createLsBridgeTool(cwd: string): AgentTool<any> {
         return textResult(lines.join('\n'), { ok: true, path: relPath, total: lines.length, truncated });
       } catch (err) {
         return errorResult('ls_failed', err instanceof Error ? err.message : String(err), { path: String(args.path ?? '.') });
-      }
-    },
-  } as unknown as AgentTool<any>;
-}
-
-function createWriteBridgeTool(cwd: string): AgentTool<any> {
-  return {
-    name: 'Write',
-    label: 'Write',
-    description: 'Write (create or overwrite) a file in the workspace. Creates parent directories as needed.',
-    parameters: {
-      type: 'object',
-      properties: {
-        file_path: { type: 'string', description: 'Workspace-relative path of the file to write' },
-        content: { type: 'string', description: 'Full file contents' },
-      },
-      required: ['file_path', 'content'],
-    } as any,
-    execute: async (toolCallId: string, params: unknown) => {
-      const args = toolParams(toolCallId, params);
-      const requested = args.file_path;
-      if (typeof requested !== 'string' || !requested.trim()) {
-        return errorResult('missing_path', 'Write requires file_path');
-      }
-      if (typeof args.content !== 'string') {
-        return errorResult('missing_content', 'Write requires string content');
-      }
-      let filePath: string;
-      try {
-        filePath = resolveInsideWorkspace(cwd, requested);
-      } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
-      }
-      try {
-        let existed = false;
-        try { existed = (await stat(filePath)).isFile(); } catch { /* new file */ }
-        await mkdir(path.dirname(filePath), { recursive: true });
-        await writeFile(filePath, args.content, 'utf8');
-        const relPath = toWorkspaceRelative(cwd, filePath);
-        return textResult(`Wrote ${relPath}`, { ok: true, type: existed ? 'update' : 'create', path: relPath });
-      } catch (err) {
-        return errorResult('write_failed', err instanceof Error ? err.message : String(err), { path: String(requested) });
-      }
-    },
-  } as unknown as AgentTool<any>;
-}
-
-function createEditBridgeTool(cwd: string): AgentTool<any> {
-  return {
-    name: 'Edit',
-    label: 'Edit',
-    description: 'Replace an exact string in an existing file. old_string must be unique unless replace_all is true. Read the file first to copy old_string exactly.',
-    parameters: {
-      type: 'object',
-      properties: {
-        file_path: { type: 'string', description: 'Workspace-relative path of the file to edit' },
-        old_string: { type: 'string', description: 'Exact text to replace' },
-        new_string: { type: 'string', description: 'Replacement text' },
-        replace_all: { type: 'boolean', default: false },
-      },
-      required: ['file_path', 'old_string', 'new_string'],
-    } as any,
-    execute: async (toolCallId: string, params: unknown) => {
-      const args = toolParams(toolCallId, params);
-      const requested = args.file_path;
-      if (typeof requested !== 'string' || !requested.trim()) {
-        return errorResult('missing_path', 'Edit requires file_path');
-      }
-      if (typeof args.old_string !== 'string' || typeof args.new_string !== 'string') {
-        return errorResult('missing_strings', 'Edit requires old_string and new_string');
-      }
-      if (args.old_string === args.new_string) {
-        return errorResult('no_op', 'old_string and new_string are identical');
-      }
-      const replaceAll = args.replace_all === true;
-      let filePath: string;
-      try {
-        filePath = resolveInsideWorkspace(cwd, requested);
-      } catch (err) {
-        return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
-      }
-      try {
-        const fileStat = await stat(filePath);
-        if (!fileStat.isFile()) {
-          return errorResult('not_a_file', `Path is not a file: ${toWorkspaceRelative(cwd, filePath)}`);
-        }
-        const original = await readFile(filePath, 'utf8');
-        const actual = findActualString(original, args.old_string);
-        if (actual === null) {
-          return errorResult('not_found', 'old_string not found in file', { path: toWorkspaceRelative(cwd, filePath) });
-        }
-        const occurrences = countOccurrences(original, actual);
-        if (!replaceAll && occurrences > 1) {
-          return errorResult('not_unique', `old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
-            path: toWorkspaceRelative(cwd, filePath),
-            occurrences,
-          });
-        }
-        const updated = applyEdit(original, actual, args.new_string, replaceAll);
-        await writeFile(filePath, updated, 'utf8');
-        const relPath = toWorkspaceRelative(cwd, filePath);
-        return textResult(`Edited ${relPath}`, { ok: true, path: relPath, replaced: replaceAll ? occurrences : 1 });
-      } catch (err) {
-        return errorResult('edit_failed', err instanceof Error ? err.message : String(err), { path: String(requested) });
       }
     },
   } as unknown as AgentTool<any>;
@@ -1617,8 +1537,8 @@ function createLspTool(cwd: string): AgentTool<any> {
 // through to the factory.
 const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions) => AgentTool<any>> = {
   Read: (cwd, options) => createReadBridgeTool(cwd, options),
-  Write: (cwd) => createWriteBridgeTool(cwd),
-  Edit: (cwd) => createEditBridgeTool(cwd),
+  Write: (cwd, options) => createFileWriteBridgeTool(cwd, options),
+  Edit: (cwd, options) => createFileEditBridgeTool(cwd, options),
   Bash: (cwd, options) => createBashBridgeTool(cwd, options),
   Grep: (cwd) => createGrepBridgeTool(cwd),
   Glob: (cwd) => createGlobTool(cwd),
@@ -1660,6 +1580,14 @@ export interface ToolBridgeOptions {
   permissionCallback?: PermissionCallback;
   /** Whether the active model accepts image content blocks (model.input includes 'image'). */
   supportsVision?: boolean;
+  /** Shared per-run read state used to require full reads before file mutations. */
+  readFileState?: ReadFileStateStore;
+  /** Optional write lifecycle hooks for diagnostics, IDE notifications, or file-history integrations. */
+  writeLifecycle?: WriteLifecycleHooks;
+  /** Optional diagnostics adapter invoked after successful file writes. */
+  diagnosticsProvider?: WriteDiagnosticsProvider;
+  /** Whether diagnostics run inline or are scheduled for deferred retrieval. */
+  diagnosticsMode?: DiagnosticsMode;
   /** Plan mode read-only sandbox, set by the adapter — spec §6.
    * When true, Bash fails closed if the sandbox is unavailable. */
   sandboxReadOnly?: boolean;
@@ -1673,9 +1601,13 @@ export interface ToolBridgeOptions {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<any>[] {
+  const effectiveOptions: ToolBridgeOptions = {
+    ...options,
+    readFileState: options?.readFileState ?? createReadFileStateStore(),
+  };
   const requested = options?.enabled ?? [...ALL_TOOL_NAMES];
   const overrides = new Map<ToolName, AgentTool<any>>();
-  for (const [overrideName, tool] of Object.entries(options?.overrides ?? {})) {
+  for (const [overrideName, tool] of Object.entries(effectiveOptions.overrides ?? {})) {
     const normalized = normalizeToolName(overrideName);
     if (normalized && tool) overrides.set(normalized, tool);
   }
@@ -1692,7 +1624,7 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
     if (override) {
       result.push(withConditionalSkillActivation(withToolName(override, name, override.label ?? name), name, cwd));
     } else {
-      result.push(withConditionalSkillActivation(TOOL_FACTORIES[name](cwd, options), name, cwd));
+      result.push(withConditionalSkillActivation(TOOL_FACTORIES[name](cwd, effectiveOptions), name, cwd));
     }
   }
 

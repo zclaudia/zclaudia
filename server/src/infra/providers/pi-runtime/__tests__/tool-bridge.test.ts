@@ -1,10 +1,11 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync } from 'fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, utimesSync, truncateSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
 import { buildTools, ALL_TOOL_NAMES, type ToolName } from '../tool-bridge.js';
+import { getDeferredDiagnosticsResult } from '../write-lifecycle.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { CommandTaskExecutor, pidAlive } from '../../../../domains/tasks/executors/command-executor.js';
@@ -149,6 +150,20 @@ describe('buildTools', () => {
     expect(result.content[0].text).toContain('2|two');
     expect(result.content[0].text).toContain('3|three');
     expect(result.content[0].text).not.toContain('1|one');
+  });
+
+  it('read can return hashline anchors for content-addressed edits', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-hashline-'));
+    tempDirs.push(root);
+    await writeFile(path.join(root, 'sample.ts'), 'const a = 1;\nconst b = 2;\n');
+    const read = buildTools(root, { enabled: ['Read'] })[0] as any;
+
+    const result = await read.execute('read-hashline', { path: 'sample.ts', hashline: true });
+
+    expect(result.details.hashline).toMatchObject({ path: 'sample.ts' });
+    expect(result.details.hashline.lines[0]).toMatchObject({ line: 1, text: 'const a = 1;' });
+    expect(result.content[0].text).toContain('[sample.ts#');
+    expect(result.content[0].text).toMatch(/[a-f0-9]{12}\|const a = 1;/);
   });
 
   it('read rejects binary files with a structured error', async () => {
@@ -731,13 +746,456 @@ describe('Write bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('path_outside_workspace');
   });
+
+  it('rejects writing obvious private key material', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-secret', {
+      file_path: 'key.pem',
+      content: '-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----\n',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('secret_detected');
+  });
+
+  it('rejects writing obvious API token material', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-token-secret', {
+      file_path: '.env',
+      content: 'ANTHROPIC_API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\n',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('secret_detected');
+  });
+
+  it('rejects dangerous permission changes in agent settings files', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-settings-unsafe', {
+      file_path: '.claude/settings.json',
+      content: '{\n  "permissionMode": "bypassPermissions"\n}\n',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('unsafe_settings_change');
+  });
+
+  it('requires an existing file to be read before overwriting it', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w3', { file_path: 'f.ts', content: 'const a = 2;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_not_read');
+  });
+
+  it('overwrites an existing file after a full read', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write', { path: 'f.ts' });
+    const res = await write.execute('w4', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.type).toBe('update');
+    expect(onDisk).toBe('const a = 2;\n');
+  });
+
+  it('returns a diff when overwriting an existing file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-diff', { path: 'f.ts' });
+    const res = await write.execute('w-diff', { file_path: 'f.ts', content: 'const a = 1;\nconst b = 3;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      type: 'update',
+      firstChangedLine: 2,
+      originalContent: 'const a = 1;\nconst b = 2;\n',
+      updatedContent: 'const a = 1;\nconst b = 3;\n',
+    });
+    expect(res.details.diff).toContain('--- f.ts');
+    expect(res.details.diff).toContain('+++ f.ts');
+    expect(res.details.diff).toContain('-const b = 2;');
+    expect(res.details.diff).toContain('+const b = 3;');
+    expect(res.details.structuredPatch).toEqual([
+      expect.objectContaining({
+        oldStart: 1,
+        oldLines: 2,
+        newStart: 1,
+        newLines: 2,
+        lines: expect.arrayContaining(['-const b = 2;', '+const b = 3;']),
+      }),
+    ]);
+    expect(res.details.lineChanges).toEqual({ additions: 1, deletions: 1, changes: 2 });
+  });
+
+  it('truncates large original and updated content in write results', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const original = `${'a'.repeat(90_000)}\n`;
+    const updated = `${'b'.repeat(90_000)}\n`;
+    writeFileSync(path.join(dir, 'large.ts'), original);
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-large-result', { path: 'large.ts' });
+    const res = await write.execute('w-large-result', { file_path: 'large.ts', content: updated });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.originalContent).not.toBe(original);
+    expect(res.details.updatedContent).not.toBe(updated);
+    expect(String(res.details.originalContent).length).toBeLessThan(81_000);
+    expect(String(res.details.updatedContent).length).toBeLessThan(81_000);
+    expect(res.details.contentTruncated).toEqual({
+      originalContent: true,
+      updatedContent: true,
+    });
+  });
+
+  it('runs the write lifecycle after updating an existing file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\n');
+    const afterWrite = vi.fn().mockResolvedValue({
+      notifications: ['indexed f.ts'],
+      diagnostics: [{ path: 'f.ts', line: 1, severity: 'warning', message: 'check import order', source: 'fake-lsp' }],
+    });
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'], writeLifecycle: { afterWrite } });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-lifecycle-update', { path: 'f.ts' });
+    const res = await write.execute('w-lifecycle-update', { file_path: 'f.ts', content: 'const a = 2;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(afterWrite).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'write',
+      type: 'update',
+      path: 'f.ts',
+      absolutePath: filePath,
+      originalContent: 'const a = 1;\n',
+      updatedContent: 'const a = 2;\n',
+      firstChangedLine: 1,
+    }));
+    expect(afterWrite.mock.calls[0][0].diff).toContain('-const a = 1;');
+    expect(afterWrite.mock.calls[0][0].diff).toContain('+const a = 2;');
+    expect(res.details.lifecycle).toMatchObject({
+      notifications: ['indexed f.ts'],
+      diagnostics: [{ path: 'f.ts', line: 1, severity: 'warning', message: 'check import order', source: 'fake-lsp' }],
+    });
+  });
+
+  it('returns diagnostics from a diagnostics provider adapter after writing', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const diagnosticsProvider = vi.fn().mockResolvedValue([
+      { path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'fake-ts' },
+    ]);
+    const write = buildTools(dir, { enabled: ['Write'], diagnosticsProvider }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-diagnostics-provider', { file_path: 'f.ts', content: 'const a: string = 1;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(diagnosticsProvider).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'write',
+      type: 'create',
+      path: 'f.ts',
+      updatedContent: 'const a: string = 1;\n',
+    }));
+    expect(res.details.lifecycle).toMatchObject({
+      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'fake-ts' }],
+    });
+  });
+
+  it('defers slow diagnostics provider results without blocking write completion', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    let releaseDiagnostics!: () => void;
+    const diagnosticsReady = new Promise<void>(resolve => { releaseDiagnostics = resolve; });
+    const diagnosticsProvider = vi.fn(async () => {
+      await diagnosticsReady;
+      return [{ path: 'f.ts', line: 1, severity: 'warning', message: 'late warning', source: 'fake-ts' }];
+    });
+    const write = buildTools(dir, {
+      enabled: ['Write'],
+      diagnosticsProvider,
+      diagnosticsMode: 'deferred',
+    }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-deferred-diagnostics', { file_path: 'f.ts', content: 'const a = 1;\n' });
+    expect(res.details.lifecycle).toMatchObject({
+      deferredDiagnostics: { status: 'pending' },
+    });
+    const id = String(res.details.lifecycle.deferredDiagnostics.id);
+    expect(getDeferredDiagnosticsResult(id)?.status).toBe('pending');
+
+    releaseDiagnostics();
+    await vi.waitFor(() => {
+      expect(getDeferredDiagnosticsResult(id)).toMatchObject({
+        status: 'completed',
+        diagnostics: [{ path: 'f.ts', line: 1, severity: 'warning', message: 'late warning', source: 'fake-ts' }],
+      });
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('runs the write lifecycle after creating a file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const filePath = path.join(dir, 'new.ts');
+    const afterWrite = vi.fn().mockResolvedValue({ notifications: ['created new.ts'] });
+    const write = buildTools(dir, { enabled: ['Write'], writeLifecycle: { afterWrite } }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-lifecycle-create', { file_path: 'new.ts', content: 'export const a = 1;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(afterWrite).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'write',
+      type: 'create',
+      path: 'new.ts',
+      absolutePath: filePath,
+      originalContent: null,
+      updatedContent: 'export const a = 1;\n',
+      firstChangedLine: 1,
+    }));
+    expect(res.details.lifecycle).toMatchObject({ notifications: ['created new.ts'] });
+  });
+
+  it('keeps the write successful when the lifecycle hook fails', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const afterWrite = vi.fn().mockRejectedValue(new Error('diagnostics unavailable'));
+    const write = buildTools(dir, { enabled: ['Write'], writeLifecycle: { afterWrite } }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-lifecycle-failure', { file_path: 'new.ts', content: 'export const a = 1;\n' });
+    const onDisk = readFileSync(path.join(dir, 'new.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk).toBe('export const a = 1;\n');
+    expect(res.details.lifecycle).toMatchObject({
+      warnings: ['write_lifecycle_failed: diagnostics unavailable'],
+      errors: [{ code: 'write_lifecycle_failed', message: 'diagnostics unavailable' }],
+    });
+  });
+
+  it('keeps the write successful when the lifecycle hook times out', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const afterWrite = vi.fn().mockReturnValue(new Promise(() => {}));
+    const write = buildTools(dir, {
+      enabled: ['Write'],
+      writeLifecycle: { afterWrite, timeoutMs: 5 },
+    }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-lifecycle-timeout', { file_path: 'new.ts', content: 'export const a = 1;\n' });
+    const onDisk = readFileSync(path.join(dir, 'new.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk).toBe('export const a = 1;\n');
+    expect(res.details.lifecycle).toMatchObject({
+      warnings: ['write_lifecycle_timeout: afterWrite exceeded 5ms'],
+      errors: [{ code: 'write_lifecycle_timeout', message: 'afterWrite exceeded 5ms' }],
+    });
+  });
+
+  it('records a lightweight backup before overwriting an existing file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-backup', { path: 'f.ts' });
+    const res = await write.execute('w-backup', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const backupContent = readFileSync(String(res.details.backup?.path), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.backup).toMatchObject({ originalPath: 'f.ts' });
+    expect(backupContent).toBe('const a = 1;\n');
+  });
+
+  it('serializes concurrent writes to the same file through lifecycle completion', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    let releaseFirst!: () => void;
+    const firstBlocked = new Promise<void>(resolve => { releaseFirst = resolve; });
+    const afterWrite = vi.fn((input: any) => input.updatedContent.includes('one') ? firstBlocked : undefined);
+    const write = buildTools(dir, {
+      enabled: ['Write'],
+      writeLifecycle: { afterWrite, timeoutMs: 1000 },
+    }).find((t: any) => t.name === 'Write') as any;
+
+    const first = write.execute('w-serial-1', { file_path: 'f.ts', content: 'one\n' });
+    const second = write.execute('w-serial-2', { file_path: 'f.ts', content: 'two\n' });
+    await new Promise(resolve => setTimeout(resolve, 25));
+    expect(afterWrite).toHaveBeenCalledTimes(1);
+
+    releaseFirst();
+    const results = await Promise.all([first, second]);
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(results[0].details.ok).toBe(true);
+    expect(results[1].details.ok).toBe(true);
+    expect(afterWrite).toHaveBeenCalledTimes(2);
+    expect(onDisk).toBe('two\n');
+  });
+
+  it('rejects overwriting when the file changed after it was read', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-stale', { path: 'f.ts' });
+    writeFileSync(filePath, 'const external = true;\n');
+    const future = new Date(Date.now() + 5000);
+    utimesSync(filePath, future, future);
+    const res = await write.execute('w-stale', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const onDisk = readFileSync(filePath, 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_modified_since_read');
+    expect(onDisk).toBe('const external = true;\n');
+  });
+
+  it('allows overwriting when only mtime changed after a full read', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-mtime-only', { path: 'f.ts' });
+    const future = new Date(Date.now() + 5000);
+    utimesSync(filePath, future, future);
+    const res = await write.execute('w-mtime-only', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const onDisk = readFileSync(filePath, 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk).toBe('const a = 2;\n');
+  });
+
+  it('preserves CRLF line endings when overwriting an existing CRLF file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\r\nconst b = 2;\r\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-crlf', { path: 'f.ts' });
+    const res = await write.execute('w-crlf', { file_path: 'f.ts', content: 'const a = 1;\nconst b = 3;\n' });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk).toBe('const a = 1;\r\nconst b = 3;\r\n');
+  });
+
+  it('preserves UTF-16LE encoding when overwriting an existing UTF-16LE file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const filePath = path.join(dir, 'utf16.ts');
+    writeFileSync(filePath, Buffer.from('\ufeffconst a = 1;\n', 'utf16le'));
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-utf16', { path: 'utf16.ts' });
+    const res = await write.execute('w-utf16', { file_path: 'utf16.ts', content: 'const a = 2;\n' });
+    const onDisk = readFileSync(filePath);
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk[0]).toBe(0xff);
+    expect(onDisk[1]).toBe(0xfe);
+    expect(onDisk.toString('utf16le')).toBe('\ufeffconst a = 2;\n');
+  });
 });
 
 describe('Edit bridge tool', () => {
+  it('applies a multi-file patch with update and add operations', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-patch-a', { path: 'a.ts' });
+    const res = await edit.execute('e-apply-patch', {
+      patch: [
+        '*** Begin Patch',
+        '*** Update File: a.ts',
+        '@@',
+        '-const a = 1;',
+        '+const a = 2;',
+        '*** Add File: b.ts',
+        '+export const b = 1;',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    const a = readFileSync(path.join(dir, 'a.ts'), 'utf8');
+    const b = readFileSync(path.join(dir, 'b.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.perFileResults).toEqual([
+      expect.objectContaining({ path: 'a.ts', type: 'update', ok: true }),
+      expect.objectContaining({ path: 'b.ts', type: 'create', ok: true }),
+    ]);
+    expect(a).toBe('const a = 2;\n');
+    expect(b).toBe('export const b = 1;\n');
+  });
+
+  it('rejects patch updates when the target file was not read first', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+
+    const res = await edit.execute('e-patch-unread', {
+      patch: [
+        '*** Begin Patch',
+        '*** Update File: a.ts',
+        '@@',
+        '-const a = 1;',
+        '+const a = 2;',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    const a = readFileSync(path.join(dir, 'a.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_not_read');
+    expect(a).toBe('const a = 1;\n');
+  });
+
   it('replaces a unique occurrence', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
-    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+    await read.execute('r-edit', { path: 'f.ts' });
     const res = await edit.execute('e1', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
@@ -745,10 +1203,327 @@ describe('Edit bridge tool', () => {
     expect(onDisk).toBe('const a = 2;\n');
   });
 
+  it('returns a diff when editing a file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-diff', { path: 'f.ts' });
+    const res = await edit.execute('e-diff', { file_path: 'f.ts', old_string: 'const b = 2;', new_string: 'const b = 3;' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      firstChangedLine: 2,
+      originalContent: 'const a = 1;\nconst b = 2;\n',
+      updatedContent: 'const a = 1;\nconst b = 3;\n',
+    });
+    expect(res.details.diff).toContain('--- f.ts');
+    expect(res.details.diff).toContain('+++ f.ts');
+    expect(res.details.diff).toContain('-const b = 2;');
+    expect(res.details.diff).toContain('+const b = 3;');
+    expect(res.details.structuredPatch).toEqual([
+      expect.objectContaining({
+        oldStart: 1,
+        oldLines: 2,
+        newStart: 1,
+        newLines: 2,
+        lines: expect.arrayContaining(['-const b = 2;', '+const b = 3;']),
+      }),
+    ]);
+    expect(res.details.lineChanges).toEqual({ additions: 1, deletions: 1, changes: 2 });
+  });
+
+  it('previews an edit without writing to disk', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-preview-edit', { path: 'f.ts' });
+    const res = await edit.execute('e-preview', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+      preview_only: true,
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      preview: true,
+      path: 'f.ts',
+      updatedContent: 'const a = 2;\n',
+    });
+    expect(res.details.diff).toContain('-const a = 1;');
+    expect(res.details.diff).toContain('+const a = 2;');
+    expect(onDisk).toBe('const a = 1;\n');
+  });
+
+  it('edits a line by hashline anchor', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    const readRes = await read.execute('r-hashline-edit', { path: 'f.ts', hashline: true });
+    const lineHash = readRes.details.hashline.lines[1].hash;
+    const res = await edit.execute('e-hashline', {
+      file_path: 'f.ts',
+      hashline_line: lineHash,
+      new_string: 'const b = 3;',
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk).toBe('const a = 1;\nconst b = 3;\n');
+  });
+
+  it('rejects hashline edits when the anchor cannot be found', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-hashline-missing', { path: 'f.ts', hashline: true });
+    const res = await edit.execute('e-hashline-missing', {
+      file_path: 'f.ts',
+      hashline_line: 'ffffffffffff',
+      new_string: 'const missing = true;',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('hashline_mismatch');
+  });
+
+  it('returns a focused structured patch hunk around the changed lines', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    const content = Array.from({ length: 10 }, (_, index) => `line ${index + 1}`).join('\n') + '\n';
+    writeFileSync(path.join(dir, 'f.ts'), content);
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-focused-patch', { path: 'f.ts' });
+    const res = await edit.execute('e-focused-patch', { file_path: 'f.ts', old_string: 'line 6', new_string: 'line six' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.structuredPatch).toEqual([
+      expect.objectContaining({
+        oldStart: 3,
+        oldLines: 7,
+        newStart: 3,
+        newLines: 7,
+      }),
+    ]);
+    expect(res.details.structuredPatch[0].lines).not.toContain(' line 1');
+    expect(res.details.structuredPatch[0].lines).toContain('-line 6');
+    expect(res.details.structuredPatch[0].lines).toContain('+line six');
+  });
+
+  it('records a lightweight backup before editing an existing file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-backup', { path: 'f.ts' });
+    const res = await edit.execute('e-backup', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const backupContent = readFileSync(String(res.details.backup?.path), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.backup).toMatchObject({ originalPath: 'f.ts' });
+    expect(backupContent).toBe('const a = 1;\n');
+  });
+
+  it('runs the write lifecycle after editing a file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\n');
+    const afterWrite = vi.fn().mockResolvedValue({
+      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'fake diagnostic', source: 'fake-lsp' }],
+    });
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'], writeLifecycle: { afterWrite } });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-lifecycle', { path: 'f.ts' });
+    const res = await edit.execute('e-lifecycle', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(afterWrite).toHaveBeenCalledWith(expect.objectContaining({
+      operation: 'edit',
+      type: 'update',
+      path: 'f.ts',
+      absolutePath: filePath,
+      originalContent: 'const a = 1;\n',
+      updatedContent: 'const a = 2;\n',
+      firstChangedLine: 1,
+    }));
+    expect(res.details.replaced).toBe(1);
+    expect(res.details.lifecycle).toMatchObject({
+      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'fake diagnostic', source: 'fake-lsp' }],
+    });
+  });
+
+  it('requires the file to be read before editing', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+
+    const res = await edit.execute('e-unread', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_not_read');
+  });
+
+  it('rejects editing notebooks with the plain Edit tool', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'n.ipynb'), '{}\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-ipynb', { path: 'n.ipynb' });
+    const res = await edit.execute('e-ipynb', { file_path: 'n.ipynb', old_string: '{}', new_string: '{"cells":[]}' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('unsupported_notebook_edit');
+  });
+
+  it('rejects editing files that are too large for safe string replacement', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    const filePath = path.join(dir, 'large.ts');
+    writeFileSync(filePath, '');
+    truncateSync(filePath, 1024 * 1024 * 1024 + 1);
+    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+
+    const res = await edit.execute('e-large', { file_path: 'large.ts', old_string: 'a', new_string: 'b' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_too_large');
+  });
+
+  it('rejects edits that would insert obvious private key material', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const key = "";\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-secret-edit', { path: 'f.ts' });
+    const res = await edit.execute('e-secret', {
+      file_path: 'f.ts',
+      old_string: 'const key = "";',
+      new_string: 'const key = "-----BEGIN PRIVATE KEY-----";',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('secret_detected');
+  });
+
+  it('rejects edits that would insert obvious API token material', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const token = "";\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-token-secret-edit', { path: 'f.ts' });
+    const res = await edit.execute('e-token-secret', {
+      file_path: 'f.ts',
+      old_string: 'const token = "";',
+      new_string: 'const token = "ghp_abcdefghijklmnopqrstuvwxyz1234567890";',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('secret_detected');
+  });
+
+  it('rejects dangerous permission changes when editing agent settings files', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    mkdirSync(path.join(dir, '.claude'), { recursive: true });
+    writeFileSync(path.join(dir, '.claude/settings.json'), '{\n  "permissionMode": "ask"\n}\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-settings-unsafe-edit', { path: '.claude/settings.json' });
+    const res = await edit.execute('e-settings-unsafe', {
+      file_path: '.claude/settings.json',
+      old_string: '"permissionMode": "ask"',
+      new_string: '"permissionMode": "bypassPermissions"',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('unsafe_settings_change');
+  });
+
+  it('requires a full read before editing', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-partial', { path: 'f.ts', offset: 1, limit: 1 });
+    const res = await edit.execute('e-partial', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 3;' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('partial_read');
+  });
+
+  it('preserves CRLF line endings when editing a CRLF file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\r\nconst b = 2;\r\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-crlf', { path: 'f.ts' });
+    const res = await edit.execute('e-crlf', { file_path: 'f.ts', old_string: 'const b = 2;', new_string: 'const b = 3;' });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(onDisk).toBe('const a = 1;\r\nconst b = 3;\r\n');
+  });
+
+  it('rejects editing when the file changed after it was read', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-stale', { path: 'f.ts' });
+    writeFileSync(filePath, 'const external = true;\n');
+    const future = new Date(Date.now() + 5000);
+    utimesSync(filePath, future, future);
+    const res = await edit.execute('e-stale', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 2;' });
+    const onDisk = readFileSync(filePath, 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_modified_since_read');
+    expect(onDisk).toBe('const external = true;\n');
+  });
+
   it('errors when old_string is not unique and replace_all is false', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'f.ts'), 'x\nx\n');
-    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+    await read.execute('r-not-unique', { path: 'f.ts' });
     const res = await edit.execute('e2', { file_path: 'f.ts', old_string: 'x', new_string: 'y' });
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('not_unique');
@@ -757,7 +1532,10 @@ describe('Edit bridge tool', () => {
   it('replaces every occurrence with replace_all', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'f.ts'), 'x\nx\n');
-    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+    await read.execute('r-replace-all', { path: 'f.ts' });
     const res = await edit.execute('e3', { file_path: 'f.ts', old_string: 'x', new_string: 'y', replace_all: true });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
@@ -768,7 +1546,10 @@ describe('Edit bridge tool', () => {
   it('errors when old_string is absent', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'f.ts'), 'abc\n');
-    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+    await read.execute('r-absent', { path: 'f.ts' });
     const res = await edit.execute('e4', { file_path: 'f.ts', old_string: 'zzz', new_string: 'q' });
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('not_found');
@@ -778,7 +1559,10 @@ describe('Edit bridge tool', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     // file contains a curly double-quoted string
     writeFileSync(path.join(dir, 'f.ts'), 'const msg = “hello”;\n');
-    const edit = buildTools(dir, { enabled: ['Edit'] }).find((t: any) => t.name === 'Edit') as any;
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+    await read.execute('r-curly', { path: 'f.ts' });
     const res = await edit.execute('e5', { file_path: 'f.ts', old_string: 'const msg = "hello";', new_string: 'const msg = "world";' });
     const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
