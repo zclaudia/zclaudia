@@ -23,6 +23,8 @@ import {
 import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
 import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
 import { isSandboxAvailable } from './pi-runtime/sandbox.js';
+import { SANDBOX_NETWORK_ESCALATION_TOOL } from './pi-runtime/sandbox-denial.js';
+import { loadSessionSandboxDomains } from '../../application/conversation/agent/permission-memory.js';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
 import { resolveImageAttachments } from '../../application/conversation/runtime/resolve-image-attachments.js';
 import { getFileStore } from '../storage/fileStore.js';
@@ -68,6 +70,7 @@ const policy: ProviderPolicy = {
   modeSwitchSessionPolicy: 'preserve',
   sessionCwdPolicy: 'requested',
   emptyResultFallback: 'ZClaudia agent completed without additional output.',
+  escalateAlwaysTools: [SANDBOX_NETWORK_ESCALATION_TOOL],
 };
 
 class AsyncQueue<T> implements AsyncIterable<T> {
@@ -385,6 +388,9 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     }
 
     // 6. Construct Agent — wire tools + hooks from pi-runtime
+    const sandboxAllowedDomains = options.db && options.claudiaSessionId
+      ? loadSessionSandboxDomains(options.db, options.claudiaSessionId)
+      : [];
     const tools = buildTools(options.cwd, {
       enabled: effectiveTools,
       supportsVision,
@@ -396,6 +402,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       agentTaskExecutor: options.agentTaskExecutor,
       permissionCallback: onPermission,
       sandboxReadOnly: isPlanMode,
+      sandboxAllowedDomains,
     });
     if (options.externalToolState) {
       for (const ref of options.externalToolState.loadedExternalTools) {

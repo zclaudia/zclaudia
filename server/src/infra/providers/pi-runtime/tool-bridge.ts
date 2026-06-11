@@ -1591,6 +1591,8 @@ export interface ToolBridgeOptions {
   /** Plan mode read-only sandbox, set by the adapter — spec §6.
    * When true, Bash fails closed if the sandbox is unavailable. */
   sandboxReadOnly?: boolean;
+  /** Phase B1: session-granted sandbox network domains, seeds the Bash escalation loop. */
+  sandboxAllowedDomains?: string[];
 }
 
 /**
