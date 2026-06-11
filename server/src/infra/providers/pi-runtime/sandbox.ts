@@ -90,6 +90,8 @@ export async function ensureSandboxInitialized(): Promise<void> {
 export interface WrapOptions {
   workspaceRoot: string;   // session project root (NOT the per-call cwd subdir)
   readOnly?: boolean;
+  /** Session-granted domains (Phase B1) appended to the network allow-list for this call. */
+  extraAllowedDomains?: string[];
   signal?: AbortSignal;
 }
 export interface WrapResult {
@@ -111,7 +113,10 @@ export async function wrapCommand(command: string, opts: WrapOptions): Promise<W
         denyWrite: [],
         allowRead: SENSITIVE_ALLOW_BACK,
       },
-      network: { allowedDomains: DEFAULT_ALLOWED_DOMAINS, deniedDomains: [] },
+      network: {
+        allowedDomains: [...DEFAULT_ALLOWED_DOMAINS, ...(opts.extraAllowedDomains ?? [])],
+        deniedDomains: [],
+      },
     };
     const wrapped = await SandboxManager.wrapWithSandboxArgv(command, undefined, customConfig, opts.signal);
     // env is already the full process.env — use as-is (spike-confirmed; do NOT merge).

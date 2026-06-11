@@ -76,3 +76,16 @@ describe('wrapCommand', () => {
     expect(r.sandboxed).toBe(false);
   });
 });
+
+describe('wrapCommand extraAllowedDomains', () => {
+  it('produces a sandboxed argv when an extra domain is granted (sandbox available)', async () => {
+    __resetSandboxCacheForTests();
+    if (!isSandboxAvailable()) return; // gated: skip where sandbox is unsupported
+    const wrap = await wrapCommand('curl https://example.com', {
+      workspaceRoot: process.cwd(),
+      extraAllowedDomains: ['example.com'],
+    });
+    expect(wrap.sandboxed).toBe(true);
+    expect(Array.isArray(wrap.argv)).toBe(true);
+  });
+});
