@@ -327,6 +327,9 @@ function isDangerousCommand(toolInput: unknown, detail: string): boolean {
 export function classify(toolName: string, toolInput: unknown, detail: string): PermissionCategory {
   if (toolName === 'AskUserQuestion') return 'userQuestions';
   if (isBlockingInteractionTool(toolName)) return 'userQuestions';
+  // Memory only mutates its own per-project directory (path safety enforced
+  // inside the tool) — treat as fileRead so default profiles auto-approve.
+  if (toolName === 'Memory') return 'fileRead';
   if (READONLY_TOOLS.includes(toolName)) return 'fileRead';
   if (EDIT_TOOLS.includes(toolName)) return 'fileWrite';
   if (toolName.startsWith('mcp__')) return 'networkOps';

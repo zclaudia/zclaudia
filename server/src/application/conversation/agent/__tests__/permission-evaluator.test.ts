@@ -194,6 +194,10 @@ describe('classify', () => {
     expect(classify('ExitPlanMode', {}, '')).toBe('userQuestions' as PermissionCategory);
   });
 
+  it('classifies Memory as fileRead (own-directory writes, auto-approved by default profile)', () => {
+    expect(classify('Memory', { command: 'create', path: '/memories/a.md' }, '')).toBe('fileRead');
+  });
+
   it('should classify unknown tools as shellSafe', () => {
     expect(classify('SomeUnknownTool', {}, '')).toBe('shellSafe' as PermissionCategory);
     expect(classify('Task', {}, '')).toBe('shellSafe' as PermissionCategory);
