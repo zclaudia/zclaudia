@@ -157,6 +157,10 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   // can always enter/exit; they mutate session state, not workspace files.
   'EnterPlanMode',
   'ExitPlanMode',
+  // Memory only writes its own per-project memory directory (path safety
+  // enforced inside the tool), never workspace files — saving memories during
+  // plan mode is allowed. declaredReadOnly stays false in its metadata because
+  // it does mutate persistent state.
   'Memory',
 ];
 

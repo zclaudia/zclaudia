@@ -11,7 +11,7 @@ import {
 } from '../tools.js';
 
 describe('tool selection resolver', () => {
-  it('expands the core-coding built-in set including Glob', () => {
+  it('expands the full core-coding built-in set in declaration order', () => {
     const resolved = resolveToolSelection({
       sets: [{ source: 'builtin', id: 'core-coding' }],
       include: [],
