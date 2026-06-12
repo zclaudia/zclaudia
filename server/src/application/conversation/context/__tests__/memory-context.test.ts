@@ -35,9 +35,11 @@ describe('buildMemoryContext', () => {
     expect(byLines).toContain('[index truncated');
     expect(byLines).not.toContain(`- line ${MAX_INDEX_LINES + 10}`);
 
-    const bigLine = 'x'.repeat(MAX_INDEX_BYTES + 1000);
-    fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), bigLine);
+    const cjkLines = Array.from({ length: 90 }, (_, i) => `- 记忆与缓存${i}：` + '构建顺序与缓存稳定性的踩坑教训记录设计模式权限规则钩子订阅事件流'.repeat(3)).join('\n');
+    fs.writeFileSync(path.join(memoryDir, 'MEMORY.md'), cjkLines);
     const byBytes = buildMemoryContext(memoryDir)!;
     expect(Buffer.byteLength(byBytes, 'utf8')).toBeLessThan(MAX_INDEX_BYTES + 2000);
+    expect(byBytes).toContain('[index truncated');
+    expect(byBytes).not.toContain('�');
   });
 });

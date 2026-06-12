@@ -28,6 +28,11 @@ export function buildMemoryContext(memoryDir: string): string | undefined {
   }
   if (Buffer.byteLength(index, 'utf8') > MAX_INDEX_BYTES) {
     index = Buffer.from(index, 'utf8').subarray(0, MAX_INDEX_BYTES).toString('utf8');
+    // Cutting at a byte boundary can split a multi-byte character and leave a
+    // partial line — trim back to the last complete line.
+    const lastNewline = index.lastIndexOf('\n');
+    if (lastNewline > 0) index = index.slice(0, lastNewline);
+    index = index.replace(/�+$/, '');
     truncated = true;
   }
   if (truncated) index += '\n[index truncated — use the Memory tool to view the full MEMORY.md and prune stale entries]';
