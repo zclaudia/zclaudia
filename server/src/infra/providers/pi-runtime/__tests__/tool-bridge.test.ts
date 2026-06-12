@@ -1527,7 +1527,7 @@ describe('Edit bridge tool', () => {
     expect(onDisk).toBe('const a = 1;\nconst b = 2;\n');
   });
 
-  it('rejects hashline edits with a stale file-level tag and asks for a fresh read', async () => {
+  it('rejects hashline edits whose anchored line changed out-of-band (tag drift alone is tolerated)', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     const filePath = path.join(dir, 'f.ts');
     writeFileSync(filePath, 'const a = 1;\nconst b = 2;\n');
@@ -1536,6 +1536,7 @@ describe('Edit bridge tool', () => {
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     const readRes = await read.execute('r-hashline-stale-tag', { path: 'f.ts', hashline: true });
+    // The anchored line itself was rewritten out-of-band, so the anchor is gone.
     writeFileSync(filePath, 'const a = 1;\nconst b = 22;\n');
     const res = await edit.execute('e-hashline-stale-tag', {
       file_path: 'f.ts',
@@ -1547,11 +1548,10 @@ describe('Edit bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({
       ok: false,
-      error: 'hashline_tag_mismatch',
-      expectedTag: readRes.details.hashline.tag,
+      error: 'hashline_mismatch',
       suggestion: 'Read the file again with hashline:true before editing.',
     });
-    expect(res.details.currentTag).toEqual(expect.any(String));
+    expect(res.content[0].text).toContain('changed since it was read');
   });
 
   it('rejects hashline edits when the anchor cannot be found', async () => {

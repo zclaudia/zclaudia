@@ -25,6 +25,7 @@ import { runBash, killProcessTree } from './bash-runner.js';
 import * as sandbox from './sandbox.js';
 import { detectSandboxDenial, SANDBOX_NETWORK_ESCALATION_TOOL, MAX_ESCALATION_ITERATIONS } from './sandbox-denial.js';
 import { findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
+import { NoopEditGuard } from './noop-edit-guard.js';
 import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
@@ -1741,6 +1742,8 @@ export interface ToolBridgeOptions {
   sandboxAllowedDomains?: string[];
   /** Foreground Bash auto-background threshold in ms (default 60s; 0 disables). */
   bashAutoBackgroundMs?: number;
+  /** Shared per-run guard against repeated identical failed/no-op edits. */
+  noopGuard?: NoopEditGuard;
 }
 
 /**
@@ -1758,6 +1761,7 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
   const effectiveOptions: ToolBridgeOptions = {
     ...options,
     readFileState: options?.readFileState ?? createReadFileStateStore(),
+    noopGuard: options?.noopGuard ?? new NoopEditGuard(),
     writeLifecycle: composeWriteLifecycleHooks(options?.writeLifecycle, fileChangeLifecycle),
     diagnosticsProvider: options?.diagnosticsProvider
       ?? lspAdapter?.diagnosticsProvider
