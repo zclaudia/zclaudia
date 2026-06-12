@@ -238,7 +238,7 @@ describe('buildTools', () => {
     expect(result.content[0].text).toContain('Use WebFetch first.');
   });
 
-  it('WebFetch fetches a URL and strips HTML by default', async () => {
+  it('WebFetch converts HTML to markdown by default and drops scripts', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       status: 200,
       statusText: 'OK',
@@ -246,12 +246,28 @@ describe('buildTools', () => {
     })));
     const webFetch = buildTools('/tmp', { enabled: ['WebFetch'] })[0] as any;
 
-    const result = await webFetch.execute({ url: 'https://example.com' });
+    const result = await webFetch.execute('fetch-1', { url: 'https://example.com' });
 
     expect(result.content[0].text).toContain('Status: 200 OK');
     expect(result.content[0].text).toContain('Hello');
     expect(result.content[0].text).toContain('World & Friends');
     expect(result.content[0].text).not.toContain('bad()');
+  });
+
+  it('WebFetch returns non-HTML content (JSON) verbatim', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: new Headers({ 'content-type': 'application/json' }),
+      text: async () => '{"name":"widget","version":"1.0"}',
+    })));
+    const webFetch = buildTools('/tmp', { enabled: ['WebFetch'] })[0] as any;
+
+    const result = await webFetch.execute('fetch-1', { url: 'https://example.com/pkg.json' });
+
+    expect(result.content[0].text).toContain('{"name":"widget","version":"1.0"}');
+    expect(result.details.extractMode).toBe('passthrough');
   });
 
   it('WebFetch rejects localhost and private network URLs before fetch', async () => {

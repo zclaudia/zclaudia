@@ -33,6 +33,7 @@ import { SessionRepository } from '../../../domains/sessions/repository.js';
 import { enterPlanMode as applyEnterPlanMode, exitPlanMode as applyExitPlanMode } from '../../../domains/sessions/plan-mode-toggle.js';
 import { interactionDispatcher } from '../../../application/conversation/interactions/interaction-dispatcher.js';
 import type { PlanReviewInteractionMessage } from '@zclaudia/shared/interaction/forms';
+import { htmlToMarkdown, stripHtmlToText, shouldExtractAsHtml } from './web-extract.js';
 import { buildHashlineEntries, formatHashlineOutput, hashlineSnapshotId, hashlineTag } from './hashline.js';
 import { createCommandDiagnosticsProvider, type CommandDiagnosticsOptions } from './command-diagnostics.js';
 import { composeWriteLifecycleHooks, createFileChangeLifecycleHooks, type FileChangeNotifier } from './file-change-notifier.js';
@@ -1527,12 +1528,12 @@ function createWebFetchTool(): AgentTool<any> {
   return {
     name: 'WebFetch',
     label: 'WebFetch',
-    description: 'Fetch a URL and return readable text content.',
+    description: 'Fetch a URL and return its content. HTML pages are extracted to clean Markdown (main article, with headings/lists/code/links preserved). format: "markdown" (default), "text" (plain-text strip), or "raw" (unprocessed body). Non-HTML responses (JSON, plain text, markdown) are returned as-is.',
     parameters: {
       type: 'object',
       properties: {
         url: { type: 'string' },
-        format: { type: 'string', enum: ['text', 'raw'], default: 'text' },
+        format: { type: 'string', enum: ['markdown', 'text', 'raw'], default: 'markdown' },
       },
       required: ['url'],
     } as any,
@@ -1549,15 +1550,44 @@ function createWebFetchTool(): AgentTool<any> {
       });
       const body = await response.text();
       const contentType = response.headers?.get?.('content-type') ?? '';
-      const content = args.format === 'raw' ? body : stripHtml(body);
+      const finalUrl = validation.url.toString();
+      const format = args.format === 'raw' || args.format === 'text' ? args.format : 'markdown';
+
+      let content = body;
+      let extractMode: string | undefined;
+      let title: string | undefined;
+      if (format === 'raw') {
+        content = body;
+      } else if (!shouldExtractAsHtml(contentType, body)) {
+        // JSON / plain text / markdown — already model-friendly, return verbatim.
+        content = body;
+        extractMode = 'passthrough';
+      } else if (format === 'text') {
+        content = stripHtmlToText(body);
+        extractMode = 'text';
+      } else {
+        const extracted = await htmlToMarkdown(body, finalUrl);
+        content = extracted.markdown;
+        extractMode = extracted.mode;
+        title = extracted.title;
+      }
+
+      const header = [
+        `URL: ${finalUrl}`,
+        `Status: ${response.status} ${response.statusText}`,
+        `Content-Type: ${contentType || 'unknown'}`,
+        ...(title ? [`Title: ${title}`] : []),
+      ].join('\n');
       return textResult(
-        truncateText(`URL: ${validation.url.toString()}\nStatus: ${response.status} ${response.statusText}\nContent-Type: ${contentType || 'unknown'}\n\n${content}`),
+        truncateText(`${header}\n\n${content}`),
         {
           ok: response.ok,
           status: response.status,
           statusText: response.statusText,
           contentType,
-          url: validation.url.toString(),
+          url: finalUrl,
+          ...(extractMode ? { extractMode } : {}),
+          ...(title ? { title } : {}),
         },
       );
     },
