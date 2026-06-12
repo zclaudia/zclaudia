@@ -98,12 +98,25 @@ export interface CompactionMarker {
 }
 
 /**
- * One category row in the /context breakdown. `estimated` marks chars/4
- * estimates (vs values derived from real usage).
+ * One category row in the /context breakdown. `estimated` marks values
+ * derived from estimation rather than real token counts.
  */
 export interface ContextUsageBreakdownEntry {
   tokens: number;
   estimated: boolean;
+}
+
+/**
+ * One category in the /context breakdown. Residual: usedTokens − (systemPrompt + tools + skills),
+ * clamped ≥ 0. `clamped` is true when the raw residual was negative (estimate overshoot),
+ * so the UI can flag estimation error.
+ */
+export interface ContextUsageBreakdown {
+  systemPrompt: ContextUsageBreakdownEntry;
+  tools: ContextUsageBreakdownEntry & { count: number };
+  skills: ContextUsageBreakdownEntry;
+  messages: ContextUsageBreakdownEntry & { clamped: boolean };
+  freeSpace: { tokens: number; percent: number };
 }
 
 /**
@@ -116,25 +129,14 @@ export interface ContextUsagePayload {
   model: string;
   /** Effective context window in tokens. */
   contextWindow: number;
-  /** Same vocabulary as wire `ContextWindowSource`:
-   *  'profile_entry' | 'pi_ai_registry' | 'openai_compat_default' | 'fallback'.
-   *  Typed as string here because core/ cannot import wire/ (layering). */
+  /** Vocabulary mirrors wire ContextWindowSource (wire/messages/core.ts); typed string to avoid a core/ → wire/ import. */
   contextWindowSource: string;
   /** Real occupancy (lastUsage.input + cacheRead) when available; falls back
    *  to the estimate sum when the first run hasn't completed yet. */
   usedTokens: number;
   /** True when usedTokens comes from real usage rather than estimates. */
   usedTokensFromUsage: boolean;
-  breakdown: {
-    systemPrompt: ContextUsageBreakdownEntry;
-    tools: ContextUsageBreakdownEntry & { count: number };
-    skills: ContextUsageBreakdownEntry;
-    /** Residual: usedTokens − (systemPrompt + tools + skills), clamped ≥ 0.
-     *  `clamped` is true when the raw residual was negative (estimate
-     *  overshoot), so the UI can flag estimation error. */
-    messages: ContextUsageBreakdownEntry & { clamped: boolean };
-    freeSpace: { tokens: number; percent: number };
-  };
+  breakdown: ContextUsageBreakdown;
   capturedAt: number;
 }
 
