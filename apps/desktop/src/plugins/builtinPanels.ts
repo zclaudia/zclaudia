@@ -13,6 +13,7 @@ import { FileViewerPanel, FileViewerActions } from '../components/fileviewer/Fil
 import { DraftPanel } from '../components/draft/DraftPanel';
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel';
 import { ChangesPanel } from '../features/changes/ChangesPanel';
+import { MemoryPanel } from '../features/memory/MemoryPanel';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useFileViewerStore } from '../stores/fileViewerStore';
 import { useDraftEditorStore } from '../stores/draftEditorStore';
@@ -104,6 +105,24 @@ export function initBuiltinPanels() {
     },
   });
 
+  // Memory: read-only view of per-project memory files written by the agent
+  registerPanel({
+    id: 'memory',
+    pluginId: 'com.claudia.memory',
+    type: 'panel',
+    label: 'Memory',
+    icon: 'Brain',
+    component: MemoryPanel,
+    order: 4,
+    platforms: ['desktop', 'mobile'],
+    defaultPlacement: 'right',
+    alwaysMount: false,
+    visible: false,
+    onClose: () => {
+      usePluginStore.getState().updatePanelVisibility('memory', false);
+    },
+  });
+
   registerPanel({
     id: 'notifications',
     pluginId: 'com.claudia.notifications',
@@ -111,7 +130,7 @@ export function initBuiltinPanels() {
     label: 'Notifications',
     icon: 'Activity',
     component: NotificationsPanel,
-    order: 4,
+    order: 5,
     platforms: ['desktop', 'mobile'],
     alwaysMount: false,
     visible: false,
