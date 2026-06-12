@@ -5,6 +5,7 @@ import { mountCapabilityRoutes } from '../../interfaces/http/provider-capabiliti
 import { mountCommandRoutes } from '../../interfaces/http/provider-commands.js';
 import { createDeferredDiagnosticsRoutes } from './pi-runtime/deferred-diagnostics-routes.js';
 import { createFileHistoryRoutes } from './pi-runtime/file-history-routes.js';
+import { createContextUsageRoutes } from './context-usage-routes.js';
 
 /**
  * Runtime adapter capability / command routes — describe what the runtime
@@ -29,6 +30,7 @@ export function registerRuntimeRoutes(deps: RuntimeRoutesDeps): void {
   mountCommandRoutes(router, db);
   router.use(createDeferredDiagnosticsRoutes());
   router.use(createFileHistoryRoutes());
+  router.use(createContextUsageRoutes());
 
   router.get('/plugin-tools', (_req: Request, res: Response) => {
     try {
