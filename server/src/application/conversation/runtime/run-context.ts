@@ -18,6 +18,8 @@ import {
   buildInteractionToolPrompt,
 } from '../../../utils/server-utils.js';
 import { createContextEngine } from '../context/engine.js';
+import { buildMemoryContext } from '../context/memory-context.js';
+import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
 import { workspaceService } from '../../services/workspace.js';
 import { mapPermissionMode } from '../../../infra/providers/pcp-permission.js';
 
@@ -117,6 +119,8 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     projectPath: session.root_path || undefined,
     skills: [],
   });
+  const memoryDir = session.project_id ? resolveProjectMemoryDir(session.project_id) : undefined;
+  const memoryContext = memoryDir ? buildMemoryContext(memoryDir) : undefined;
   const skillDirectoryHint = buildSkillDirectoryHint();
 
   const nativeMode = adapter.manifest
@@ -136,6 +140,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
     baseSystemPrompt: agentProfile.systemPrompt,
     workspacePrompt,
     skillDirectoryHint,
+    memoryContext,
     systemContext: message.systemContext,
     nonNativePlanPrompt,
     planDocumentPrompt,
@@ -156,6 +161,7 @@ export async function buildRunContext(input: BuildRunContextInput): Promise<{
       claudiaSessionId: message.sessionId,
       runId,
       permissionOverride: message.permissionOverride as Partial<UnifiedPermissionPolicy> | undefined,
+      memoryDir,
       db,
       agentTaskExecutor,
       llmProfileConfig: providerConfig,

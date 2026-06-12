@@ -27,6 +27,7 @@ function assembleCodingTemplate(input: AssemblyInput): string {
     input.baseSystemPrompt,
     input.workspacePrompt,
     input.skillDirectoryHint,
+    input.memoryContext,
     input.systemContext,
     input.nonNativePlanPrompt,
     input.planDocumentPrompt,
