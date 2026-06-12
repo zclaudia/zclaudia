@@ -6,6 +6,7 @@ import type { PermissionCallback } from '../types.js';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
 import { measureTextBytes, persistToolResultText } from './tool-result-store.js';
+import { remediationForResult } from './remediation.js';
 
 export const DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
@@ -79,6 +80,8 @@ export interface AgentHooksInput {
   /** Per-turn cumulative tool-result budget in bytes (default 192 KiB; 0 disables).
    *  Once exceeded, large results are persisted to disk with an inline preview. */
   toolResultBudgetBytes?: number;
+  /** Append auto-fix remediation hints to recognizable tool failures (default on). */
+  autoFixHints?: boolean;
   /** Architectural placeholders for future sub-projects. */
   transformContext?: AgentLoopConfig['transformContext'];
   /** Stream function for the agent loop. Note: pi accepts this as a separate argument to
@@ -159,6 +162,7 @@ export function truncateContent(
 export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
   const limit = input.outputTruncationLimit ?? DEFAULT_OUTPUT_LIMIT_BYTES;
   const turnBudgetBytes = input.toolResultBudgetBytes ?? DEFAULT_TURN_BUDGET_BYTES;
+  const autoFixHints = input.autoFixHints ?? true;
   let turnSpentBytes = 0;
 
   return {
@@ -207,6 +211,16 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       const toolName: string = toolCall?.name ?? '';
       let content = result.content;
       let hookAppended = false;
+      // Auto-fix: append a concrete next step for recognizable failures so the
+      // model self-corrects instead of blindly retrying.
+      let remediationAppended = false;
+      if (autoFixHints) {
+        const hint = remediationForResult(toolName, result.details);
+        if (hint) {
+          content = [...content, { type: 'text', text: `[fix] ${hint}` }];
+          remediationAppended = true;
+        }
+      }
       if (input.userHooks?.length) {
         const extras = await runPostToolUseHooks(input.userHooks, {
           event: 'PostToolUse',
@@ -261,7 +275,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       }
       turnSpentBytes += finalSize;
 
-      if (!truncated.didTruncate && !hookAppended) return undefined;
+      if (!truncated.didTruncate && !hookAppended && !remediationAppended) return undefined;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         content: finalContent as any,

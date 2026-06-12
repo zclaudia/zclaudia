@@ -1,0 +1,68 @@
+import { describe, it, expect } from 'vitest';
+import { remediationForResult } from '../remediation.js';
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function det(d: Record<string, unknown>): any {
+  return d;
+}
+
+describe('remediationForResult', () => {
+  it('returns undefined for successful results', () => {
+    expect(remediationForResult('Edit', det({ ok: true }))).toBeUndefined();
+    expect(remediationForResult('Bash', det({ ok: true, exitCode: 0 }))).toBeUndefined();
+  });
+
+  it('returns undefined when there is no details object', () => {
+    expect(remediationForResult('Edit', undefined)).toBeUndefined();
+  });
+
+  it('suggests re-reading on Edit not_found', () => {
+    const hint = remediationForResult('Edit', det({ ok: false, error: 'not_found' }));
+    expect(hint).toMatch(/read/i);
+    expect(hint).toMatch(/whitespace|exact|indentation/i);
+  });
+
+  it('suggests replace_all or more context on Edit not_unique', () => {
+    const hint = remediationForResult('Edit', det({ ok: false, error: 'not_unique', occurrences: 3 }));
+    expect(hint).toMatch(/replace_all|more context/i);
+  });
+
+  it('suggests a fresh hashline read on hashline_mismatch', () => {
+    const hint = remediationForResult('Edit', det({ ok: false, error: 'hashline_mismatch' }));
+    expect(hint).toMatch(/hashline/i);
+  });
+
+  it('does not pile on when the loop guard already fired', () => {
+    expect(remediationForResult('Edit', det({ ok: false, error: 'edit_loop_detected' }))).toBeUndefined();
+  });
+
+  it('explains command-not-found Bash exits', () => {
+    const hint = remediationForResult('Bash', det({ ok: false, exitCode: 127 }));
+    expect(hint).toMatch(/not found|not installed|PATH/i);
+  });
+
+  it('flags workspace-relative path errors', () => {
+    const hint = remediationForResult('Write', det({ ok: false, error: 'path_outside_workspace' }));
+    expect(hint).toMatch(/workspace-relative|inside the workspace/i);
+  });
+
+  it('explains stale-read write rejections', () => {
+    const hint = remediationForResult('Write', det({ ok: false, error: 'file_modified_since_read' }));
+    expect(hint).toMatch(/read .* again|re-read/i);
+  });
+
+  it('explains auto-generated refusals', () => {
+    const hint = remediationForResult('Edit', det({ ok: false, error: 'auto_generated_file' }));
+    expect(hint).toMatch(/generated|source/i);
+  });
+
+  it('points at the full output file when a Bash result was persisted', () => {
+    const hint = remediationForResult('Bash', det({ ok: false, exitCode: 1, fullOutputPath: '/tmp/x.log' }));
+    // exitCode 1 alone is generic; should not over-explain, but may surface the log
+    expect(hint === undefined || /\/tmp\/x\.log|full output/.test(hint)).toBe(true);
+  });
+
+  it('returns undefined for unknown error codes', () => {
+    expect(remediationForResult('Grep', det({ ok: false, error: 'some_novel_error' }))).toBeUndefined();
+  });
+});

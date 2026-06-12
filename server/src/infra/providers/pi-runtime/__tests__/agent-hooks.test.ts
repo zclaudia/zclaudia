@@ -304,6 +304,43 @@ describe('user hooks integration', () => {
     fs.rmSync(capture, { force: true });
   });
 
+  it('appends an auto-fix hint to a recognizable tool failure', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: allow() });
+    const result = await hooks.afterToolCall!({
+      toolCall: { id: 't1', name: 'Edit', arguments: {} },
+      args: {},
+      result: { content: [{ type: 'text', text: 'old_string not found in file' }], details: { ok: false, error: 'not_found' } },
+      isError: false,
+      context: {} as any,
+    } as any);
+    expect(result?.content).toHaveLength(2);
+    expect(result?.content[1].text).toMatch(/^\[fix\] .*Read the file again/);
+  });
+
+  it('does not append a hint for successful results', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: allow() });
+    const result = await hooks.afterToolCall!({
+      toolCall: { id: 't1', name: 'Edit', arguments: {} },
+      args: {},
+      result: { content: [{ type: 'text', text: 'Edited f.ts' }], details: { ok: true } },
+      isError: false,
+      context: {} as any,
+    } as any);
+    expect(result).toBeUndefined();
+  });
+
+  it('respects autoFixHints:false', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: allow(), autoFixHints: false });
+    const result = await hooks.afterToolCall!({
+      toolCall: { id: 't1', name: 'Edit', arguments: {} },
+      args: {},
+      result: { content: [{ type: 'text', text: 'old_string not found in file' }], details: { ok: false, error: 'not_found' } },
+      isError: false,
+      context: {} as any,
+    } as any);
+    expect(result).toBeUndefined();
+  });
+
   it('PostToolUse exit-2 stderr is appended to the tool result content', async () => {
     const hooks = buildAgentHooks({
       permissionCallback: allow(),
