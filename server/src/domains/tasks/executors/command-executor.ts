@@ -1,5 +1,5 @@
-import { spawn } from 'child_process';
-import { mkdirSync, openSync, closeSync } from 'fs';
+import { spawn, type ChildProcess } from 'child_process';
+import { mkdirSync, openSync, closeSync, createWriteStream } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
@@ -74,6 +74,34 @@ export class CommandTaskExecutor implements TaskExecutor {
     child.unref();
     child.on('error', (err) => this.finalize(task.id, null, `spawn error: ${err.message}`));
     child.on('exit', (code) => this.finalize(task.id, code));
+    return { status: 'running', executorRef: { pid: child.pid, command } };
+  }
+
+  /**
+   * Adopt an already-running child (auto-backgrounded foreground command).
+   * Output captured so far plus all future stdio is appended to the task log,
+   * and the task is finalized on exit, mirroring start(). Unlike start(), the
+   * child's stdio is piped to this process, so output stops if the server dies;
+   * reconcile() then settles the task by pid liveness as usual.
+   */
+  adopt(task: TaskRecord, child: ChildProcess, initialOutput: string): TaskExecutorUpdate {
+    const meta = (task.metadata ?? {}) as { command?: unknown };
+    const command = typeof meta.command === 'string' ? meta.command : '';
+    const logPath = commandTaskLogPath(task.id);
+    mkdirSync(path.dirname(logPath), { recursive: true });
+    const stream = createWriteStream(logPath, { flags: 'a' });
+    if (initialOutput) stream.write(initialOutput);
+    child.stdout?.on('data', (chunk) => stream.write(chunk));
+    child.stderr?.on('data', (chunk) => stream.write(chunk));
+    const closeStream = () => { try { stream.end(); } catch { /* already closed */ } };
+    child.on('error', (err) => { closeStream(); this.finalize(task.id, null, `adopted process error: ${err.message}`); });
+    if (child.exitCode !== null || child.signalCode !== null) {
+      // Exited between handoff and adoption — settle immediately.
+      closeStream();
+      this.finalize(task.id, child.exitCode);
+    } else {
+      child.on('exit', (code) => { closeStream(); this.finalize(task.id, code); });
+    }
     return { status: 'running', executorRef: { pid: child.pid, command } };
   }
 

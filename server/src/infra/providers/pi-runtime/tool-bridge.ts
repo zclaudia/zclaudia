@@ -21,7 +21,7 @@ import { createCommandDiagnosticsProvider, type CommandDiagnosticsOptions } from
 import { composeWriteLifecycleHooks, createFileChangeLifecycleHooks, type FileChangeNotifier } from './file-change-notifier.js';
 import { createLspDiagnosticsAdapter, type LspTransport } from './lsp-diagnostics-adapter.js';
 import { runRipgrep } from './ripgrep-runner.js';
-import { runBash } from './bash-runner.js';
+import { runBash, killProcessTree } from './bash-runner.js';
 import * as sandbox from './sandbox.js';
 import { detectSandboxDenial, SANDBOX_NETWORK_ESCALATION_TOOL, MAX_ESCALATION_ITERATIONS } from './sandbox-denial.js';
 import { findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
@@ -459,6 +459,7 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
   const DEFAULT_TIMEOUT_SEC = 120;
   const MAX_TIMEOUT_SEC = 600;
   const UPDATE_THROTTLE_MS = 100;
+  const DEFAULT_AUTO_BACKGROUND_MS = 60_000;
   // Session-granted domains, shared across all Bash calls in this run; seeded from DB (prior turns).
   const grantedDomains = new Set<string>(options?.sandboxAllowedDomains ?? []);
   const buildEscalationDetail = (hosts: string[]): string => {
@@ -469,7 +470,7 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
   return {
     name: 'Bash',
     label: 'Bash',
-    description: 'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. Default timeout 120s (max 600s). Set run_in_background:true for long-running commands (dev servers, watchers).',
+    description: 'Execute a shell command (bash -c) in the workspace. Returns merged stdout+stderr and the exit code. Output is truncated to the last 2000 lines / 50KB; full output is written to a temp file when truncated. A command still running after 60s is automatically moved to a background task (returns a taskId to poll with TaskOutput); set an explicit timeout (max 600s) to wait inline and kill at the deadline instead. Set run_in_background:true to background immediately (dev servers, watchers).',
     parameters: {
       type: 'object',
       properties: {
@@ -553,6 +554,16 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
 
       const timeoutSec = Math.min(Math.max(1, Number(args.timeout ?? DEFAULT_TIMEOUT_SEC) || DEFAULT_TIMEOUT_SEC), MAX_TIMEOUT_SEC);
 
+      // Auto-background: a still-running command is handed off to a background
+      // task at the threshold instead of blocking the turn. An explicit timeout
+      // expresses wait-and-kill intent, so it disables the handoff.
+      const canAutoBackground = !!options?.db
+        && options?.sandboxReadOnly !== true
+        && args.timeout === undefined;
+      const autoBackgroundMs = canAutoBackground
+        ? ((options?.bashAutoBackgroundMs ?? DEFAULT_AUTO_BACKGROUND_MS) || undefined)
+        : undefined;
+
       let lastEmit = 0;
       const onChunk = onUpdate
         ? (text: string) => {
@@ -574,14 +585,14 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         return errorResult('sandbox_unavailable_plan_mode', 'Read-only Bash requires the sandbox, which is not active for this command');
       }
       let result = await runBash({
-        command, cwd: runCwd, timeoutSec, signal, onChunk,
+        command, cwd: runCwd, timeoutSec, signal, onChunk, autoBackgroundMs,
         sandbox: wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined,
       });
 
       // Phase B1: escalate-on-denial (network only). Foreground + sandboxed + a permission channel.
       const canEscalate = wrap.sandboxed && options?.sandboxReadOnly !== true && !!options?.permissionCallback;
       for (let iteration = 0; canEscalate && iteration < MAX_ESCALATION_ITERATIONS; iteration++) {
-        if (result.aborted || result.exitCode === 0) break;
+        if (result.handoff || result.aborted || result.exitCode === 0) break;
         const allowedNow = new Set<string>([...sandbox.DEFAULT_ALLOWED_DOMAINS, ...grantedDomains]);
         const denial = detectSandboxDenial(command, result.fullOutput, allowedNow);
         if (!denial) break;
@@ -612,9 +623,49 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         });
         if (!wrap.sandboxed) break; // re-wrap degraded; do not re-run unsandboxed
         result = await runBash({
-          command, cwd: runCwd, timeoutSec, signal, onChunk,
+          command, cwd: runCwd, timeoutSec, signal, onChunk, autoBackgroundMs,
           sandbox: { argv: wrap.argv!, env: wrap.env! },
         });
+      }
+
+      if (result.handoff) {
+        const handoff = result.handoff;
+        try {
+          const repo = new TaskRepository(options!.db!);
+          const service = new TaskService(repo);
+          const executor = new CommandTaskExecutor(repo);
+          const task = service.createTask({
+            type: 'command',
+            sessionId: options?.sessionId,
+            runId: options?.runId,
+            parentToolUseId: toolCallId,
+            title: truncateText(command, 80),
+            metadata: { command, cwd: runCwd, autoBackgrounded: true },
+          });
+          handoff.detach();
+          const adopted = executor.adopt(task, handoff.child, result.fullOutput);
+          service.startTask(task.id, { executorRef: adopted.executorRef });
+          const seconds = Math.round((autoBackgroundMs ?? 0) / 1000);
+          const tail = result.output ? `${result.output}\n\n` : '';
+          return textResult(
+            `${tail}[Still running after ${seconds}s — moved to background task ${task.id}. `
+              + `Poll with TaskOutput({ task_id: "${task.id}" }); stop with Monitor({ action: "stop", task_id: "${task.id}" }).]`,
+            {
+              ok: true,
+              background: true,
+              autoBackgrounded: true,
+              taskId: task.id,
+              pid: handoff.child.pid,
+              logPath: commandTaskLogPath(task.id),
+              durationMs: result.durationMs,
+              sandboxed: wrap.sandboxed,
+            },
+          );
+        } catch (err) {
+          // Adoption failed — don't leak an unsupervised process.
+          if (handoff.child.pid) killProcessTree(handoff.child.pid);
+          return errorResult('auto_background_failed', err instanceof Error ? err.message : String(err));
+        }
       }
 
       if (result.aborted) {
@@ -1688,6 +1739,8 @@ export interface ToolBridgeOptions {
   sandboxReadOnly?: boolean;
   /** Phase B1: session-granted sandbox network domains, seeds the Bash escalation loop. */
   sandboxAllowedDomains?: string[];
+  /** Foreground Bash auto-background threshold in ms (default 60s; 0 disables). */
+  bashAutoBackgroundMs?: number;
 }
 
 /**

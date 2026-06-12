@@ -15,6 +15,18 @@ export interface BashRunOptions {
   stdin?: string;
   /** Extra env vars merged over process.env (non-sandbox path only). */
   extraEnv?: Record<string, string>;
+  /**
+   * When set and the command is still running after this many ms, resolve early
+   * with a `handoff` instead of waiting: the kill timeout and abort listener are
+   * disarmed and the caller takes over the live child (auto-background).
+   */
+  autoBackgroundMs?: number;
+}
+
+export interface BashHandoff {
+  child: ChildProcess;
+  /** Remove the runner's stdio listeners so the adopter can attach its own. */
+  detach(): void;
 }
 
 export interface BashRunResult {
@@ -27,6 +39,8 @@ export interface BashRunResult {
   durationMs: number;
   /** stderr captured separately (merged output unchanged), capped at 64KB. */
   stderrOutput: string;
+  /** Present when the run was handed off at autoBackgroundMs; the child is still alive. */
+  handoff?: BashHandoff;
 }
 
 const DEFAULT_MAX_LINES = 2000;
@@ -162,8 +176,7 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     let aborted = false;
 
     const onData = (chunk: Buffer) => { full += chunk.toString('utf8'); onChunk?.(full); };
-    child.stdout?.on('data', onData);
-    child.stderr?.on('data', (chunk: Buffer) => {
+    const onStderrData = (chunk: Buffer) => {
       const text = chunk.toString('utf8');
       if (stderrBytes < STDERR_CAPTURE_LIMIT) {
         stderrChunks.push(text);
@@ -171,7 +184,9 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       }
       full += text;
       onChunk?.(full);
-    });
+    };
+    child.stdout?.on('data', onData);
+    child.stderr?.on('data', onStderrData);
 
     let timer: NodeJS.Timeout | undefined;
     if (timeoutSec > 0) {
@@ -180,9 +195,36 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     const onAbort = () => { aborted = true; if (child.pid) killProcessTree(child.pid); };
     if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
+    let handedOff = false;
+    let handoffTimer: NodeJS.Timeout | undefined;
+    if (opts.autoBackgroundMs && opts.autoBackgroundMs > 0) {
+      handoffTimer = setTimeout(() => {
+        handedOff = true;
+        // Disarm the kill timeout and abort listener: the child now belongs to
+        // the adopter (background task) and must not die with this call.
+        if (timer) clearTimeout(timer);
+        if (signal) signal.removeEventListener('abort', onAbort);
+        const { display, truncated } = truncateTail(full, maxLines, maxBytes);
+        resolve({
+          exitCode: null, output: display, fullOutput: full, truncated,
+          timedOut: false, aborted: false, durationMs: Date.now() - startedAt,
+          stderrOutput: stderrChunks.join(''),
+          handoff: {
+            child,
+            detach: () => {
+              child.stdout?.off('data', onData);
+              child.stderr?.off('data', onStderrData);
+            },
+          },
+        });
+      }, opts.autoBackgroundMs);
+    }
+
     const finish = (exitCode: number | null) => {
       if (timer) clearTimeout(timer);
+      if (handoffTimer) clearTimeout(handoffTimer);
       if (signal) signal.removeEventListener('abort', onAbort);
+      if (handedOff) return; // already resolved with a handoff; adopter owns the child
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
       resolve({ exitCode, output: display, fullOutput: full, truncated, timedOut, aborted, durationMs: Date.now() - startedAt, stderrOutput: stderrChunks.join('') });
     };
