@@ -81,14 +81,18 @@ export function recordContextUsage(sessionId: string, usage: ContextSnapshotUsag
 }
 
 export function getContextSnapshot(sessionId: string): ContextSnapshot | undefined {
-  return snapshots.get(sessionId);
+  // Shallow copy: the store object is mutated by recordContextUsage; callers
+  // get a stable view as of the call.
+  const snapshot = snapshots.get(sessionId);
+  return snapshot ? { ...snapshot } : undefined;
 }
 
 export function computeContextUsage(snapshot: ContextSnapshot): ContextUsagePayload {
   const estimateSum = snapshot.systemPromptTokens + snapshot.toolTokens + snapshot.skillCatalogTokens;
-  const fromUsage = snapshot.lastUsage !== undefined;
-  const usedTokens = fromUsage
-    ? snapshot.lastUsage!.input + snapshot.lastUsage!.cacheRead
+  const lastUsage = snapshot.lastUsage;
+  const fromUsage = lastUsage !== undefined;
+  const usedTokens = lastUsage !== undefined
+    ? lastUsage.input + lastUsage.cacheRead
     : estimateSum;
   const rawResidual = usedTokens - estimateSum;
   const freeTokens = Math.max(0, snapshot.contextWindow - usedTokens);
