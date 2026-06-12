@@ -5,7 +5,7 @@ import { useSupervisionStore } from '../../stores/supervisionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { activatePanel } from '../../utils/openPanel';
 import * as api from '../../services/api';
-import type { CommandExecuteResponse, SlashCommand, Session, Project, MessageRole } from '@zclaudia/shared';
+import type { CommandExecuteResponse, SlashCommand, Session, Project, MessageRole, MessageMetadata } from '@zclaudia/shared';
 
 interface UseCommandHandlerParams {
   sessionId: string;
@@ -14,7 +14,7 @@ interface UseCommandHandlerParams {
   currentProject: Project | null | undefined;
   isForcedPlanSession: boolean;
   mode: string;
-  addMessage: (sessionId: string, message: { id: string; clientMessageId?: string; sessionId: string; role: MessageRole; content: string; createdAt: number }) => void;
+  addMessage: (sessionId: string, message: { id: string; clientMessageId?: string; sessionId: string; role: MessageRole; content: string; metadata?: MessageMetadata; createdAt: number }) => void;
   clearMessages: (sessionId: string) => void;
   scrollToBottom: () => void;
   startRun: (msg: {
@@ -288,6 +288,44 @@ export function useCommandHandler({
         content: sections,
         createdAt: Date.now(),
       });
+      return;
+    }
+
+    // Handle /context locally — fetch the server-side context snapshot and
+    // render it as a ContextUsageCard via a synthetic system message.
+    if (command === '/context') {
+      try {
+        const result = await api.getSessionContextUsage(sessionId);
+        if (!result.available) {
+          addMessage(sessionId, {
+            id: crypto.randomUUID(),
+            sessionId,
+            role: 'system',
+            content: 'No context data yet — send a message first, then try /context again.',
+            createdAt: Date.now(),
+          });
+        } else {
+          const { available: _available, ...contextUsage } = result;
+          addMessage(sessionId, {
+            id: crypto.randomUUID(),
+            sessionId,
+            role: 'system',
+            // Fallback text for clients that don't know the metadata sentinel.
+            content: 'Context window usage',
+            metadata: { contextUsage },
+            createdAt: Date.now(),
+          });
+        }
+      } catch (err) {
+        addMessage(sessionId, {
+          id: crypto.randomUUID(),
+          sessionId,
+          role: 'system',
+          content: `Failed to get context usage: ${(err as Error).message}`,
+          createdAt: Date.now(),
+        });
+      }
+      setTimeout(() => scrollToBottom(), 100);
       return;
     }
 
