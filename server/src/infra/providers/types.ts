@@ -56,6 +56,8 @@ export interface RunOptions {
   images?: Array<{ name: string; mimeType: string; data: string }>;
   /** Resolved user hooks for PreToolUse / PostToolUse lifecycle. */
   userHooks?: import('@zclaudia/shared/interaction/user-hooks').UserHookDefinition[];
+  /** Per-project memory directory (absent = memory feature disabled for this run). */
+  memoryDir?: string;
 }
 
 /** Agent runtime adapter interface. */

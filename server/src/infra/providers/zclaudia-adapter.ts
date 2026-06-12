@@ -432,6 +432,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       permissionCallback: onPermission,
       sandboxReadOnly: isPlanMode,
       sandboxAllowedDomains,
+      memoryDir: options.memoryDir,
     });
     if (options.externalToolState) {
       for (const ref of options.externalToolState.loadedExternalTools) {

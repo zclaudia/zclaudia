@@ -29,6 +29,7 @@ import { createEnterPlanModeTool, createExitPlanModeTool } from './mode-tools.js
 import { createEnterWorktreeTool, createExitWorktreeTool } from './worktree-tools.js';
 import { createAgentTool, createMonitorTool, createTaskOutputTool } from './task-tools.js';
 import { createBashBridgeTool } from './bash-tool.js';
+import { createMemoryTool } from './memory-tool.js';
 export { ALL_TOOL_NAMES, type ToolName };
 
 function toolParams(first: unknown, second: unknown): Record<string, unknown> {
@@ -104,6 +105,7 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   ExitWorktree: (cwd, options) => createExitWorktreeTool(cwd, options),
   EnterPlanMode: (cwd, options) => createEnterPlanModeTool(cwd, options),
   ExitPlanMode: (cwd, options) => createExitPlanModeTool(cwd, options),
+  Memory: (_cwd, options) => createMemoryTool({ memoryDir: options!.memoryDir! }),
 };
 
 export interface ToolBridgeOptions {
@@ -150,6 +152,8 @@ export interface ToolBridgeOptions {
   bashAutoBackgroundMs?: number;
   /** Shared per-run guard against repeated identical failed/no-op edits. */
   noopGuard?: NoopEditGuard;
+  /** Per-project memory directory; absent = Memory tool disabled (e.g. sessions without a project, subagent tasks). */
+  memoryDir?: string;
 }
 
 /**
@@ -188,6 +192,7 @@ export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<
       console.warn(`[buildTools] Unknown tool name skipped: ${requestedName}`);
       continue;
     }
+    if (name === 'Memory' && !effectiveOptions.memoryDir) continue;
     const override = overrides.get(name);
     if (override) {
       result.push(withConditionalSkillActivation(withToolName(override, name, override.label ?? name), name, cwd));
