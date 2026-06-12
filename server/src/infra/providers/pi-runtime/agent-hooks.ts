@@ -5,8 +5,16 @@ import { truncateHead, truncateTail, DEFAULT_MAX_LINES, type TruncationResult } 
 import type { PermissionCallback } from '../types.js';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
+import { measureTextBytes, persistToolResultText } from './tool-result-store.js';
 
 export const DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
+
+/** Per-turn budget for cumulative tool-result text; overflow goes to disk. */
+export const DEFAULT_TURN_BUDGET_BYTES = 192 * 1024;
+/** Results below this size always stay inline, even over budget. */
+const PERSIST_MIN_BYTES = 4 * 1024;
+/** Inline preview size for a persisted result. */
+const PERSIST_PREVIEW_BYTES = 1024;
 
 /**
  * Tools whose output is more useful from the head (file reads, listings, search hits).
@@ -68,6 +76,9 @@ export interface AgentHooksInput {
   abortSignal?: AbortSignal;
   /** Output truncation limit in bytes. Default: 64 KiB. */
   outputTruncationLimit?: number;
+  /** Per-turn cumulative tool-result budget in bytes (default 192 KiB; 0 disables).
+   *  Once exceeded, large results are persisted to disk with an inline preview. */
+  toolResultBudgetBytes?: number;
   /** Architectural placeholders for future sub-projects. */
   transformContext?: AgentLoopConfig['transformContext'];
   /** Stream function for the agent loop. Note: pi accepts this as a separate argument to
@@ -147,6 +158,8 @@ export function truncateContent(
 
 export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
   const limit = input.outputTruncationLimit ?? DEFAULT_OUTPUT_LIMIT_BYTES;
+  const turnBudgetBytes = input.toolResultBudgetBytes ?? DEFAULT_TURN_BUDGET_BYTES;
+  let turnSpentBytes = 0;
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,10 +222,49 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         }
       }
       const truncated = truncateContent(content, toolName, limit);
+      const finalContent = truncated.didTruncate ? truncated.content : content;
+      const finalSize = measureTextBytes(finalContent);
+
+      // Per-turn budget: once cumulative tool-result text exceeds the budget,
+      // large results move to disk and only a preview plus the file path stays
+      // in context (the model can Read the file back when it needs the rest).
+      if (turnBudgetBytes > 0
+        && finalSize > PERSIST_MIN_BYTES
+        && turnSpentBytes + finalSize > turnBudgetBytes) {
+        const persisted = persistToolResultText(toolName, content);
+        if (persisted) {
+          const direction = selectTruncDirection(toolName);
+          const previewFn = direction === 'head' ? truncateHead : truncateTail;
+          const previewSource = content
+            .filter((block: { type: string; text?: string }) => block.type === 'text' && typeof block.text === 'string')
+            .map((block: { text?: string }) => block.text as string)
+            .join('\n');
+          const preview = previewFn(previewSource, { maxBytes: PERSIST_PREVIEW_BYTES, maxLines: DEFAULT_MAX_LINES });
+          const note = `[Tool result (${persisted.size} bytes) exceeded this turn's context budget and was saved to `
+            + `${persisted.filePath} — Read that file if you need the full output. Preview (${direction}):]\n${preview.content}`;
+          const replacement = [
+            ...content.filter((block: { type: string }) => block.type !== 'text'),
+            { type: 'text', text: note },
+          ];
+          turnSpentBytes += measureTextBytes(replacement);
+          return {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            content: replacement as any,
+            details: {
+              ...(result.details ?? {}),
+              budgetExceeded: true,
+              persistedPath: persisted.filePath,
+              originalSize: persisted.size,
+            },
+          };
+        }
+      }
+      turnSpentBytes += finalSize;
+
       if (!truncated.didTruncate && !hookAppended) return undefined;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        content: (truncated.didTruncate ? truncated.content : content) as any,
+        content: finalContent as any,
         details: truncated.didTruncate
           ? { ...(result.details ?? {}), truncated: true, originalSize: truncated.originalSize }
           : result.details,
@@ -220,6 +272,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
     },
 
     shouldStopAfterTurn: async () => {
+      turnSpentBytes = 0;
       return input.abortSignal?.aborted ?? false;
     },
 
