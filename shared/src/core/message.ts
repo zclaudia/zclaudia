@@ -106,15 +106,14 @@ export interface ContextUsageBreakdownEntry {
   estimated: boolean;
 }
 
-/**
- * One category in the /context breakdown. Residual: usedTokens − (systemPrompt + tools + skills),
- * clamped ≥ 0. `clamped` is true when the raw residual was negative (estimate overshoot),
- * so the UI can flag estimation error.
- */
+/** Per-category composition of the context window for the /context card. */
 export interface ContextUsageBreakdown {
   systemPrompt: ContextUsageBreakdownEntry;
   tools: ContextUsageBreakdownEntry & { count: number };
   skills: ContextUsageBreakdownEntry;
+  /** Residual: usedTokens − (systemPrompt + tools + skills), clamped ≥ 0.
+   *  `clamped` is true when the raw residual was negative (estimate
+   *  overshoot), so the UI can flag estimation error. */
   messages: ContextUsageBreakdownEntry & { clamped: boolean };
   freeSpace: { tokens: number; percent: number };
 }
