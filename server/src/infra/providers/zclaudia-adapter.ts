@@ -150,6 +150,21 @@ function extractErrorStop(messages: AgentMessage[]): string | undefined {
 }
 
 /**
+ * Usage of the LAST assistant message that carries a usage block.
+ *
+ * Context-window occupancy is a point-in-time property of the final LLM call
+ * in a turn (its input + cacheRead IS the occupied window). Do not confuse
+ * with extractUsage, which sums across the turn for cost accounting.
+ */
+function extractLastCallUsage(messages: AgentMessage[]): Partial<Usage> | undefined {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i] as { role?: string; usage?: Partial<Usage> };
+    if (msg.role === 'assistant' && msg.usage) return msg.usage;
+  }
+  return undefined;
+}
+
+/**
  * Sum usage across all assistant messages in an `agent_end` payload.
  *
  * A tool-using turn yields multiple assistant messages (one per LLM call); each carries
@@ -254,7 +269,7 @@ export function resolvePlanModeTools(
   return requestedTools.filter((t) => allowed.has(t));
 }
 
-export const __testables = { AsyncQueue, buildModel, translateEvent, extractErrorStop };
+export const __testables = { AsyncQueue, buildModel, translateEvent, extractErrorStop, extractLastCallUsage };
 
 export class ZClaudiaAdapter implements ProviderAdapter {
   readonly type = 'zclaudia';
@@ -471,6 +486,7 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     // separately from the base prompt; the external provider catalog and the
     // plan-mode suffix ride with the base prompt. Keyed by the zclaudia
     // session id (what the desktop knows), not the adapter-local sessionId.
+    // The estimate intentionally omits the catalog boilerplate/separators baseSystemPrompt adds (~tens of tokens; noise for a chars/4 estimate).
     if (options.claudiaSessionId) {
       captureContextSnapshot({
         sessionId: options.claudiaSessionId,
@@ -570,12 +586,15 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         const usage = extractUsage(messages);
 
         if (options.claudiaSessionId) {
-          recordContextUsage(options.claudiaSessionId, {
-            input: usage.input,
-            output: usage.output,
-            cacheRead: usage.cacheRead,
-            cacheWrite: usage.cacheWrite,
-          });
+          const lastCallUsage = extractLastCallUsage(messages);
+          if (lastCallUsage) {
+            recordContextUsage(options.claudiaSessionId, {
+              input: lastCallUsage.input ?? 0,
+              output: lastCallUsage.output ?? 0,
+              cacheRead: lastCallUsage.cacheRead ?? 0,
+              cacheWrite: lastCallUsage.cacheWrite ?? 0,
+            });
+          }
         }
 
         // Surface LLM-level errors that pi-agent-core's loop quietly absorbs

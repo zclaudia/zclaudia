@@ -129,7 +129,7 @@ function scriptNextAgent(events: AgentEvent[], options?: { rejectWith?: Error; w
   scriptQueue.push({ events, rejectWith: options?.rejectWith, waitForPromise: options?.waitForPromise });
 }
 
-const { AsyncQueue, buildModel, translateEvent, extractErrorStop } = __testables;
+const { AsyncQueue, buildModel, translateEvent, extractErrorStop, extractLastCallUsage } = __testables;
 
 function createTestDb(): Database.Database {
   const db = new Database(':memory:');
@@ -249,6 +249,43 @@ describe('extractErrorStop', () => {
   it('returns undefined for empty / no-assistant message list', () => {
     expect(extractErrorStop([])).toBeUndefined();
     expect(extractErrorStop([{ role: 'user', content: 'hi', timestamp: 0 } as any])).toBeUndefined();
+  });
+});
+
+describe('extractLastCallUsage', () => {
+  it('returns the LAST assistant message usage on a multi-call turn', () => {
+    const messages = [
+      { role: 'assistant', content: [], usage: { input: 1000, output: 100, cacheRead: 0, cacheWrite: 0, totalTokens: 1100 }, timestamp: 0 } as any,
+      { role: 'tool', content: [], timestamp: 0 } as any,
+      { role: 'assistant', content: [], usage: { input: 1200, output: 80, cacheRead: 300, cacheWrite: 0, totalTokens: 1580 }, timestamp: 0 } as any,
+    ];
+    const result = extractLastCallUsage(messages);
+    expect(result).toMatchObject({ input: 1200, cacheRead: 300 });
+    // Must NOT be the first assistant message's usage
+    expect(result?.input).not.toBe(1000);
+  });
+
+  it('skips assistant messages without a usage block and returns an earlier one that has it', () => {
+    const messages = [
+      { role: 'assistant', content: [], usage: { input: 500, output: 50, cacheRead: 10, cacheWrite: 0, totalTokens: 560 }, timestamp: 0 } as any,
+      { role: 'tool', content: [], timestamp: 0 } as any,
+      // Last assistant message has no usage block
+      { role: 'assistant', content: [{ type: 'text', text: 'done' }], timestamp: 0 } as any,
+    ];
+    const result = extractLastCallUsage(messages);
+    expect(result).toMatchObject({ input: 500, cacheRead: 10 });
+  });
+
+  it('returns undefined when no assistant message carries a usage block', () => {
+    const messages = [
+      { role: 'user', content: 'hi', timestamp: 0 } as any,
+      { role: 'assistant', content: [{ type: 'text', text: 'hello' }], timestamp: 0 } as any,
+    ];
+    expect(extractLastCallUsage(messages)).toBeUndefined();
+  });
+
+  it('returns undefined for an empty message list', () => {
+    expect(extractLastCallUsage([])).toBeUndefined();
   });
 });
 
