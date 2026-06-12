@@ -13,6 +13,9 @@
 
 import { newId } from '../../../utils/uuid.js';
 import http from 'http';
+import type { initDatabase } from '../../../infra/storage/db.js';
+import { SessionRepository } from '../../../domains/sessions/repository.js';
+import { enterPlanMode as applyEnterPlanMode, exitPlanMode as applyExitPlanMode } from '../../../domains/sessions/plan-mode-toggle.js';
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { interactionDispatcher } from './interaction-dispatcher.js';
 import { normalizeTodoItems } from './todo-normalizer.js';
@@ -21,6 +24,8 @@ import type { TodoUpdateInteractionMessage, InteractionPromptMessage, ApprovalIn
 
 export interface InteractionToolsConfig {
   getServerPort: () => number | null;
+  /** Database accessor; enables plan-mode tools to enforce read-only via plan_status. */
+  getDb?: () => ReturnType<typeof initDatabase>;
 }
 
 /** HTTP POST to self (localhost) — reuses existing route handlers. */
@@ -310,14 +315,27 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
       type: 'function',
       function: {
         name: 'enter_plan_mode',
-        description: 'Enter plan mode to analyze and plan before executing. Use this when the task is complex and you want to create a thorough plan before making changes. In plan mode, only use read-only tools (read files, search, etc.) — do not modify files until the plan is approved.',
+        description: 'Enter plan mode to analyze and plan before executing. Use this when the task is complex and you want to create a thorough plan before making changes. From your next turn on, only read-only tools are available — produce the plan, then call exit_plan_mode for the user to approve before any changes are made.',
         parameters: {
           type: 'object',
           properties: {},
         },
       },
     },
-    handler: async () => {
+    handler: async (_args, context) => {
+      const sessionId = (context?.sessionId as string) || '';
+      const db = config?.getDb?.();
+      if (db && sessionId) {
+        const result = applyEnterPlanMode(new SessionRepository(db), sessionId);
+        if (!result.ok) {
+          return JSON.stringify({ entered: false, error: result.error });
+        }
+        return JSON.stringify({
+          entered: true,
+          alreadyActive: result.alreadyActive ?? false,
+          note: 'Read-only enforcement applies from your next turn. Finish planning this turn, then call exit_plan_mode.',
+        });
+      }
       return JSON.stringify({ entered: true });
     },
   });
@@ -377,6 +395,12 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
           ? response.feedback.trim()
           : 'Plan rejected by user';
         throw new Error(feedback);
+      }
+      // Plan approved: lift read-only enforcement so execution can proceed.
+      const db = config?.getDb?.();
+      if (db && sessionId) {
+        try { applyExitPlanMode(new SessionRepository(db), sessionId); }
+        catch (err) { console.warn('[exit_plan_mode] failed to clear plan status:', err); }
       }
       return JSON.stringify(response);
     },

@@ -78,11 +78,13 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
     console.log('[@ Mention] Processed input:', mentionProcessed);
   }
 
-  const forcedPlanBySession = session.project_role === 'task' && session.plan_status === 'planning';
+  // A session in planning status runs read-only — whether opened for planning
+  // by supervision (task role) or switched in by the model via enter_plan_mode.
+  const forcedPlanBySession = session.plan_status === 'planning';
   const requestedMode = message.mode || 'default';
   const modeValue = forcedPlanBySession ? 'plan' : requestedMode;
   if (forcedPlanBySession && modeValue !== requestedMode) {
-    console.log(`[Mode] Forced plan mode for task planning session ${message.sessionId}`);
+    console.log(`[Mode] Forced plan mode for planning session ${message.sessionId}`);
   }
 
   const permissionCallback = createPermissionCallback({
