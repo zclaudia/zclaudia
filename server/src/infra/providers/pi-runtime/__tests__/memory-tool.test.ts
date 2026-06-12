@@ -11,7 +11,7 @@ function run(params: Record<string, unknown>) {
   return (tool as any).execute('tc-1', params);
 }
 
-/** 取工具结果的文本内容 */
+/** Extract the text content from a tool result */
 function text(result: { content: Array<{ type: string; text?: string }> }): string {
   return result.content.filter((b) => b.type === 'text').map((b) => b.text).join('\n');
 }
@@ -97,5 +97,20 @@ describe('Memory tool', () => {
     const result = await run({ command: 'view', path: '/memories/link.md' });
     expect((result.details as any).error).toBe('symlink_not_allowed');
     fs.rmSync(outside, { force: true });
+  });
+
+  it('view on the root before any create returns an empty listing, not an error', async () => {
+    fs.rmdirSync(memoryDir);
+    const result = await run({ command: 'view', path: '/memories' });
+    expect((result.details as any).ok).toBe(true);
+    expect(text(result)).toContain('no memories yet');
+  });
+
+  it('rejects dangling symlinks (create must not write through them)', async () => {
+    const outside = path.join(os.tmpdir(), `zclaudia-dangling-${Date.now()}.md`);
+    fs.symlinkSync(outside, path.join(memoryDir, 'dangling.md'));
+    const result = await run({ command: 'create', path: '/memories/dangling.md', file_text: 'x' });
+    expect((result.details as any).error).toBe('symlink_not_allowed');
+    expect(fs.existsSync(outside)).toBe(false);
   });
 });

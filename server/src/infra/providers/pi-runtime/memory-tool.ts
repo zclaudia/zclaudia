@@ -19,6 +19,15 @@ Conventions: one fact per markdown file with a one-line "description:" frontmatt
 type Resolved = { abs: string };
 type ResolveFailure = { error: { code: string; message: string } };
 
+/** Walk up from abs toward root, returning the nearest ancestor that already exists on disk. */
+function nearestExistingAncestor(root: string, abs: string): string {
+  let p = path.dirname(abs);
+  while (p !== root && p.startsWith(root + path.sep) && !fs.existsSync(p)) {
+    p = path.dirname(p);
+  }
+  return p;
+}
+
 function resolveVirtualPath(memoryDir: string, raw: unknown): Resolved | ResolveFailure {
   if (typeof raw !== 'string' || !raw.trim()) {
     return { error: { code: 'invalid_path', message: `path is required and must start with ${VIRTUAL_ROOT}/` } };
@@ -33,18 +42,14 @@ function resolveVirtualPath(memoryDir: string, raw: unknown): Resolved | Resolve
   if (abs !== root && !abs.startsWith(root + path.sep)) {
     return { error: { code: 'path_escape', message: 'path escapes the memory directory' } };
   }
-  if (fs.existsSync(abs) && fs.lstatSync(abs).isSymbolicLink()) {
+  const lst = fs.lstatSync(abs, { throwIfNoEntry: false });
+  if (lst?.isSymbolicLink()) {
     return { error: { code: 'symlink_not_allowed', message: 'symlinks are not allowed in memory' } };
   }
-  // Guard against symlinked intermediate directories (only when abs is strictly inside root).
+  // Guard against symlinked intermediate directories: an intermediate dir replaced by a symlink
+  // would redirect mkdirSync/writeFileSync outside the root (only when abs is strictly inside root).
   if (abs !== root) {
-    const existingParent = (() => {
-      let p = path.dirname(abs);
-      while (p !== root && p.startsWith(root + path.sep) && !fs.existsSync(p)) {
-        p = path.dirname(p);
-      }
-      return p;
-    })();
+    const existingParent = nearestExistingAncestor(root, abs);
     if (existingParent !== root && existingParent.startsWith(root + path.sep) && fs.existsSync(existingParent)) {
       const realParent = fs.realpathSync(existingParent);
       const realRoot = fs.existsSync(root) ? fs.realpathSync(root) : root;
@@ -118,12 +123,18 @@ export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
             const target = args.path === undefined ? VIRTUAL_ROOT : args.path;
             const resolved = resolveVirtualPath(memoryDir, target);
             if (isFailure(resolved)) return errorResult(resolved.error.code, resolved.error.message);
-            if (!fs.existsSync(resolved.abs)) return errorResult('not_found', `${String(target)} does not exist`);
+            const isRoot = resolved.abs === path.resolve(memoryDir);
+            if (!fs.existsSync(resolved.abs)) {
+              if (isRoot) return textResult(listFiles(resolved.abs), { ok: true, kind: 'directory' });
+              return errorResult('not_found', `${String(target)} does not exist`);
+            }
             if (fs.statSync(resolved.abs).isDirectory()) {
               return textResult(truncateText(listFiles(resolved.abs)), { ok: true, kind: 'directory' });
             }
-            const range = Array.isArray(args.view_range) && args.view_range.length === 2
-              ? [Number(args.view_range[0]), Number(args.view_range[1])] as [number, number]
+            const vr = args.view_range;
+            const range = Array.isArray(vr) && vr.length === 2
+              && Number.isInteger(Number(vr[0])) && Number.isInteger(Number(vr[1]))
+              ? [Number(vr[0]), Number(vr[1])] as [number, number]
               : undefined;
             return textResult(truncateText(numberedLines(fs.readFileSync(resolved.abs, 'utf8'), range)), { ok: true, kind: 'file' });
           }
