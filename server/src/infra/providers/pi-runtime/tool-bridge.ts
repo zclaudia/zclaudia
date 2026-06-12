@@ -105,6 +105,8 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   ExitWorktree: (cwd, options) => createExitWorktreeTool(cwd, options),
   EnterPlanMode: (cwd, options) => createEnterPlanModeTool(cwd, options),
   ExitPlanMode: (cwd, options) => createExitPlanModeTool(cwd, options),
+  // The buildTools loop skips Memory when memoryDir is absent, so the
+  // assertions are safe at this callsite; createMemoryTool also fail-fasts.
   Memory: (_cwd, options) => createMemoryTool({ memoryDir: options!.memoryDir! }),
 };
 

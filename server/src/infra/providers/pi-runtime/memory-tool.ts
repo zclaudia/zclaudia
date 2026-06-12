@@ -89,6 +89,10 @@ function numberedLines(content: string, range?: [number, number]): string {
 }
 
 export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
+  if (!options.memoryDir) {
+    // An empty memoryDir would resolve the /memories root to process cwd — refuse loudly.
+    throw new Error('createMemoryTool requires a non-empty memoryDir');
+  }
   const { memoryDir } = options;
   return {
     name: 'Memory',
