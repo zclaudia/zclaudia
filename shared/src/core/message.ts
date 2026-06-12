@@ -72,6 +72,12 @@ export interface MessageMetadata {
    * session_compactions table and interleaves by createdAt.
    */
   compactionMarker?: CompactionMarker;
+  /**
+   * Set on synthetic, frontend-only system messages produced by the /context
+   * command. MessageList renders a ContextUsageCard instead of the default
+   * system bubble. Never persisted.
+   */
+  contextUsage?: ContextUsagePayload;
 }
 
 /**
@@ -89,6 +95,47 @@ export interface CompactionMarker {
   readFiles: string[];
   modifiedFiles: string[];
   createdAt: number;
+}
+
+/**
+ * One category row in the /context breakdown. `estimated` marks chars/4
+ * estimates (vs values derived from real usage).
+ */
+export interface ContextUsageBreakdownEntry {
+  tokens: number;
+  estimated: boolean;
+}
+
+/**
+ * Payload for the `/context` command card. Attached to a synthetic,
+ * frontend-only system message via `metadata.contextUsage`; never persisted.
+ * Produced by the server from the per-run context snapshot
+ * (see server `infra/providers/context-snapshot.ts`).
+ */
+export interface ContextUsagePayload {
+  model: string;
+  /** Effective context window in tokens. */
+  contextWindow: number;
+  /** Same vocabulary as wire `ContextWindowSource`:
+   *  'profile_entry' | 'pi_ai_registry' | 'openai_compat_default' | 'fallback'.
+   *  Typed as string here because core/ cannot import wire/ (layering). */
+  contextWindowSource: string;
+  /** Real occupancy (lastUsage.input + cacheRead) when available; falls back
+   *  to the estimate sum when the first run hasn't completed yet. */
+  usedTokens: number;
+  /** True when usedTokens comes from real usage rather than estimates. */
+  usedTokensFromUsage: boolean;
+  breakdown: {
+    systemPrompt: ContextUsageBreakdownEntry;
+    tools: ContextUsageBreakdownEntry & { count: number };
+    skills: ContextUsageBreakdownEntry;
+    /** Residual: usedTokens − (systemPrompt + tools + skills), clamped ≥ 0.
+     *  `clamped` is true when the raw residual was negative (estimate
+     *  overshoot), so the UI can flag estimation error. */
+    messages: ContextUsageBreakdownEntry & { clamped: boolean };
+    freeSpace: { tokens: number; percent: number };
+  };
+  capturedAt: number;
 }
 
 export interface FilePushMetadata {

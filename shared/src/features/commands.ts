@@ -18,6 +18,7 @@ export const LOCAL_COMMANDS: SlashCommand[] = [
   { command: '/model', description: 'Show current model/provider info', source: 'local' },
   { command: '/status', description: 'Show system status', source: 'local' },
   { command: '/cost', description: 'Show token usage', source: 'local' },
+  { command: '/context', description: 'Show context window usage', source: 'local' },
   { command: '/config', description: 'Open settings', source: 'local' },
   { command: '/new-session', description: 'Create new session', source: 'local' },
   { command: '/reload', description: 'Reload custom commands', source: 'local' },
