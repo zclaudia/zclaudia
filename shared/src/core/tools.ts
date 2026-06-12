@@ -23,6 +23,8 @@ export const ALL_TOOL_NAMES = [
   'AstEdit',
   'EnterWorktree',
   'ExitWorktree',
+  'EnterPlanMode',
+  'ExitPlanMode',
 ] as const;
 
 export type ToolName = typeof ALL_TOOL_NAMES[number];
@@ -150,6 +152,10 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   'TaskOutput',
   'LSPTool',
   'AstGrep',
+  // Plan-mode tools must survive the plan-mode read-only filter so the model
+  // can always enter/exit; they mutate session state, not workspace files.
+  'EnterPlanMode',
+  'ExitPlanMode',
 ];
 
 export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
@@ -417,13 +423,35 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresUserInteraction: false,
     riskLevel: 'medium',
   },
+  EnterPlanMode: {
+    ref: { source: 'builtin', name: 'EnterPlanMode' },
+    label: 'EnterPlanMode',
+    description: 'Switch the session into read-only plan mode.',
+    setIds: ['core-coding'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  ExitPlanMode: {
+    ref: { source: 'builtin', name: 'ExitPlanMode' },
+    label: 'ExitPlanMode',
+    description: 'Leave plan mode (optionally presenting a plan for approval) and resume execution.',
+    setIds: ['core-coding'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: true,
+    riskLevel: 'low',
+  },
 };
 
 export const BUILTIN_TOOL_SETS = {
   'core-coding': {
     id: 'core-coding',
     label: 'Core Coding',
-    tools: ['Read', 'Write', 'Edit', 'Bash', 'Eval', 'Grep', 'Glob', 'LS'],
+    tools: ['Read', 'Write', 'Edit', 'Bash', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode'],
   },
   interaction: {
     id: 'interaction',

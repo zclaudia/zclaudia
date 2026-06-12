@@ -31,7 +31,7 @@ describe('ensureDefaultAgentProfile', () => {
       include: [],
       exclude: [],
     });
-    expect(agents[0].enabledTools).toEqual(['Read', 'Write', 'Edit', 'Bash', 'Eval', 'Grep', 'Glob', 'LS']);
+    expect(agents[0].enabledTools).toEqual(['Read', 'Write', 'Edit', 'Bash', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode']);
     log.mockRestore();
   });
 

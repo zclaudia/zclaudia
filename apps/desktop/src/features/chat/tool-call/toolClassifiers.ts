@@ -48,6 +48,7 @@ function isPlanModeTool(toolName: string, semantic?: ToolSemantic): boolean {
   if (semantic === 'plan_enter' || semantic === 'plan_exit' || semantic === 'plan_proposal') {
     return true;
   }
+  if (toolName === 'EnterPlanMode' || toolName === 'ExitPlanMode') return true;
   return hasInteractionToolSuffix(toolName, 'enter_plan_mode')
     || hasInteractionToolSuffix(toolName, 'exit_plan_mode');
 }
@@ -57,6 +58,7 @@ function isPlanModeTool(toolName: string, semantic?: ToolSemantic): boolean {
 // provider-specific names like `ExitPlanMode` or `createPlan`.
 function isPlanProposalTool(toolName: string, semantic?: ToolSemantic): boolean {
   if (semantic === 'plan_proposal') return true;
+  if (toolName === 'ExitPlanMode') return true;
   return hasInteractionToolSuffix(toolName, 'exit_plan_mode');
 }
 

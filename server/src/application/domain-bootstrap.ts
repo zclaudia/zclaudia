@@ -166,7 +166,6 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
 
   registerInteractionTools({
     getServerPort,
-    getDb: () => db,
   });
 
   registerAgentTools({

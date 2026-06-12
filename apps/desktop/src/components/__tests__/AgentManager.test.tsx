@@ -223,7 +223,7 @@ describe('AgentManager', () => {
     expect(screen.getByText('System Prompt')).toBeInTheDocument();
     expect(screen.getByText('Tool Sets')).toBeInTheDocument();
     expect(screen.getByText('Core Coding')).toBeInTheDocument();
-    expect(screen.getByText('7 tools')).toBeInTheDocument();
+    expect(screen.getByText('10 tools')).toBeInTheDocument();
     expect(screen.queryByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeNull();
     await clickAsync(screen.getByLabelText('expand tool set core-coding'));
     expect(screen.getByText('Read')).toBeInTheDocument();
@@ -277,13 +277,16 @@ describe('AgentManager', () => {
               { source: 'builtin', name: 'Read' },
               { source: 'builtin', name: 'Write' },
               { source: 'builtin', name: 'Edit' },
+              { source: 'builtin', name: 'Eval' },
               { source: 'builtin', name: 'Grep' },
               { source: 'builtin', name: 'Glob' },
               { source: 'builtin', name: 'LS' },
+              { source: 'builtin', name: 'EnterPlanMode' },
+              { source: 'builtin', name: 'ExitPlanMode' },
             ],
             exclude: [],
           },
-          enabledTools: ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'LS'],
+          enabledTools: ['Read', 'Write', 'Edit', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode'],
           thinkingLevel: 'low',
           isDefault: true,
         })

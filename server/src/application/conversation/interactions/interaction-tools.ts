@@ -13,19 +13,14 @@
 
 import { newId } from '../../../utils/uuid.js';
 import http from 'http';
-import type { initDatabase } from '../../../infra/storage/db.js';
-import { SessionRepository } from '../../../domains/sessions/repository.js';
-import { enterPlanMode as applyEnterPlanMode, exitPlanMode as applyExitPlanMode } from '../../../domains/sessions/plan-mode-toggle.js';
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { interactionDispatcher } from './interaction-dispatcher.js';
 import { normalizeTodoItems } from './todo-normalizer.js';
 import { trackAndAutoComplete } from './todo-state-tracker.js';
-import type { TodoUpdateInteractionMessage, InteractionPromptMessage, ApprovalInteractionMessage, PlanReviewInteractionMessage } from '@zclaudia/shared/interaction/forms';
+import type { TodoUpdateInteractionMessage, InteractionPromptMessage, ApprovalInteractionMessage } from '@zclaudia/shared/interaction/forms';
 
 export interface InteractionToolsConfig {
   getServerPort: () => number | null;
-  /** Database accessor; enables plan-mode tools to enforce read-only via plan_status. */
-  getDb?: () => ReturnType<typeof initDatabase>;
 }
 
 /** HTTP POST to self (localhost) — reuses existing route handlers. */
@@ -305,106 +300,10 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
     },
   });
 
-  // ============================================
-  // enter_plan_mode — fire-and-forget, signals plan mode entry
-  // ============================================
-  toolRegistry.register({
-    id: 'enter_plan_mode',
-    source: 'interaction',
-    definition: {
-      type: 'function',
-      function: {
-        name: 'enter_plan_mode',
-        description: 'Enter plan mode to analyze and plan before executing. Use this when the task is complex and you want to create a thorough plan before making changes. From your next turn on, only read-only tools are available — produce the plan, then call exit_plan_mode for the user to approve before any changes are made.',
-        parameters: {
-          type: 'object',
-          properties: {},
-        },
-      },
-    },
-    handler: async (_args, context) => {
-      const sessionId = (context?.sessionId as string) || '';
-      const db = config?.getDb?.();
-      if (db && sessionId) {
-        const result = applyEnterPlanMode(new SessionRepository(db), sessionId);
-        if (!result.ok) {
-          return JSON.stringify({ entered: false, error: result.error });
-        }
-        return JSON.stringify({
-          entered: true,
-          alreadyActive: result.alreadyActive ?? false,
-          note: 'Read-only enforcement applies from your next turn. Finish planning this turn, then call exit_plan_mode.',
-        });
-      }
-      return JSON.stringify({ entered: true });
-    },
-  });
+  // Plan mode moved to first-class builtin tools (EnterPlanMode / ExitPlanMode
+  // in tool-bridge.ts): the read-only capability is core, and the approval
+  // dialog is folded in as ExitPlanMode's optional `plan` flow (same
+  // interaction_plan_review event, so the UI is unchanged).
 
-  // ============================================
-  // exit_plan_mode — blocks until user approves/denies the plan
-  // ============================================
-  toolRegistry.register({
-    id: 'exit_plan_mode',
-    source: 'interaction',
-    definition: {
-      type: 'function',
-      function: {
-        name: 'exit_plan_mode',
-        description: 'Exit plan mode with a completed plan for user review. The plan will be presented to the user for approval. If approved, you may proceed with execution. If denied, read the feedback and revise your plan.',
-        parameters: {
-          type: 'object',
-          properties: {
-            plan: { type: 'string', description: 'The complete execution plan in markdown format' },
-            allowedPrompts: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  tool: { type: 'string', description: 'Tool name to be used' },
-                  prompt: { type: 'string', description: 'Description of what this tool call will do' },
-                },
-                required: ['tool', 'prompt'],
-              },
-              description: 'List of tool calls the plan intends to make',
-            },
-          },
-          required: ['plan'],
-        },
-      },
-    },
-    handler: async (args, context) => {
-      const sessionId = (context?.sessionId as string) || '';
-      const interactionId = newId();
-
-      const event: PlanReviewInteractionMessage = {
-        type: 'interaction_plan_review',
-        interactionId,
-        sessionId,
-        source: 'tool_call',
-        createdAt: Date.now(),
-        plan: (args.plan as string) || '',
-        allowedPrompts: args.allowedPrompts as PlanReviewInteractionMessage['allowedPrompts'],
-      };
-
-      const response = await interactionDispatcher.dispatchAndWait(interactionId, sessionId, event);
-      if (response.error) {
-        throw new Error(String(response.error));
-      }
-      if (response.approved !== true) {
-        const feedback = typeof response.feedback === 'string' && response.feedback.trim()
-          ? response.feedback.trim()
-          : 'Plan rejected by user';
-        throw new Error(feedback);
-      }
-      // Plan approved: lift read-only enforcement so execution can proceed.
-      const db = config?.getDb?.();
-      if (db && sessionId) {
-        try { applyExitPlanMode(new SessionRepository(db), sessionId); }
-        catch (err) { console.warn('[exit_plan_mode] failed to clear plan status:', err); }
-      }
-      return JSON.stringify(response);
-    },
-  });
-
-  console.log('[InteractionTools] Registered 6 interaction tools: update_todo_list, ask_user_form, request_approval, push_file, enter_plan_mode, exit_plan_mode');
+  console.log('[InteractionTools] Registered 4 interaction tools: update_todo_list, ask_user_form, request_approval, push_file');
 }

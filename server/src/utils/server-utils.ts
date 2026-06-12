@@ -216,8 +216,6 @@ const INTERACTION_TOOL_DESCRIPTIONS: Record<string, string> = {
   ask_user_form: '**ask_user_form**: Present a structured form when you need specific input from the user — multiple fields, choices, or confirmations. The form blocks until the user responds.',
   request_approval: '**request_approval**: Request user approval before proceeding with a destructive, irreversible, or high-impact action. Blocks until the user approves or rejects. The response contains { approved: true/false, reason?: string }.',
   push_file: '**push_file**: Push a local file to the user\'s device. Use this when you build, generate, or export files (images, APKs, binaries, archives, documents, etc.) that the user needs. Images and small files (<500KB) auto-download; larger files show a download notification. Prefer this over curl to push files.',
-  enter_plan_mode: '**enter_plan_mode**: Enter plan mode to analyze and plan before executing. Use for complex multi-step tasks. In plan mode, only use read-only tools.',
-  exit_plan_mode: '**exit_plan_mode**: Exit plan mode with your completed plan for user review. Blocks until the user approves or denies. If denied, read the feedback and revise.',
 };
 
 export function buildInteractionToolPrompt(toolIds: string[]): string {
