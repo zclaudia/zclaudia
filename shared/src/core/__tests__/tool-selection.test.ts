@@ -23,18 +23,26 @@ describe('tool selection resolver', () => {
       'Write',
       'Edit',
       'Bash',
+      'Eval',
       'Grep',
       'Glob',
       'LS',
+      'EnterPlanMode',
+      'ExitPlanMode',
+      'Memory',
     ]);
     expect(resolved.refs.map(toolRefKey)).toEqual([
       'builtin:Read',
       'builtin:Write',
       'builtin:Edit',
       'builtin:Bash',
+      'builtin:Eval',
       'builtin:Grep',
       'builtin:Glob',
       'builtin:LS',
+      'builtin:EnterPlanMode',
+      'builtin:ExitPlanMode',
+      'builtin:Memory',
     ]);
   });
 

@@ -25,6 +25,7 @@ export const ALL_TOOL_NAMES = [
   'ExitWorktree',
   'EnterPlanMode',
   'ExitPlanMode',
+  'Memory',
 ] as const;
 
 export type ToolName = typeof ALL_TOOL_NAMES[number];
@@ -156,6 +157,7 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   // can always enter/exit; they mutate session state, not workspace files.
   'EnterPlanMode',
   'ExitPlanMode',
+  'Memory',
 ];
 
 export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
@@ -445,13 +447,24 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresUserInteraction: true,
     riskLevel: 'low',
   },
+  Memory: {
+    ref: { source: 'builtin', name: 'Memory' },
+    label: 'Memory',
+    description: 'Read and maintain persistent project memory files under /memories (survives across sessions).',
+    setIds: ['core-coding'],
+    declaredReadOnly: false,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
 };
 
 export const BUILTIN_TOOL_SETS = {
   'core-coding': {
     id: 'core-coding',
     label: 'Core Coding',
-    tools: ['Read', 'Write', 'Edit', 'Bash', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode'],
+    tools: ['Read', 'Write', 'Edit', 'Bash', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory'],
   },
   interaction: {
     id: 'interaction',
