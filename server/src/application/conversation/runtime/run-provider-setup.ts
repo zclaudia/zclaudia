@@ -4,6 +4,7 @@ import { resolveImageAttachments, type ResolvedImage } from './resolve-image-att
 import { getFileStore } from '../../../infra/storage/fileStore.js';
 import { createPermissionCallback } from './run-permissions.js';
 import { resolveUserHooks } from './resolve-user-hooks.js';
+import { drainPendingTaskNotices } from './pending-task-notices.js';
 import type { RunStartMessage, RunSessionRecord } from './run-bootstrap.js';
 import type { ActiveRun, ConnectedClient } from '../transport/types.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
@@ -68,7 +69,10 @@ export function prepareProviderRun(input: PrepareProviderRunInput): PreparedProv
   const parsedInput = parseMessageInput(message.input);
   const { images, notices } = resolveImageAttachments(parsedInput.attachments, getFileStore());
   const mentionProcessed = processAtMentions(parsedInput.text, session.root_path);
-  const processedInput = notices.length > 0 ? `${mentionProcessed}\n\n${notices.join('\n')}` : mentionProcessed;
+  // Background tasks that settled while the session was idle surface here.
+  const taskNotices = drainPendingTaskNotices(message.sessionId);
+  const allNotices = [...notices, ...taskNotices];
+  const processedInput = allNotices.length > 0 ? `${mentionProcessed}\n\n${allNotices.join('\n')}` : mentionProcessed;
   console.log('[@ Mention] Original input:', parsedInput.text);
   if (mentionProcessed !== parsedInput.text) {
     console.log('[@ Mention] Processed input:', mentionProcessed);

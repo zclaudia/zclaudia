@@ -7,6 +7,7 @@ import type {
 } from '@zclaudia/shared/core/task';
 
 import type { CreateTaskInput, TaskRepository } from './repository.js';
+import { emitTaskLifecycle } from './task-events-bus.js';
 
 const TERMINAL_STATUSES = new Set<TaskStatus>(['completed', 'failed', 'stopped']);
 
@@ -109,6 +110,11 @@ export class TaskService {
       status,
       payload: input?.payload,
     });
+    if (status === 'running' && task.status === 'queued') {
+      emitTaskLifecycle({ type: 'started', task: updated });
+    } else if (TERMINAL_STATUSES.has(status)) {
+      emitTaskLifecycle({ type: 'settled', task: updated });
+    }
     return updated;
   }
 }

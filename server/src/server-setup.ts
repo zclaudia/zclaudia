@@ -25,6 +25,7 @@ import type { createRouter } from './interfaces/websocket/index.js';
 import { createGatewayState } from './infra/gateway/gateway-state.js';
 import { bootstrapDomains } from './application/domain-bootstrap.js';
 import { buildAppSelectionClickUrl, getBackendDisplayName, getBackendRouteId } from './infra/push/notification-context.js';
+import { registerTaskSettlementNotifier } from './application/conversation/runtime/task-settlement-notifier.js';
 
 export interface SetupDependencies {
   db: ReturnType<typeof initDatabase>;
@@ -70,6 +71,10 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     handleRunStart, getServerPort,
     notificationSender, setProcessMonitor,
   } = deps;
+
+  // Background command tasks → conversation bridge (task monitor broadcasts,
+  // steer-on-completion, queued notices for idle sessions).
+  registerTaskSettlementNotifier({ activeRuns, connectedClients: clients });
 
   // Process supervisor
   const processSupervisor = new ProcessSupervisor(db);
