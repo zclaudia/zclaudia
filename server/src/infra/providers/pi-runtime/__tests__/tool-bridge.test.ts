@@ -52,6 +52,8 @@ describe('buildTools', () => {
     expect(names).toEqual([
       'Agent',
       'AskUserQuestion',
+      'AstEdit',
+      'AstGrep',
       'Bash',
       'Edit',
       'Eval',
@@ -104,6 +106,8 @@ describe('buildTools', () => {
     expect([...ALL_TOOL_NAMES].sort()).toEqual([
       'Agent',
       'AskUserQuestion',
+      'AstEdit',
+      'AstGrep',
       'Bash',
       'Edit',
       'Eval',

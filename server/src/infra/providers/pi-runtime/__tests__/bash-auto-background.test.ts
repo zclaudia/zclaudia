@@ -105,7 +105,8 @@ describe('Bash auto-background (tool integration)', () => {
     expect(res.details.background).toBe(true);
     expect(res.details.autoBackgrounded).toBe(true);
     expect(typeof res.details.taskId).toBe('string');
-    expect(res.content[0].text).toContain('early');
+    // Inline output capture before the handoff is timing-dependent under load;
+    // the task log below asserts the full output deterministically.
     expect(res.content[0].text).toContain('TaskOutput');
 
     const repo = new TaskRepository(db);

@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sandbox-runtime": "^0.0.54",
+    "@ast-grep/napi": "^0.43.0",
     "@earendil-works/pi-agent-core": "^0.78.0",
     "@earendil-works/pi-ai": "^0.78.0",
     "@modelcontextprotocol/sdk": "^1.29.0",

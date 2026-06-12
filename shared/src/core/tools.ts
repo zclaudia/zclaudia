@@ -19,6 +19,8 @@ export const ALL_TOOL_NAMES = [
   'Monitor',
   'Agent',
   'LSPTool',
+  'AstGrep',
+  'AstEdit',
 ] as const;
 
 export type ToolName = typeof ALL_TOOL_NAMES[number];
@@ -145,6 +147,7 @@ export const READ_ONLY_TOOL_NAMES: ReadonlyArray<ToolName> = [
   'ReadMcpResource',
   'TaskOutput',
   'LSPTool',
+  'AstGrep',
 ];
 
 export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
@@ -368,6 +371,28 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresUserInteraction: false,
     riskLevel: 'low',
   },
+  AstGrep: {
+    ref: { source: 'builtin', name: 'AstGrep' },
+    label: 'AstGrep',
+    description: 'Structural code search via AST patterns (ast-grep).',
+    setIds: ['code-intelligence'],
+    declaredReadOnly: true,
+    mutatesWorkspace: false,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'low',
+  },
+  AstEdit: {
+    ref: { source: 'builtin', name: 'AstEdit' },
+    label: 'AstEdit',
+    description: 'Structural code rewrite via AST patterns (ast-grep) with dry-run preview.',
+    setIds: ['code-intelligence'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
 };
 
 export const BUILTIN_TOOL_SETS = {
@@ -399,7 +424,7 @@ export const BUILTIN_TOOL_SETS = {
   'code-intelligence': {
     id: 'code-intelligence',
     label: 'Code Intelligence',
-    tools: ['LSPTool'],
+    tools: ['LSPTool', 'AstGrep', 'AstEdit'],
   },
   'all-builtin': {
     id: 'all-builtin',
