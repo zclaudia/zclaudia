@@ -29,10 +29,10 @@ export function ContextUsageCard({ usage }: ContextUsageCardProps) {
   const usedPercent = contextWindow > 0 ? (usedTokens / contextWindow) * 100 : 0;
 
   const rows = [
-    { key: 'system-prompt', label: 'System prompt', tokens: breakdown.systemPrompt.tokens, estimated: true, color: 'bg-blue-500' },
-    { key: 'tools', label: `Tools (${breakdown.tools.count})`, tokens: breakdown.tools.tokens, estimated: true, color: 'bg-violet-500' },
-    { key: 'skills', label: 'Skills', tokens: breakdown.skills.tokens, estimated: true, color: 'bg-amber-500' },
-    { key: 'messages', label: 'Messages', tokens: breakdown.messages.tokens, estimated: true, color: 'bg-emerald-500' },
+    { key: 'system-prompt', label: 'System prompt', tokens: breakdown.systemPrompt.tokens, estimated: breakdown.systemPrompt.estimated, color: 'bg-blue-500' },
+    { key: 'tools', label: `Tools (${breakdown.tools.count})`, tokens: breakdown.tools.tokens, estimated: breakdown.tools.estimated, color: 'bg-violet-500' },
+    { key: 'skills', label: 'Skills', tokens: breakdown.skills.tokens, estimated: breakdown.skills.estimated, color: 'bg-amber-500' },
+    { key: 'messages', label: 'Messages', tokens: breakdown.messages.tokens, estimated: breakdown.messages.estimated, color: 'bg-emerald-500' },
     { key: 'free-space', label: 'Free space', tokens: breakdown.freeSpace.tokens, estimated: false, color: 'bg-muted' },
   ];
 
