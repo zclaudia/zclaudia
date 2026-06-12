@@ -21,6 +21,8 @@ export const ALL_TOOL_NAMES = [
   'LSPTool',
   'AstGrep',
   'AstEdit',
+  'EnterWorktree',
+  'ExitWorktree',
 ] as const;
 
 export type ToolName = typeof ALL_TOOL_NAMES[number];
@@ -393,6 +395,28 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresUserInteraction: false,
     riskLevel: 'medium',
   },
+  EnterWorktree: {
+    ref: { source: 'builtin', name: 'EnterWorktree' },
+    label: 'EnterWorktree',
+    description: 'Create an isolated git worktree and switch the session to it.',
+    setIds: ['tasks'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
+  ExitWorktree: {
+    ref: { source: 'builtin', name: 'ExitWorktree' },
+    label: 'ExitWorktree',
+    description: 'Leave the current git worktree and switch back to the project root.',
+    setIds: ['tasks'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: false,
+    requiresUserInteraction: false,
+    riskLevel: 'medium',
+  },
 };
 
 export const BUILTIN_TOOL_SETS = {
@@ -419,7 +443,7 @@ export const BUILTIN_TOOL_SETS = {
   tasks: {
     id: 'tasks',
     label: 'Tasks',
-    tools: ['Agent', 'TaskOutput', 'Monitor'],
+    tools: ['Agent', 'TaskOutput', 'Monitor', 'EnterWorktree', 'ExitWorktree'],
   },
   'code-intelligence': {
     id: 'code-intelligence',

@@ -14,6 +14,7 @@ import * as path from 'path';
 import { createGitWorktree } from './git-worktrees.js';
 
 export const AGENT_WORKTREES_DIR = path.join('.worktrees', 'agents');
+export const SESSION_WORKTREES_DIR = path.join('.worktrees', 'sessions');
 
 export interface AgentWorktree {
   path: string;
@@ -72,6 +73,34 @@ export function createAgentWorktree(rootPath: string, taskId: string): AgentWork
   const branch = agentWorktreeBranch(taskId);
   const created = createGitWorktree(rootPath, worktreePath, branch);
   return { path: created.path, branch };
+}
+
+function slugify(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'wt';
+}
+
+/**
+ * Create a named worktree for a main session under .worktrees/sessions/.
+ * Same disposable semantics as agent worktrees; the slug derives the branch.
+ */
+export function createSessionWorktree(rootPath: string, name: string): AgentWorktree {
+  ensureWorktreesIgnored(rootPath);
+  const slug = slugify(name);
+  const worktreePath = path.join(rootPath, SESSION_WORKTREES_DIR, slug);
+  fs.mkdirSync(path.dirname(worktreePath), { recursive: true });
+  const branch = `worktree/${slug}`;
+  const created = createGitWorktree(rootPath, worktreePath, branch);
+  return { path: created.path, branch };
+}
+
+/** Best-effort current branch of a worktree (for ExitWorktree cleanup). */
+export function worktreeBranch(worktreePath: string): string | undefined {
+  try {
+    const branch = git(worktreePath, 'rev-parse --abbrev-ref HEAD').trim();
+    return branch && branch !== 'HEAD' ? branch : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** Commits reachable only from this branch (not from any other branch or tag). */
