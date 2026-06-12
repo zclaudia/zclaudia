@@ -951,7 +951,9 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
 
     expect(mockAgentInstances.length).toBe(1);
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
-    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(ALL_TOOL_NAMES.length);
+    // Memory is skipped when memoryDir is absent (no project context here), so
+    // the built tool count is one less than the full canonical list.
+    expect((mockAgentInstances[0].initialState as any).tools.length).toBe(ALL_TOOL_NAMES.length - 1);
   });
 
   it('adds external discovery meta tools when external tool state is present', async () => {

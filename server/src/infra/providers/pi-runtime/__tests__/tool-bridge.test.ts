@@ -125,6 +125,7 @@ describe('buildTools', () => {
       'LSPTool',
       'ListMcpResources',
       'MCPTool',
+      'Memory',
       'Monitor',
       'Read',
       'ReadMcpResource',
