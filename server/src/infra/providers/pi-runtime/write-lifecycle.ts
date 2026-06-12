@@ -87,6 +87,7 @@ export function mergeWriteLifecycleResults(
     ...(first.notifications || second.notifications ? { notifications: [...(first.notifications ?? []), ...(second.notifications ?? [])] } : {}),
     ...(first.warnings || second.warnings ? { warnings: [...(first.warnings ?? []), ...(second.warnings ?? [])] } : {}),
     ...(first.errors || second.errors ? { errors: [...(first.errors ?? []), ...(second.errors ?? [])] } : {}),
+    ...(first.deferredDiagnostics || second.deferredDiagnostics ? { deferredDiagnostics: first.deferredDiagnostics ?? second.deferredDiagnostics } : {}),
   };
 }
 

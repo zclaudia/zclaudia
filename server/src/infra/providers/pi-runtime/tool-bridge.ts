@@ -16,7 +16,10 @@ import { createReadFileStateStore, type ReadFileStateStore } from './read-file-s
 import { createEditBridgeTool as createFileEditBridgeTool, createWriteBridgeTool as createFileWriteBridgeTool } from './edit-write-tools.js';
 import type { DiagnosticsMode, WriteDiagnosticsProvider, WriteLifecycleHooks } from './write-lifecycle.js';
 import { decodeTextBuffer } from './text-io.js';
-import { buildHashlineEntries, formatHashlineOutput, hashlineTag } from './hashline.js';
+import { buildHashlineEntries, formatHashlineOutput, hashlineSnapshotId, hashlineTag } from './hashline.js';
+import { createCommandDiagnosticsProvider, type CommandDiagnosticsOptions } from './command-diagnostics.js';
+import { composeWriteLifecycleHooks, createFileChangeLifecycleHooks, type FileChangeNotifier } from './file-change-notifier.js';
+import { createLspDiagnosticsAdapter, type LspTransport } from './lsp-diagnostics-adapter.js';
 import { runRipgrep } from './ripgrep-runner.js';
 import { runBash } from './bash-runner.js';
 import * as sandbox from './sandbox.js';
@@ -305,6 +308,7 @@ function createReadBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
             hashline: {
               path: relPath,
               tag: hashlineTag(text),
+              snapshotId: hashlineSnapshotId(relPath, text),
               lines: hashlineEntries,
             },
           } : {}),
@@ -1638,8 +1642,18 @@ export interface ToolBridgeOptions {
   readFileState?: ReadFileStateStore;
   /** Optional write lifecycle hooks for diagnostics, IDE notifications, or file-history integrations. */
   writeLifecycle?: WriteLifecycleHooks;
+  /** Optional adapter notified after successful file creates/modifications. */
+  fileChangeNotifier?: FileChangeNotifier;
+  /** Optional LSP diagnostics adapter backed by an injected transport. */
+  lspDiagnosticsAdapter?: {
+    transport: LspTransport;
+    diagnosticsTimeoutMs?: number;
+    languageIdForPath?: (filePath: string) => string;
+  };
   /** Optional diagnostics adapter invoked after successful file writes. */
   diagnosticsProvider?: WriteDiagnosticsProvider;
+  /** Optional command-backed diagnostics adapter invoked after successful file writes. */
+  diagnosticsCommand?: CommandDiagnosticsOptions;
   /** Whether diagnostics run inline or are scheduled for deferred retrieval. */
   diagnosticsMode?: DiagnosticsMode;
   /** Plan mode read-only sandbox, set by the adapter — spec §6.
@@ -1657,9 +1671,17 @@ export interface ToolBridgeOptions {
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function buildTools(cwd: string, options?: ToolBridgeOptions): AgentTool<any>[] {
+  const lspAdapter = options?.lspDiagnosticsAdapter
+    ? createLspDiagnosticsAdapter({ cwd, ...options.lspDiagnosticsAdapter })
+    : undefined;
+  const fileChangeLifecycle = createFileChangeLifecycleHooks(options?.fileChangeNotifier ?? lspAdapter?.fileChangeNotifier);
   const effectiveOptions: ToolBridgeOptions = {
     ...options,
     readFileState: options?.readFileState ?? createReadFileStateStore(),
+    writeLifecycle: composeWriteLifecycleHooks(options?.writeLifecycle, fileChangeLifecycle),
+    diagnosticsProvider: options?.diagnosticsProvider
+      ?? lspAdapter?.diagnosticsProvider
+      ?? (options?.diagnosticsCommand ? createCommandDiagnosticsProvider(cwd, options.diagnosticsCommand) : undefined),
   };
   const requested = options?.enabled ?? [...ALL_TOOL_NAMES];
   const overrides = new Map<ToolName, AgentTool<any>>();

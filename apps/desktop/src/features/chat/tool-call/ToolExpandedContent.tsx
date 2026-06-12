@@ -20,6 +20,7 @@ import {
 import { TerminalOutput, RunInTerminalButton } from './TerminalOutput';
 import { PlanContent } from './PlanContent';
 import { extractPlanPayload } from '../planReviewPayload';
+import { FileMutationResult, getToolResultDetails } from './FileMutationResult';
 
 function looksLikeUnifiedDiff(value: string): boolean {
   return (
@@ -67,6 +68,19 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
 
   const input = normalizeToolInput(toolInput) as Record<string, unknown> | undefined;
   const fileChangeDiffs = getFileChangeDiffs(effect);
+  const fileMutationDetails = toolName === 'Edit' || toolName === 'Write' ? getToolResultDetails(result) : undefined;
+  const hasFileMutationResult = Boolean(
+    fileMutationDetails?.diff
+    || fileMutationDetails?.perFileResults?.length
+    || fileMutationDetails?.lifecycle?.diagnostics?.length
+    || fileMutationDetails?.lifecycle?.deferredDiagnostics
+    || fileMutationDetails?.backup
+    || fileMutationDetails?.preview
+  );
+
+  if ((toolName === 'Edit' || toolName === 'Write') && fileMutationDetails && hasFileMutationResult) {
+    return <FileMutationResult details={fileMutationDetails} />;
+  }
 
   // Provider file-change tools may only provide a unified diff summary
   // (Cursor editToolCall, Codex fileChange, etc.).

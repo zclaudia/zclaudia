@@ -24,3 +24,4 @@ export * from './api/files';
 export * from './api/commands';
 export * from './api/debug';
 export * from './api/plugins';
+export * from './api/provider-diagnostics';

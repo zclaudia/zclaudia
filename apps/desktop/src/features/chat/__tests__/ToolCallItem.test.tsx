@@ -9,6 +9,10 @@ const mockHandlePromptAnswer = vi.fn();
 const mockSetDrawerOpen = vi.fn();
 const mockOpenTerminal = vi.fn();
 const mockWaitForReady = vi.fn();
+const { mockGetDeferredDiagnostics, mockRestoreFileBackup } = vi.hoisted(() => ({
+  mockGetDeferredDiagnostics: vi.fn(),
+  mockRestoreFileBackup: vi.fn(),
+}));
 const terminalIdsByBackend = new Map<string, string>();
 
 // Mock heavy sub-components
@@ -35,6 +39,11 @@ vi.mock('../../../components/renderers/CodeViewer', () => ({
       {filePath && <span>{filePath}</span>}
     </div>
   ),
+}));
+
+vi.mock('../../../services/api', () => ({
+  getDeferredDiagnostics: mockGetDeferredDiagnostics,
+  restoreFileBackup: mockRestoreFileBackup,
 }));
 
 vi.mock('../../../contexts/ConnectionContext', () => ({
@@ -148,6 +157,10 @@ describe('ToolCallItem', () => {
     mockSetDrawerOpen.mockReset();
     mockOpenTerminal.mockReset();
     mockWaitForReady.mockReset();
+    mockGetDeferredDiagnostics.mockReset();
+    mockGetDeferredDiagnostics.mockResolvedValue({ status: 'pending' });
+    mockRestoreFileBackup.mockReset();
+    mockRestoreFileBackup.mockResolvedValue({ restored: true, originalPath: 'file.ts' });
     mockPromptRequestState.pendingRequests = [];
     terminalIdsByBackend.clear();
     (globalThis as any).__toolCallTestActiveBackend = 'backend-1';
@@ -498,6 +511,127 @@ describe('ToolCallItem', () => {
       expect(unifiedDiff.textContent).toContain('+new');
     });
 
+    it('shows Edit result diff before falling back to input diff', () => {
+      const diff = [
+        '--- file.ts',
+        '+++ file.ts',
+        '@@ -1,1 +1,1 @@',
+        '-old',
+        '+new',
+      ].join('\n');
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'Edit',
+        toolInput: { file_path: 'file.ts', old_string: 'ignored old', new_string: 'ignored new' },
+        status: 'completed',
+        result: { details: { ok: true, path: 'file.ts', diff } },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.queryByTestId('diff-viewer')).not.toBeInTheDocument();
+      const unifiedDiff = screen.getByTestId('unified-diff-viewer');
+      expect(unifiedDiff.textContent).toContain('-old');
+      expect(unifiedDiff.textContent).toContain('+new');
+    });
+
+    it('shows multi-file patch results from Edit details', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'Edit',
+        toolInput: { patch: '*** Begin Patch\n*** End Patch' },
+        status: 'completed',
+        result: {
+          details: {
+            ok: true,
+            perFileResults: [
+              { path: 'a.ts', diff: '--- a.ts\n+++ a.ts\n@@\n-old\n+new' },
+              { path: 'b.ts', diff: '--- b.ts\n+++ b.ts\n@@\n-x\n+y' },
+            ],
+          },
+        },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getAllByTestId('unified-diff-viewer')).toHaveLength(2);
+      expect(screen.getAllByText('a.ts').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('b.ts').length).toBeGreaterThan(0);
+    });
+
+    it('shows diagnostics backup and preview metadata for Edit results', async () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'Edit',
+        toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new', preview_only: true },
+        status: 'completed',
+        result: {
+          details: {
+            ok: true,
+            preview: true,
+            path: 'file.ts',
+            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+            backup: { originalPath: 'file.ts', path: '/tmp/backup.bak' },
+            lifecycle: {
+              diagnostics: [{ path: 'file.ts', line: 3, severity: 'warning', message: 'unused variable', source: 'ts' }],
+              deferredDiagnostics: { id: 'diag-1', status: 'pending' },
+            },
+          },
+        },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getByText('Preview only')).toBeInTheDocument();
+      expect(screen.getByText('Backup created')).toBeInTheDocument();
+      expect(screen.getByText(/unused variable/)).toBeInTheDocument();
+      expect(screen.getByText(/Diagnostics pending/)).toBeInTheDocument();
+      await waitFor(() => expect(mockGetDeferredDiagnostics).toHaveBeenCalledWith('diag-1'));
+    });
+
+    it('refreshes deferred diagnostics and renders completed results', async () => {
+      mockGetDeferredDiagnostics.mockResolvedValueOnce({
+        status: 'completed',
+        diagnostics: [{ path: 'file.ts', line: 4, column: 2, severity: 'error', message: 'late type error', source: 'tsc' }],
+      });
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'Edit',
+        toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new' },
+        status: 'completed',
+        result: {
+          details: {
+            ok: true,
+            path: 'file.ts',
+            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+            lifecycle: {
+              deferredDiagnostics: { id: 'diag-1', status: 'pending' },
+            },
+          },
+        },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => {
+        expect(mockGetDeferredDiagnostics).toHaveBeenCalledWith('diag-1');
+        expect(screen.getByText(/Diagnostics completed/)).toBeInTheDocument();
+        expect(screen.getByText(/late type error/)).toBeInTheDocument();
+      });
+    });
+
+    it('restores a file backup from Edit results', async () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'Edit',
+        toolInput: { file_path: 'file.ts', old_string: 'old', new_string: 'new' },
+        status: 'completed',
+        result: {
+          details: {
+            ok: true,
+            path: 'file.ts',
+            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+            backup: { id: 'backup-1', originalPath: 'file.ts', path: '/tmp/backup.bak' },
+          },
+        },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      fireEvent.click(screen.getByRole('button', { name: /Restore backup/ }));
+
+      await waitFor(() => {
+        expect(mockRestoreFileBackup).toHaveBeenCalledWith('backup-1');
+        expect(screen.getByText(/Backup restored/)).toBeInTheDocument();
+      });
+    });
+
     it('shows CodeViewer for Write tool when expanded', () => {
       render(<ToolCallItem toolCall={createToolCall({
         toolName: 'Write',
@@ -506,6 +640,18 @@ describe('ToolCallItem', () => {
       })} />);
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
+    });
+
+    it('shows Write result diff when available', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'Write',
+        toolInput: { file_path: 'file.ts', content: 'new' },
+        status: 'completed',
+        result: { details: { ok: true, path: 'file.ts', diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new' } },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.queryByTestId('code-viewer')).not.toBeInTheDocument();
+      expect(screen.getByTestId('unified-diff-viewer')).toBeInTheDocument();
     });
 
     it('shows CodeViewer for Read tool result when expanded', () => {

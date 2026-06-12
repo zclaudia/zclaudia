@@ -3,6 +3,8 @@ import type { Express, RequestHandler } from 'express';
 import type Database from 'better-sqlite3';
 import { mountCapabilityRoutes } from '../../interfaces/http/provider-capabilities.js';
 import { mountCommandRoutes } from '../../interfaces/http/provider-commands.js';
+import { createDeferredDiagnosticsRoutes } from './pi-runtime/deferred-diagnostics-routes.js';
+import { createFileHistoryRoutes } from './pi-runtime/file-history-routes.js';
 
 /**
  * Runtime adapter capability / command routes — describe what the runtime
@@ -25,6 +27,8 @@ export function registerRuntimeRoutes(deps: RuntimeRoutesDeps): void {
 
   mountCapabilityRoutes(router, db);
   mountCommandRoutes(router, db);
+  router.use(createDeferredDiagnosticsRoutes());
+  router.use(createFileHistoryRoutes());
 
   router.get('/plugin-tools', (_req: Request, res: Response) => {
     try {

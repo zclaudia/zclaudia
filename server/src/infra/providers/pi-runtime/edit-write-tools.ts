@@ -1,5 +1,5 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
-import { mkdir, stat } from 'fs/promises';
+import { mkdir, rename, rm, stat } from 'fs/promises';
 import * as path from 'path';
 
 import { findActualString, countOccurrences, applyEdit } from './edit-match.js';
@@ -19,7 +19,7 @@ import { MAX_EDIT_FILE_BYTES, validateMutationContent } from './write-guards.js'
 import { recordFileBackup } from './file-history.js';
 import { runWithFileWriteLock } from './file-write-lock.js';
 import { parseApplyPatch } from './apply-patch.js';
-import { replaceHashlineLine } from './hashline.js';
+import { hashlineTag, parseHashlineOperation, replaceHashlineLine } from './hashline.js';
 
 type TextBlock = { type: 'text'; text: string };
 type ToolContent = TextBlock[];
@@ -118,7 +118,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
         }
         await mkdir(path.dirname(filePath), { recursive: true });
         const relPath = toWorkspaceRelative(cwd, filePath);
-        const backup = originalContent !== null ? await recordFileBackup(relPath, originalContent) : undefined;
+        const backup = originalContent !== null ? await recordFileBackup(relPath, originalContent, filePath) : undefined;
         const updatedContentForDisk = originalContent !== null
           ? applyLineEndingStyle(content, lineEndingFor(originalContent))
           : content;
@@ -178,6 +178,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         replace_all: { type: 'boolean', default: false },
         patch: { type: 'string', description: 'Optional apply_patch-style multi-file patch' },
         hashline_line: { type: 'string', description: 'Optional line hash from Read(hashline:true)' },
+        hashline_operation: { type: 'string', description: 'Optional hashline operation, such as replace:<line-hash>' },
+        hashline_tag: { type: 'string', description: 'Optional file-level tag from Read(hashline:true)' },
       },
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
@@ -186,15 +188,104 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         try {
           const operations = parseApplyPatch(args.patch);
           const perFileResults = [];
+          const previewOnly = args.preview_only === true;
           for (const operation of operations) {
             if (operation.type === 'add') {
+              if (previewOnly) {
+                const relPath = operation.path;
+                const diff = buildFileDiff(relPath, '', operation.content);
+                perFileResults.push({
+                  ok: true,
+                  preview: true,
+                  type: 'create',
+                  path: relPath,
+                  diff: diff.diff,
+                  firstChangedLine: diff.firstChangedLine,
+                  structuredPatch: diff.structuredPatch,
+                  lineChanges: diff.lineChanges,
+                  ...buildContentDetailFields(null, operation.content),
+                });
+                continue;
+              }
               const writeTool = createWriteBridgeTool(cwd, options) as any;
               const result = await writeTool.execute(`${toolCallId}:add:${operation.path}`, {
                 file_path: operation.path,
                 content: operation.content,
               });
-              if (result.details?.ok === false) return result;
+              if (result.details?.ok === false) {
+                if (perFileResults.length === 0) return result;
+                perFileResults.push({ ...result.details, path: operation.path });
+                break;
+              }
               perFileResults.push({ ...result.details, path: operation.path });
+              continue;
+            }
+            if (operation.type === 'delete') {
+              const filePath = resolveInsideWorkspace(cwd, operation.path);
+              const originalMetadata = await readTextFileWithMetadata(filePath);
+              const original = originalMetadata.content;
+              const readCheck = await options?.readFileState?.assertSafeToWrite(filePath, original);
+              if (readCheck && !readCheck.ok) {
+                const failure = { ok: false, error: readCheck.code, message: readCheck.message, path: operation.path, type: 'delete' };
+                if (perFileResults.length === 0) return textResult(readCheck.message, failure);
+                perFileResults.push(failure);
+                break;
+              }
+              const diff = buildFileDiff(operation.path, original, '');
+              const backup = previewOnly ? undefined : await recordFileBackup(operation.path, original, filePath);
+              if (!previewOnly) {
+                await rm(filePath);
+              }
+              perFileResults.push({
+                ok: true,
+                ...(previewOnly ? { preview: true } : {}),
+                type: 'delete',
+                path: operation.path,
+                diff: diff.diff,
+                firstChangedLine: diff.firstChangedLine,
+                structuredPatch: diff.structuredPatch,
+                lineChanges: diff.lineChanges,
+                ...buildContentDetailFields(original, ''),
+                ...(backup ? { backup } : {}),
+              });
+              continue;
+            }
+            if (operation.type === 'rename') {
+              const fromPath = resolveInsideWorkspace(cwd, operation.from);
+              const toPath = resolveInsideWorkspace(cwd, operation.to);
+              try {
+                await stat(toPath);
+                const failure = { ok: false, error: 'target_exists', message: `Rename target already exists: ${operation.to}`, path: operation.to, originalPath: operation.from, type: 'rename' };
+                if (perFileResults.length === 0) return textResult(failure.message, failure);
+                perFileResults.push(failure);
+                break;
+              } catch {
+                // Target does not exist, so rename is allowed.
+              }
+              const originalMetadata = await readTextFileWithMetadata(fromPath);
+              const original = originalMetadata.content;
+              const readCheck = await options?.readFileState?.assertSafeToWrite(fromPath, original);
+              if (readCheck && !readCheck.ok) {
+                const failure = { ok: false, error: readCheck.code, message: readCheck.message, path: operation.to, originalPath: operation.from, type: 'rename' };
+                if (perFileResults.length === 0) return textResult(readCheck.message, failure);
+                perFileResults.push(failure);
+                break;
+              }
+              const backup = previewOnly ? undefined : await recordFileBackup(operation.from, original, fromPath);
+              if (!previewOnly) {
+                await mkdir(path.dirname(toPath), { recursive: true });
+                await rename(fromPath, toPath);
+                await options?.readFileState?.recordWrite(toPath, original);
+              }
+              perFileResults.push({
+                ok: true,
+                ...(previewOnly ? { preview: true } : {}),
+                type: 'rename',
+                path: operation.to,
+                originalPath: operation.from,
+                updatedContent: original,
+                ...(backup ? { backup } : {}),
+              });
               continue;
             }
             const editTool = createEditBridgeTool(cwd, options) as any;
@@ -202,12 +293,26 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               file_path: operation.path,
               old_string: operation.oldText,
               new_string: operation.newText,
+              ...(previewOnly ? { preview_only: true } : {}),
             });
-            if (result.details?.ok === false) return result;
+            if (result.details?.ok === false) {
+              if (perFileResults.length === 0) return result;
+              perFileResults.push({ ...result.details, type: 'update', path: operation.path });
+              break;
+            }
             perFileResults.push({ ...result.details, type: 'update', path: operation.path });
+          }
+          const failed = perFileResults.some((result: any) => result.ok === false);
+          if (failed) {
+            return textResult('Patch partially failed', {
+              ok: false,
+              error: 'patch_partial_failure',
+              perFileResults,
+            });
           }
           return textResult(`Applied patch to ${perFileResults.length} file(s)`, {
             ok: true,
+            ...(previewOnly ? { preview: true } : {}),
             perFileResults,
             diff: perFileResults.map((result: any) => result.diff).filter(Boolean).join('\n'),
             firstChangedLine: perFileResults.find((result: any) => result.firstChangedLine)?.firstChangedLine,
@@ -220,7 +325,9 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
       if (typeof requested !== 'string' || !requested.trim()) {
         return errorResult('missing_path', 'Edit requires file_path');
       }
-      const isHashlineEdit = typeof args.hashline_line === 'string' && args.hashline_line.trim();
+      const hashlineOperation = parseHashlineOperation(args.hashline_operation);
+      const hashlineLine = hashlineOperation?.hash ?? (typeof args.hashline_line === 'string' ? args.hashline_line.trim() : '');
+      const isHashlineEdit = Boolean(hashlineLine);
       if (!isHashlineEdit && (typeof args.old_string !== 'string' || typeof args.new_string !== 'string')) {
         return errorResult('missing_strings', 'Edit requires old_string and new_string');
       }
@@ -263,16 +370,29 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         }
         const originalMetadata = await readTextFileWithMetadata(filePath);
         const original = originalMetadata.content;
+        if (isHashlineEdit && typeof args.hashline_tag === 'string' && args.hashline_tag.trim()) {
+          const currentTag = hashlineTag(original);
+          const expectedTag = args.hashline_tag.trim();
+          if (currentTag !== expectedTag) {
+            return errorResult('hashline_tag_mismatch', 'hashline_tag does not match the current file content', {
+              path: toWorkspaceRelative(cwd, filePath),
+              expectedTag,
+              currentTag,
+              suggestion: 'Read the file again with hashline:true before editing.',
+            });
+          }
+        }
         const readCheck = await options?.readFileState?.assertSafeToWrite(filePath, original);
         if (readCheck && !readCheck.ok) {
           return errorResult(readCheck.code, readCheck.message, { path: toWorkspaceRelative(cwd, filePath) });
         }
         const actual = isHashlineEdit ? null : findActualString(original, oldString);
         if (isHashlineEdit) {
-          const updated = replaceHashlineLine(original, String(args.hashline_line), newString);
+          const updated = replaceHashlineLine(original, hashlineLine, newString);
           if (updated === undefined) {
             return errorResult('hashline_mismatch', 'hashline_line was not found in the current file', {
               path: toWorkspaceRelative(cwd, filePath),
+              suggestion: 'Read the file again with hashline:true before editing.',
             });
           }
           const relPath = toWorkspaceRelative(cwd, filePath);
@@ -287,10 +407,11 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               firstChangedLine: diff.firstChangedLine,
               structuredPatch: diff.structuredPatch,
               lineChanges: diff.lineChanges,
+              hashline: { tag: hashlineTag(original) },
               ...buildContentDetailFields(original, updated),
             });
           }
-          const backup = await recordFileBackup(relPath, original);
+          const backup = await recordFileBackup(relPath, original, filePath);
           await writeTextFileAtomic(filePath, applyLineEndingStyle(updated, lineEndingFor(original)), originalMetadata);
           await options?.readFileState?.recordWrite(filePath, updated);
           return textResult(`Edited ${relPath}`, {
@@ -301,6 +422,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             firstChangedLine: diff.firstChangedLine,
             structuredPatch: diff.structuredPatch,
             lineChanges: diff.lineChanges,
+            hashline: { tag: hashlineTag(updated) },
             ...buildContentDetailFields(original, updated),
             backup,
           });
@@ -331,7 +453,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             ...buildContentDetailFields(original, updated),
           });
         }
-        const backup = await recordFileBackup(relPath, original);
+        const backup = await recordFileBackup(relPath, original, filePath);
         await writeTextFileAtomic(filePath, applyLineEndingStyle(updated, lineEndingFor(original)), originalMetadata);
         await options?.readFileState?.recordWrite(filePath, updated);
         const lifecycleInput = {

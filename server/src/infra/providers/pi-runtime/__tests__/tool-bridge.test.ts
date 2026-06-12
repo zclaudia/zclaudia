@@ -6,6 +6,7 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import { buildTools, ALL_TOOL_NAMES, type ToolName } from '../tool-bridge.js';
 import { getDeferredDiagnosticsResult } from '../write-lifecycle.js';
+import { filePathToUri, type LspTransport } from '../lsp-diagnostics-adapter.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
 import { CommandTaskExecutor, pidAlive } from '../../../../domains/tasks/executors/command-executor.js';
@@ -161,6 +162,7 @@ describe('buildTools', () => {
     const result = await read.execute('read-hashline', { path: 'sample.ts', hashline: true });
 
     expect(result.details.hashline).toMatchObject({ path: 'sample.ts' });
+    expect(result.details.hashline.snapshotId).toEqual(expect.any(String));
     expect(result.details.hashline.lines[0]).toMatchObject({ line: 1, text: 'const a = 1;' });
     expect(result.content[0].text).toContain('[sample.ts#');
     expect(result.content[0].text).toMatch(/[a-f0-9]{12}\|const a = 1;/);
@@ -905,6 +907,29 @@ describe('Write bridge tool', () => {
     });
   });
 
+  it('notifies a file change adapter after writing a file', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const notifyFileChanged = vi.fn();
+    const write = buildTools(dir, {
+      enabled: ['Write'],
+      fileChangeNotifier: { notifyFileChanged },
+    } as any).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-file-change-notify', { file_path: 'f.ts', content: 'const a = 1;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(notifyFileChanged).toHaveBeenCalledWith(expect.objectContaining({
+      path: 'f.ts',
+      absolutePath: path.join(dir, 'f.ts'),
+      changeKind: 'create',
+      operation: 'write',
+    }));
+    expect(res.details.lifecycle).toMatchObject({
+      notifications: ['file_change_notified:f.ts'],
+    });
+  });
+
   it('returns diagnostics from a diagnostics provider adapter after writing', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const diagnosticsProvider = vi.fn().mockResolvedValue([
@@ -923,6 +948,63 @@ describe('Write bridge tool', () => {
     }));
     expect(res.details.lifecycle).toMatchObject({
       diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'fake-ts' }],
+    });
+  });
+
+  it('returns diagnostics from a configured diagnostics command after writing', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const write = buildTools(dir, {
+      enabled: ['Write'],
+      diagnosticsCommand: {
+        command: process.execPath,
+        args: ['-e', 'console.log("f.ts:1:7 - error TS2322: Type mismatch")'],
+      },
+    } as any).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-command-diagnostics', { file_path: 'f.ts', content: 'const a: string = 1;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.lifecycle).toMatchObject({
+      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'TS2322' }],
+    });
+  });
+
+  it('wires an LSP diagnostics adapter into write diagnostics and file notifications', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const filePath = path.join(dir, 'f.ts');
+    const handlers = new Map<string, (params: unknown) => void>();
+    const transport: LspTransport = {
+      notify: vi.fn(async (method) => {
+        if (method === 'textDocument/didSave') {
+          handlers.get('textDocument/publishDiagnostics')?.({
+            uri: filePathToUri(filePath),
+            diagnostics: [{
+              range: { start: { line: 0, character: 6 } },
+              severity: 1,
+              message: 'Type mismatch',
+              source: 'tsserver',
+            }],
+          });
+        }
+      }),
+      onNotification: (method, handler) => {
+        handlers.set(method, handler);
+        return () => handlers.delete(method);
+      },
+    };
+    const write = buildTools(dir, {
+      enabled: ['Write'],
+      lspDiagnosticsAdapter: { transport, diagnosticsTimeoutMs: 100 },
+    } as any).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-lsp-diagnostics', { file_path: 'f.ts', content: 'const a: string = 1;\n' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(transport.notify).toHaveBeenCalledWith('textDocument/didOpen', expect.any(Object));
+    expect(transport.notify).toHaveBeenCalledWith('textDocument/didSave', expect.any(Object));
+    expect(res.details.lifecycle).toMatchObject({
+      diagnostics: [{ path: 'f.ts', line: 1, column: 7, severity: 'error', message: 'Type mismatch', source: 'tsserver' }],
+      notifications: ['file_change_notified:f.ts'],
     });
   });
 
@@ -1167,6 +1249,105 @@ describe('Edit bridge tool', () => {
     expect(b).toBe('export const b = 1;\n');
   });
 
+  it('applies patch delete and rename operations', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'delete.ts'), 'export const deleted = true;\n');
+    writeFileSync(path.join(dir, 'old.ts'), 'export const renamed = true;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-patch-delete', { path: 'delete.ts' });
+    await read.execute('r-patch-rename', { path: 'old.ts' });
+    const res = await edit.execute('e-apply-patch-delete-rename', {
+      patch: [
+        '*** Begin Patch',
+        '*** Delete File: delete.ts',
+        '*** Rename File: old.ts -> new.ts',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    const deletedExists = existsSync(path.join(dir, 'delete.ts'));
+    const oldExists = existsSync(path.join(dir, 'old.ts'));
+    const renamed = readFileSync(path.join(dir, 'new.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.perFileResults).toEqual([
+      expect.objectContaining({ path: 'delete.ts', type: 'delete', ok: true }),
+      expect.objectContaining({ path: 'new.ts', originalPath: 'old.ts', type: 'rename', ok: true }),
+    ]);
+    expect(deletedExists).toBe(false);
+    expect(oldExists).toBe(false);
+    expect(renamed).toBe('export const renamed = true;\n');
+  });
+
+  it('previews a patch without writing any files', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-patch-preview', { path: 'a.ts' });
+    const res = await edit.execute('e-apply-patch-preview', {
+      preview_only: true,
+      patch: [
+        '*** Begin Patch',
+        '*** Update File: a.ts',
+        '@@',
+        '-const a = 1;',
+        '+const a = 2;',
+        '*** Add File: b.ts',
+        '+export const b = 1;',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    const a = readFileSync(path.join(dir, 'a.ts'), 'utf8');
+    const bExists = existsSync(path.join(dir, 'b.ts'));
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: true, preview: true });
+    expect(res.details.perFileResults).toEqual([
+      expect.objectContaining({ path: 'a.ts', type: 'update', preview: true, ok: true }),
+      expect.objectContaining({ path: 'b.ts', type: 'create', preview: true, ok: true }),
+    ]);
+    expect(a).toBe('const a = 1;\n');
+    expect(bExists).toBe(false);
+  });
+
+  it('returns per-file patch failure summaries instead of discarding context', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-patch-summary', { path: 'a.ts' });
+    const res = await edit.execute('e-apply-patch-summary', {
+      preview_only: true,
+      patch: [
+        '*** Begin Patch',
+        '*** Update File: a.ts',
+        '@@',
+        '-const a = 1;',
+        '+const a = 2;',
+        '*** Update File: missing.ts',
+        '@@',
+        '-missing',
+        '+still missing',
+        '*** End Patch',
+      ].join('\n'),
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'patch_partial_failure' });
+    expect(res.details.perFileResults).toEqual([
+      expect.objectContaining({ path: 'a.ts', ok: true, preview: true }),
+      expect.objectContaining({ path: 'missing.ts', ok: false }),
+    ]);
+  });
+
   it('rejects patch updates when the target file was not read first', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
@@ -1264,6 +1445,43 @@ describe('Edit bridge tool', () => {
     expect(onDisk).toBe('const a = 1;\n');
   });
 
+  it('notifies a file change adapter after editing a file but not for preview', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\n');
+    const notifyFileChanged = vi.fn();
+    const tools = buildTools(dir, {
+      enabled: ['Read', 'Edit'],
+      fileChangeNotifier: { notifyFileChanged },
+    } as any);
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+    await read.execute('r-file-change-edit', { path: 'f.ts' });
+
+    const preview = await edit.execute('e-file-change-preview', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+      preview_only: true,
+    });
+    const res = await edit.execute('e-file-change-edit', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(preview.details.preview).toBe(true);
+    expect(res.details.ok).toBe(true);
+    expect(notifyFileChanged).toHaveBeenCalledTimes(1);
+    expect(notifyFileChanged).toHaveBeenCalledWith(expect.objectContaining({
+      path: 'f.ts',
+      absolutePath: filePath,
+      changeKind: 'modify',
+      operation: 'edit',
+    }));
+  });
+
   it('edits a line by hashline anchor', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
@@ -1283,6 +1501,57 @@ describe('Edit bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
     expect(onDisk).toBe('const a = 1;\nconst b = 3;\n');
+  });
+
+  it('previews a hashline edit using operation grammar without writing to disk', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    const readRes = await read.execute('r-hashline-preview', { path: 'f.ts', hashline: true });
+    const lineHash = readRes.details.hashline.lines[1].hash;
+    const res = await edit.execute('e-hashline-preview', {
+      file_path: 'f.ts',
+      hashline_operation: `replace:${lineHash}`,
+      hashline_tag: readRes.details.hashline.tag,
+      new_string: 'const b = 3;',
+      preview_only: true,
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: true, preview: true, hashline: { tag: readRes.details.hashline.tag } });
+    expect(res.details.diff).toContain('+const b = 3;');
+    expect(onDisk).toBe('const a = 1;\nconst b = 2;\n');
+  });
+
+  it('rejects hashline edits with a stale file-level tag and asks for a fresh read', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    const readRes = await read.execute('r-hashline-stale-tag', { path: 'f.ts', hashline: true });
+    writeFileSync(filePath, 'const a = 1;\nconst b = 22;\n');
+    const res = await edit.execute('e-hashline-stale-tag', {
+      file_path: 'f.ts',
+      hashline_line: readRes.details.hashline.lines[1].hash,
+      hashline_tag: readRes.details.hashline.tag,
+      new_string: 'const b = 3;',
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: false,
+      error: 'hashline_tag_mismatch',
+      expectedTag: readRes.details.hashline.tag,
+      suggestion: 'Read the file again with hashline:true before editing.',
+    });
+    expect(res.details.currentTag).toEqual(expect.any(String));
   });
 
   it('rejects hashline edits when the anchor cannot be found', async () => {

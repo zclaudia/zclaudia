@@ -1,6 +1,8 @@
 export type ApplyPatchOperation =
   | { type: 'update'; path: string; oldText: string; newText: string }
-  | { type: 'add'; path: string; content: string };
+  | { type: 'add'; path: string; content: string }
+  | { type: 'delete'; path: string }
+  | { type: 'rename'; from: string; to: string };
 
 export function parseApplyPatch(input: string): ApplyPatchOperation[] {
   const lines = input.split(/\r?\n/);
@@ -47,6 +49,21 @@ export function parseApplyPatch(input: string): ApplyPatchOperation[] {
         index += 1;
       }
       operations.push({ type: 'add', path: filePath, content: `${contentLines.join('\n')}\n` });
+      continue;
+    }
+    if (line.startsWith('*** Delete File: ')) {
+      const filePath = line.slice('*** Delete File: '.length).trim();
+      if (!filePath) throw new Error(`Missing delete path at line ${index + 1}`);
+      operations.push({ type: 'delete', path: filePath });
+      index += 1;
+      continue;
+    }
+    if (line.startsWith('*** Rename File: ')) {
+      const spec = line.slice('*** Rename File: '.length).trim();
+      const match = /^(.*?)\s*->\s*(.*?)$/.exec(spec);
+      if (!match?.[1] || !match[2]) throw new Error(`Invalid rename operation at line ${index + 1}`);
+      operations.push({ type: 'rename', from: match[1].trim(), to: match[2].trim() });
+      index += 1;
       continue;
     }
     throw new Error(`Unsupported patch operation: ${line}`);

@@ -83,6 +83,8 @@ import {
   getSupervisionContext,
   getSupervisionBudget,
   getSupervisionLogs,
+  getDeferredDiagnostics,
+  restoreFileBackup,
 } from '../api';
 import {
   listLocalPRs,
@@ -659,6 +661,35 @@ describe('api', () => {
       mockResponse({ streaming: true });
       const result = await getProviderCapabilities('prov1');
       expect(result).toEqual({ streaming: true });
+    });
+
+    it('getDeferredDiagnostics returns deferred diagnostics status', async () => {
+      const data = {
+        status: 'completed' as const,
+        diagnostics: [{ path: 'file.ts', line: 1, severity: 'warning' as const, message: 'late warning' }],
+      };
+      mockResponse(data);
+
+      const result = await getDeferredDiagnostics('diag 1');
+
+      expect(result).toEqual(data);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:3100/api/providers/deferred-diagnostics/diag%201',
+        expect.objectContaining({ headers: expect.any(Object) }),
+      );
+    });
+
+    it('restoreFileBackup posts to the file history restore endpoint', async () => {
+      const data = { id: 'backup 1', originalPath: 'file.ts', path: '/tmp/backup.bak', restored: true as const };
+      mockResponse(data);
+
+      const result = await restoreFileBackup('backup 1');
+
+      expect(result).toEqual(data);
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://localhost:3100/api/providers/file-history/backups/backup%201/restore',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({}) }),
+      );
     });
 
     it('getProviderTypeCapabilities', async () => {
