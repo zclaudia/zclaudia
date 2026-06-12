@@ -24,6 +24,7 @@ import { runRipgrep } from './ripgrep-runner.js';
 import { runBash } from './bash-runner.js';
 import * as sandbox from './sandbox.js';
 import { detectSandboxDenial, SANDBOX_NETWORK_ESCALATION_TOOL, MAX_ESCALATION_ITERATIONS } from './sandbox-denial.js';
+import { findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
 import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
@@ -483,6 +484,32 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
       const args = toolParams(toolCallId, params);
       const command = typeof args.command === 'string' ? args.command : '';
       if (!command.trim()) return errorResult('missing_command', 'Bash requires a command');
+
+      // Critical-pattern gate: a second closure alongside the sandbox. Matches
+      // escalate to the user when a permission channel exists, otherwise deny.
+      const critical = findCriticalBashPattern(command);
+      if (critical) {
+        if (!options?.permissionCallback) {
+          return errorResult(
+            'critical_command_blocked',
+            `Command blocked: it matches a critical-risk pattern (${critical.reason}) and no approval channel is available.`,
+          );
+        }
+        const decision = await options.permissionCallback({
+          requestId: `${toolCallId}:critical-bash`,
+          toolName: CRITICAL_BASH_APPROVAL_TOOL,
+          toolInput: { command, reason: critical.reason },
+          detail: `This command matches a critical-risk pattern: ${critical.reason}. Approving runs it once.`,
+          timeoutSeconds: 0,
+          timeoutBehavior: 'deny',
+        });
+        if (decision.behavior !== 'allow') {
+          return errorResult(
+            'critical_command_blocked',
+            `Command blocked by the user: it matches a critical-risk pattern (${critical.reason}).`,
+          );
+        }
+      }
 
       let runCwd: string;
       try {
