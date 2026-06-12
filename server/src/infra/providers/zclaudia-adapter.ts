@@ -26,6 +26,7 @@ import { isSandboxAvailable } from './pi-runtime/sandbox.js';
 import { SANDBOX_NETWORK_ESCALATION_TOOL } from './pi-runtime/sandbox-denial.js';
 import { loadSessionSandboxDomains } from '../../application/conversation/agent/permission-memory.js';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
+import { captureContextSnapshot, recordContextUsage } from './context-snapshot.js';
 import { resolveImageAttachments } from '../../application/conversation/runtime/resolve-image-attachments.js';
 import { getFileStore } from '../storage/fileStore.js';
 
@@ -466,6 +467,28 @@ export class ZClaudiaAdapter implements ProviderAdapter {
       ? baseSystemPrompt + PLAN_MODE_SYSTEM_PROMPT_SUFFIX
       : baseSystemPrompt;
 
+    // Context snapshot for the /context command. The skill catalog is counted
+    // separately from the base prompt; the external provider catalog and the
+    // plan-mode suffix ride with the base prompt. Keyed by the zclaudia
+    // session id (what the desktop knows), not the adapter-local sessionId.
+    if (options.claudiaSessionId) {
+      captureContextSnapshot({
+        sessionId: options.claudiaSessionId,
+        model: ctx.model,
+        contextWindow: effectiveContextWindow,
+        contextWindowSource,
+        systemPromptText: (options.systemPrompt ?? '')
+          + externalProviderCatalog
+          + (isPlanMode ? PLAN_MODE_SYSTEM_PROMPT_SUFFIX : ''),
+        skillCatalogText: skillCatalog + activeSkillContext,
+        tools: tools.map((t) => ({
+          name: t.name,
+          description: t.description,
+          parameters: t.parameters,
+        })),
+      });
+    }
+
     // Queue is created before agentOpts so the onRetry callback can push
     // retry_scheduled messages without a forward reference to the queue.
     const queue = new AsyncQueue<ClaudeMessage>();
@@ -545,6 +568,15 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const messages = (event as any).messages as AgentMessage[];
         const usage = extractUsage(messages);
+
+        if (options.claudiaSessionId) {
+          recordContextUsage(options.claudiaSessionId, {
+            input: usage.input,
+            output: usage.output,
+            cacheRead: usage.cacheRead,
+            cacheWrite: usage.cacheWrite,
+          });
+        }
 
         // Surface LLM-level errors that pi-agent-core's loop quietly absorbs
         // (it routes `error` and `done` stop reasons through the same
