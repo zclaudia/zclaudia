@@ -1415,6 +1415,7 @@ function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
 }
 
 function createAgentTool(
+  cwd: string,
   sessionId?: string,
   runId?: string,
   db?: Database.Database,
@@ -1424,13 +1425,14 @@ function createAgentTool(
   return {
     name: 'Agent',
     label: 'Agent',
-    description: 'Delegate work to a background sub-agent task.',
+    description: 'Delegate work to a background sub-agent task. Set isolation:"worktree" to run it in an ephemeral git worktree so parallel agents never conflict on files; a clean worktree is removed automatically, one with changes is kept and reported.',
     parameters: {
       type: 'object',
       properties: {
         prompt: { type: 'string' },
         description: { type: 'string' },
         wait: { type: 'boolean' },
+        isolation: { type: 'string', enum: ['worktree'], description: 'Run the sub-agent in an isolated git worktree' },
       },
       required: ['prompt'],
     } as any,
@@ -1453,6 +1455,8 @@ function createAgentTool(
           prompt: args.prompt,
           wait: Boolean(args.wait),
           permissionOverride: args.permission_override ?? args.permissionOverride ?? permissionOverride,
+          cwd,
+          ...(args.isolation === 'worktree' ? { isolation: 'worktree' } : {}),
         },
       });
 
@@ -1716,7 +1720,8 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   ReadMcpResource: (_cwd, options) => createReadMcpResourceTool(options?.db),
   TaskOutput: (_cwd, options) => createTaskOutputTool(options?.db),
   Monitor: (_cwd, options) => createMonitorTool(options?.sessionId, options?.runId, options?.db),
-  Agent: (_cwd, options) => createAgentTool(
+  Agent: (cwd, options) => createAgentTool(
+    cwd,
     options?.sessionId,
     options?.runId,
     options?.db,

@@ -1,6 +1,12 @@
 import type Database from 'better-sqlite3';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { newId } from '../../utils/uuid.js';
+import {
+  createAgentWorktree,
+  cleanupAgentWorktree,
+  isGitRepository,
+  type AgentWorktree,
+} from '../../utils/agent-worktrees.js';
 import { ClaudiaBranchService } from './claudia-branch-service.js';
 
 const VIRTUAL_CLIENT_TIMEOUT_MS = 30 * 60 * 1000;
@@ -23,6 +29,10 @@ export interface AgentRunnerTask {
   initiator: 'system' | 'claudia';
   llmProfileId?: string;
   permissionOverride?: Partial<import('@zclaudia/shared/interaction/permissions').UnifiedPermissionPolicy>;
+  /** Parent workspace root; the subagent runs here unless isolated. */
+  cwd?: string | null;
+  /** 'worktree': run in an ephemeral git worktree of cwd (removed when clean). */
+  isolation?: 'worktree' | null;
   retryCount: number;
   maxRetries: number;
   createdAt: number;
@@ -75,6 +85,39 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
       const sessionId = resolveSession(task);
       callbacks.onStarted(sessionId);
 
+      // Worktree isolation: the subagent gets its own ephemeral checkout so
+      // parallel agents never trample each other's files. Falls back to the
+      // parent cwd when the workspace is not a git repo or creation fails.
+      let agentWorktree: AgentWorktree | undefined;
+      let workingDirectory = task.cwd ?? undefined;
+      if (task.isolation === 'worktree' && task.cwd) {
+        if (isGitRepository(task.cwd)) {
+          try {
+            agentWorktree = createAgentWorktree(task.cwd, task.id);
+            workingDirectory = agentWorktree.path;
+          } catch (err) {
+            console.warn(`[AgentTaskRunner] worktree isolation failed for task ${task.id}; running in place:`, err);
+          }
+        } else {
+          console.warn(`[AgentTaskRunner] task ${task.id} requested worktree isolation but ${task.cwd} is not a git repository`);
+        }
+      }
+
+      /** Idempotent; returns a note when the worktree is kept because it has work in it. */
+      function settleWorktree(): string | undefined {
+        if (!agentWorktree || !task.cwd) return undefined;
+        const worktree = agentWorktree;
+        agentWorktree = undefined;
+        const cleanup = cleanupAgentWorktree(task.cwd, worktree);
+        if (cleanup.removed) return undefined;
+        if (cleanup.reason === 'error') {
+          console.warn(`[AgentTaskRunner] failed to clean up worktree ${worktree.path} for task ${task.id}`);
+          return undefined;
+        }
+        return `Worktree kept at ${worktree.path} (branch ${worktree.branch}) — it contains the agent's ${
+          cleanup.reason === 'has_commits' ? 'commits' : 'uncommitted changes'}.`;
+      }
+
       const clientId = `orchestrator-${task.id}`;
       const clients = deps.getClients();
       let settled = false;
@@ -90,6 +133,7 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
         if (!settled) {
           console.warn(`[AgentTaskRunner] Virtual client timeout for task ${task.id}`);
           cleanupVirtualClient();
+          settleWorktree();
           callbacks.onFailed('Task timed out (30 minutes)');
         }
       }, VIRTUAL_CLIENT_TIMEOUT_MS);
@@ -108,16 +152,19 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
               toolCount++;
             } else if (msg.type === 'run_completed') {
               cleanupVirtualClient();
+              const worktreeNote = settleWorktree();
               const stripped = fullContent.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
               const summary = stripped.slice(0, 200) || 'Task completed';
               callbacks.onCompleted({
-                resultSummary: summary,
-                responseText: fullContent,
+                resultSummary: worktreeNote ? `${summary}\n${worktreeNote}` : summary,
+                responseText: worktreeNote ? `${fullContent}\n\n[${worktreeNote}]` : fullContent,
                 toolCount,
               });
             } else if (msg.type === 'run_failed') {
               cleanupVirtualClient();
-              callbacks.onFailed((msg as { error?: string }).error || 'Task failed');
+              const worktreeNote = settleWorktree();
+              const baseError = (msg as { error?: string }).error || 'Task failed';
+              callbacks.onFailed(worktreeNote ? `${baseError} (${worktreeNote})` : baseError);
             }
           } catch (err) {
             console.error(`[AgentTaskRunner] Error in virtual client send for task ${task.id}:`, err);
@@ -135,6 +182,7 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
           input: task.task,
           llmProfileId: task.llmProfileId,
           permissionOverride: task.permissionOverride,
+          ...(workingDirectory ? { workingDirectory } : {}),
           _contextTemplate: task.contextTemplate || 'agent',
         },
         deps.db,
@@ -142,6 +190,7 @@ export function createAgentTaskRunner(deps: AgentTaskRunnerDeps): AgentTaskRunne
         clients,
       ).catch((err: unknown) => {
         cleanupVirtualClient();
+        settleWorktree();
         callbacks.onFailed(err instanceof Error ? err.message : 'Failed to start task');
       });
     },
