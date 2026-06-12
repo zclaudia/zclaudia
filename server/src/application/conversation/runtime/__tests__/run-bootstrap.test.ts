@@ -299,7 +299,7 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
       },
     });
 
-    expect(result?.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Grep', 'Glob', 'LS']);
+    expect(result?.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Eval', 'Grep', 'Glob', 'LS']);
     expect(result?.agentProfile.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
   });
 

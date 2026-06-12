@@ -27,6 +27,7 @@ import * as sandbox from './sandbox.js';
 import { detectSandboxDenial, SANDBOX_NETWORK_ESCALATION_TOOL, MAX_ESCALATION_ITERATIONS } from './sandbox-denial.js';
 import { findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
 import { NoopEditGuard } from './noop-edit-guard.js';
+import { getEvalKernel } from './eval-kernel.js';
 import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
 import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
@@ -723,6 +724,48 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         ...(fullOutputPath ? { fullOutputPath } : {}),
         durationMs: result.durationMs,
         sandboxed: wrap.sandboxed,
+      });
+    },
+  } as unknown as AgentTool<any>;
+}
+
+function createEvalBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTool<any> {
+  return {
+    name: 'Eval',
+    label: 'Eval',
+    description: 'Run JavaScript in a persistent per-session Node kernel (much faster than Bash for data processing — state survives across calls). var/function/const declarations persist between cells. Cells containing `await` run in an async wrapper: use `return` for the result value and globalThis.x for cross-cell persistence. console output is captured. Runs under the same sandbox policy as Bash. Set reset:true to start a fresh kernel.',
+    parameters: {
+      type: 'object',
+      properties: {
+        code: { type: 'string', description: 'JavaScript code to evaluate' },
+        timeout: { type: 'number', description: 'Per-cell timeout in seconds (default 30, max 600). On timeout the kernel restarts and state is lost.' },
+        reset: { type: 'boolean', default: false, description: 'Discard kernel state before running' },
+      },
+      required: ['code'],
+    } as any,
+    execute: async (toolCallId: string, params: unknown) => {
+      const args = toolParams(toolCallId, params);
+      if (typeof args.code !== 'string' || !args.code.trim()) {
+        return errorResult('missing_code', 'Eval requires code');
+      }
+      const readOnly = options?.sandboxReadOnly === true;
+      const kernelKey = `${options?.sessionId ?? `cwd:${cwd}`}:${readOnly ? 'ro' : 'rw'}`;
+      const kernel = getEvalKernel(kernelKey, { workspaceRoot: cwd, readOnly });
+      const timeoutMs = typeof args.timeout === 'number' && Number.isFinite(args.timeout)
+        ? args.timeout * 1000
+        : undefined;
+      const result = await kernel.exec(args.code, {
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        reset: args.reset === true,
+      });
+      let text = result.output || '';
+      if (result.error) text = text ? `${text}\n${result.error}` : result.error;
+      if (!text) text = '(no output)';
+      return textResult(text, {
+        ok: result.ok,
+        ...(result.timedOut ? { timedOut: true } : {}),
+        ...(result.kernelRestarted ? { kernelRestarted: true } : {}),
+        ...(result.sandboxed !== undefined ? { sandboxed: result.sandboxed } : {}),
       });
     },
   } as unknown as AgentTool<any>;
@@ -1707,6 +1750,7 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   Write: (cwd, options) => createFileWriteBridgeTool(cwd, options),
   Edit: (cwd, options) => createFileEditBridgeTool(cwd, options),
   Bash: (cwd, options) => createBashBridgeTool(cwd, options),
+  Eval: (cwd, options) => createEvalBridgeTool(cwd, options),
   Grep: (cwd) => createGrepBridgeTool(cwd),
   Glob: (cwd) => createGlobTool(cwd),
   LS: (cwd) => createLsBridgeTool(cwd),

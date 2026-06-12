@@ -3,6 +3,7 @@ export const ALL_TOOL_NAMES = [
   'Write',
   'Edit',
   'Bash',
+  'Eval',
   'Grep',
   'Glob',
   'LS',
@@ -191,6 +192,17 @@ export const BUILTIN_TOOL_METADATA: Readonly<Record<ToolName, ToolMetadata>> = {
     requiresUserInteraction: false,
     riskLevel: 'high',
   },
+  Eval: {
+    ref: { source: 'builtin', name: 'Eval' },
+    label: 'Eval',
+    description: 'Run JavaScript in a persistent per-session kernel (sandboxed like Bash).',
+    setIds: ['core-coding'],
+    declaredReadOnly: false,
+    mutatesWorkspace: true,
+    requiresNetwork: true,
+    requiresUserInteraction: false,
+    riskLevel: 'high',
+  },
   Grep: {
     ref: { source: 'builtin', name: 'Grep' },
     label: 'Grep',
@@ -362,7 +374,7 @@ export const BUILTIN_TOOL_SETS = {
   'core-coding': {
     id: 'core-coding',
     label: 'Core Coding',
-    tools: ['Read', 'Write', 'Edit', 'Bash', 'Grep', 'Glob', 'LS'],
+    tools: ['Read', 'Write', 'Edit', 'Bash', 'Eval', 'Grep', 'Glob', 'LS'],
   },
   interaction: {
     id: 'interaction',
