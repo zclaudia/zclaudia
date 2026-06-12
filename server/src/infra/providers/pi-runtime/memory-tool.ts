@@ -88,6 +88,11 @@ function numberedLines(content: string, range?: [number, number]): string {
     .join('\n');
 }
 
+// Concurrency invariant: every command below uses only synchronous fs calls
+// with no await between read and write, so commands are atomic w.r.t. this
+// process's event loop (concurrent runs interleave at whole-command granularity,
+// worst case last-write-wins). Converting to fs.promises would break this —
+// add locking (see file-write-lock.ts) before doing so.
 export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
   if (!options.memoryDir) {
     // An empty memoryDir would resolve the /memories root to process cwd — refuse loudly.
