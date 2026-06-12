@@ -21,6 +21,8 @@ export interface BashRunOptions {
    * disarmed and the caller takes over the live child (auto-background).
    */
   autoBackgroundMs?: number;
+  /** Fires the same handoff on demand (user-requested "send to background"). */
+  backgroundSignal?: AbortSignal;
 }
 
 export interface BashHandoff {
@@ -196,35 +198,43 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     if (signal) signal.addEventListener('abort', onAbort, { once: true });
 
     let handedOff = false;
+    let finished = false;
     let handoffTimer: NodeJS.Timeout | undefined;
-    if (opts.autoBackgroundMs && opts.autoBackgroundMs > 0) {
-      handoffTimer = setTimeout(() => {
-        handedOff = true;
-        // Disarm the kill timeout and abort listener: the child now belongs to
-        // the adopter (background task) and must not die with this call.
-        if (timer) clearTimeout(timer);
-        if (signal) signal.removeEventListener('abort', onAbort);
-        const { display, truncated } = truncateTail(full, maxLines, maxBytes);
-        resolve({
-          exitCode: null, output: display, fullOutput: full, truncated,
-          timedOut: false, aborted: false, durationMs: Date.now() - startedAt,
-          stderrOutput: stderrChunks.join(''),
-          handoff: {
-            child,
-            detach: () => {
-              child.stdout?.off('data', onData);
-              child.stderr?.off('data', onStderrData);
-            },
+    const performHandoff = () => {
+      if (handedOff || finished) return;
+      handedOff = true;
+      // Disarm the kill timeout and abort listener: the child now belongs to
+      // the adopter (background task) and must not die with this call.
+      if (timer) clearTimeout(timer);
+      if (handoffTimer) clearTimeout(handoffTimer);
+      if (signal) signal.removeEventListener('abort', onAbort);
+      opts.backgroundSignal?.removeEventListener('abort', performHandoff);
+      const { display, truncated } = truncateTail(full, maxLines, maxBytes);
+      resolve({
+        exitCode: null, output: display, fullOutput: full, truncated,
+        timedOut: false, aborted: false, durationMs: Date.now() - startedAt,
+        stderrOutput: stderrChunks.join(''),
+        handoff: {
+          child,
+          detach: () => {
+            child.stdout?.off('data', onData);
+            child.stderr?.off('data', onStderrData);
           },
-        });
-      }, opts.autoBackgroundMs);
+        },
+      });
+    };
+    if (opts.autoBackgroundMs && opts.autoBackgroundMs > 0) {
+      handoffTimer = setTimeout(performHandoff, opts.autoBackgroundMs);
     }
+    opts.backgroundSignal?.addEventListener('abort', performHandoff, { once: true });
 
     const finish = (exitCode: number | null) => {
       if (timer) clearTimeout(timer);
       if (handoffTimer) clearTimeout(handoffTimer);
       if (signal) signal.removeEventListener('abort', onAbort);
+      opts.backgroundSignal?.removeEventListener('abort', performHandoff);
       if (handedOff) return; // already resolved with a handoff; adopter owns the child
+      finished = true;
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
       resolve({ exitCode, output: display, fullOutput: full, truncated, timedOut, aborted, durationMs: Date.now() - startedAt, stderrOutput: stderrChunks.join('') });
     };

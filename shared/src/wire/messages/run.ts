@@ -226,6 +226,15 @@ export interface StopBackgroundTaskMessage {
   taskCommand?: string;
 }
 
+// Move a currently-running foreground Bash command into a background task
+// (Client → Server). Without toolUseId, the session's oldest in-flight
+// foreground command is converted.
+export interface BackgroundRunningCommandMessage {
+  type: 'background_running_command';
+  sessionId: string;
+  toolUseId?: string;
+}
+
 // Background task status update (Server → Client)
 export type BackgroundTaskStatus = 'running' | 'paused' | 'completed' | 'failed';
 

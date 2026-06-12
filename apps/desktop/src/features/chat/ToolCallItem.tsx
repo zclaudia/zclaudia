@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect, useRef, memo } from 'react';
 import { type ToolCallState } from '../../stores/chatStore';
 import { getToolIcon } from '../../config/icons';
 import { Icon } from '../../components/ui/Icon';
-import { CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight } from 'lucide-react';
+import { CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, SendToBack } from 'lucide-react';
+import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
@@ -48,6 +49,8 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
   }, [toolCall.status, toolCall.toolName, toolCall.semantic]);
   const { toolName, toolInput, status, result, isError, activity, semantic, effect } = toolCall;
   const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
+  const { sendMessage } = useConnection();
+  const [backgroundRequested, setBackgroundRequested] = useState(false);
   const pendingPromptRequest = usePromptRequestStore((s) => {
     if (!selectedSessionId || toolName !== 'AskUserQuestion') return null;
     for (let i = s.pendingRequests.length - 1; i >= 0; i--) {
@@ -149,6 +152,29 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
           {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         </span>
       </button>
+
+      {/* Running Bash: let the user free the session by sending the command to background */}
+      {status === 'running' && toolName === 'Bash' && selectedSessionId && (
+        <div className="px-3 pb-2 -mt-1 pl-9">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (backgroundRequested) return;
+              setBackgroundRequested(true);
+              sendMessage({
+                type: 'background_running_command',
+                sessionId: selectedSessionId,
+                toolUseId: toolCall.id,
+              });
+            }}
+            disabled={backgroundRequested}
+            className="inline-flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
+          >
+            <SendToBack size={11} />
+            {backgroundRequested ? 'Moving to background…' : 'Send to background'}
+          </button>
+        </div>
+      )}
 
       {/* Subagent activity indicator — shows what the Agent is currently doing */}
       {status === 'running' && activity && toolName === 'Agent' && (

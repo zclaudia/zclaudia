@@ -21,7 +21,8 @@ import { createCommandDiagnosticsProvider, type CommandDiagnosticsOptions } from
 import { composeWriteLifecycleHooks, createFileChangeLifecycleHooks, type FileChangeNotifier } from './file-change-notifier.js';
 import { createLspDiagnosticsAdapter, type LspTransport } from './lsp-diagnostics-adapter.js';
 import { runRipgrep } from './ripgrep-runner.js';
-import { runBash, killProcessTree } from './bash-runner.js';
+import { runBash, killProcessTree, type BashRunOptions } from './bash-runner.js';
+import { registerInflightForegroundCommand } from './inflight-bash-registry.js';
 import * as sandbox from './sandbox.js';
 import { detectSandboxDenial, SANDBOX_NETWORK_ESCALATION_TOOL, MAX_ESCALATION_ITERATIONS } from './sandbox-denial.js';
 import { findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
@@ -565,6 +566,29 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
         ? ((options?.bashAutoBackgroundMs ?? DEFAULT_AUTO_BACKGROUND_MS) || undefined)
         : undefined;
 
+      // Manual "send to background": while the command runs, the UI can fire
+      // this controller through the inflight registry and the runner performs
+      // the same handoff as the auto-background timer. Allowed even with an
+      // explicit timeout — the user's request overrides the wait intent.
+      const canBackgroundConvert = !!options?.db && options?.sandboxReadOnly !== true;
+      const manualBackground = canBackgroundConvert ? new AbortController() : undefined;
+      const runForegroundBash = async (bashOpts: BashRunOptions) => {
+        const unregisterInflight = manualBackground && options?.sessionId
+          ? registerInflightForegroundCommand({
+              sessionId: options.sessionId,
+              toolUseId: toolCallId,
+              command,
+              startedAt: Date.now(),
+              requestBackground: () => manualBackground.abort(),
+            })
+          : undefined;
+        try {
+          return await runBash({ ...bashOpts, backgroundSignal: manualBackground?.signal });
+        } finally {
+          unregisterInflight?.();
+        }
+      };
+
       let lastEmit = 0;
       const onChunk = onUpdate
         ? (text: string) => {
@@ -585,7 +609,7 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
       if (!wrap.sandboxed && options?.sandboxReadOnly === true) {
         return errorResult('sandbox_unavailable_plan_mode', 'Read-only Bash requires the sandbox, which is not active for this command');
       }
-      let result = await runBash({
+      let result = await runForegroundBash({
         command, cwd: runCwd, timeoutSec, signal, onChunk, autoBackgroundMs,
         sandbox: wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined,
       });
@@ -623,7 +647,7 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
           signal,
         });
         if (!wrap.sandboxed) break; // re-wrap degraded; do not re-run unsandboxed
-        result = await runBash({
+        result = await runForegroundBash({
           command, cwd: runCwd, timeoutSec, signal, onChunk, autoBackgroundMs,
           sandbox: { argv: wrap.argv!, env: wrap.env! },
         });
@@ -646,10 +670,12 @@ function createBashBridgeTool(cwd: string, options?: ToolBridgeOptions): AgentTo
           handoff.detach();
           const adopted = executor.adopt(task, handoff.child, result.fullOutput);
           service.startTask(task.id, { executorRef: adopted.executorRef });
-          const seconds = Math.round((autoBackgroundMs ?? 0) / 1000);
+          const reason = manualBackground?.signal.aborted
+            ? 'Moved to background at the user\'s request'
+            : `Still running after ${Math.round((autoBackgroundMs ?? 0) / 1000)}s — moved to background`;
           const tail = result.output ? `${result.output}\n\n` : '';
           return textResult(
-            `${tail}[Still running after ${seconds}s — moved to background task ${task.id}. `
+            `${tail}[${reason} as task ${task.id}. `
               + `Poll with TaskOutput({ task_id: "${task.id}" }); stop with Monitor({ action: "stop", task_id: "${task.id}" }).]`,
             {
               ok: true,

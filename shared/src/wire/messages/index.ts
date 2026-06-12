@@ -27,7 +27,7 @@ import type {
 } from './core.js';
 import type {
   RunStartMessage, RunCancelMessage, RunSteerMessage, KillLeakedProcessesMessage,
-  StopBackgroundTaskMessage, AgentStartMessage, AgentCancelMessage,
+  StopBackgroundTaskMessage, BackgroundRunningCommandMessage, AgentStartMessage, AgentCancelMessage,
 } from './run.js';
 import type {
   GetProjectsMessage, GetSessionsMessage, GetServersMessage,
@@ -75,6 +75,7 @@ export type ClientMessage =
   | RunSteerMessage
   | KillLeakedProcessesMessage
   | StopBackgroundTaskMessage
+  | BackgroundRunningCommandMessage
   | PermissionDecisionMessage
   | PromptAnswerMessage
   | PingMessage

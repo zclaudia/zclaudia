@@ -90,6 +90,9 @@ export class CommandTaskExecutor implements TaskExecutor {
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
     const stream = createWriteStream(logPath, { flags: 'a' });
+    stream.on('error', (err) => {
+      console.warn(`[CommandTaskExecutor] adopted task ${task.id} log stream error:`, err.message);
+    });
     if (initialOutput) stream.write(initialOutput);
     child.stdout?.on('data', (chunk) => stream.write(chunk));
     child.stderr?.on('data', (chunk) => stream.write(chunk));

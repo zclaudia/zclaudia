@@ -30,6 +30,7 @@ import {
 import {
   handleKillLeakedProcesses, handleStopBackgroundTask, handleAgentCancel, handleRunSteer,
 } from '../handlers/run.js';
+import { requestBackgroundForCommand } from '../../../infra/providers/pi-runtime/inflight-bash-registry.js';
 import { broadcastRunMessage } from './broadcast.js';
 import {
   handleClaudiaMessage, handleClaudiaTaskSubmit, handleClaudiaTaskContinue, handleClaudiaTaskCancel,
@@ -120,6 +121,16 @@ export async function handleClientMessage(
       }
       await handleStopBackgroundTask(client, message, db, ctx.activeRuns, ctx.findProcessPidsByTaskCommand, ctx.providerRegistry);
       break;
+
+    case 'background_running_command': {
+      const conversion = requestBackgroundForCommand(message.sessionId, message.toolUseId);
+      if (!conversion.ok) {
+        sendMessage(client.ws, { type: 'error', code: 'NO_INFLIGHT_COMMAND', message: conversion.reason } as ErrorMessage);
+      }
+      // On success the tool result (background:true) and the task_notification
+      // broadcast arrive through the normal run/task event flow.
+      break;
+    }
 
     // ── Notifications ──
     case 'get_notifications':
