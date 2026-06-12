@@ -8,6 +8,7 @@ import { ToolCallList } from './tool-call/ToolCallList';
 import { FilePushCard } from './FilePushNotification';
 import { FilePreviewModal } from './FilePreviewModal';
 import { CompactionMarkerCard } from './CompactionMarkerCard';
+import { ContextUsageCard } from './ContextUsageCard';
 import type { MessageWithToolCalls, ToolCallState } from '../../stores/chatStore';
 import type { ContentBlock, ThinkingBlock as ThinkingBlockMeta } from '@zclaudia/shared';
 import { useFilePushStore, type FilePushItem } from '../../stores/filePushStore';
@@ -200,8 +201,9 @@ export const MessageList = memo(function MessageList({
   // otherwise be filtered out below — keep them by detecting the metadata sentinel.
   const filteredMessages = useMemo(() => {
     return (messages || []).filter((message) => {
-      // Compaction markers always pass — even though their role is 'system' and content is empty.
+      // Compaction markers and /context cards always pass — even though their role is 'system' and content is empty.
       if (message.metadata?.compactionMarker) return true;
+      if (message.metadata?.contextUsage) return true;
 
       // Filter out empty assistant messages (placeholders from run_started that never received content)
       if (message.role === 'assistant') {
@@ -305,6 +307,19 @@ export const MessageList = memo(function MessageList({
           className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-primary/5' : ''}`}
         >
           <CompactionMarkerCard marker={message.metadata.compactionMarker} />
+        </div>
+      );
+    }
+
+    // /context card dispatch — synthetic, frontend-only system message.
+    if (message.metadata?.contextUsage) {
+      return (
+        <div
+          key={message.id}
+          data-message-id={message.id}
+          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-primary/5' : ''}`}
+        >
+          <ContextUsageCard usage={message.metadata.contextUsage} />
         </div>
       );
     }
