@@ -56,6 +56,27 @@ describe('remediationForResult', () => {
     expect(hint).toMatch(/generated|source/i);
   });
 
+  it('steers to a workspace-relative path on sandbox write-outside-workspace denial', () => {
+    const hint = remediationForResult('Bash', det({
+      ok: false,
+      exitCode: 1,
+      sandboxed: true,
+      sandboxFsDenied: 'write_outside_workspace',
+    }));
+    expect(hint).toMatch(/workspace-relative|workspace root/i);
+    expect(hint).toMatch(/sandbox/i);
+  });
+
+  it('steers to ExitPlanMode on read-only sandbox denial', () => {
+    const hint = remediationForResult('Bash', det({
+      ok: false,
+      exitCode: 1,
+      sandboxed: true,
+      sandboxFsDenied: 'read_only',
+    }));
+    expect(hint).toMatch(/ExitPlanMode|Plan mode/);
+  });
+
   it('points at the full output file when a Bash result was persisted', () => {
     const hint = remediationForResult('Bash', det({ ok: false, exitCode: 1, fullOutputPath: '/tmp/x.log' }));
     // exitCode 1 alone is generic; should not over-explain, but may surface the log

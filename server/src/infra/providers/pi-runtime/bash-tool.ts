@@ -19,6 +19,28 @@ import { detectSandboxDenial, MAX_ESCALATION_ITERATIONS, SANDBOX_NETWORK_ESCALAT
 import { errorResult, textResult, toolParams, truncateText } from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
+export type SandboxFsDenial = 'read_only' | 'write_outside_workspace';
+
+/**
+ * Sandbox FS denials surface as kernel-level EPERM ("Operation not permitted")
+ * or EROFS ("Read-only file system") in bash stderr — both are macOS
+ * sandbox-exec-specific phrasings, so false positives on a normal-Unix Permission
+ * denied are avoided. We split the two reasons so the remediation hint can steer
+ * the model differently (workspace-relative path vs. ExitPlanMode).
+ */
+export function detectSandboxFsDenial(
+  output: string,
+  sandboxed: boolean,
+  readOnly: boolean,
+): SandboxFsDenial | undefined {
+  if (!sandboxed) return undefined;
+  if (/: Read-only file system\b/.test(output)) return 'read_only';
+  if (/: Operation not permitted\b/.test(output)) {
+    return readOnly ? 'read_only' : 'write_outside_workspace';
+  }
+  return undefined;
+}
+
 export interface BashBridgeToolOptions {
   db?: Database.Database;
   sessionId?: string;
@@ -274,6 +296,10 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
       if (footers.length) text = `${text ? text + '\n\n' : ''}[${footers.join('. ')}]`;
       if (!text) text = '(no output)';
 
+      const sandboxFsDenied = result.exitCode !== 0 && !result.timedOut
+        ? detectSandboxFsDenial(result.fullOutput, wrap.sandboxed, options?.sandboxReadOnly === true)
+        : undefined;
+
       return textResult(text, {
         ok: result.exitCode === 0 && !result.timedOut,
         exitCode: result.exitCode,
@@ -282,6 +308,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         ...(fullOutputPath ? { fullOutputPath } : {}),
         durationMs: result.durationMs,
         sandboxed: wrap.sandboxed,
+        ...(sandboxFsDenied ? { sandboxFsDenied } : {}),
       });
     },
   } as unknown as AgentTool<any>;

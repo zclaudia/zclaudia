@@ -648,6 +648,35 @@ describe('ZClaudiaAdapter.run', () => {
     expect(init?.systemInfo?.contextWindowMatchedProvider).toBe('anthropic');
   });
 
+  it('reports the agent profile model in init systemInfo (not the env/default fallback)', async () => {
+    scriptNextAgent([
+      { type: 'agent_start' },
+      { type: 'agent_end', messages: [] },
+    ]);
+
+    const prevEnv = process.env.PI_MODEL;
+    delete process.env.PI_MODEL;
+    try {
+      const adapter = new ZClaudiaAdapter();
+      const out = await collect(adapter, 'hi', {
+        agentProfile: {
+          model: 'kimi-k2.6',
+          systemPrompt: '',
+          enabledTools: [],
+        } as any,
+        llmProfileConfig: {
+          id: 'lp', name: 'p', providerType: 'openai',
+          baseUrl: 'http://example.local/v1',
+          createdAt: 0, updatedAt: 0,
+        } as any,
+      });
+      const init = out.find(m => m.type === 'init');
+      expect(init?.systemInfo?.model).toBe('kimi-k2.6');
+    } finally {
+      if (prevEnv !== undefined) process.env.PI_MODEL = prevEnv;
+    }
+  });
+
   it('reports contextWindowSource=profile_entry when models[*].contextWindow is set', async () => {
     scriptNextAgent([
       { type: 'agent_start' },

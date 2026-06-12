@@ -12,7 +12,7 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
   return {
     name: 'Eval',
     label: 'Eval',
-    description: 'Run JavaScript in a persistent per-session Node kernel (much faster than Bash for data processing - state survives across calls). var/function/const declarations persist between cells. Cells containing `await` run in an async wrapper: use `return` for the result value and globalThis.x for cross-cell persistence. console output is captured. Runs under the same sandbox policy as Bash. Set reset:true to start a fresh kernel.',
+    description: 'Run JavaScript in a persistent per-session Node kernel. Best for arithmetic, parsing already-structured data (JSON in scope, numbers, dates), and transforms over values that live in kernel state from earlier cells. var/function/const declarations persist between cells. Cells containing `await` run in an async wrapper: use `return` for the result value and globalThis.x for cross-cell persistence. console output is captured. Runs under the same sandbox policy as Bash. Set reset:true to start a fresh kernel. Do NOT paste raw search/grep output into the code as string literals to filter it — unescaped quotes break parsing; pipe through Bash/Grep with the right flags (or write a small Bash one-liner) instead.',
     parameters: {
       type: 'object',
       properties: {

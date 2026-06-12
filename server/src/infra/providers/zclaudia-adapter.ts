@@ -282,9 +282,17 @@ export class ZClaudiaAdapter implements ProviderAdapter {
     onPermission?: PermissionCallback,
   ): AsyncGenerator<ClaudeMessage, void, void> {
     const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
+    // ctx.model surfaces in init.systemInfo (the UI's "Model:" badge) and in the
+    // captured context snapshot. Resolution order mirrors buildModel:
+    //   1. agent profile's model (the canonical surface — the editor writes it here)
+    //   2. PI_MODEL env knob (dev-time override)
+    //   3. DEFAULT_MODEL fallback
+    // The literal built by buildModel below may further normalize this (registry
+    // hits use the registry's `id` for the wire call), so after a successful
+    // build we refresh ctx.model from modelInfo.model.id to match what was sent.
     const ctx: TranslateContext = {
       sessionId,
-      model: process.env.PI_MODEL || DEFAULT_MODEL,
+      model: options.agentProfile?.model || process.env.PI_MODEL || DEFAULT_MODEL,
       cwd: options.cwd,
       permissionMode: options.mode === 'plan' ? 'plan' : 'default',
     };
@@ -302,6 +310,11 @@ export class ZClaudiaAdapter implements ProviderAdapter {
         ? options.llmProfileConfig?.models?.find((m) => m.modelId === modelId)
         : undefined;
       modelInfo = buildModel(options.llmProfileConfig, modelId, modelEntry);
+      // Refresh ctx.model to the canonical id post-resolution so the UI badge
+      // and context snapshot reflect exactly what was put on the wire.
+      if (typeof modelInfo.model.id === 'string' && modelInfo.model.id) {
+        ctx.model = modelInfo.model.id;
+      }
       const modelInput = (modelInfo.model as { input?: string[] }).input;
       supportsVision = Array.isArray(modelInput) && modelInput.includes('image');
     } catch (err) {

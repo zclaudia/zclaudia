@@ -24,6 +24,12 @@ const SELF_EXPLANATORY = new Set([
 ]);
 
 function bashHint(details: NonNullable<ToolDetails>): string | undefined {
+  if (details.sandboxFsDenied === 'write_outside_workspace') {
+    return 'The Bash sandbox blocks file writes outside the workspace root. Re-run with a workspace-relative path (e.g. a scratch file at the repo root); or pipe the data straight to the next step instead of staging it in /tmp.';
+  }
+  if (details.sandboxFsDenied === 'read_only') {
+    return 'Plan mode runs Bash read-only — file writes are blocked. Use Read/Grep/Glob/LS to inspect; call ExitPlanMode first if the task genuinely needs to write.';
+  }
   if (details.exitCode === 127) {
     return 'Exit 127 usually means the command was not found — check the name, or that the tool is installed and on PATH.';
   }
