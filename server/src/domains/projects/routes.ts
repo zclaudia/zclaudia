@@ -6,6 +6,7 @@ import { parseUserHooks } from '@zclaudia/shared/interaction/user-hooks';
 import { ProjectRepository } from './repository.js';
 import { ProjectWorktreeService, ProjectNotFoundError, ProjectRootPathMissingError } from './worktree-service.js';
 import { createGitRoutes } from './git-routes.js';
+import { resolveProjectMemoryDir } from '../../utils/memory-paths.js';
 import { WorkflowRepository } from '../workflows/repository.js';
 import {
   applyProjectPatch,
@@ -68,6 +69,29 @@ export function createProjectRoutes(
       res.status(500).json({
         success: false,
         error: { code: 'DB_ERROR', message: 'Failed to fetch project' },
+      });
+    }
+  });
+
+  router.get('/:id/memory-dir', (req: Request, res: Response) => {
+    try {
+      const project = repo.findById(req.params.id);
+      if (!project) {
+        res.status(404).json({
+          success: false,
+          error: { code: 'NOT_FOUND', message: 'Project not found' },
+        });
+        return;
+      }
+      res.json({
+        success: true,
+        data: { memoryDir: resolveProjectMemoryDir(project.id) },
+      } as ApiResponse<{ memoryDir: string }>);
+    } catch (error) {
+      console.error('Error resolving memory dir:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: 'Failed to resolve memory dir' },
       });
     }
   });

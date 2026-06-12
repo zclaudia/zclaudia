@@ -1026,6 +1026,31 @@ describe('projects routes', () => {
     });
   });
 
+  describe('GET /api/projects/:id/memory-dir', () => {
+    it('returns resolved memory dir for an existing project', async () => {
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO projects (id, name, type, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run('p-mem', 'Memory Project', 'code', now, now);
+
+      const res = await request(app).get('/api/projects/p-mem/memory-dir');
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.memoryDir).toBeDefined();
+      expect(res.body.data.memoryDir).toMatch(/memory[/\\]p-mem$/);
+    });
+
+    it('returns 404 for a missing project', async () => {
+      const res = await request(app).get('/api/projects/nonexistent/memory-dir');
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('NOT_FOUND');
+    });
+  });
+
   describe('POST /api/projects/reorder', () => {
     it('updates sort_order without changing updated_at', async () => {
       const now = Date.now();
