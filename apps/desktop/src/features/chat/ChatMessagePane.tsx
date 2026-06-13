@@ -257,6 +257,9 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       onScroll={handleMessagesScroll}
       onWheel={(e) => handleMessageWheel(e.deltaY)}
     >
+      {/* Centered reading column — keeps content from stretching edge-to-edge
+          on wide windows; whitespace falls to both sides like Claude/Cursor. */}
+      <div className="mx-auto w-full max-w-3xl">
       {/* Load more indicator */}
       {sessionPagination?.hasMore && (
         <div className="text-center py-2 mb-2">
@@ -330,14 +333,14 @@ export const ChatMessagePane = memo(function ChatMessagePane({
 
       {/* Active tool calls */}
       {!useStreamingSegmented && sessionToolCalls.length > 0 && (
-        <div className="mt-4 max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
+        <div className="mt-4">
           <ToolCallList toolCalls={sessionToolCalls} />
         </div>
       )}
 
       {/* Inline permission requests */}
       {permissionRequests.length > 0 && (
-        <div className="mt-4 space-y-3 max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
+        <div className="mt-4 space-y-3">
           {permissionRequests.map(req => (
             <InlinePermissionRequest
               key={req.requestId}
@@ -349,7 +352,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       )}
 
       {promptInteractions.length > 0 && (
-        <div className="mt-4 space-y-3 max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
+        <div className="mt-4 space-y-3">
           {promptInteractions.map((interaction) => (
             <InteractionItem key={interaction.interactionId} interaction={interaction} />
           ))}
@@ -357,7 +360,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       )}
 
       {planReviewInteractions.length > 0 && (
-        <div className="mt-4 space-y-3 max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl">
+        <div className="mt-4 space-y-3">
           {planReviewInteractions.map((interaction) => (
             <InteractionItem key={interaction.interactionId} interaction={interaction} />
           ))}
@@ -365,6 +368,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
       )}
 
       <div ref={messagesEndRef} />
+      </div>
 
       {showScrollToBottom && (
         <button
