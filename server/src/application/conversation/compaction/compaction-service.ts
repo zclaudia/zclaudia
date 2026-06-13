@@ -15,6 +15,7 @@ import { SessionCompactionRepository } from '../../../domains/sessions/compactio
 import { rebuildHistory } from '../../../infra/providers/pi-runtime/history-rebuilder.js';
 import { buildModel } from '../../../infra/providers/pi-runtime/build-model.js';
 import { resolveContextWindow } from './context-windows.js';
+import { compactionCircuitBreaker } from './circuit-breaker.js';
 
 export interface CompactionContext {
   db: Database;
@@ -26,29 +27,67 @@ export interface CompactionContext {
   customInstructions?: string;
   source: 'auto' | 'manual';
   signal?: AbortSignal;
+  /** Injectable clock (ms since epoch). Defaults to Date.now(). */
+  now?: number;
 }
 
 export interface CompactionOutcome {
-  compacted: boolean;
+  outcome: 'compacted' | 'skipped' | 'failed' | 'aborted';
+  compacted: boolean;        // === (outcome === 'compacted'); kept for existing readers
   compactionId?: string;
   tokensBefore?: number;
   reason?: string;
+  breaker?: { consecutiveFailures: number; breakerOpen: boolean; nextRetryAtMs?: number };
+}
+
+function skipped(reason: string, tokensBefore?: number, extra?: Partial<CompactionOutcome>): CompactionOutcome {
+  return { outcome: 'skipped', compacted: false, reason, tokensBefore, ...extra };
+}
+
+function classifyFailure(ctx: CompactionContext, err: unknown, now: number): CompactionOutcome {
+  const message = err instanceof Error ? err.message : String(err);
+  const aborted = ctx.signal?.aborted === true || (err instanceof Error && err.name === 'AbortError');
+  if (aborted) {
+    return { outcome: 'aborted', compacted: false, reason: `aborted: ${message}` };
+  }
+  compactionCircuitBreaker.recordFailure(ctx.sessionId, now);
+  return {
+    outcome: 'failed',
+    compacted: false,
+    reason: `error: ${message}`,
+    breaker: compactionCircuitBreaker.snapshot(ctx.sessionId),
+  };
 }
 
 /**
  * Auto entry — checks `shouldCompact` against the resolved context window and
  * runs compaction only when the threshold is exceeded. Intended for the
  * `agent_end` hook in run-events.
+ *
+ * This is the SOLE breaker mutation point for automatic compaction.
  */
 export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
-  const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
-  if (messages.length === 0) return { compacted: false, reason: 'no_messages' };
-  const tokens = estimateContextTokens(messages).tokens;
-  const window = resolveContextWindow(ctx.agentProfile, undefined, ctx.llmProfile).value;
-  if (!shouldCompact(tokens, window, DEFAULT_COMPACTION_SETTINGS)) {
-    return { compacted: false, tokensBefore: tokens, reason: 'below_threshold' };
+  const now = ctx.now ?? Date.now();
+  const decision = compactionCircuitBreaker.evaluate(ctx.sessionId, now);
+  if (decision.action === 'skip') {
+    return skipped('circuit_open', undefined, {
+      breaker: { ...compactionCircuitBreaker.snapshot(ctx.sessionId), breakerOpen: true },
+    });
   }
-  return runCompaction(ctx, messages, dbIds, tokens);
+  try {
+    const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
+    if (messages.length === 0) return skipped('no_messages');
+    const tokens = estimateContextTokens(messages).tokens;
+    const window = resolveContextWindow(ctx.agentProfile, undefined, ctx.llmProfile).value;
+    if (!shouldCompact(tokens, window, DEFAULT_COMPACTION_SETTINGS)) {
+      return skipped('below_threshold', tokens);
+    }
+    const result = await runCompaction(ctx, messages, dbIds, tokens);
+    if (result.outcome === 'compacted') compactionCircuitBreaker.recordSuccess(ctx.sessionId);
+    return result;
+  } catch (err) {
+    return classifyFailure(ctx, err, now);
+  }
 }
 
 /**
@@ -60,12 +99,22 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
  * On short conversations where everything fits inside the keep-recent budget,
  * this correctly returns `no_cut_point` — there's nothing meaningful to
  * compact.
+ *
+ * Does NOT consult the circuit breaker. Resets the breaker on success so that
+ * a successful manual compact clears any accumulated failure state.
  */
 export async function forceCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
-  const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
-  if (messages.length === 0) return { compacted: false, reason: 'no_messages' };
-  const tokens = estimateContextTokens(messages).tokens;
-  return runCompaction(ctx, messages, dbIds, tokens);
+  try {
+    const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
+    if (messages.length === 0) return skipped('no_messages');
+    const tokens = estimateContextTokens(messages).tokens;
+    const result = await runCompaction(ctx, messages, dbIds, tokens);
+    if (result.outcome === 'compacted') compactionCircuitBreaker.reset(ctx.sessionId);
+    return result;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { outcome: 'failed', compacted: false, reason: `error: ${message}` };
+  }
 }
 
 /**
@@ -95,11 +144,11 @@ async function runCompaction(
   const entries = wrapAsEntries(messages);
   const cut = findCutPoint(entries, 0, entries.length, DEFAULT_COMPACTION_SETTINGS.keepRecentTokens);
   if (cut.firstKeptEntryIndex <= 0) {
-    return { compacted: false, tokensBefore: tokens, reason: 'no_cut_point' };
+    return skipped('no_cut_point', tokens);
   }
   const firstKeptDbId = dbIds[cut.firstKeptEntryIndex];
   if (!firstKeptDbId) {
-    return { compacted: false, tokensBefore: tokens, reason: 'cut_point_unmappable' };
+    return skipped('cut_point_unmappable', tokens);
   }
   const toSummarize = messages.slice(0, cut.firstKeptEntryIndex);
 
@@ -120,8 +169,7 @@ async function runCompaction(
     ctx.agentProfile.thinkingLevel,
   );
   if (!result.ok) {
-    const message = result.error instanceof Error ? result.error.message : String(result.error);
-    return { compacted: false, tokensBefore: tokens, reason: `error: ${message}` };
+    throw result.error instanceof Error ? result.error : new Error(String(result.error));
   }
 
   const created = new SessionCompactionRepository(ctx.db).create({
@@ -137,5 +185,5 @@ async function runCompaction(
     customInstructions: ctx.customInstructions,
     createdAt: Date.now(),
   });
-  return { compacted: true, compactionId: created.id, tokensBefore: tokens };
+  return { outcome: 'compacted', compacted: true, compactionId: created.id, tokensBefore: tokens };
 }

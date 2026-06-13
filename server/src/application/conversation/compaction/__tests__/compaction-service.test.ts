@@ -5,6 +5,8 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { SessionCompactionRepository } from '../../../../domains/sessions/compaction-repository.js';
 import { maybeCompact, forceCompact } from '../compaction-service.js';
+import { compactionCircuitBreaker } from '../circuit-breaker.js';
+import * as pi from '@earendil-works/pi-agent-core';
 
 // Mock pi generateSummary to avoid hitting a real LLM. The other pure helpers
 // (shouldCompact / estimateContextTokens / findCutPoint / DEFAULT_COMPACTION_SETTINGS)
@@ -180,5 +182,82 @@ describe('compaction-service', () => {
     expect(result.compacted).toBe(true);
     const created = new SessionCompactionRepository(db).getLatest('s1')!;
     expect(created.firstKeptMessageId).toMatch(/^m\d+$/);
+  });
+});
+
+describe('maybeCompact circuit breaker', () => {
+  beforeEach(() => {
+    compactionCircuitBreaker.clear();
+    vi.mocked(pi.generateSummary).mockReset();
+  });
+
+  it('classifies a generateSummary failure as outcome=failed and records it', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const seed = seedSession(db, 100);
+    const lp = { ...seed.llmProfile, models: [{ modelId: seed.agentProfile.model, contextWindow: 100 }] };
+    vi.mocked(pi.generateSummary).mockResolvedValue({ ok: false, error: new Error('prompt_too_long') } as any);
+
+    const out = await maybeCompact({ db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp, source: 'auto', now: 1000 });
+    expect(out.outcome).toBe('failed');
+    expect(out.compacted).toBe(false);
+    expect(compactionCircuitBreaker.snapshot('s1').consecutiveFailures).toBe(1);
+  });
+
+  it('skips with circuit_open after maxFailures without calling generateSummary', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const seed = seedSession(db, 100);
+    const lp = { ...seed.llmProfile, models: [{ modelId: seed.agentProfile.model, contextWindow: 100 }] };
+    vi.mocked(pi.generateSummary).mockResolvedValue({ ok: false, error: new Error('x') } as any);
+
+    for (let i = 0; i < 3; i++) {
+      await maybeCompact({ db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp, source: 'auto', now: 1000 });
+    }
+    const callsBefore = vi.mocked(pi.generateSummary).mock.calls.length;
+    const out = await maybeCompact({ db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp, source: 'auto', now: 1001 });
+    expect(out.outcome).toBe('skipped');
+    expect(out.reason).toBe('circuit_open');
+    expect(vi.mocked(pi.generateSummary).mock.calls.length).toBe(callsBefore);
+  });
+
+  it('a success clears the failure count', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const seed = seedSession(db, 100);
+    const lp = { ...seed.llmProfile, models: [{ modelId: seed.agentProfile.model, contextWindow: 100 }] };
+    vi.mocked(pi.generateSummary).mockResolvedValueOnce({ ok: false, error: new Error('x') } as any);
+    await maybeCompact({ db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp, source: 'auto', now: 1000 });
+    expect(compactionCircuitBreaker.snapshot('s1').consecutiveFailures).toBe(1);
+    vi.mocked(pi.generateSummary).mockResolvedValue({ ok: true, value: 'SUMMARY' } as any);
+    const out = await maybeCompact({ db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp, source: 'auto', now: 1001 });
+    expect(out.outcome).toBe('compacted');
+    expect(compactionCircuitBreaker.snapshot('s1').consecutiveFailures).toBe(0);
+  });
+
+  it('an aborted compaction does not count as a failure', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const seed = seedSession(db, 100);
+    const lp = { ...seed.llmProfile, models: [{ modelId: seed.agentProfile.model, contextWindow: 100 }] };
+    const ac = new AbortController();
+    ac.abort();
+    vi.mocked(pi.generateSummary).mockResolvedValue({ ok: false, error: new Error('aborted') } as any);
+    const out = await maybeCompact({ db, sessionId: 's1', agentProfile: seed.agentProfile, llmProfile: lp, source: 'auto', signal: ac.signal, now: 1000 });
+    expect(out.outcome).toBe('aborted');
+    expect(compactionCircuitBreaker.snapshot('s1').consecutiveFailures).toBe(0);
+  });
+
+  it('forceCompact success resets the breaker', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const { agentProfile, llmProfile } = seedSession(db, 100);
+    compactionCircuitBreaker.recordFailure('s1', 0);
+    compactionCircuitBreaker.recordFailure('s1', 0);
+    compactionCircuitBreaker.recordFailure('s1', 0);
+    vi.mocked(pi.generateSummary).mockResolvedValue({ ok: true, value: 'SUMMARY' } as any);
+    const out = await forceCompact({ db, sessionId: 's1', agentProfile, llmProfile, source: 'manual' });
+    expect(out.outcome).toBe('compacted');
+    expect(compactionCircuitBreaker.size()).toBe(0);
   });
 });
