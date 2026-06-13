@@ -5,7 +5,7 @@ import { NotificationsPanel } from '../components/notifications/NotificationsPan
 interface MobileOverlaysProps {
   isAgentExpanded: boolean;
   isFeedOpen: boolean;
-  swipeCloseRef: RefObject<HTMLDivElement>;
+  swipeCloseRef: RefObject<HTMLDivElement | null>;
   agentSwipePreview: { mode: 'open' | 'close' | null; progress: number };
   claudiaSwipePreviewProgress: number;
   claudiaOverlayOpacity: number;

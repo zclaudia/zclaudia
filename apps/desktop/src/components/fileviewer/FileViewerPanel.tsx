@@ -117,7 +117,7 @@ interface VirtualizedCodeViewProps {
   theme: PrismTheme;
   highlightStart: number | null;
   highlightEnd: number | null;
-  listRef: React.RefObject<ListImperativeAPI>;
+  listRef: React.RefObject<ListImperativeAPI | null>;
 }
 
 /**

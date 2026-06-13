@@ -183,7 +183,7 @@ function AppContent() {
   useAndroidBack(() => setSidebarOpen(true), isMobile && !sidebarOpen && !isAgentExpanded && !fileViewerFullscreen, 5);
 
   // --- Mobile swipe gestures ---
-  const swipeOpenClaudiaRef = useSwipeBack({
+  const swipeOpenClaudiaRef = useSwipeBack<HTMLElement>({
     onSwipe: () => setAgentExpanded(true),
     onProgress: (progress) => setAgentSwipePreview(progress > 0 ? { mode: 'open', progress } : { mode: null, progress: 0 }),
     enabled: isMobile && !isAgentExpanded && !sidebarOpen && !fileViewerFullscreen,

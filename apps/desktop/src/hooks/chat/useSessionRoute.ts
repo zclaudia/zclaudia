@@ -91,7 +91,7 @@ export function useSessionRoute(
     backends,
   );
   const catchUpSignatureRef = useRef<string | null>(null);
-  const prevStreamStateRef = useRef<string | undefined>();
+  const prevStreamStateRef = useRef<string | undefined>(undefined);
   const lastRecoveryGenerationRef = useRef(0);
 
   useEffect(() => {

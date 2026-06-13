@@ -36,7 +36,7 @@ interface SwipeState {
   source: 'touch' | 'pointer' | null;
 }
 
-export function useSwipeBack(options: UseSwipeBackOptions) {
+export function useSwipeBack<E extends HTMLElement = HTMLDivElement>(options: UseSwipeBackOptions) {
   const {
     onSwipe,
     onProgress,
@@ -55,7 +55,7 @@ export function useSwipeBack(options: UseSwipeBackOptions) {
     startX: 0, startY: 0, startTime: 0, tracking: false, source: null,
   });
 
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<E>(null);
 
   const beginTracking = useCallback((source: 'touch' | 'pointer', x: number, y: number) => {
     if (!enabled) return;

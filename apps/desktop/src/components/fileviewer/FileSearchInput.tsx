@@ -15,7 +15,7 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   // Auto-focus on mount
   useEffect(() => {

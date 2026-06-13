@@ -18,8 +18,8 @@ const AUTO_STICK_BOTTOM_THRESHOLD_PX = 200;
 interface ChatMessagePaneProps {
   sessionId: string;
   // Pagination / scroll refs & state
-  messagesEndRef: RefObject<HTMLDivElement>;
-  messagesContainerRef: RefObject<HTMLDivElement>;
+  messagesEndRef: RefObject<HTMLDivElement | null>;
+  messagesContainerRef: RefObject<HTMLDivElement | null>;
   initialLoadDone: boolean;
   showScrollToBottom: boolean;
   scrollMetrics: { scrollTop: number; viewportHeight: number };
