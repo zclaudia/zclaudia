@@ -1,4 +1,6 @@
-import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff } from 'lucide-react';
+import { useState } from 'react';
+import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff, Bot, Cpu, FolderOpen, PieChart, ChevronDown } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import type { Session, Project } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
@@ -32,6 +34,7 @@ interface SessionHeaderProps {
   archiveDisabled?: boolean;
   onPopOut: () => void;
   onToggleSessionMenu: () => void;
+  contextPercent?: number | null;
 }
 
 export function SessionHeader({
@@ -54,7 +57,9 @@ export function SessionHeader({
   archiveDisabled = false,
   onPopOut,
   onToggleSessionMenu,
+  contextPercent = null,
 }: SessionHeaderProps) {
+  const [showInfo, setShowInfo] = useState(false);
   const activeServerId = useServerStore(s => s.activeServerId);
   const connectionQuality = useServerStore(s =>
     activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined,
@@ -124,15 +129,51 @@ export function SessionHeader({
           </button>
         </div>
       )}
-      <div className="hidden sm:flex min-w-0 shrink-0 items-center gap-1.5 text-[9px] leading-none text-muted-foreground">
-        <span className="uppercase leading-none tracking-[0.16em] text-muted-foreground/70">Session</span>
-        <span
-          className="inline-flex h-4 items-center rounded-full border border-border/70 bg-muted/45 px-1.5 text-[9px] font-medium leading-none text-muted-foreground"
-          title={agentLabel}
-        >
-          {agentLabel}
-        </span>
-      </div>
+      {/* Session info chip — agent/model + context%, opens a details popover */}
+      {currentSession.type !== 'background' && (
+        <div className="relative hidden shrink-0 sm:block">
+          <button
+            onClick={() => setShowInfo((v) => !v)}
+            className={`inline-flex max-w-[260px] items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] leading-none transition-colors ${showInfo ? 'border-border bg-secondary text-foreground' : 'border-border/70 bg-muted/40 text-muted-foreground hover:text-foreground'}`}
+            title="Session info"
+            aria-haspopup="dialog"
+            aria-expanded={showInfo}
+          >
+            <Cpu size={12} className="shrink-0" />
+            <span className="truncate">{agentLabel}</span>
+            {contextPercent != null && (
+              <span className="shrink-0 text-muted-foreground/80">· {contextPercent}%</span>
+            )}
+            <ChevronDown size={11} className="shrink-0 opacity-70" />
+          </button>
+          {showInfo && (
+            <>
+              <div className="fixed inset-0 z-[70]" onClick={() => setShowInfo(false)} />
+              <div
+                role="dialog"
+                className="absolute right-0 top-full z-[80] mt-1.5 w-64 rounded-xl border border-border/80 bg-card p-3 shadow-xl"
+              >
+                <div
+                  className="mb-2 truncate text-[13px] font-semibold text-foreground"
+                  title={currentSession.name || 'Untitled Session'}
+                >
+                  {currentSession.name || 'Untitled Session'}
+                </div>
+                <div className="flex flex-col gap-2 text-xs">
+                  <InfoRow icon={Bot} label="Agent" value={agent?.name ?? DEFAULT_AGENT_LABEL} />
+                  {agent?.model && <InfoRow icon={Cpu} label="Model" value={agent.model} />}
+                  {currentSession.workingDirectory && (
+                    <InfoRow icon={FolderOpen} label="Path" value={currentSession.workingDirectory} mono />
+                  )}
+                  {contextPercent != null && (
+                    <InfoRow icon={PieChart} label="Context" value={`${contextPercent}%`} />
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
       {/* currentProject is retained on the props contract — T4 will use it to surface
           agent / project metadata in a richer header layout. */}
       <span className="hidden" data-stub-project-id={currentProject?.id} />
@@ -256,6 +297,31 @@ export function SessionHeader({
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function InfoRow({
+  icon: Icon,
+  label,
+  value,
+  mono = false,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <Icon size={14} className="shrink-0 text-muted-foreground" />
+      <span className="w-12 shrink-0 text-muted-foreground">{label}</span>
+      <span
+        className={`min-w-0 flex-1 truncate text-right text-foreground ${mono ? 'font-mono text-[11px]' : ''}`}
+        title={value}
+      >
+        {value}
+      </span>
     </div>
   );
 }

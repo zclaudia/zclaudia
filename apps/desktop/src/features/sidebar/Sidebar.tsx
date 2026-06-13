@@ -1,6 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus } from 'lucide-react';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
 import { ProjectSettings } from '../settings/ProjectSettings';
 import { SettingsPanel } from '../../components/SettingsPanel';
@@ -156,18 +155,6 @@ export function Sidebar({
   });
 
   const settingsProject = settingsProjectId ? visibleProjects.find(p => p.id === settingsProjectId) || null : null;
-
-  // "New session" targets the current session's project, else the first visible
-  // project. Disabled when there are no projects to create a session in.
-  const newSessionTargetProjectId =
-    visibleSessions.find((s) => s.id === selectedSessionId)?.projectId
-    ?? filteredProjects[0]?.id
-    ?? null;
-  const handleNewSession = useCallback(() => {
-    if (!newSessionTargetProjectId) return;
-    setExpandedProjects((prev) => new Set(prev).add(newSessionTargetProjectId));
-    setCreatingSessionForProject(newSessionTargetProjectId);
-  }, [newSessionTargetProjectId]);
 
   // --- Worktree logic ---
   useEffect(() => {
@@ -483,19 +470,7 @@ export function Sidebar({
         />
       )}
 
-      <div className="flex-shrink-0 px-2 pt-2 pb-1">
-        <button
-          onClick={handleNewSession}
-          disabled={!newSessionTargetProjectId}
-          className="flex w-full items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
-          title={newSessionTargetProjectId ? 'Create a new session' : 'Add a project first'}
-        >
-          <Plus size={15} strokeWidth={2} />
-          New session
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto scrollbar-hidden p-2 pt-1">
+      <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
         {renderProjectList()}
       </div>
 

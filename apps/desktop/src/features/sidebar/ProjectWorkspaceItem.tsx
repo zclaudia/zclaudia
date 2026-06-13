@@ -40,12 +40,12 @@ export function ProjectWorkspaceItem({
           onClick={onSelect}
           className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-colors ${
             isSelected
-              ? 'bg-primary/10 border-primary/30 text-foreground'
+              ? 'bg-accent border-border text-foreground'
               : 'bg-muted/40 border-transparent hover:bg-muted/70 text-foreground/80 hover:text-foreground'
           }`}
         >
           <div className={`shrink-0 w-6 h-6 rounded-md flex items-center justify-center ${
-            isSelected ? 'bg-primary/15 text-primary' : 'bg-muted-foreground/10 text-muted-foreground/60'
+            isSelected ? 'bg-foreground/10 text-foreground' : 'bg-muted-foreground/10 text-muted-foreground/60'
           }`}>
             <Bot className="w-3.5 h-3.5" />
           </div>

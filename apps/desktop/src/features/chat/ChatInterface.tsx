@@ -224,6 +224,11 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           archiveDisabled={isSessionRunning}
           onPopOut={handlePopOut}
           onToggleSessionMenu={() => setShowSessionMenu(!showSessionMenu)}
+          contextPercent={
+            currentUsage.contextWindow && currentUsage.contextWindow > 0
+              ? Math.min(100, Math.round(((currentUsage.latestInputTokens ?? 0) / currentUsage.contextWindow) * 100))
+              : null
+          }
         />
       )}
 

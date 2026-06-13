@@ -47,7 +47,7 @@ export function SessionItem({
   // Task items under Supervisor use lighter styling
   const selectedClass = isTask
     ? 'bg-muted/60 text-foreground'
-    : 'bg-primary/15 text-foreground';
+    : 'bg-accent text-foreground';
   const unselectedClass = isTask
     ? `text-muted-foreground/70 hover:bg-muted/40 ${isMobile ? 'active:bg-muted/40' : ''} hover:text-foreground`
     : `text-muted-foreground hover:bg-secondary ${isMobile ? 'active:bg-secondary' : ''} hover:text-foreground`;
@@ -67,6 +67,12 @@ export function SessionItem({
           isMobile ? 'min-h-[44px]' : 'h-7'
         } ${onPopOut && !isMobile ? 'pr-6' : ''} ${isSelected ? selectedClass : unselectedClass}`}
       >
+        {!isTask && (
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${isActive ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
+            aria-hidden
+          />
+        )}
         <span className="truncate">{displayName}</span>
         {/* Project role badge */}
         {roleBadge && (
@@ -77,7 +83,7 @@ export function SessionItem({
         {/* Provider name tag (for regular sessions, only when idle) */}
         {!session.projectRole && providerName && !statusLabel && (
           <span className={`text-[9px] px-1 rounded-md shrink-0 ${
-            isSelected ? 'bg-primary/15 text-primary' : 'bg-muted-foreground/10 text-muted-foreground/60'
+            isSelected ? 'bg-foreground/10 text-muted-foreground' : 'bg-muted-foreground/10 text-muted-foreground/60'
           }`}>
             {providerName}
           </span>

@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { Folder, FolderOpen } from 'lucide-react';
 import { isDesktopTauri } from '../../utils/platform';
 import { SessionItem } from './SessionItem';
 import { WorktreeGroupItem } from './WorktreeGroupItem';
@@ -192,22 +193,12 @@ export function ProjectListItem({
           onClick={onToggle}
           className={projectButtonClass}
         >
-          <svg
-            className={`w-3 h-3 flex-shrink-0 transition-transform text-muted-foreground/60 ${
-              isExpanded ? 'rotate-90' : ''
-            }`}
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2.5}
-              d="M9 5l7 7-7 7"
-            />
-          </svg>
-          <span className="truncate text-sm font-bold uppercase tracking-wider text-foreground/80">{project.name}</span>
+          {isExpanded ? (
+            <FolderOpen className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
+          ) : (
+            <Folder className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
+          )}
+          <span className="truncate text-sm font-medium text-foreground">{project.name}</span>
         </button>
         {/* Project menu button */}
         <button
