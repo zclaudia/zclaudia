@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { Folder, FolderOpen } from 'lucide-react';
+import { Folder, FolderOpen, ChevronDown, ChevronRight } from 'lucide-react';
 import { isDesktopTauri } from '../../utils/platform';
 import { SessionItem } from './SessionItem';
 import { WorktreeGroupItem } from './WorktreeGroupItem';
@@ -198,7 +198,12 @@ export function ProjectListItem({
           ) : (
             <Folder className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
           )}
-          <span className="truncate text-sm font-medium text-foreground">{project.name}</span>
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">{project.name}</span>
+          {isExpanded ? (
+            <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" strokeWidth={2} />
+          ) : (
+            <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" strokeWidth={2} />
+          )}
         </button>
         {/* Project menu button */}
         <button

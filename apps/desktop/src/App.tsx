@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } fro
 import { emit as emitTauri } from '@tauri-apps/api/event';
 import { NOTCH_EVENT } from './services/notchBridge';
 import { Sidebar } from './features/sidebar/Sidebar';
+import { SidebarCollapsedBar } from './features/sidebar/SidebarCollapsedBar';
 import { SessionChatLayout } from './features/chat/SessionChatLayout';
 import { MobileSetup } from './components/setup/MobileSetup';
 import { WindowsSetup } from './components/setup/WindowsSetup';
@@ -83,6 +84,7 @@ function AppContent() {
   const [dashboardProjectId, setDashboardProjectId] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarSearchOpen, setSidebarSearchOpen] = useState(false);
   const [isFeedOpen, setFeedOpen] = useState(false);
   const [agentSwipePreview, setAgentSwipePreview] = useState<{
     mode: 'open' | 'close' | null;
@@ -122,6 +124,15 @@ function AppContent() {
   const openAutomationWindowFn = useCallback((opts?: OpenAutomationWindowOptions) => {
     import('./features/automation/openAutomationWindow').then(m => m.openAutomationWindow(opts ?? {}));
   }, []);
+
+  const openNotifications = useCallback(() => {
+    setAgentExpanded(false);
+    if (isMobile) {
+      setFeedOpen((current) => !current);
+    } else {
+      void emitTauri(NOTCH_EVENT.toggle, {});
+    }
+  }, [isMobile, setAgentExpanded]);
 
   const openProjectDashboardWindowFn = useCallback((projectId: string) => {
     const project = useProjectStore.getState().projects.find((item) => item.id === projectId);
@@ -266,6 +277,19 @@ function AppContent() {
         />
       )}
 
+      {/* Desktop, expanded: the wide sidebar header hosts the traffic lights
+          inline. Collapsed: no rail — a thin full-width top bar holds the global
+          icons next to the lights (Cursor-style); content fills below. */}
+      {!isMobile && sidebarCollapsed && (
+        <SidebarCollapsedBar
+          onExpand={() => setSidebarCollapsed(false)}
+          onOpenSearch={() => { setSidebarCollapsed(false); setSidebarSearchOpen(true); }}
+          onOpenNotifications={openNotifications}
+          notificationUnreadCount={notificationUnreadCount}
+          disableNotifications={disabledBuiltinPanels.includes('notifications')}
+        />
+      )}
+
       {/* Desktop relocates these controls into the sidebar's own header, so the
           full-width AppHeader band only renders on mobile (hamburger / agent). */}
       {isMobile && !(selectedSessionId && !isAgentExpanded) && (
@@ -291,14 +315,9 @@ function AppContent() {
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           disableNotifications={disabledBuiltinPanels.includes('notifications')}
-          onOpenNotifications={() => {
-            setAgentExpanded(false);
-            if (isMobile) {
-              setFeedOpen((current) => !current);
-            } else {
-              void emitTauri(NOTCH_EVENT.toggle, {});
-            }
-          }}
+          onOpenNotifications={openNotifications}
+          searchOpen={!isMobile ? sidebarSearchOpen : undefined}
+          onSearchOpenChange={!isMobile ? setSidebarSearchOpen : undefined}
           isNotificationsOpen={isMobile ? isFeedOpen : false}
           onOpenDashboard={(projectId) => {
             selectProjectRoute(projectId);

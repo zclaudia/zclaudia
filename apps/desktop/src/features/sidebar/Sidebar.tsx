@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
 import { ProjectSettings } from '../settings/ProjectSettings';
@@ -10,7 +10,6 @@ import { SortableList, SortableItem } from '../../components/SortableList';
 import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
-import { SidebarRail } from './SidebarRail';
 import { ServerSelector } from '../settings/ServerSelector';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
@@ -20,6 +19,7 @@ import { SidebarFooter } from './SidebarFooter';
 import { useSidebarData } from './useSidebarData';
 import { useSidebarActions } from './useSidebarActions';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
+import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
 
 import * as api from '../../services/api';
 import type { GitWorktree } from '@zclaudia/shared';
@@ -37,6 +37,10 @@ interface SidebarProps {
   onOpenNotifications?: () => void;
   isNotificationsOpen?: boolean;
   disableNotifications?: boolean;
+  /** Optionally control the desktop search popover from outside (e.g. so the
+   *  collapsed top bar can open search after expanding). Uncontrolled if absent. */
+  searchOpen?: boolean;
+  onSearchOpenChange?: (open: boolean) => void;
 }
 
 export function Sidebar({
@@ -50,6 +54,8 @@ export function Sidebar({
   onOpenNotifications,
   isNotificationsOpen = false,
   disableNotifications = false,
+  searchOpen: searchOpenProp,
+  onSearchOpenChange,
 }: SidebarProps) {
   const data = useSidebarData();
   const {
@@ -94,7 +100,48 @@ export function Sidebar({
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const search = useSearchSidebar();
-  const [searchOpen, setSearchOpen] = useState(false);
+  // Controlled-or-uncontrolled search popover state.
+  const [internalSearchOpen, setInternalSearchOpen] = useState(false);
+  const searchOpen = searchOpenProp ?? internalSearchOpen;
+  const setSearchOpen = useCallback((open: boolean) => {
+    if (onSearchOpenChange) onSearchOpenChange(open);
+    else setInternalSearchOpen(open);
+  }, [onSearchOpenChange]);
+
+  // Resizable width (desktop) — mirrors the right sidebar's drag handle.
+  const sidebarWidth = useSidebarWidthStore((s) => s.widthPx);
+  const setSidebarWidth = useSidebarWidthStore((s) => s.setWidth);
+  const resizeDragging = useRef(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
+  const onResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    resizeDragging.current = true;
+    resizeStartX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    resizeStartWidth.current = useSidebarWidthStore.getState().widthPx;
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      if (!resizeDragging.current) return;
+      const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
+      // Handle is on the right edge: dragging right widens the sidebar.
+      setSidebarWidth(resizeStartWidth.current + (clientX - resizeStartX.current));
+    };
+    const cleanup = () => {
+      resizeDragging.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+      resizeCleanupRef.current = null;
+    };
+    const onUp = () => cleanup();
+    resizeCleanupRef.current = cleanup;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove);
+    document.addEventListener('touchend', onUp);
+  }, [setSidebarWidth]);
   const [expandedWorktrees, setExpandedWorktrees] = useState<Set<string>>(new Set());
   const [regularSessionsCollapsed, setRegularSessionsCollapsed] = useState<Set<string>>(new Set());
   const [worktreesByProject, setWorktreesByProject] = useState<Map<string, GitWorktree[]>>(new Map());
@@ -418,30 +465,37 @@ export function Sidebar({
     );
   }
 
-  // Desktop — collapsed: slim icon rail
+  // Desktop — collapsed: the rail is replaced by a full-width top bar rendered
+  // in App, so the sidebar renders only its portaled modals here.
   if (collapsed) {
-    return (
-      <>
-        <SidebarRail
-          onExpand={onToggle}
-          onOpenSearch={() => { onToggle(); setSearchOpen(true); }}
-          onOpenNotifications={onOpenNotifications}
-          notificationUnreadCount={notificationUnreadCount}
-          disableNotifications={disableNotifications}
-        />
-        {renderPortaledModals()}
-      </>
-    );
+    return renderPortaledModals();
   }
 
   // Desktop — expanded
+  const clampedSidebarWidth = Math.max(
+    SIDEBAR_WIDTH_LIMITS.MIN_WIDTH_PX,
+    Math.min(
+      (typeof window !== 'undefined' ? window.innerWidth : 1920) * (SIDEBAR_WIDTH_LIMITS.MAX_WIDTH_VW / 100),
+      sidebarWidth,
+    ),
+  );
   return (
     <>
-    <div className="relative w-64 bg-[hsl(var(--sidebar))] border-r border-border/50 flex flex-col">
+    <div
+      className="relative flex flex-shrink-0 flex-col border-r border-border/50 bg-[hsl(var(--sidebar))]"
+      style={{ width: clampedSidebarWidth }}
+    >
+      {/* Resize handle on the right edge */}
+      <div
+        className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-primary/20"
+        onMouseDown={onResizeStart}
+        onTouchStart={onResizeStart}
+        aria-hidden
+      />
       <div className="relative z-50 flex-shrink-0">
         <SidebarTopBar
           onToggle={onToggle}
-          onOpenSearch={() => setSearchOpen((v) => !v)}
+          onOpenSearch={() => setSearchOpen(!searchOpen)}
           isSearchOpen={searchOpen}
           onOpenNotifications={onOpenNotifications}
           isNotificationsOpen={isNotificationsOpen}

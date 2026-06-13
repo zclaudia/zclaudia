@@ -69,7 +69,7 @@ export function SessionItem({
       >
         {!isTask && (
           <span
-            className={`h-1.5 w-1.5 shrink-0 rounded-full ${isActive ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
+            className={`h-1.5 w-1.5 mr-1.5 shrink-0 rounded-full ${isActive ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
             aria-hidden
           />
         )}

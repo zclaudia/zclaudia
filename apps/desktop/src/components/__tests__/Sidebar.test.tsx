@@ -275,11 +275,12 @@ describe('Sidebar', () => {
     expect(container.querySelector('button[title="Collapse sidebar"]')).toBeTruthy();
   });
 
-  it('renders the icon rail when collapsed', () => {
+  it('renders no inline chrome when collapsed (handled by the app-level top bar)', () => {
     const { container } = render(<Sidebar collapsed={true} onToggle={vi.fn()} />);
-    // Collapsed rail exposes an expand affordance and the search icon.
-    expect(container.querySelector('button[title="Expand sidebar"]')).toBeTruthy();
-    expect(container.querySelector('button[title="Search messages"]')).toBeTruthy();
+    // The collapsed sidebar no longer renders a rail — the global icons live in
+    // SidebarCollapsedBar, rendered by App. So none of them appear here.
+    expect(container.querySelector('button[title="Search messages"]')).toBeNull();
+    expect(container.querySelector('button[title="Collapse sidebar"]')).toBeNull();
   });
 
   it('calls onToggle when collapse button is clicked', () => {

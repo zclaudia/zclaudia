@@ -74,6 +74,10 @@ export function SidebarTopBar({
 
         <PluginWindowButtons />
 
+        {/* Spacer pushes the collapse toggle to the right, away from the
+            search / notifications / window cluster. */}
+        <div className="flex-1" data-tauri-drag-region />
+
         <button
           onClick={onToggle}
           className={iconBtn}
@@ -82,8 +86,6 @@ export function SidebarTopBar({
         >
           <ChevronsLeft size={16} strokeWidth={1.75} />
         </button>
-
-        <div className="flex-1" data-tauri-drag-region />
       </div>
     </div>
   );
