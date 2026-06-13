@@ -161,7 +161,7 @@ function authenticate(ws) {
           if (msg.success) resolve(msg);
           else reject(new Error(`auth_result success=false: ${JSON.stringify(msg)}`));
         }
-      } catch {}
+      } catch { /* non-JSON or unrelated frame — keep listening */ }
     };
     ws.addEventListener('message', handler);
     send(ws, { type: 'auth' });

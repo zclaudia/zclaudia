@@ -1,4 +1,6 @@
-/* global localStorage, confirm, location */
+/* global confirm, location */
+// localStorage is a Node 22+ global so the no-redeclare check sees it as
+// already-defined; the rest are browser-only and stay declared here.
 // 在浏览器控制台中运行此脚本，快速添加 Gateway 服务器配置
 // 使用方法：
 //   1. 打开 http://localhost:1420

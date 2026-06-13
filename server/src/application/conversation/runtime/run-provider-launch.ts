@@ -260,6 +260,7 @@ function completeRunLocally(input: {
   return { providerRunner: emptyProviderStream() };
 }
 
+// eslint-disable-next-line require-yield -- intentional: an empty async iterable that yields nothing
 async function* emptyProviderStream(): AsyncIterable<ClaudeMessage> {
   return;
 }
