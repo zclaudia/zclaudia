@@ -159,6 +159,22 @@ export interface CompactionCompletedEvent {
   tokensBefore: number;
 }
 
+/**
+ * Emitted when an automatic compaction attempt fails (the summarizer LLM call
+ * errored). `breakerOpen` is true once consecutive failures reach the threshold
+ * — subsequent turns will skip compaction during the cooldown. Clients surface a
+ * non-blocking notice when breakerOpen so the user can run /compact or start a
+ * fresh session.
+ */
+export interface CompactionFailedEvent {
+  type: 'compaction_failed';
+  runId?: string;
+  sessionId: string;
+  reason: string;
+  breakerOpen: boolean;
+  nextRetryAtMs?: number;
+}
+
 export interface RunFailedMessage {
   type: 'run_failed';
   runId: string;
