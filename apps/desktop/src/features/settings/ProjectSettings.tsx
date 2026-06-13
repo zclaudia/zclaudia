@@ -62,7 +62,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
 
   const scopedProviders = useLlmProfileMetaStore((s) => s.getProviders(activeServerId));
   const storeProviders = scopedProviders.length > 0 ? scopedProviders : legacyProviders;
-  const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders);
+  const [providers, setProviders] = useState<LlmProfileConfig[]>(storeProviders ?? []);
 
   // Agent profiles for the Default Agent picker
   const agentProfilesById = useAgentProfileMetaStore((s) => s.profiles);
@@ -294,7 +294,10 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
       <div className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
 
       {/* Modal */}
-      <div className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[500px] md:max-h-[80vh] bg-card border border-border rounded-lg shadow-xl z-50 flex flex-col">
+      <div
+        data-testid="project-settings"
+        className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[500px] md:max-h-[80vh] bg-card border border-border rounded-lg shadow-xl z-50 flex flex-col"
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
           <h2 className="text-lg font-semibold text-card-foreground">Project Settings</h2>
@@ -375,7 +378,7 @@ export function ProjectSettings({ project, isOpen, onClose }: ProjectSettingsPro
               size="lg"
               options={[
                 { value: '', label: 'Same as Project Provider' },
-                ...providers.map((provider) => ({
+                ...(providers ?? []).map((provider) => ({
                   value: provider.id,
                   label: `${provider.name} (${provider.providerType})${provider.isDefault ? ' - Default' : ''}`,
                 })),

@@ -29,10 +29,13 @@ interface SortableItemProps {
   wrapperClassName?: string;
 }
 
-/** Wraps a single draggable item. The drag handle is the grip icon. */
-export function SortableItem({ id, children, dragHandleClassName, wrapperClassName }: SortableItemProps) {
+/**
+ * Wraps a single draggable item. The whole row is the drag activator: a drag
+ * only begins once the pointer moves past the sensor's distance threshold, so a
+ * plain click still falls through to the item's own handler (e.g. select).
+ */
+export function SortableItem({ id, children, wrapperClassName }: SortableItemProps) {
   const {
-    attributes,
     listeners,
     setNodeRef,
     transform,
@@ -45,28 +48,12 @@ export function SortableItem({ id, children, dragHandleClassName, wrapperClassNa
     transition,
     opacity: isDragging ? 0.4 : 1,
     position: 'relative' as const,
+    zIndex: isDragging ? 1 : undefined,
   };
 
   return (
     <li ref={setNodeRef} style={style}>
-      <div className={`flex group/sortable ${wrapperClassName ?? 'items-center'}`}>
-        {/* Drag handle — visible on hover */}
-        <button
-          {...attributes}
-          {...listeners}
-          className={`flex-shrink-0 cursor-grab active:cursor-grabbing opacity-0 group-hover/sortable:opacity-60 hover:!opacity-100 transition-opacity touch-none ${dragHandleClassName ?? 'w-4 h-4 -ml-1 mr-0.5'}`}
-          tabIndex={-1}
-          aria-label="Drag to reorder"
-        >
-          <svg className="w-3.5 h-3.5 text-muted-foreground" viewBox="0 0 16 16" fill="currentColor">
-            <circle cx="5.5" cy="3.5" r="1.2" />
-            <circle cx="10.5" cy="3.5" r="1.2" />
-            <circle cx="5.5" cy="8" r="1.2" />
-            <circle cx="10.5" cy="8" r="1.2" />
-            <circle cx="5.5" cy="12.5" r="1.2" />
-            <circle cx="10.5" cy="12.5" r="1.2" />
-          </svg>
-        </button>
+      <div {...listeners} className={`flex select-none ${wrapperClassName ?? 'items-center'}`}>
         <div className="flex-1 min-w-0">{children}</div>
       </div>
     </li>
@@ -158,6 +145,7 @@ export function SortableList({
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={() => setActiveId(null)}
     >
       <SortableContext items={items} strategy={verticalListSortingStrategy}>
         <ul className={className}>{children}</ul>
