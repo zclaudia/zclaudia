@@ -138,7 +138,7 @@ describe('ServerSelector', () => {
     fireEvent.click(button);
 
     // Should show connection status in dropdown
-    const statusEl = container.querySelector('[data-testid="connection-status"]');
+    const statusEl = document.body.querySelector('[data-testid="connection-status"]');
     expect(statusEl).toBeTruthy();
     expect(statusEl!.textContent).toBe('Connected');
   });
@@ -162,7 +162,7 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    expect(container.textContent).toContain('Configure in Settings');
+    expect(document.body.textContent).toContain('Configure in Settings');
   });
 
   it('shows connecting status', () => {
@@ -175,7 +175,7 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    const statusEl = container.querySelector('[data-testid="connection-status"]');
+    const statusEl = document.body.querySelector('[data-testid="connection-status"]');
     expect(statusEl!.textContent).toBe('Reconnecting...');
   });
 
@@ -192,7 +192,7 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    const statusEl = container.querySelector('[data-testid="connection-status"]');
+    const statusEl = document.body.querySelector('[data-testid="connection-status"]');
     expect(statusEl!.textContent).toBe('Connected');
     expect(container.textContent).toContain('Local Server');
   });
@@ -202,7 +202,7 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    expect(container.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Connected');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Connected');
 
     act(() => {
       useFacadeStore.setState({
@@ -213,7 +213,7 @@ describe('ServerSelector', () => {
 
     rerender(<ServerSelector />);
 
-    expect(container.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Reconnecting...');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Reconnecting...');
   });
 
   it('uses mobile recovery status on Android', () => {
@@ -228,7 +228,7 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    expect(container.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Connected');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Connected');
   });
 
   it('shows reconnecting state when transport is not connected', () => {
@@ -247,6 +247,6 @@ describe('ServerSelector', () => {
     const button = container.querySelector('[data-testid="server-selector"]')!;
     fireEvent.click(button);
 
-    expect(container.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Reconnecting...');
+    expect(document.body.querySelector('[data-testid="connection-status"]')!.textContent).toBe('Reconnecting...');
   });
 });

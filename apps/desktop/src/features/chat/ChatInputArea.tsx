@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, ChevronDown, ChevronUp, Plus } from 'lucide-react';
+import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, ChevronDown, ChevronUp, Plus, GitBranch } from 'lucide-react';
 import { ModeSelector } from './ModeSelector';
 import { SystemInfoButton } from './SystemInfoButton';
 import { PermissionSelector } from './PermissionSelector';
@@ -205,7 +205,7 @@ export function ChatInputArea({
 
   // Normal input mode
   return (
-    <div className="border-t border-border p-2 pb-3 md:p-4 safe-bottom-pad overflow-visible flex-shrink-0">
+    <div className="p-2 pb-3 md:px-4 md:pb-3 md:pt-2 safe-bottom-pad overflow-visible flex-shrink-0">
       {/* Toolbar */}
       <div className="mb-1.5 md:mb-2 flex items-center gap-1 md:gap-2">
         {capabilities && (
@@ -237,22 +237,6 @@ export function ChatInputArea({
             lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
           />
         )}
-        {/* Hidden on mobile - can tap to view details */}
-        <div className="hidden md:block">
-          <TokenUsageDisplay
-            latestInputTokens={currentUsage.latestInputTokens}
-            latestOutputTokens={currentUsage.latestOutputTokens}
-            inputTokens={currentUsage.inputTokens}
-            outputTokens={currentUsage.outputTokens}
-            contextWindow={currentUsage.contextWindow}
-            contextWindowSource={currentUsage.contextWindowSource}
-            contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
-            cacheReadTokens={currentUsage.cacheReadTokens}
-            cacheWriteTokens={currentUsage.cacheWriteTokens}
-            latestCacheReadTokens={currentUsage.latestCacheReadTokens}
-            latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
-          />
-        </div>
         <div className="flex-1 min-w-[8px]" />
         {/* Desktop: Draft button */}
         {!isMobile && !disabledBuiltinPanels.includes('draft') && (() => {
@@ -525,6 +509,32 @@ export function ChatInputArea({
             : 'Type a message... (Enter to send)'
         }
       />
+      {/* Status strip — branch/worktree on the left, context usage on the right. */}
+      <div className="mt-1 hidden items-center gap-2 px-1 text-[11px] leading-none text-muted-foreground md:flex">
+        {currentSession?.workingDirectory && (
+          <span
+            className="inline-flex min-w-0 items-center gap-1 truncate"
+            title={currentSession.workingDirectory}
+          >
+            <GitBranch size={11} strokeWidth={1.75} className="flex-shrink-0" />
+            <span className="truncate">{currentSession.workingDirectory.split('/').filter(Boolean).pop()}</span>
+          </span>
+        )}
+        <span className="flex-1 min-w-[8px]" />
+        <TokenUsageDisplay
+          latestInputTokens={currentUsage.latestInputTokens}
+          latestOutputTokens={currentUsage.latestOutputTokens}
+          inputTokens={currentUsage.inputTokens}
+          outputTokens={currentUsage.outputTokens}
+          contextWindow={currentUsage.contextWindow}
+          contextWindowSource={currentUsage.contextWindowSource}
+          contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
+          cacheReadTokens={currentUsage.cacheReadTokens}
+          cacheWriteTokens={currentUsage.cacheWriteTokens}
+          latestCacheReadTokens={currentUsage.latestCacheReadTokens}
+          latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
+        />
+      </div>
     </div>
   );
 }

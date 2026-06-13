@@ -67,7 +67,10 @@ export function SessionHeader({
     : DEFAULT_AGENT_LABEL;
 
   return (
-    <div className="flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 border-b border-border bg-card safe-top-pad">
+    <div
+      className="flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 border-b border-border bg-card safe-top-pad"
+      data-tauri-drag-region
+    >
       {/* Mobile: hamburger menu */}
       {isMobile && onOpenSidebar && (
         <button
@@ -145,43 +148,67 @@ export function SessionHeader({
       {/* Actions (hidden for background sessions) */}
       {currentSession.type !== 'background' && (
         <>
-          {/* Desktop: show all buttons inline */}
+          {/* Desktop: collapse low-frequency actions into a "..." menu */}
           {!isMobile && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              <div className="flex items-center gap-0.5 rounded-xl border border-border/70 bg-background/85 p-px shadow-sm">
-                <button
-                  onClick={onResetProviderSession}
-                  disabled={isLoading}
-                  className={`p-0.5 rounded-md transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed text-muted-foreground' : 'hover:bg-secondary text-muted-foreground hover:text-foreground'}`}
-                  title="Reset underlying provider session"
-                >
-                  <RotateCcw size={12} />
-                </button>
-                <button
-                  onClick={onExport}
-                  className="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                  title="Export as Markdown"
-                >
-                  <Download size={12} />
-                </button>
-                {isDesktopTauri && !isStandaloneSessionWindow && (
-                  <button
-                    onClick={onPopOut}
-                    className="p-0.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                    title="Open in new window"
-                  >
-                    <ExternalLink size={12} />
-                  </button>
-                )}
-              </div>
+            <div className="relative shrink-0">
               <button
-                onClick={onArchive}
-                disabled={archiveDisabled}
-                className="p-0.5 rounded-lg border border-transparent text-muted-foreground transition-colors hover:bg-destructive/8 hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-                title={archiveDisabled ? 'Stop the run before archiving' : 'Archive session'}
+                onClick={onToggleSessionMenu}
+                className={`flex h-7 w-7 items-center justify-center rounded-md transition-colors ${showSessionMenu ? 'bg-secondary text-foreground' : 'hover:bg-secondary text-muted-foreground hover:text-foreground'}`}
+                title="Session actions"
+                aria-label="Session actions"
+                aria-haspopup="menu"
+                aria-expanded={showSessionMenu}
               >
-                <Archive size={12} />
+                <MoreHorizontal size={16} strokeWidth={1.75} />
               </button>
+              {showSessionMenu && (
+                <>
+                  <div className="fixed inset-0 z-[70]" onClick={onToggleSessionMenu} />
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-full z-[80] mt-1 min-w-[190px] overflow-hidden rounded-xl border border-border/80 bg-card py-1 shadow-xl"
+                  >
+                    <button
+                      role="menuitem"
+                      onClick={() => { onResetProviderSession(); onToggleSessionMenu(); }}
+                      disabled={isLoading}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RotateCcw size={14} className="text-muted-foreground" />
+                      Reset session
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => { onExport(); onToggleSessionMenu(); }}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary"
+                    >
+                      <Download size={14} className="text-muted-foreground" />
+                      Export as Markdown
+                    </button>
+                    {isDesktopTauri && !isStandaloneSessionWindow && (
+                      <button
+                        role="menuitem"
+                        onClick={() => { onPopOut(); onToggleSessionMenu(); }}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-foreground hover:bg-secondary"
+                      >
+                        <ExternalLink size={14} className="text-muted-foreground" />
+                        Open in new window
+                      </button>
+                    )}
+                    <div className="my-1 h-px bg-border" />
+                    <button
+                      role="menuitem"
+                      onClick={() => { onArchive(); onToggleSessionMenu(); }}
+                      disabled={archiveDisabled}
+                      title={archiveDisabled ? 'Stop the run before archiving' : undefined}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm text-destructive hover:bg-destructive/8 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                    >
+                      <Archive size={14} />
+                      Archive session
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           )}
           {/* Mobile: collapse actions into "..." dropdown */}

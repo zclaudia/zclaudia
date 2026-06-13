@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useServerStore } from '../../stores/serverStore';
 import { useGatewayStore, shouldShowNonCurrentInstanceBackend } from '../../stores/gatewayStore';
 import { useFacadeStore } from '../../stores/facadeStore';
@@ -17,7 +18,7 @@ function formatLatency(latencyMs?: number | null): string | null {
   return `${latencyMs}ms`;
 }
 
-export function ServerSelector() {
+export function ServerSelector({ placement = 'down' }: { placement?: 'down' | 'up' } = {}) {
   const activeServerId = useServerStore((s) => s.activeServerId);
   const connections = useServerStore((s) => s.connections);
   const setActiveServer = useServerStore((s) => s.setActiveServer);
@@ -31,6 +32,24 @@ export function ServerSelector() {
   const isMobile = useIsMobile();
 
   const [isOpen, setIsOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+
+  // Position the dropdown via a body portal so it escapes the sidebar's
+  // backdrop-filter containing block (which otherwise clips/anchors it).
+  const toggleOpen = () => {
+    if (isOpen) { setIsOpen(false); return; }
+    const r = triggerRef.current?.getBoundingClientRect();
+    if (r) {
+      const width = Math.min(Math.max(r.width, 256), window.innerWidth - 16);
+      const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
+      const style: React.CSSProperties = { position: 'fixed', left, width };
+      if (placement === 'up') style.bottom = Math.max(8, window.innerHeight - r.top + 4);
+      else style.top = r.bottom + 4;
+      setMenuStyle(style);
+    }
+    setIsOpen(true);
+  };
 
   const backends = useFacadeStore((s) => s.backends);
   const localBackendId = useFacadeStore((s) => s.localBackendId);
@@ -114,7 +133,8 @@ export function ServerSelector() {
     <div className="relative">
       {/* Current Server Button */}
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        ref={triggerRef}
+        onClick={toggleOpen}
         className="flex w-full min-w-0 items-center gap-2 px-3 py-1.5 rounded-lg bg-secondary hover:bg-muted transition-colors"
         data-testid="server-selector"
       >
@@ -132,9 +152,11 @@ export function ServerSelector() {
         </svg>
       </button>
 
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="fixed inset-x-2 top-14 md:absolute md:inset-x-auto md:top-full md:left-0 mt-1 md:w-72 bg-card border border-border rounded-lg shadow-xl z-[60]">
+      {/* Dropdown — portaled to body to escape the sidebar's clipping context */}
+      {isOpen && createPortal(
+        <>
+          <div className="fixed inset-0 z-[55]" onClick={() => setIsOpen(false)} />
+          <div style={menuStyle} className="max-h-[70vh] overflow-y-auto bg-card border border-border rounded-lg shadow-xl z-[60]">
           {/* Status */}
           <div className="px-3 py-2 border-b border-border">
             <div className="flex items-center gap-2 text-sm">
@@ -210,15 +232,9 @@ export function ServerSelector() {
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Backdrop */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 z-[55]"
-          onClick={() => setIsOpen(false)}
-        />
+          </div>
+        </>,
+        document.body
       )}
     </div>
   );

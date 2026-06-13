@@ -133,7 +133,10 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
       )}
 
       {/* Header: tabs + actions */}
-      <div className="flex items-center gap-1 px-2 py-1 select-none border-b border-border flex-shrink-0">
+      <div
+        className="flex min-h-9 items-center gap-1 px-2 py-1 select-none border-b border-border flex-shrink-0"
+        data-tauri-drag-region
+      >
         <div className="flex items-center gap-0.5 flex-shrink-0 min-w-0 overflow-hidden">
           {showTabs ? (
             <>

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { Plus } from 'lucide-react';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
 import { ProjectSettings } from '../settings/ProjectSettings';
 import { SettingsPanel } from '../../components/SettingsPanel';
@@ -9,7 +10,9 @@ import { SortableList, SortableItem } from '../../components/SortableList';
 
 import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
-import { SidebarHeader } from './SidebarHeader';
+import { SidebarTopBar } from './SidebarTopBar';
+import { SidebarRail } from './SidebarRail';
+import { ServerSelector } from '../settings/ServerSelector';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { ProjectListItem } from './ProjectListItem';
@@ -30,11 +33,11 @@ interface SidebarProps {
   isMobile?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
-  hideHeader?: boolean;
   onOpenDashboard?: (projectId: string) => void;
   onOpenAutomations?: () => void;
   onOpenNotifications?: () => void;
   isNotificationsOpen?: boolean;
+  disableNotifications?: boolean;
 }
 
 export function Sidebar({
@@ -43,11 +46,11 @@ export function Sidebar({
   isMobile,
   isOpen,
   onClose,
-  hideHeader,
   onOpenDashboard,
   onOpenAutomations,
   onOpenNotifications,
   isNotificationsOpen = false,
+  disableNotifications = false,
 }: SidebarProps) {
   const data = useSidebarData();
   const {
@@ -92,9 +95,17 @@ export function Sidebar({
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const search = useSearchSidebar();
+  const [searchOpen, setSearchOpen] = useState(false);
   const [expandedWorktrees, setExpandedWorktrees] = useState<Set<string>>(new Set());
   const [regularSessionsCollapsed, setRegularSessionsCollapsed] = useState<Set<string>>(new Set());
   const [worktreesByProject, setWorktreesByProject] = useState<Map<string, GitWorktree[]>>(new Map());
+
+  // Focus the search input when the desktop search popover opens.
+  useEffect(() => {
+    if (!searchOpen) return;
+    const id = setTimeout(() => search.searchInputRef.current?.focus(), 0);
+    return () => clearTimeout(id);
+  }, [searchOpen, search.searchInputRef]);
 
   const refreshProjectWorktrees = useCallback(async (projectId: string) => {
     try {
@@ -145,6 +156,18 @@ export function Sidebar({
   });
 
   const settingsProject = settingsProjectId ? visibleProjects.find(p => p.id === settingsProjectId) || null : null;
+
+  // "New session" targets the current session's project, else the first visible
+  // project. Disabled when there are no projects to create a session in.
+  const newSessionTargetProjectId =
+    visibleSessions.find((s) => s.id === selectedSessionId)?.projectId
+    ?? filteredProjects[0]?.id
+    ?? null;
+  const handleNewSession = useCallback(() => {
+    if (!newSessionTargetProjectId) return;
+    setExpandedProjects((prev) => new Set(prev).add(newSessionTargetProjectId));
+    setCreatingSessionForProject(newSessionTargetProjectId);
+  }, [newSessionTargetProjectId]);
 
   // --- Worktree logic ---
   useEffect(() => {
@@ -408,27 +431,71 @@ export function Sidebar({
     );
   }
 
-  // Desktop
+  // Desktop — collapsed: slim icon rail
+  if (collapsed) {
+    return (
+      <>
+        <SidebarRail
+          onExpand={onToggle}
+          onOpenSearch={() => { onToggle(); setSearchOpen(true); }}
+          onOpenNotifications={onOpenNotifications}
+          notificationUnreadCount={notificationUnreadCount}
+          disableNotifications={disableNotifications}
+        />
+        {renderPortaledModals()}
+      </>
+    );
+  }
+
+  // Desktop — expanded
   return (
     <>
-    <div
-      className={`bg-card/80 glass border-r border-border/50 flex flex-col transition-[width] duration-200 ease-out ${
-        collapsed ? 'w-0 overflow-hidden' : 'w-64'
-      }`}
-    >
-      {!collapsed && (
-        <>
-      {!hideHeader && (
-        <SidebarHeader onToggle={onToggle} />
+    <div className="relative w-64 bg-card/80 glass border-r border-border/50 flex flex-col">
+      <div className="relative z-50 flex-shrink-0">
+        <SidebarTopBar
+          onToggle={onToggle}
+          onOpenSearch={() => setSearchOpen((v) => !v)}
+          isSearchOpen={searchOpen}
+          onOpenNotifications={onOpenNotifications}
+          isNotificationsOpen={isNotificationsOpen}
+          notificationUnreadCount={notificationUnreadCount}
+          disableNotifications={disableNotifications}
+        />
+        {searchOpen && (
+          <div className="absolute inset-x-1 top-full z-50 mt-1 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
+            <SidebarSearch
+              search={search}
+              sessions={sessions}
+              onResultSelect={(sessionId, messageId, ownerBackendId) => {
+                actions.handleSearchResultSelect(sessionId, messageId, ownerBackendId);
+                setSearchOpen(false);
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      {searchOpen && (
+        <div
+          className="absolute inset-0 z-40"
+          onClick={() => setSearchOpen(false)}
+          aria-hidden
+        />
       )}
 
-      <SidebarSearch
-        search={search}
-        sessions={sessions}
-        onResultSelect={actions.handleSearchResultSelect}
-      />
+      <div className="flex-shrink-0 px-2 pt-2 pb-1">
+        <button
+          onClick={handleNewSession}
+          disabled={!newSessionTargetProjectId}
+          className="flex w-full items-center gap-2 rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-50"
+          title={newSessionTargetProjectId ? 'Create a new session' : 'Add a project first'}
+        >
+          <Plus size={15} strokeWidth={2} />
+          New session
+        </button>
+      </div>
 
-      <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
+      <div className="flex-1 overflow-y-auto scrollbar-hidden p-2 pt-1">
         {renderProjectList()}
       </div>
 
@@ -438,14 +505,15 @@ export function Sidebar({
         />
       </div>
 
+      <div className="flex-shrink-0 border-t border-border/50 px-2 py-2">
+        <ServerSelector placement="up" />
+      </div>
+
       <SidebarFooter
         onOpenAutomations={onOpenAutomations}
         onShowSettings={() => setShowSettings(true)}
         onClose={onClose}
       />
-
-      </>
-    )}
     </div>
     {renderPortaledModals()}
     </>

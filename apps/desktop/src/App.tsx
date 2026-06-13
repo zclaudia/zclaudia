@@ -256,13 +256,19 @@ function AppContent() {
   // --- Main render ---
   return (
     <div className="flex flex-col h-dvh bg-background text-foreground">
-      <div
-        className={`safe-top-spacer bg-card flex-shrink-0 ${isMobile && selectedSessionId && !isAgentExpanded ? 'hidden' : ''}`}
-        data-tauri-drag-region
-      />
+      {/* Mobile keeps a full-width safe-area strip. On desktop the three columns
+          run to y=0 and each owns its top strip, so the macOS traffic lights sit
+          inline in the sidebar header (cleared via left padding) instead. */}
+      {isMobile && (
+        <div
+          className={`safe-top-spacer bg-card flex-shrink-0 ${selectedSessionId && !isAgentExpanded ? 'hidden' : ''}`}
+          data-tauri-drag-region
+        />
+      )}
 
-      {/* Inline the hidden-on-mobile check the same way the original did */}
-      {!(isMobile && selectedSessionId && !isAgentExpanded) && (
+      {/* Desktop relocates these controls into the sidebar's own header, so the
+          full-width AppHeader band only renders on mobile (hamburger / agent). */}
+      {isMobile && !(selectedSessionId && !isAgentExpanded) && (
         <AppHeader
           isMobile={isMobile}
           isAgentExpanded={isAgentExpanded}
@@ -284,7 +290,7 @@ function AppContent() {
           isMobile={isMobile}
           isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
-          hideHeader={true}
+          disableNotifications={disabledBuiltinPanels.includes('notifications')}
           onOpenNotifications={() => {
             setAgentExpanded(false);
             if (isMobile) {

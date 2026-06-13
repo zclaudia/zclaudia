@@ -182,6 +182,18 @@ async function advanceDebounce(ms: number) {
   });
 }
 
+// Desktop search now lives in a popover opened from the header search icon.
+function openSearchPopover(container: HTMLElement) {
+  if (!container.querySelector('input[placeholder="Search messages..."]')) {
+    const trigger = container.querySelector('button[title="Search messages"]');
+    if (trigger) fireEvent.click(trigger);
+  }
+}
+function getSearchInput(container: HTMLElement): HTMLInputElement {
+  openSearchPopover(container);
+  return container.querySelector('input[placeholder="Search messages..."]') as HTMLInputElement;
+}
+
 describe('Sidebar', () => {
   beforeEach(() => {
     setupStores();
@@ -257,15 +269,17 @@ describe('Sidebar', () => {
     expect(container.textContent).not.toContain('Project B');
   });
 
-  it('shows ZClaudia header when hideHeader is false', () => {
+  it('renders the header controls (search / collapse) when expanded', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    expect(container.textContent).toContain('ZClaudia');
+    expect(container.querySelector('button[title="Search messages"]')).toBeTruthy();
+    expect(container.querySelector('button[title="Collapse sidebar"]')).toBeTruthy();
   });
 
-  it('hides header when hideHeader is true', () => {
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} hideHeader={true} />);
-    // The header div should not be rendered - no "AI Assistant" text
-    expect(container.textContent).not.toContain('AI Assistant');
+  it('renders the icon rail when collapsed', () => {
+    const { container } = render(<Sidebar collapsed={true} onToggle={vi.fn()} />);
+    // Collapsed rail exposes an expand affordance and the search icon.
+    expect(container.querySelector('button[title="Expand sidebar"]')).toBeTruthy();
+    expect(container.querySelector('button[title="Search messages"]')).toBeTruthy();
   });
 
   it('calls onToggle when collapse button is clicked', () => {
@@ -834,7 +848,7 @@ describe('Sidebar', () => {
 
   it('renders search input', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]');
+    const searchInput = getSearchInput(container);
     expect(searchInput).toBeTruthy();
   });
 
@@ -843,7 +857,7 @@ describe('Sidebar', () => {
     (api.searchMessages as ReturnType<typeof vi.fn>).mockImplementation(() => new Promise(() => {}));
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'test query' } });
@@ -859,7 +873,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'no match' } });
@@ -880,7 +894,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'hello' } });
@@ -901,7 +915,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'hello' } });
@@ -925,7 +939,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'remote' } });
@@ -948,7 +962,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'file' } });
@@ -967,7 +981,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'tool' } });
@@ -987,7 +1001,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'content' } });
@@ -1000,12 +1014,14 @@ describe('Sidebar', () => {
 
   it('shows search filter button', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    openSearchPopover(container);
     const filterBtn = container.querySelector('button[title="Filters"]');
     expect(filterBtn).toBeTruthy();
   });
 
   it('toggles search filters', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    openSearchPopover(container);
     const filterBtn = container.querySelector('button[title="Filters"]')!;
     fireEvent.click(filterBtn);
     expect(container.querySelector('[data-testid="search-filters"]')).toBeTruthy();
@@ -1445,7 +1461,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'hello' } });
@@ -1464,7 +1480,7 @@ describe('Sidebar', () => {
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
 
     await act(async () => {
       fireEvent.change(searchInput, { target: { value: 'x' } });
@@ -1488,7 +1504,7 @@ describe('Sidebar', () => {
     // Wait for history to load
     await advanceDebounce(50);
 
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
     expect(container.textContent).toContain('Recent Searches');
@@ -1506,7 +1522,7 @@ describe('Sidebar', () => {
 
     await advanceDebounce(50);
 
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
     const clearBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Clear');
@@ -1530,7 +1546,7 @@ describe('Sidebar', () => {
 
     await advanceDebounce(50);
 
-    const searchInput = container.querySelector('input[placeholder="Search messages..."]')!;
+    const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
     const historyBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('old search'));
