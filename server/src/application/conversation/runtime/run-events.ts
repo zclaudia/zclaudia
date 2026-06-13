@@ -17,6 +17,7 @@ import type { NotificationSender } from '../../../infra/push/notification-sender
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import { postRunCompletedNotification, postRunFailedNotification } from './run-terminal-notifications.js';
 import { setPhase, recomputePhase, isTerminalPhase, computeBlockers } from './active-run-phase.js';
+import { compactionEventFor } from './compaction-events.js';
 
 export interface ProviderEventState {
   sdkSessionId?: string;
@@ -540,18 +541,18 @@ export function handleProviderEvent({
           source: 'auto',
           signal: activeRun.abortController?.signal,
         }).then((outcome) => {
-          if (outcome.compacted) {
+          if (outcome.outcome === 'compacted') {
             console.log(`[Compaction] auto session=${activeRun.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
-            sendRunEvent({
-              type: 'compaction_completed',
-              runId,
-              sessionId: activeRun.sessionId,
-              compactionId: outcome.compactionId!,
-              tokensBefore: outcome.tokensBefore!,
-            });
+          } else if (outcome.outcome === 'failed') {
+            console.warn(`[Compaction] auto FAILED session=${activeRun.sessionId} reason=${outcome.reason} breakerOpen=${outcome.breaker?.breakerOpen}`);
+          } else if (outcome.reason === 'circuit_open') {
+            console.log(`[Compaction] auto skipped session=${activeRun.sessionId} (circuit open until ${outcome.breaker?.nextRetryAtMs})`);
           }
+          const event = compactionEventFor(runId, activeRun.sessionId, outcome);
+          if (event) sendRunEvent(event);
         }).catch((err: unknown) => {
-          console.warn('[Compaction] auto-trigger failed:', err instanceof Error ? err.message : err);
+          // maybeCompact no longer lets exceptions escape; this is a defensive net.
+          console.warn('[Compaction] auto-trigger unexpected error:', err instanceof Error ? err.message : err);
         }).finally(() => {
           // `completed` is already true; the inner branch of emitRunCompleted
           // will only send run_completed if msg.usage is present (which it is

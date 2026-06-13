@@ -6,7 +6,7 @@ const cleanupPendingPermissionsMock = vi.fn();
 const upsertAssistantMessageMock = vi.fn();
 const pluginEventsEmitMock = vi.fn(async () => {});
 const sendMessageMock = vi.fn();
-const maybeCompactMock = vi.fn(async () => ({ compacted: false }));
+const maybeCompactMock = vi.fn(async () => ({ outcome: 'skipped', compacted: false, reason: 'below_threshold' }));
 
 vi.mock('../run-lifecycle.js', () => ({
   cleanupPendingPermissions: cleanupPendingPermissionsMock,
@@ -1244,7 +1244,7 @@ describe('run-events agent_end -> maybeCompact', () => {
       llmProfile,
     } as any;
 
-    maybeCompactMock.mockResolvedValueOnce({ compacted: false, reason: 'below_threshold' });
+    maybeCompactMock.mockResolvedValueOnce({ outcome: 'skipped', compacted: false, reason: 'below_threshold' });
 
     const { handleProviderEvent } = await import('../run-events.js');
 
@@ -1314,6 +1314,7 @@ describe('run-events agent_end -> maybeCompact', () => {
     } as any;
 
     maybeCompactMock.mockResolvedValueOnce({
+      outcome: 'compacted',
       compacted: true,
       compactionId: 'c1',
       tokensBefore: 500,

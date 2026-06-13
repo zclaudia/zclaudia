@@ -28,6 +28,7 @@ import type { GatewayState } from '../infra/gateway/gateway-state.js';
 import { createDomainPorts } from './bootstrap/domain-ports.js';
 import { registerFeatureDomains } from './bootstrap/feature-domains.js';
 import { recordActivity } from './conversation/memory/activity-log.js';
+import { compactionCircuitBreaker } from './conversation/compaction/circuit-breaker.js';
 import { registerPlatformRoutes } from './bootstrap/platform-routes.js';
 import { TaskExecutorRegistry } from '../domains/tasks/executors/registry.js';
 import { AgentTaskExecutor } from '../domains/tasks/executors/agent-executor.js';
@@ -206,6 +207,10 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     } catch {
       // Activity log is best-effort, don't break run completion
     }
+  });
+
+  pluginEvents.on('session.deleted', (event: any) => {
+    if (event?.sessionId) compactionCircuitBreaker.evict(event.sessionId);
   });
 
   registerInteractionDomain({ activeRuns, clients });
