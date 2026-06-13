@@ -11,6 +11,7 @@
 
     /* Card colors */
     --card: 0 0% 100%;
+    --sidebar: 240 6% 96%;
     --card-foreground: 0 0% 0%;
 
     /* Popover colors */
@@ -79,6 +80,7 @@
     --background: 220 8% 8%;
     --foreground: 210 15% 93%;
     --card: 220 7% 10%;
+    --sidebar: 220 8% 6%;
     --card-foreground: 210 15% 93%;
     --popover: 220 7% 10%;
     --popover-foreground: 210 15% 93%;
@@ -121,6 +123,7 @@
     --background: 30 6% 7.5%;
     --foreground: 40 12% 92%;
     --card: 30 6% 10%;
+    --sidebar: 30 6% 5.5%;
     --card-foreground: 40 12% 92%;
     --popover: 30 6% 10%;
     --popover-foreground: 40 12% 92%;
@@ -162,6 +165,7 @@
     --background: 225 18% 7%;
     --foreground: 215 20% 93%;
     --card: 225 16% 9.5%;
+    --sidebar: 225 18% 5%;
     --card-foreground: 215 20% 93%;
     --popover: 225 16% 9.5%;
     --popover-foreground: 215 20% 93%;

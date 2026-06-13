@@ -26,7 +26,7 @@ export function SidebarRail({
     'flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground';
 
   return (
-    <div className="flex w-12 flex-shrink-0 flex-col items-center border-r border-border/50 bg-card/80 glass">
+    <div className="flex w-12 flex-shrink-0 flex-col items-center border-r border-border/50 bg-[hsl(var(--sidebar))]">
       {/* Clears the macOS traffic lights overlaying the top; also draggable. */}
       <div className="h-7 w-full flex-shrink-0" data-tauri-drag-region />
       <button

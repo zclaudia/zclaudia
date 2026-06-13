@@ -450,7 +450,7 @@ export function Sidebar({
   // Desktop — expanded
   return (
     <>
-    <div className="relative w-64 bg-card/80 glass border-r border-border/50 flex flex-col">
+    <div className="relative w-64 bg-[hsl(var(--sidebar))] border-r border-border/50 flex flex-col">
       <div className="relative z-50 flex-shrink-0">
         <SidebarTopBar
           onToggle={onToggle}

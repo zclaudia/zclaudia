@@ -68,7 +68,7 @@ export function SessionHeader({
 
   return (
     <div
-      className="flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 border-b border-border bg-card safe-top-pad"
+      className="flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad"
       data-tauri-drag-region
     >
       {/* Mobile: hamburger menu */}
