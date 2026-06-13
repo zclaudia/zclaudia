@@ -285,6 +285,23 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       }
       return true;
 
+    case 'compaction_failed': {
+      const sessionId = msg.sessionId;
+      if (!sessionId) {
+        console.warn(`[${logTag}] compaction_failed missing sessionId, ignoring`);
+        return true;
+      }
+      console.warn(`[${logTag}] compaction_failed session=${sessionId} reason=${msg.reason} breakerOpen=${msg.breakerOpen}`);
+      useChatStore.getState().setCompactionNotice(sessionId, {
+        sessionId,
+        reason: msg.reason,
+        breakerOpen: msg.breakerOpen,
+        nextRetryAtMs: msg.nextRetryAtMs,
+        receivedAt: Date.now(),
+      });
+      return true;
+    }
+
     case 'compaction_completed': {
       // Wire-level event: server has persisted a session_compactions row. Fetch
       // the full marker payload and append a synthetic system message carrying
@@ -297,6 +314,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         console.warn(`[${logTag}] compaction_completed missing sessionId/compactionId, ignoring`);
         return true;
       }
+      useChatStore.getState().clearCompactionNotice(sessionId);
       void getSessionCompaction(sessionId, compactionId)
         .then((c) => {
           useChatStore.getState().addMessage(sessionId, {

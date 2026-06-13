@@ -55,6 +55,14 @@ export interface RunRetryStatus {
   receivedAt: number;
 }
 
+export interface CompactionNotice {
+  sessionId: string;
+  reason: string;
+  breakerOpen: boolean;
+  nextRetryAtMs?: number;
+  receivedAt: number;
+}
+
 export interface DraftAttachment {
   id: string;
   type: 'image' | 'file';
@@ -81,6 +89,8 @@ interface ChatState {
   runHealth: Record<string, RunHealth>;
   // Retry status while LLM call is in backoff: runId → RunRetryStatus
   runRetryStatus: Record<string, RunRetryStatus>;
+  // Per-session compaction failure notice (cleared on success or dismiss)
+  compactionNotice: Record<string, CompactionNotice>;
   // Active tool calls per run: runId → { toolUseId → ToolCallState }
   activeToolCalls: Record<string, Record<string, ToolCallState>>;
   // Tool calls history per run: runId → ToolCallState[] (preserves order)
@@ -151,6 +161,8 @@ interface ChatState {
   updateRunHealth: (runId: string, health: RunHealth) => void;
   updateRunRetryStatus: (runId: string, status: RunRetryStatus) => void;
   clearRunRetryStatus: (runId: string) => void;
+  setCompactionNotice: (sessionId: string, notice: CompactionNotice) => void;
+  clearCompactionNotice: (sessionId: string) => void;
 
   // Actions — Tool calls (per run)
   addToolCall: (runId: string, toolUseId: string, toolName: string, toolInput: unknown, semantic?: ToolSemantic, effect?: ToolEffect) => void;
@@ -227,6 +239,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   backgroundRunIds: new Set<string>(),
   runHealth: {},
   runRetryStatus: {},
+  compactionNotice: {},
   activeToolCalls: {},
   toolCallsHistory: {},
   runContentBlocks: {},
@@ -472,6 +485,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!state.runRetryStatus[runId]) return state;
       const { [runId]: _removed, ...rest } = state.runRetryStatus;
       return { runRetryStatus: rest };
+    }),
+
+  setCompactionNotice: (sessionId, notice) =>
+    set((state) => ({ compactionNotice: { ...state.compactionNotice, [sessionId]: notice } })),
+
+  clearCompactionNotice: (sessionId) =>
+    set((state) => {
+      const { [sessionId]: _removed, ...rest } = state.compactionNotice;
+      return { compactionNotice: rest };
     }),
 
   // ── Tool call actions (per run) ────────────────────────────────

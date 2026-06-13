@@ -6,6 +6,7 @@ const mockChatStore = {
   activeRuns: {} as Record<string, string>,
   runHealth: {} as Record<string, any>,
   runRetryStatus: {} as Record<string, any>,
+  compactionNotice: {} as Record<string, any>,
   appendToLastMessage: vi.fn(),
   appendTextBlock: vi.fn(),
   startRun: vi.fn(),
@@ -25,6 +26,12 @@ const mockChatStore = {
   updateRunHealth: vi.fn(),
   updateRunRetryStatus: vi.fn(),
   clearRunRetryStatus: vi.fn(),
+  setCompactionNotice: vi.fn((sessionId: string, notice: any) => {
+    mockChatStore.compactionNotice[sessionId] = notice;
+  }),
+  clearCompactionNotice: vi.fn((sessionId: string) => {
+    delete mockChatStore.compactionNotice[sessionId];
+  }),
 };
 
 const mockProjectStore = {
@@ -191,6 +198,7 @@ describe('handleServerMessage', () => {
     mockGetProjectsForBackend.mockReset();
     mockChatStore.activeRuns = {};
     mockChatStore.runHealth = {};
+    mockChatStore.compactionNotice = {};
     mockBackgroundTaskStore.tasks = {};
     mockProjectStore.selectedSessionId = 'current-session';
     mockProjectStore.sessions = [];
@@ -754,6 +762,24 @@ describe('handleServerMessage', () => {
       expect(mockGetSessionCompaction).not.toHaveBeenCalled();
       expect(warn).toHaveBeenCalled();
       warn.mockRestore();
+    });
+  });
+
+  describe('compaction_failed', () => {
+    it('sets a compaction notice when breaker is open', () => {
+      handleServerMessage(
+        { type: 'compaction_failed', sessionId: 's1', reason: 'error: prompt_too_long', breakerOpen: true, nextRetryAtMs: 999 } as any,
+        makeCtx(),
+      );
+      const notice = mockChatStore.compactionNotice['s1'];
+      expect(notice).toBeTruthy();
+      expect(notice.breakerOpen).toBe(true);
+      expect(notice.reason).toContain('prompt_too_long');
+    });
+
+    it('ignores events missing sessionId', () => {
+      handleServerMessage({ type: 'compaction_failed', sessionId: '', reason: 'x', breakerOpen: false } as any, makeCtx());
+      expect(Object.keys(mockChatStore.compactionNotice)).toHaveLength(0);
     });
   });
 

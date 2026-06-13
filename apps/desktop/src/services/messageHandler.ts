@@ -147,6 +147,7 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
       'system_info',
       'message_appended',
       'compaction_completed',
+      'compaction_failed',
     ],
     handle: handleRunMessage,
   },

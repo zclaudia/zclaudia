@@ -3,6 +3,7 @@ import { Loader2, AlertTriangle, ArrowDown } from 'lucide-react';
 import { MessageList } from './MessageList';
 import { ToolCallList } from './tool-call/ToolCallList';
 import { LoadingIndicator } from './LoadingIndicator';
+import { CompactionNoticeBanner } from './CompactionNoticeBanner';
 import { InlinePermissionRequest } from './InlinePermissionRequest';
 import { InteractionItem } from './InteractionItem';
 import type { MessageWithToolCalls, ToolCallState, RunHealth, RunRetryStatus } from '../../stores/chatStore';
@@ -324,6 +325,8 @@ export const ChatMessagePane = memo(function ChatMessagePane({
         onCancel={onCancelRun}
         retryStatus={sessionRetryStatus}
       />
+
+      <CompactionNoticeBanner sessionId={sessionId} />
 
       {/* Active tool calls */}
       {!useStreamingSegmented && sessionToolCalls.length > 0 && (
