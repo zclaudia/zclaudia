@@ -183,15 +183,15 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
   return {
     name: 'Edit',
     label: 'Edit',
-    description: 'Replace an exact string in an existing file, or apply a small multi-file patch.',
+    description: 'Replace an exact string in an existing file, or apply a small multi-file patch. For structurally-sensitive files (Markdown tables, JSON arrays, indented YAML/TOML, aligned diffs) where one bad Edit can break the layout and cascade into more Edits, prefer a single Write that rewrites the file. To bundle several independent changes across one or more files atomically, pass them through the `patch` parameter in apply_patch format instead of issuing repeated Edit calls.',
     parameters: {
       type: 'object',
       properties: {
-        file_path: { type: 'string', description: 'Workspace-relative path of the file to edit' },
-        old_string: { type: 'string', description: 'Exact text to replace' },
-        new_string: { type: 'string', description: 'Replacement text' },
+        file_path: { type: 'string', description: 'Workspace-relative path of the file to edit (required unless `patch` is given)' },
+        old_string: { type: 'string', description: 'Exact text to replace (required unless `patch` or `hashline_operation` is given)' },
+        new_string: { type: 'string', description: 'Replacement text (required unless `patch` is given)' },
         replace_all: { type: 'boolean', default: false },
-        patch: { type: 'string', description: 'Optional apply_patch-style multi-file patch' },
+        patch: { type: 'string', description: 'Optional apply_patch-style multi-file patch. When provided, file_path/old_string/new_string are ignored.' },
         hashline_line: { type: 'string', description: 'Optional line hash from Read(hashline:true)' },
         hashline_operation: { type: 'string', description: 'Optional hashline operation, such as replace:<line-hash>' },
         hashline_tag: { type: 'string', description: 'Optional file-level tag from Read(hashline:true)' },

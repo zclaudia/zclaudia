@@ -215,6 +215,91 @@ describe('buildAgentHooks.afterToolCall', () => {
   });
 });
 
+describe('buildAgentHooks Edit flood advisory', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function callEdit(hooks: any, filePath: string, ok = true) {
+    return hooks.afterToolCall({
+      toolCall: { id: 't', name: 'Edit', arguments: {} } as any,
+      args: { file_path: filePath },
+      result: {
+        content: [{ type: 'text', text: 'Edited ' + filePath }],
+        details: { ok, path: filePath },
+      },
+      isError: !ok,
+      context: {} as any,
+    });
+  }
+
+  function adviceText(result: { content?: Array<{ type: string; text?: string }> } | undefined): string {
+    return (result?.content ?? [])
+      .filter(b => b.type === 'text' && typeof b.text === 'string' && b.text.startsWith('[fix]'))
+      .map(b => b.text!)
+      .join('\n');
+  }
+
+  it('stays silent on the first 3 Edits to the same file', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: vi.fn() });
+    const r1 = await callEdit(hooks, 'a.md');
+    const r2 = await callEdit(hooks, 'a.md');
+    const r3 = await callEdit(hooks, 'a.md');
+    expect(adviceText(r1)).toBe('');
+    expect(adviceText(r2)).toBe('');
+    expect(adviceText(r3)).toBe('');
+  });
+
+  it('appends the [fix] advisory on the 4th Edit to the same file', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: vi.fn() });
+    for (let i = 0; i < 3; i++) await callEdit(hooks, 'a.md');
+    const r4 = await callEdit(hooks, 'a.md');
+    const advice = adviceText(r4);
+    expect(advice).toMatch(/Edit has now run 4 times against a\.md/);
+    expect(advice).toMatch(/Write|patch/);
+  });
+
+  it('counts per file independently', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: vi.fn() });
+    for (let i = 0; i < 3; i++) await callEdit(hooks, 'a.md');
+    const otherFile = await callEdit(hooks, 'b.md');
+    expect(adviceText(otherFile)).toBe('');
+  });
+
+  it('counts failed Edits too — the advisory is about file-level flooding, not just success', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: vi.fn() });
+    for (let i = 0; i < 3; i++) await callEdit(hooks, 'a.md', /* ok */ false);
+    const r4 = await callEdit(hooks, 'a.md', /* ok */ false);
+    expect(adviceText(r4)).toMatch(/Edit has now run 4 times/);
+  });
+
+  it('a successful Write clears the counter so post-rewrite Edits start fresh', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: vi.fn() });
+    for (let i = 0; i < 3; i++) await callEdit(hooks, 'a.md');
+    await hooks.afterToolCall!({
+      toolCall: { id: 't', name: 'Write', arguments: {} } as any,
+      args: { file_path: 'a.md' },
+      result: { content: [{ type: 'text', text: 'Wrote a.md' }], details: { ok: true, path: 'a.md' } },
+      isError: false,
+      context: {} as any,
+    } as any);
+    const next = await callEdit(hooks, 'a.md');
+    expect(adviceText(next)).toBe('');
+  });
+
+  it('shouldStopAfterTurn resets the counter so the next turn starts fresh', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: vi.fn() });
+    for (let i = 0; i < 3; i++) await callEdit(hooks, 'a.md');
+    await hooks.shouldStopAfterTurn!({} as any);
+    const next = await callEdit(hooks, 'a.md');
+    expect(adviceText(next)).toBe('');
+  });
+
+  it('respects autoFixHints:false — no advisory even past threshold', async () => {
+    const hooks = buildAgentHooks({ permissionCallback: vi.fn(), autoFixHints: false });
+    for (let i = 0; i < 5; i++) await callEdit(hooks, 'a.md');
+    const r6 = await callEdit(hooks, 'a.md');
+    expect(adviceText(r6)).toBe('');
+  });
+});
+
 describe('buildAgentHooks.shouldStopAfterTurn', () => {
   it('returns false when no abortSignal', async () => {
     const hooks = buildAgentHooks({ permissionCallback: vi.fn() });

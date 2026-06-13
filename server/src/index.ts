@@ -63,15 +63,23 @@ const GATEWAY_NAME = process.env.GATEWAY_NAME || `Backend on ${os.hostname()}`;
  *
  * This prevents TCC consent dialogs from appearing later during remote
  * terminal sessions when nobody is at the Mac to approve them.
+ *
+ * MUST stay async (fs.promises, not fs.readdirSync): a bare-launched node
+ * process without TCC approval blocks on the first readdir until a consent
+ * dialog is answered. The synchronous form froze the event loop inside the
+ * server.listen callback, so accepted TCP connections were never serviced and
+ * every HTTP request hung. The async form pushes the blocking syscall to the
+ * libuv threadpool (sequentially, occupying at most one thread) while the
+ * event loop keeps serving requests. Fire-and-forget — never await this.
  */
-function probeMacOSFolderPermissions(): void {
+async function probeMacOSFolderPermissions(): Promise<void> {
   if (process.platform !== 'darwin') return;
 
   const home = os.homedir();
   for (const folder of ['Desktop', 'Documents', 'Downloads']) {
     const dir = path.join(home, folder);
     try {
-      fs.readdirSync(dir);
+      await fs.promises.readdir(dir);
     } catch {
       // Permission denied or folder doesn't exist — either way, the TCC
       // dialog has been triggered (or will be on next attempt).
@@ -172,7 +180,8 @@ async function main() {
 
       // Probe TCC-protected folders so macOS consent dialogs appear now
       // (while user is at the keyboard) rather than during remote sessions.
-      probeMacOSFolderPermissions();
+      // Fire-and-forget: must not block the listen callback / event loop.
+      void probeMacOSFolderPermissions();
 
       // Priority 1: Environment variables (for backward compatibility)
       if (GATEWAY_URL && GATEWAY_SECRET) {

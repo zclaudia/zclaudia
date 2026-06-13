@@ -18,6 +18,14 @@ const PERSIST_MIN_BYTES = 4 * 1024;
 const PERSIST_PREVIEW_BYTES = 1024;
 
 /**
+ * Once Edit has been called on the same file this many times in one turn,
+ * append an advisory pushing the model toward Write / the `patch` parameter.
+ * Threshold sits above "legitimate 3-spot fine edit" and below the typical
+ * "model is fumbling a Markdown table" loop (5+ Edits).
+ */
+const EDIT_FLOOD_THRESHOLD = 4;
+
+/**
  * Tools whose output is more useful from the head (file reads, listings, search hits).
  * Bash and unknown tools default to tail (errors/results usually at the end).
  */
@@ -164,6 +172,9 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
   const turnBudgetBytes = input.toolResultBudgetBytes ?? DEFAULT_TURN_BUDGET_BYTES;
   const autoFixHints = input.autoFixHints ?? true;
   let turnSpentBytes = 0;
+  // Tracks how many times Edit has hit each file path in the current turn.
+  // Reset on shouldStopAfterTurn alongside turnSpentBytes.
+  const editAttemptsByPath = new Map<string, number>();
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -220,6 +231,29 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           content = [...content, { type: 'text', text: `[fix] ${hint}` }];
           remediationAppended = true;
         }
+      }
+
+      // Edit flood advisory: when Edit keeps hitting the same file, the model
+      // is usually fighting structural cascade (Markdown table / JSON array /
+      // indentation drift) — point it at Write or the `patch` parameter
+      // before it burns more turns. Counts both successes and failures (the
+      // failure remediation hints already exist; this is the aggregate signal).
+      // A successful Write clears the counter so post-rewrite Edits start fresh.
+      if (autoFixHints && toolName === 'Edit' && typeof args?.file_path === 'string') {
+        const key = args.file_path.trim();
+        if (key) {
+          const next = (editAttemptsByPath.get(key) ?? 0) + 1;
+          editAttemptsByPath.set(key, next);
+          if (next >= EDIT_FLOOD_THRESHOLD) {
+            const advisory = `Edit has now run ${next} times against ${key} this turn. If you're fighting a structural file (Markdown tables, JSON arrays, indented YAML), Edits cascade — switch to a single Write to rewrite the file, or pass all the changes through Edit's \`patch\` parameter in one atomic call.`;
+            content = [...content, { type: 'text', text: `[fix] ${advisory}` }];
+            remediationAppended = true;
+          }
+        }
+      }
+      if (toolName === 'Write' && typeof args?.file_path === 'string' && result?.details?.ok !== false) {
+        const key = args.file_path.trim();
+        if (key) editAttemptsByPath.delete(key);
       }
       if (input.userHooks?.length) {
         const extras = await runPostToolUseHooks(input.userHooks, {
@@ -287,6 +321,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
 
     shouldStopAfterTurn: async () => {
       turnSpentBytes = 0;
+      editAttemptsByPath.clear();
       return input.abortSignal?.aborted ?? false;
     },
 
