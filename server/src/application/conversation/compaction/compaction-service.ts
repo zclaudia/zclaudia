@@ -71,6 +71,8 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
   const decision = compactionCircuitBreaker.evaluate(ctx.sessionId, now);
   if (decision.action === 'skip') {
     return skipped('circuit_open', undefined, {
+      // When we skip, the breaker is open by definition; pin breakerOpen=true in
+      // case a concurrent recordSuccess/reset raced between evaluate() and snapshot().
       breaker: { ...compactionCircuitBreaker.snapshot(ctx.sessionId), breakerOpen: true },
     });
   }
@@ -112,6 +114,8 @@ export async function forceCompact(ctx: CompactionContext): Promise<CompactionOu
     if (result.outcome === 'compacted') compactionCircuitBreaker.reset(ctx.sessionId);
     return result;
   } catch (err) {
+    // Manual /compact failures are surfaced to the user directly and must NOT
+    // call recordFailure — they do not trip the auto-compaction breaker.
     const message = err instanceof Error ? err.message : String(err);
     return { outcome: 'failed', compacted: false, reason: `error: ${message}` };
   }
