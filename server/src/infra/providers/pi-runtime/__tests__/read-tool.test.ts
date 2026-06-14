@@ -26,6 +26,41 @@ describe('Read bridge tool module', () => {
     expect(result.content[0].text).not.toContain('1|one');
   });
 
+  it('appends an end-of-file footer when the whole file is returned', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-footer-full-'));
+    await writeFile(path.join(root, 'sample.ts'), ['one', 'two', 'three'].join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'sample.ts' });
+
+    expect(result.details).toMatchObject({ totalLines: 3, returnedLines: 3 });
+    expect(result.content[0].text).toContain('[End of file — all 3 lines shown.]');
+  });
+
+  it('tells the model how many lines remain and where to continue', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-footer-partial-'));
+    const lines = Array.from({ length: 50 }, (_, i) => `line${i + 1}`);
+    await writeFile(path.join(root, 'big.ts'), lines.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'big.ts', offset: 1, limit: 10 });
+
+    expect(result.details).toMatchObject({ totalLines: 50, returnedLines: 10 });
+    expect(result.content[0].text).toContain('Showing lines 1-10 of 50. 40 more lines below — call Read again with offset=11 to continue.');
+  });
+
+  it('defaults to reading up to 2000 lines in one call', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-default-limit-'));
+    const lines = Array.from({ length: 300 }, (_, i) => `line${i + 1}`);
+    await writeFile(path.join(root, 'medium.ts'), lines.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'medium.ts' });
+
+    expect(result.details).toMatchObject({ totalLines: 300, returnedLines: 300 });
+    expect(result.content[0].text).toContain('300|line300');
+  });
+
   it('can return hashline anchors for content-addressed edits', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-hash-module-'));
     await writeFile(path.join(root, 'sample.ts'), 'const a = 1;\nconst b = 2;\n');

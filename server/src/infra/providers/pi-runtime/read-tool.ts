@@ -35,18 +35,34 @@ function formatNumberedLines(lines: string[], startLine: number): string {
   return lines.map((line, index) => `${startLine + index}|${line}`).join('\n');
 }
 
+// Tells the model the file's full size and whether more lines remain, so it
+// reads a large window (or stops) instead of probing a few lines at a time.
+function buildReadFooter(offset: number, returnedLines: number, totalLines: number): string {
+  if (totalLines === 0) return '\n\n[File is empty — 0 lines.]';
+  const lastLine = offset + returnedLines - 1;
+  const remaining = totalLines - lastLine;
+  if (remaining > 0) {
+    const nextOffset = lastLine + 1;
+    return `\n\n[Showing lines ${offset}-${lastLine} of ${totalLines}. ${remaining} more line${remaining === 1 ? '' : 's'} below — call Read again with offset=${nextOffset} to continue.]`;
+  }
+  if (offset === 1) {
+    return `\n\n[End of file — all ${totalLines} line${totalLines === 1 ? '' : 's'} shown.]`;
+  }
+  return `\n\n[Showing lines ${offset}-${totalLines} of ${totalLines} (end of file).]`;
+}
+
 export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): AgentTool<any> {
   return {
     name: 'Read',
     label: 'Read',
-    description: 'Read a file. Text files use line pagination; images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call).',
+    description: 'Read a file. Text files return up to 2000 lines per call (default reads from the start); the output footer reports the total line count and whether more lines remain, so prefer one large read over many small ones and only paginate with offset when a file exceeds 2000 lines. Images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call).',
     parameters: {
       type: 'object',
       properties: {
         path: { type: 'string' },
         file_path: { type: 'string' },
         offset: { type: 'number', default: 1 },
-        limit: { type: 'number', default: 200 },
+        limit: { type: 'number', default: 2000 },
         pages: { type: 'string', description: 'For PDFs: page range like "1-5" or "2,7" (max 20 pages per call)' },
       },
     } as any,
@@ -125,12 +141,14 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const lines = rendered.split('\n');
           const totalLines = lines.length;
           const offset = Math.max(1, Number(args.offset ?? 1) || 1);
-          const limit = Math.max(1, Math.min(Number(args.limit ?? 200) || 200, 2000));
+          const limit = Math.max(1, Math.min(Number(args.limit ?? 2000) || 2000, 2000));
           const selected = lines.slice(offset - 1, offset - 1 + limit);
-          return textResult(formatNumberedLines(selected, offset), {
-            ok: true, path: relPath, format: 'notebook', offset, limit, totalLines,
-            returnedLines: selected.length, size: fileStat.size,
-          });
+          return textResult(
+            formatNumberedLines(selected, offset) + buildReadFooter(offset, selected.length, totalLines),
+            {
+              ok: true, path: relPath, format: 'notebook', offset, limit, totalLines,
+              returnedLines: selected.length, size: fileStat.size,
+            });
         }
 
         if (fileStat.size > DEFAULT_READ_MAX_BYTES) {
@@ -153,7 +171,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
         const totalLines = lines.length;
         const offset = Math.max(1, Number(args.offset ?? 1) || 1);
-        const limit = Math.max(1, Math.min(Number(args.limit ?? 200) || 200, 2000));
+        const limit = Math.max(1, Math.min(Number(args.limit ?? 2000) || 2000, 2000));
         const selected = lines.slice(offset - 1, offset - 1 + limit);
         const relPath = toWorkspaceRelative(cwd, filePath);
         const hashlineEntries = args.hashline === true ? buildHashlineEntries(selected) : undefined;
@@ -168,7 +186,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         return textResult(
           args.hashline === true
             ? formatHashlineOutput(relPath, text, hashlineEntries ?? [])
-            : formatNumberedLines(selected, offset),
+            : formatNumberedLines(selected, offset) + buildReadFooter(offset, selected.length, totalLines),
           {
             ok: true,
             path: relPath,
