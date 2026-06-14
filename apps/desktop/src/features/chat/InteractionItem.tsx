@@ -86,7 +86,7 @@ function ChoiceField({
             key={opt.value}
             className={`flex items-start gap-2 p-2 rounded-md cursor-pointer transition-colors text-xs ${
               isSelected
-                ? 'bg-primary/10 border border-primary/30'
+                ? 'bg-muted/60 border border-primary/30'
                 : 'bg-muted/50 border border-transparent hover:bg-muted'
             }`}
           >
@@ -111,7 +111,7 @@ function ChoiceField({
         <label
           className={`flex items-start gap-2 p-2 rounded-md cursor-pointer transition-colors text-xs ${
             customEnabled
-              ? 'bg-primary/10 border border-primary/30'
+              ? 'bg-muted/60 border border-primary/30'
               : 'bg-muted/50 border border-transparent hover:bg-muted'
           }`}
         >
@@ -256,7 +256,7 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
   }
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-primary/5 border border-primary/30">
+    <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-muted/40 border border-primary/30">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground">
         <FileQuestion size={12} className="text-primary" />
         <span>{interaction.title}</span>
@@ -308,7 +308,7 @@ function PromptRenderer({ interaction }: { interaction: InteractionPromptMessage
         )}
         <button
           onClick={handleSubmit}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
         >
           <Send size={10} />
           {interaction.submitLabel || 'Submit'}
@@ -364,7 +364,7 @@ function ApprovalRenderer({ interaction }: { interaction: ApprovalInteractionMes
         </button>
         <button
           onClick={() => handleDecision(true)}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
         >
           <ThumbsUp size={10} />
           {interaction.approveLabel || 'Approve'}
@@ -495,7 +495,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
     const tone = isApproved
       ? 'bg-success/10 border-success/30 text-success'
       : isSaved
-        ? 'bg-primary/10 border-primary/30 text-primary'
+        ? 'bg-muted/60 border-primary/30 text-primary'
         : 'bg-destructive/10 border-destructive/30 text-destructive';
     return (
       <div className={`flex flex-col gap-1 px-3 py-2 rounded-md border ${tone}`}>
@@ -520,7 +520,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
   }
 
   return (
-    <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-primary/5 border border-primary/30">
+    <div className="flex flex-col gap-2 px-3 py-2 rounded-md bg-muted/40 border border-primary/30">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium text-foreground">
           <ClipboardCheck size={12} className="text-primary" />
@@ -626,7 +626,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
         <button
           onClick={handleApprove}
           disabled={saving}
-          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <ThumbsUp size={10} />
           Approve Plan

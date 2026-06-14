@@ -61,7 +61,7 @@ export function NewRunDropdown({ projectId, socket, onNewClassicChange }: Props)
               />
               <div className="flex gap-2">
                 <button
-                  className="flex-1 px-2.5 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+                  className="flex-1 px-2.5 py-1.5 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted"
                   onClick={submitMeta}
                 >
                   Create

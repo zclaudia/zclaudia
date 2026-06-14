@@ -621,7 +621,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
                     key={set.id}
                     className={`min-w-0 rounded-lg border p-3 text-sm transition-colors ${
                       checked
-                        ? 'bg-primary/10 border-primary/45 text-primary shadow-sm'
+                        ? 'bg-muted/60 border-primary/45 text-primary shadow-sm'
                         : customized
                           ? 'bg-secondary/80 border-primary/25 text-foreground'
                           : 'bg-secondary/60 border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground/40'
@@ -657,7 +657,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
                         aria-label={`customize tool set ${set.id}`}
                         className={`shrink-0 rounded-md border px-2 py-1 text-[11px] transition-colors ${
                           customized
-                            ? 'border-primary/40 bg-primary/10 text-primary'
+                            ? 'border-primary/40 bg-muted/60 text-primary'
                             : 'border-border bg-background/70 text-muted-foreground hover:text-foreground'
                         }`}
                       >
@@ -764,7 +764,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
                         disabled={readOnly}
                         className={`shrink-0 rounded-md px-2 py-1 text-[10px] transition-colors ${
                           selected
-                            ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                            ? 'bg-muted text-primary hover:bg-muted'
                             : 'bg-secondary text-muted-foreground hover:text-foreground'
                         } disabled:opacity-50`}
                       >
@@ -938,7 +938,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
         <button
           onClick={handleSubmit}
           disabled={!formName.trim() || saving}
-          className="flex-1 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium disabled:opacity-50"
+          className="flex-1 px-4 py-2 bg-muted/60 text-foreground hover:bg-muted rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {saving ? 'Saving...' : editingAgent ? 'Update' : 'Create'}
         </button>
@@ -975,7 +975,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
                 <div className="flex items-center gap-2">
                   <span className="font-medium truncate">{agent.name}</span>
                   {agent.isDefault && (
-                    <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-xs rounded-md">
+                    <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">
                       Default
                     </span>
                   )}
@@ -1173,7 +1173,7 @@ function ModelSelector({
                   setOpen(false);
                 }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                  m.modelId === value ? 'text-primary font-medium bg-primary/5' : 'text-foreground hover:bg-secondary/80'
+                  m.modelId === value ? 'text-primary font-medium bg-muted/40' : 'text-foreground hover:bg-secondary/80'
                 }`}
               >
                 <span className="w-4 flex-shrink-0">
@@ -1237,7 +1237,7 @@ function LlmProfileSelector({
                 setOpen(false);
               }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                p.id === value ? 'text-primary font-medium bg-primary/5' : 'text-foreground hover:bg-secondary/80'
+                p.id === value ? 'text-primary font-medium bg-muted/40' : 'text-foreground hover:bg-secondary/80'
               }`}
             >
               <span className="w-4 flex-shrink-0">
@@ -1245,7 +1245,7 @@ function LlmProfileSelector({
               </span>
               <span className="truncate">{p.name}</span>
               {p.isDefault && (
-                <span className="ml-auto px-1.5 py-0.5 bg-primary/15 text-primary text-[10px] rounded-md">Default</span>
+                <span className="ml-auto px-1.5 py-0.5 bg-muted/60 text-primary text-[10px] rounded-md">Default</span>
               )}
             </button>
           ))}
@@ -1298,7 +1298,7 @@ function ThinkingLevelSelector({
                 setOpen(false);
               }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                opt.value === value ? 'text-primary font-medium bg-primary/5' : 'text-foreground hover:bg-secondary/80'
+                opt.value === value ? 'text-primary font-medium bg-muted/40' : 'text-foreground hover:bg-secondary/80'
               }`}
             >
               <span className="w-4 flex-shrink-0">

@@ -183,7 +183,7 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
               <button
                 onClick={handleSaveEdit}
                 disabled={isSaving}
-                className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+                className="px-3 py-1.5 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
               >
                 {isSaving ? 'Saving...' : 'Save'}
               </button>
@@ -225,7 +225,7 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
         <button
           type="button"
           onClick={() => { setShowNewForm(true); setEditingSkillId(null); }}
-          className="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 whitespace-nowrap transition-colors"
+          className="px-3 py-2 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted whitespace-nowrap transition-colors"
         >
           + Add
         </button>
@@ -307,7 +307,7 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
             <button
               onClick={handleCreateSkill}
               disabled={!newSkillId.trim() || !newSkillContent.trim() || isSaving}
-              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              className="px-3 py-1.5 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted disabled:opacity-50 transition-colors"
             >
               {isSaving ? 'Creating...' : 'Create'}
             </button>
@@ -372,12 +372,12 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                   {(skill.metadata?.allowedTools?.length || skill.metadata?.paths?.length || skill.metadata?.arguments?.length || skill.metadata?.argumentHint || skill.metadata?.snippets?.length || skill.metadata?.shellSnippets?.length || skill.metadata?.hookTriggers?.tools?.length || skill.metadata?.hookTriggers?.paths?.length || requirementSummary) && (
                     <div className="mt-1 flex flex-wrap gap-1">
                       {skill.metadata?.argumentHint && (
-                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary">
+                        <span className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] text-primary">
                           args {skill.metadata.argumentHint}
                         </span>
                       )}
                       {skill.metadata?.arguments?.length && !skill.metadata.argumentHint ? (
-                        <span className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary">
+                        <span className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] text-primary">
                           args {skill.metadata.arguments.join(' ')}
                         </span>
                       ) : null}
@@ -392,7 +392,7 @@ export function WorkspaceSkillsSettings({ readOnly = false }: { readOnly?: boole
                         </span>
                       ))}
                       {skill.metadata?.snippets?.map((snippet) => (
-                        <span key={`snippet:${snippet}`} className="px-1.5 py-0.5 rounded bg-primary/10 text-[10px] text-primary">
+                        <span key={`snippet:${snippet}`} className="px-1.5 py-0.5 rounded bg-muted/60 text-[10px] text-primary">
                           snippet {snippet}
                         </span>
                       ))}

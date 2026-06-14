@@ -299,7 +299,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
               <button
                 onClick={() => { void handleCopyJSON(); }}
                 disabled={crashReports.length === 0}
-                className="px-2 py-1 text-xs bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground rounded-lg transition-colors"
+                className="px-2 py-1 text-xs bg-muted/60 hover:bg-muted disabled:bg-muted disabled:text-muted-foreground text-foreground rounded-lg transition-colors"
               >
                 {copied ? 'Copied!' : 'Copy JSON'}
               </button>
@@ -357,7 +357,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
               </button>
               <button
                 onClick={() => { void handleExportLogs(); }}
-                className="px-3 py-1 text-xs bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors"
+                className="px-3 py-1 text-xs bg-muted/60 hover:bg-muted text-foreground rounded-lg font-medium transition-colors"
               >
                 Export Logs
               </button>
@@ -481,7 +481,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
                 onClick={() => { setPermLogs([]); setPermLogsFilter(filter); }}
                 className={`px-2 py-0.5 text-[11px] rounded-md transition-colors ${
                   permLogsFilter === filter
-                    ? 'bg-primary text-primary-foreground'
+                    ? 'bg-muted/60 text-foreground'
                     : 'bg-secondary/80 text-muted-foreground hover:text-foreground'
                 }`}
               >
@@ -619,7 +619,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
           <button
             onClick={() => { void handleRunSimulation(); }}
             disabled={simRunning || !simDetail.trim() || simProviders.length === 0}
-            className="w-full py-1.5 text-xs bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground rounded-lg font-medium transition-colors"
+            className="w-full py-1.5 text-xs bg-muted/60 hover:bg-muted disabled:bg-muted disabled:text-muted-foreground text-foreground rounded-lg font-medium transition-colors"
           >
             {simRunning ? 'Running Review…' : 'Run Review'}
           </button>

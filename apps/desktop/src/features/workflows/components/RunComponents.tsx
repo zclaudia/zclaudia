@@ -37,7 +37,7 @@ export function formatDuration(startedAt?: number, completedAt?: number): string
 
 export function RunStatusBadge({ status }: { status: string }) {
   const colors: Record<string, string> = {
-    running: 'bg-primary/10 text-primary',
+    running: 'bg-muted/60 text-primary',
     completed: 'bg-green-500/10 text-green-600',
     failed: 'bg-destructive/10 text-destructive',
     cancelled: 'bg-muted text-muted-foreground',

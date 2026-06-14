@@ -74,7 +74,7 @@ export function ThemeToggle() {
                 className={`
                   w-full flex items-center gap-2 px-3 py-2 text-xs text-left transition-colors
                   ${theme === option.value
-                    ? 'bg-primary/10 text-primary'
+                    ? 'bg-muted/60 text-primary'
                     : 'text-popover-foreground hover:bg-muted'
                   }
                 `}

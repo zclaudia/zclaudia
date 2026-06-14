@@ -77,7 +77,7 @@ export function PromotionDialog({ projectId, run, poolItemId, socket: _socket }:
       {error && <div className="text-sm text-red-500">Error: {error}</div>}
 
       <div className="flex gap-2">
-        <button className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        <button className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
                 disabled={submitting}
                 onClick={onPromote}>
           {submitting ? 'Promoting…' : 'Promote'}

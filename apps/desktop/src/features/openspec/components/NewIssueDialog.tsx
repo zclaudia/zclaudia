@@ -128,7 +128,7 @@ export function NewIssueDialog({
             Cancel
           </button>
           <button
-            className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
             disabled={busy || !title.trim()}
             onClick={() => void onSubmit()}
           >

@@ -47,11 +47,11 @@ export function formatInterval(ms: number): string {
 }
 
 export const CATEGORY_COLORS: Record<string, string> = {
-  ai: 'bg-primary/15 text-primary',
+  ai: 'bg-muted/60 text-primary',
   git: 'bg-success/15 text-success',
   maintenance: 'bg-warning/15 text-warning',
   quality: 'bg-thinking/15 text-thinking',
-  scheduling: 'bg-primary/15 text-primary',
+  scheduling: 'bg-muted/60 text-primary',
   sync: 'bg-success/15 text-success',
   supervision: 'bg-thinking/15 text-thinking',
   plugin: 'bg-muted text-muted-foreground',

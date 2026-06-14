@@ -141,7 +141,7 @@ function SummaryBar({ toolCalls, onClick }: { toolCalls: ToolCallState[]; onClic
                 displayStatus === 'error'
                   ? 'bg-destructive/20 text-destructive'
                   : displayStatus === 'running'
-                  ? 'bg-primary/20 text-primary'
+                  ? 'bg-muted text-primary'
                   : 'bg-secondary text-muted-foreground'
               }`}
               title={formatToolInput(tc.toolName, tc.toolInput)}

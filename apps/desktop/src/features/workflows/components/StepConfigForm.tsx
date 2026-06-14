@@ -344,7 +344,7 @@ export function StepConfigForm({ step, onChange, onDelete }: StepConfigFormProps
                 (step.onError ?? 'abort') === opt
                   ? opt === 'route'
                     ? 'border-orange-500 bg-orange-500/10 text-orange-600'
-                    : 'border-primary bg-primary/10 text-primary'
+                    : 'border-primary bg-muted/60 text-primary'
                   : 'border-border hover:bg-secondary'
               }`}
             >

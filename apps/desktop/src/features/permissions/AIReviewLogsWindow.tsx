@@ -31,7 +31,7 @@ function formatTime(ts?: number): string {
 
 function StepCard({ step, highlight }: { step: WorkflowStepRun; highlight: boolean }) {
   return (
-    <div className={`rounded-lg border p-3 ${highlight ? 'border-primary/40 bg-primary/5' : 'border-border bg-card/40'}`}>
+    <div className={`rounded-lg border p-3 ${highlight ? 'border-primary/40 bg-muted/40' : 'border-border bg-card/40'}`}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           <StepStatusIcon status={step.status} />
@@ -40,7 +40,7 @@ function StepCard({ step, highlight }: { step: WorkflowStepRun; highlight: boole
             {step.stepType}
           </span>
           {highlight && (
-            <span className="text-[10px] text-primary px-1.5 py-0.5 rounded bg-primary/10 flex items-center gap-1">
+            <span className="text-[10px] text-primary px-1.5 py-0.5 rounded bg-muted/60 flex items-center gap-1">
               <Bot size={10} />
               AI review
             </span>

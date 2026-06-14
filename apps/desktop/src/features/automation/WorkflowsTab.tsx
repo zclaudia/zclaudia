@@ -39,9 +39,9 @@ export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId
     const boundProjects = projects.filter((project) => project.permissionWorkflowOverrideId === workflow.id);
     const projectBinding = boundProjects.find((project) => project.id === workflow.projectId);
     if (projectBinding) {
-      badges.push({ label: 'Project override', className: 'bg-primary/10 text-primary border-primary/20' });
+      badges.push({ label: 'Project override', className: 'bg-muted/60 text-primary border-primary/20' });
     } else if (boundProjects.length > 0) {
-      badges.push({ label: `${boundProjects.length} project override${boundProjects.length === 1 ? '' : 's'}`, className: 'bg-primary/10 text-primary border-primary/20' });
+      badges.push({ label: `${boundProjects.length} project override${boundProjects.length === 1 ? '' : 's'}`, className: 'bg-muted/60 text-primary border-primary/20' });
     }
     if (globalPermissionWorkflowOverrideId === workflow.id) {
       badges.push({ label: 'Global override', className: 'bg-success/10 text-success border-success/20' });
@@ -139,7 +139,7 @@ export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId
           )}
           <button
             onClick={handleCreate}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
           >
             <Plus size={12} />
             New
@@ -175,7 +175,7 @@ export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId
                       onClick={() => handleEnableTemplate(t.id, effectiveProjectId)}
                       disabled={enabled}
                       className={`self-start text-[10px] px-2 py-0.5 rounded-md transition-colors ${
-                        enabled ? 'bg-success/15 text-success' : 'bg-primary/10 text-primary hover:bg-primary/20'
+                        enabled ? 'bg-success/15 text-success' : 'bg-muted/60 text-primary hover:bg-muted'
                       }`}
                     >
                       {enabled ? 'Enabled' : 'Enable'}

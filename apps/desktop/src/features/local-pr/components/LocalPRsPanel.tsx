@@ -206,14 +206,14 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
           <GitPullRequest className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm font-medium">Local Pull Requests</span>
           {activePRs > 0 && (
-            <span className="text-xs bg-primary/20 text-primary px-1.5 py-0.5 rounded-full">
+            <span className="text-xs bg-muted text-primary px-1.5 py-0.5 rounded-full">
               {activePRs}
             </span>
           )}
         </div>
         <button
           onClick={() => setCreateOpen(true)}
-          className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20"
+          className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-md bg-muted/60 text-primary hover:bg-muted"
           title="New PR"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -259,7 +259,7 @@ export function LocalPRsPanel({ projectId, projectRootPath }: LocalPRsPanelProps
                           <button
                             onClick={() => handleQuickCreate(wt.path)}
                             disabled={disableCreate}
-                            className="shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="shrink-0 flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-muted/60 text-primary hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             {creatingPath === wt.path ? (
                               <Loader2 className="w-3 h-3 animate-spin" />

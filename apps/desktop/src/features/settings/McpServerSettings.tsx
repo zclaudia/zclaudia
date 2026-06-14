@@ -846,7 +846,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
               onClick={() => toggleScope(opt.value)}
               className={`px-2 py-0.5 text-xs rounded-lg border transition-colors ${
                 formScope.includes(opt.value)
-                  ? 'bg-primary/20 border-primary text-primary'
+                  ? 'bg-muted border-primary text-primary'
                   : 'bg-secondary/50 border-border text-muted-foreground hover:border-primary/50'
               }`}
             >
@@ -871,7 +871,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
         <button
           type="button"
           onClick={handleSubmit}
-          className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+          className="px-3 py-1.5 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted transition-colors"
         >
           {editingId ? 'Save' : 'Add'}
         </button>
@@ -909,7 +909,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
         <button
           type="button"
           onClick={() => { setShowAddForm(true); setEditingId(null); resetForm(); }}
-          className="px-3 py-2 text-sm bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 whitespace-nowrap transition-colors"
+          className="px-3 py-2 text-sm bg-muted/60 text-foreground rounded-lg hover:bg-muted whitespace-nowrap transition-colors"
         >
           + Add
         </button>
@@ -1044,7 +1044,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
                     {server.providerScope && server.providerScope.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
                         {server.providerScope.map(p => (
-                          <span key={p} className="px-1.5 py-0.5 rounded-md text-[10px] bg-primary/10 text-primary font-mono">
+                          <span key={p} className="px-1.5 py-0.5 rounded-md text-[10px] bg-muted/60 text-primary font-mono">
                             {p}
                           </span>
                         ))}

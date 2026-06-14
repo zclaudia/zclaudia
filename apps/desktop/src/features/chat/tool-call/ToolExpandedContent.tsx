@@ -206,7 +206,7 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
           {questions.map((q, idx) => (
             <div key={idx}>
               <div className="flex items-start gap-2 mb-1.5">
-                <span className="inline-block px-1.5 py-0.5 bg-primary/20 text-primary text-[10px] rounded-md font-medium flex-shrink-0">
+                <span className="inline-block px-1.5 py-0.5 bg-muted text-primary text-[10px] rounded-md font-medium flex-shrink-0">
                   {q.header}
                 </span>
                 <span className="text-xs text-foreground">{q.question}</span>
@@ -240,7 +240,7 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
         {result !== undefined && (
           <div className="mt-3">
             <div className="text-xs text-muted-foreground mb-1">User's Answer:</div>
-            <pre className="text-xs bg-primary/10 rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre text-foreground">
+            <pre className="text-xs bg-muted/60 rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre text-foreground">
               {formatToolResult(result)}
             </pre>
           </div>
@@ -265,7 +265,7 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
             <pre
               data-testid="tool-result"
               className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${
-                isError ? 'bg-destructive/20 text-destructive' : 'bg-primary/10 text-foreground'
+                isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'
               }`}
             >
               {formatToolResult(result)}
@@ -325,7 +325,7 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
         {status !== 'running' && result !== undefined && (
           <div className="mt-2">
             <div className="text-xs text-muted-foreground mb-1">Response:</div>
-            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-primary/10 text-foreground'}`}>
+            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}>
               {formatToolResult(result)}
             </pre>
           </div>
@@ -346,7 +346,7 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
         </div>
         {status !== 'running' && result !== undefined && (
           <div className="mt-2">
-            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-primary/10 text-foreground'}`}>
+            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}>
               {formatToolResult(result)}
             </pre>
           </div>
@@ -367,7 +367,7 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
         </div>
         {status !== 'running' && result !== undefined && (
           <div className="mt-2">
-            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-primary/10 text-foreground'}`}>
+            <pre className={`text-xs rounded-md p-2 overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch] whitespace-pre ${isError ? 'bg-destructive/20 text-destructive' : 'bg-muted/60 text-foreground'}`}>
               {formatToolResult(result)}
             </pre>
           </div>

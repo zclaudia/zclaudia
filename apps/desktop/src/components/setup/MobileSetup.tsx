@@ -147,7 +147,7 @@ export function MobileSetup() {
               <button
                 type="button"
                 onClick={handleLogoTap}
-                className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4"
+                className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4"
               >
                 <Bot size={32} strokeWidth={1.5} className="text-primary" />
               </button>
@@ -234,7 +234,7 @@ export function MobileSetup() {
             <button
               type="button"
               onClick={handleLogoTap}
-              className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4"
+              className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4"
             >
               <Bot size={32} strokeWidth={1.5} className="text-primary" />
             </button>
@@ -294,7 +294,7 @@ export function MobileSetup() {
           <button
             onClick={handleConnect}
             disabled={connecting || !gatewayUrl.trim() || !gatewaySecret.trim()}
-            className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl
+            className="w-full py-3 bg-muted/60 hover:bg-muted text-foreground rounded-xl
                      font-medium text-sm transition-colors
                      disabled:opacity-50 disabled:cursor-not-allowed"
           >

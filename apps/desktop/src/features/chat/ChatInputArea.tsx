@@ -269,7 +269,7 @@ export function ChatInputArea({
                   console.error('Failed to unlock session:', err);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary/10 text-primary hover:bg-primary/20 rounded-md transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-muted/60 text-primary hover:bg-muted rounded-md transition-colors"
             >
               <Unlock size={14} />
               Unlock
@@ -454,7 +454,7 @@ export function ChatInputArea({
                         <button
                           key={item.key}
                           onClick={item.onClick}
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${item.isActive ? 'text-primary bg-primary/5' : 'text-foreground hover:bg-muted'}`}
+                          className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${item.isActive ? 'text-primary bg-muted/40' : 'text-foreground hover:bg-muted'}`}
                         >
                           <span className="relative flex-shrink-0">
                             {item.icon}

@@ -144,7 +144,7 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
       {/* Drag handle on left edge */}
       {expanded && (
         <div
-          className="absolute top-0 left-0 w-1 h-full cursor-ew-resize hover:bg-primary/20 z-10"
+          className="absolute top-0 left-0 w-1 h-full cursor-ew-resize hover:bg-muted z-10"
           onMouseDown={onDragStart}
           onTouchStart={onDragStart}
         />

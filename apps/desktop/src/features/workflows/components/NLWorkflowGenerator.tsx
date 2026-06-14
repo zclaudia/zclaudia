@@ -132,7 +132,7 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
           <button
             onClick={handleGenerate}
             disabled={!description.trim() || loading || !llmProfileId}
-            className="flex items-center justify-center gap-1.5 w-full py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             {loading ? 'Generating...' : 'Generate'}
@@ -152,7 +152,7 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
                 key={i}
                 className={`text-[10px] px-1.5 py-1 rounded-md ${
                   entry.role === 'user'
-                    ? 'bg-primary/10 text-foreground'
+                    ? 'bg-muted/60 text-foreground'
                     : 'bg-muted text-muted-foreground'
                 }`}
               >
@@ -175,7 +175,7 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
           <button
             onClick={handleRefine}
             disabled={!refineInput.trim() || loading}
-            className="flex items-center justify-center gap-1.5 w-full py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40"
+            className="flex items-center justify-center gap-1.5 w-full py-1.5 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors disabled:opacity-40"
           >
             {loading ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
             {loading ? 'Refining...' : 'Refine'}

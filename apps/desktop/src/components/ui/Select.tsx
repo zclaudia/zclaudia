@@ -157,7 +157,7 @@ export function Select<T extends string = string>({
                   ${opt.disabled
                     ? 'opacity-50 cursor-not-allowed'
                     : isActive
-                      ? 'bg-primary/10 text-primary font-medium'
+                      ? 'bg-muted/60 text-primary font-medium'
                       : 'text-foreground hover:bg-muted active:bg-muted'}
                 `}
               >

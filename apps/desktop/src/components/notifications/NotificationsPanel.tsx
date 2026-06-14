@@ -48,7 +48,7 @@ export function NotificationsPanel() {
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm">Notifications</span>
           {unreadCount > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-primary text-primary-foreground rounded-full">
+            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-muted/60 text-foreground rounded-full">
               {unreadCount}
             </span>
           )}

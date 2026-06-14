@@ -138,7 +138,7 @@ export function DraftPanel() {
             <button
               onClick={handleFinish}
               disabled={!localContent.trim()}
-              className="px-3 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Finish & Send
             </button>

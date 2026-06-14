@@ -345,7 +345,7 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
             <button
               onClick={handleSave}
               disabled={saving || !name.trim()}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-40 shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors disabled:opacity-40 shrink-0"
             >
               <Save size={14} />
               {saving ? 'Saving...' : 'Save'}

@@ -168,7 +168,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
           type="button"
           onClick={commit}
           disabled={committing || !message.trim() || !status || status.staged.length === 0}
-          className="w-full text-xs py-1.5 rounded bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-1.5"
+          className="w-full text-xs py-1.5 rounded bg-muted/60 text-foreground disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-1.5"
           title={status && status.staged.length === 0 ? 'Stage files first' : 'git commit -m'}
         >
           <Check className="w-3 h-3" />
@@ -212,7 +212,7 @@ function FileSection({
           <button
             type="button"
             onClick={onAll}
-            className="rounded-md px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-primary/10"
+            className="rounded-md px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-muted/60"
           >
             {action} all
           </button>

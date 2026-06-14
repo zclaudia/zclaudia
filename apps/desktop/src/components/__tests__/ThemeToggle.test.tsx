@@ -129,7 +129,7 @@ describe('ThemeToggle', () => {
     const darkButton = Array.from(allButtons).find(
       b => b.textContent?.includes('Dark') && !b.textContent?.includes('Warm') && !b.textContent?.includes('Cool') && b.className.includes('w-full')
     );
-    expect(darkButton?.className).toContain('bg-primary/10');
+    expect(darkButton?.className).toContain('bg-muted/60');
   });
 
   it('renders light icon when theme is light', () => {

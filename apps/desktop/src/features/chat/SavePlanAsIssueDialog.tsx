@@ -74,7 +74,7 @@ export function SavePlanAsIssueDialog({
             <button
               type="submit"
               disabled={!canSave}
-              className="px-3 py-1.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors disabled:opacity-50"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>

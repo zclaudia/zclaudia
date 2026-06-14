@@ -46,7 +46,7 @@ export function DraftLockPrompt() {
             </button>
             <button
               onClick={() => forceOpen(activeSessionId)}
-              className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:opacity-90"
+              className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:opacity-90"
             >
               Force Edit
             </button>

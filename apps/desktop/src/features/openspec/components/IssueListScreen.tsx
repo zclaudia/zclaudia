@@ -117,7 +117,7 @@ export function IssueListScreen({ projectId }: Props): React.ReactElement {
               key={c.value}
               className={`px-2 py-0.5 text-xs rounded-md ${
                 active
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-muted/60 text-foreground'
                   : 'bg-secondary text-muted-foreground hover:text-foreground'
               }`}
               onClick={() =>

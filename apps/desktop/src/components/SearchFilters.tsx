@@ -99,7 +99,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             onClick={() => handleScopeChange('messages')}
             className={`px-3 py-1.5 rounded-md text-xs ${
               (!localFilters.scope || localFilters.scope === 'messages')
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
           >
@@ -109,7 +109,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             onClick={() => handleScopeChange('files')}
             className={`px-3 py-1.5 rounded-md text-xs ${
               localFilters.scope === 'files'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
           >
@@ -119,7 +119,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             onClick={() => handleScopeChange('tool_calls')}
             className={`px-3 py-1.5 rounded-md text-xs ${
               localFilters.scope === 'tool_calls'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
           >
@@ -129,7 +129,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             onClick={() => handleScopeChange('all')}
             className={`px-3 py-1.5 rounded-md text-xs ${
               localFilters.scope === 'all'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
           >
@@ -146,7 +146,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             onClick={() => handleRoleChange(undefined)}
             className={`flex-1 px-3 py-1.5 rounded-md text-xs ${
               !localFilters.role
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
           >
@@ -156,7 +156,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             onClick={() => handleRoleChange('user')}
             className={`flex-1 px-3 py-1.5 rounded-md text-xs ${
               localFilters.role === 'user'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
           >
@@ -166,7 +166,7 @@ export function SearchFilters({ filters, sessions = [], onFiltersChange, onClose
             onClick={() => handleRoleChange('assistant')}
             className={`flex-1 px-3 py-1.5 rounded-md text-xs ${
               localFilters.role === 'assistant'
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-foreground hover:bg-secondary/80'
             }`}
           >

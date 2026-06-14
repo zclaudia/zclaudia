@@ -294,7 +294,7 @@ function GatewayBackendItem({
           </span>
         )}
         {isActive && (
-          <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-xs rounded-md flex-shrink-0">
+          <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md flex-shrink-0">
             Active
           </span>
         )}

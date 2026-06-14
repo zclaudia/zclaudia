@@ -191,7 +191,7 @@ export function ArchivedSessionsDialog({ isOpen, onClose }: ArchivedSessionsDial
                 <button
                   onClick={() => handleRestore(Array.from(selectedIds))}
                   disabled={loading}
-                  className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+                  className="px-3 py-1 text-xs bg-muted/60 text-foreground rounded-md hover:opacity-90 disabled:opacity-50"
                 >
                   Restore Selected
                 </button>
@@ -267,7 +267,7 @@ export function ArchivedSessionsDialog({ isOpen, onClose }: ArchivedSessionsDial
                       <button
                         onClick={() => handleRestore([session.id])}
                         disabled={loading}
-                        className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded-md hover:opacity-90 disabled:opacity-50"
+                        className="px-2 py-1 text-xs bg-muted/60 text-foreground rounded-md hover:opacity-90 disabled:opacity-50"
                         title="Restore"
                       >
                         Restore

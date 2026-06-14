@@ -61,7 +61,7 @@ export function MobileSidebarHeader({
           >
             <Bell size={18} strokeWidth={1.75} />
             {notificationUnreadCount > 0 && !isNotificationsOpen && (
-              <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center bg-primary text-primary-foreground text-[9px] font-medium rounded-full px-0.5">
+              <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] flex items-center justify-center bg-muted/60 text-primary-foreground text-[9px] font-medium rounded-full px-0.5">
                 {notificationUnreadCount > 99 ? '99+' : notificationUnreadCount}
               </span>
             )}

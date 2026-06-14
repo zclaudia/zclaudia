@@ -43,7 +43,7 @@ export const StepNode = memo(function StepNode({ data, selected }: NodeProps) {
 
   return (
     <div className={`px-4 py-3 rounded-lg border-2 shadow-sm min-w-[180px] transition-colors ${
-      selected ? 'border-primary bg-primary/5' : 'border-border bg-card'
+      selected ? 'border-primary bg-muted/40' : 'border-border bg-card'
     }`}>
       {/* Target handle: incoming connection */}
       <Handle

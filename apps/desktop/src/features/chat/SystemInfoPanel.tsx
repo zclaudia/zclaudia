@@ -24,11 +24,11 @@ export function SystemInfoPanel({ systemInfo }: SystemInfoPanelProps) {
   if (!hasAnyInfo) return null;
 
   return (
-    <div className="bg-primary/5 border border-primary/20 rounded-lg mx-2 md:mx-4 mb-4 overflow-hidden">
+    <div className="bg-muted/40 border border-primary/20 rounded-lg mx-2 md:mx-4 mb-4 overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-primary/10 transition-colors"
+        className="w-full flex items-center gap-2 px-4 py-2 text-left hover:bg-muted/60 transition-colors"
       >
         <span className="text-primary text-sm">
           {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}

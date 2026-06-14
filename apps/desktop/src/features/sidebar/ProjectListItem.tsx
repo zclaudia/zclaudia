@@ -99,8 +99,8 @@ export function ProjectListItem({
     : 'w-full px-2 py-1.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
   const buttonRowClass = isMobile ? 'flex gap-2 mt-2' : 'flex gap-1 mt-1.5';
   const createBtnClass = isMobile
-    ? 'flex-1 px-3 py-2.5 bg-primary text-primary-foreground hover:bg-primary/90 active:bg-primary/80 rounded-lg text-sm'
-    : 'flex-1 px-2 py-1 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-xs';
+    ? 'flex-1 px-3 py-2.5 bg-muted/60 text-foreground hover:bg-muted active:bg-muted/60 rounded-lg text-sm'
+    : 'flex-1 px-2 py-1 bg-muted/60 text-foreground hover:bg-muted rounded-lg text-xs';
   const cancelBtnClass = isMobile
     ? 'flex-1 px-3 py-2.5 bg-muted/60 hover:bg-muted active:bg-muted/80 rounded-lg text-sm'
     : 'flex-1 px-2 py-1 bg-muted/60 hover:bg-muted rounded-lg text-xs';

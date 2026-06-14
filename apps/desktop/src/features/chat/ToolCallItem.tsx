@@ -118,7 +118,7 @@ export const ToolCallItem = memo(function ToolCallItem({ toolCall }: ToolCallIte
       data-testid="tool-use"
       className={`my-2 rounded-xl shadow-apple-sm border ${
         status === 'running'
-          ? 'border-primary/30 bg-primary/5'
+          ? 'border-primary/30 bg-muted/40'
           : showAsError
           ? 'border-destructive/30 bg-destructive/5'
           : 'border-success/30 bg-success/5'

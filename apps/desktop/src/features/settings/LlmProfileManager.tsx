@@ -884,7 +884,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           onClick={() => { void handleSubmit(); }}
           disabled={!formName.trim() || saving || !!formRequestHeadersError || (formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry)}
           title={(formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry) ? 'Add at least one model before saving' : undefined}
-          className="flex-1 px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium disabled:opacity-50"
+          className="flex-1 px-4 py-2 bg-muted/60 text-foreground hover:bg-muted rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}
         </button>
@@ -914,7 +914,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
               <div className="flex items-center gap-2">
                 <span className="font-medium truncate">{profile.name}</span>
                 {profile.isDefault && (
-                  <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-xs rounded-md">
+                  <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">
                     Default
                   </span>
                 )}
@@ -1523,7 +1523,7 @@ function FetchModelsPickerDialog({
           <button
             onClick={onConfirm}
             disabled={selected.size === 0}
-            className="flex-1 px-3 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-md text-sm font-medium disabled:opacity-50"
+            className="flex-1 px-3 py-2 bg-muted/60 text-foreground hover:bg-muted rounded-md text-sm font-medium disabled:opacity-50"
           >
             Add {selected.size} model{selected.size === 1 ? '' : 's'}
           </button>
@@ -1573,7 +1573,7 @@ function ProviderTypeSelector({ value, onChange }: { value: string; onChange: (v
               type="button"
               onClick={() => { onChange(opt.value); setOpen(false); }}
               className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors ${
-                opt.value === value ? 'text-primary font-medium bg-primary/5' : 'text-foreground hover:bg-secondary/80'
+                opt.value === value ? 'text-primary font-medium bg-muted/40' : 'text-foreground hover:bg-secondary/80'
               }`}
             >
               <span className="w-4 flex-shrink-0">

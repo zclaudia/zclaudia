@@ -63,7 +63,7 @@ export function PlanStatusBar({
           <button
             onClick={onSubmitPlan}
             disabled={!taskPlanStatus?.ready || submitPlanLoading || discardPlanLoading || isLoading}
-            className="px-3 py-1.5 rounded-md text-xs bg-primary text-primary-foreground disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+            className="px-3 py-1.5 rounded-md text-xs bg-muted/60 text-foreground disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
           >
             {submitPlanLoading ? 'Submitting...' : 'Submit Plan'}
           </button>

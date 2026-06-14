@@ -104,7 +104,7 @@ function getUnifiedDiffLineClass(type: UnifiedDiffLine['type']): string {
     case 'remove':
       return 'bg-red-500/15 text-red-700 dark:text-red-300';
     case 'hunk':
-      return 'bg-primary/10 text-primary';
+      return 'bg-muted/60 text-primary';
     case 'file':
     case 'meta':
       return 'bg-muted/40 text-muted-foreground';

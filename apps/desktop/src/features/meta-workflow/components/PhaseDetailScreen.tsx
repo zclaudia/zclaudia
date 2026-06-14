@@ -96,14 +96,14 @@ export function PhaseDetailScreen({ projectId, run, phaseId, socket }: Props): R
 
       <div className="flex flex-wrap gap-2">
         {phase.status === 'pending' && (
-          <button className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          <button className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted"
                   onClick={() => sendRunPhase(socket, { runId: run.id, phaseId: phase.phaseId })}>
             Run
           </button>
         )}
         {(phase.status === 'done' || phase.status === 'failed' || phase.status === 'stale') && (
           <>
-            <button className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            <button className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted"
                     onClick={() => sendRerunPhase(socket, { runId: run.id, phaseId: phase.phaseId })}>
               Re-run
             </button>

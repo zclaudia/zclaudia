@@ -160,7 +160,7 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
             className={`
               w-full text-left px-3 py-1.5 transition-colors
               ${!hasOverride
-                ? 'bg-primary/10 text-primary font-medium'
+                ? 'bg-muted/60 text-primary font-medium'
                 : 'text-foreground hover:bg-muted active:bg-muted'
               }
             `}
@@ -186,7 +186,7 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
                     className={`
                       w-full text-left px-3 py-1.5 transition-colors
                       ${isActive
-                        ? (isBypassAll ? 'bg-orange-500/15 text-orange-300 font-medium' : 'bg-primary/10 text-primary font-medium')
+                        ? (isBypassAll ? 'bg-orange-500/15 text-orange-300 font-medium' : 'bg-muted/60 text-primary font-medium')
                         : (isBypassAll ? 'text-orange-400 hover:bg-orange-500/10 active:bg-orange-500/15' : 'text-foreground hover:bg-muted active:bg-muted')
                       }
                     `}
@@ -207,7 +207,7 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
                 className={`
                   w-full text-left px-3 py-1.5 transition-colors
                   ${triggerLabel === 'Custom'
-                    ? 'bg-primary/10 text-primary font-medium'
+                    ? 'bg-muted/60 text-primary font-medium'
                     : 'text-foreground hover:bg-muted active:bg-muted'
                   }
                 `}

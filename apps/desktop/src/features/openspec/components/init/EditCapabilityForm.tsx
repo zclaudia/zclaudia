@@ -58,7 +58,7 @@ export function EditCapabilityForm({ initialName, initialDescription, onSave, on
       </div>
       {err && <div className="text-[10px] text-red-500">{err}</div>}
       <div className="flex gap-2">
-        <button className="px-2 py-0.5 text-xs rounded bg-primary text-primary-foreground disabled:opacity-50" disabled={!canSave} onClick={() => void save()}>Save</button>
+        <button className="px-2 py-0.5 text-xs rounded bg-muted/60 text-foreground disabled:opacity-50" disabled={!canSave} onClick={() => void save()}>Save</button>
         <button className="px-2 py-0.5 text-xs rounded bg-secondary" onClick={onCancel}>Cancel</button>
       </div>
     </div>

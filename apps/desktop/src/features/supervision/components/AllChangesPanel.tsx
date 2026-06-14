@@ -38,7 +38,7 @@ export function AllChangesPanel({
             onClick={() => onFilterChange(filter)}
             className={`rounded-md px-2 py-1 text-[11px] transition-colors ${
               changesFilter === filter
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-muted-foreground hover:text-foreground'
             }`}
           >
@@ -53,7 +53,7 @@ export function AllChangesPanel({
             key={change.id}
             className={`rounded-md border px-3 py-2 transition-colors ${
               previewChangeId === change.id
-                ? 'border-primary bg-primary/5'
+                ? 'border-primary bg-muted/40'
                 : 'border-border bg-secondary/20'
             }`}
           >

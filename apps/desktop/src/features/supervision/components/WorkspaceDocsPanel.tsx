@@ -105,7 +105,7 @@ export function WorkspaceDocsPanel({
                   type="button"
                   onClick={onSaveDocument}
                   disabled={loading}
-                  className="rounded-md bg-primary px-2 py-1 text-[11px] text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  className="rounded-md bg-muted/60 px-2 py-1 text-[11px] text-foreground hover:bg-muted disabled:opacity-50"
                 >
                   Save
                 </button>
@@ -122,7 +122,7 @@ export function WorkspaceDocsPanel({
             onClick={() => onSelectDoc(doc.id)}
             className={`rounded-md px-2 py-1 text-xs transition-colors ${
               selectedDocId === doc.id
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-muted-foreground hover:text-foreground'
             }`}
           >

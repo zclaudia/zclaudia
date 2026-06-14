@@ -129,7 +129,7 @@ export function SummarySection({
             <button
               type="button"
               onClick={() => handleGenerate(false)}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-primary text-primary-foreground hover:opacity-90"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-muted/60 text-foreground hover:opacity-90"
             >
               <Sparkles className="w-3 h-3" />
               Generate summary

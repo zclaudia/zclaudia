@@ -82,7 +82,7 @@ function BranchSection({
                 {b.name}
               </span>
               {b.isCurrent && (
-                <span className="text-[9px] px-1 py-0.5 rounded bg-primary/10 text-primary flex-shrink-0">
+                <span className="text-[9px] px-1 py-0.5 rounded bg-muted/60 text-primary flex-shrink-0">
                   current
                 </span>
               )}

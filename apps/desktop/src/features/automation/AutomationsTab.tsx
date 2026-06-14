@@ -135,7 +135,7 @@ export function AutomationsTab({ api, projects, projectName, initialProjectId }:
           )}
           <button
             onClick={() => setShowCreate(!showCreate)}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
           >
             <Plus size={12} />
             New
@@ -148,7 +148,7 @@ export function AutomationsTab({ api, projects, projectName, initialProjectId }:
 
       {/* Create Form */}
       {showCreate && (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 space-y-2">
+        <div className="rounded-lg border border-primary/30 bg-muted/40 p-3 space-y-2">
           <input
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
@@ -227,7 +227,7 @@ export function AutomationsTab({ api, projects, projectName, initialProjectId }:
             >
               Cancel
             </button>
-            <button onClick={handleCreate} disabled={!newName.trim()} className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50">Create</button>
+            <button onClick={handleCreate} disabled={!newName.trim()} className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50">Create</button>
           </div>
         </div>
       )}

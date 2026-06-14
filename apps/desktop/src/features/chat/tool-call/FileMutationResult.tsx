@@ -113,7 +113,7 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
         {(details.preview || details.backup || details.lifecycle?.deferredDiagnostics) && (
           <div className="flex flex-wrap gap-1.5">
             {details.preview && (
-              <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] text-primary">Preview only</span>
+              <span className="rounded-md border border-primary/30 bg-muted/60 px-2 py-0.5 text-[11px] text-primary">Preview only</span>
             )}
             {details.backup && (
               <span className="rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] text-success" title={details.backup.path}>

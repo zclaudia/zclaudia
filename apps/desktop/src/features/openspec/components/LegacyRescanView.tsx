@@ -229,7 +229,7 @@ export function LegacyRescanView({ scanId, onClose }: Props): React.ReactElement
         )}
         {scan.status === 'awaiting_review' && (
           <button
-            className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
             disabled={busy !== null || items.length > 0}
             title={items.length > 0 ? 'Resolve all pending items first' : 'Finalize'}
             onClick={() => void onFinalize()}
@@ -239,7 +239,7 @@ export function LegacyRescanView({ scanId, onClose }: Props): React.ReactElement
         )}
         {scan.status === 'completed' && (
           <button
-            className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted"
             onClick={onClose}
           >
             Done

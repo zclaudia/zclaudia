@@ -304,7 +304,7 @@ export const MessageList = memo(function MessageList({
         <div
           key={message.id}
           data-message-id={message.id}
-          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-primary/5' : ''}`}
+          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
         >
           <CompactionMarkerCard marker={message.metadata.compactionMarker} />
         </div>
@@ -317,7 +317,7 @@ export const MessageList = memo(function MessageList({
         <div
           key={message.id}
           data-message-id={message.id}
-          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-primary/5' : ''}`}
+          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
         >
           <ContextUsageCard usage={message.metadata.contextUsage} />
         </div>
@@ -347,7 +347,7 @@ export const MessageList = memo(function MessageList({
         <div
           key={message.id}
           data-message-id={message.id}
-          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-primary/5' : ''}`}
+          className={`max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0 scroll-mt-24 rounded-2xl transition-colors ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
         >
           <FilePushCard item={item} onPreview={setPreviewItem} />
         </div>
@@ -365,7 +365,7 @@ export const MessageList = memo(function MessageList({
       <div
         key={message.id}
         data-message-id={message.id}
-        className={`scroll-mt-24 rounded-2xl transition-colors min-w-0 max-w-full ${isHighlighted ? 'ring-2 ring-primary/40 bg-primary/5' : ''}`}
+        className={`scroll-mt-24 rounded-2xl transition-colors min-w-0 max-w-full ${isHighlighted ? 'ring-2 ring-primary/40 bg-muted/40' : ''}`}
       >
         <MessageItem
           message={message}
@@ -601,7 +601,7 @@ function AttachmentDisplay({ attachment }: { attachment: MessageAttachment }) {
             className="block max-w-full h-auto"
             style={{ maxHeight: '300px' }}
           />
-          <div className="px-2 py-1 bg-black/20 text-xs text-primary-foreground/70">
+          <div className="px-2 py-1 bg-black/20 text-xs text-foreground/70">
             {attachment.name}
           </div>
         </div>
@@ -883,7 +883,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
       <div
         className={`rounded-2xl px-3 md:px-4 py-2 ${
           isUser
-            ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-primary text-primary-foreground shadow-apple-sm'
+            ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted/60 text-foreground shadow-apple-sm'
             : isSystem
             ? 'max-w-[85%] md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-muted text-muted-foreground text-sm'
             : 'w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl bg-card text-card-foreground min-w-0'

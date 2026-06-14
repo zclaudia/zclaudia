@@ -169,7 +169,7 @@ export function PluginPermissionDialog() {
             </button>
             <button
               onClick={() => handleDecision(true)}
-              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
+              className="px-3 py-1.5 text-sm bg-muted/60 text-foreground hover:bg-muted rounded-md"
             >
               Allow
             </button>

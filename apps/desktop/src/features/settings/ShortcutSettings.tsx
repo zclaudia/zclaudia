@@ -123,7 +123,7 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
                   disabled={disabled}
                   className={`px-2 py-1 text-xs rounded-md transition-colors ${
                     isSelected 
-                      ? 'bg-primary text-primary-foreground' 
+                      ? 'bg-muted/60 text-foreground' 
                       : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                   }`}
                 >
@@ -142,7 +142,7 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
                 disabled={disabled}
                 className={`px-1 py-1 text-xs rounded-md transition-colors ${
                   tempMainKey === key 
-                    ? 'bg-primary text-primary-foreground' 
+                    ? 'bg-muted/60 text-foreground' 
                     : 'bg-secondary hover:bg-secondary/80 text-secondary-foreground'
                 }`}
               >
@@ -169,7 +169,7 @@ export function ShortcutSettings({ disabled = false }: { disabled?: boolean }) {
             <button
               onClick={() => void handleSave()}
               disabled={isLoading || disabled || !tempMainKey || tempModifiers.length === 0}
-              className="px-3 py-1.5 text-xs bg-primary hover:bg-primary/90 text-primary-foreground rounded-md transition-colors disabled:opacity-50"
+              className="px-3 py-1.5 text-xs bg-muted/60 hover:bg-muted text-foreground rounded-md transition-colors disabled:opacity-50"
             >
               {isLoading ? 'Saving...' : 'Save'}
             </button>

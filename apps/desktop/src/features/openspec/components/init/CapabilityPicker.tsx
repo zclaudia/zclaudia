@@ -61,7 +61,7 @@ export function CapabilityPicker({ scan, onClose }: Props): React.ReactElement {
       <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
         <button className="px-3 py-1.5 text-sm rounded-md bg-secondary" onClick={onClose}>Cancel</button>
         <button
-          className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+          className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground disabled:opacity-50"
           disabled={selectedCount === 0 || generating}
           onClick={() => void generate()}
         >

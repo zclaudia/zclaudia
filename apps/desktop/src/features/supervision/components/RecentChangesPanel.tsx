@@ -47,7 +47,7 @@ export function RecentChangesPanel({
             key={change.id}
             className={`rounded-md border px-3 py-2 transition-colors ${
               previewChangeId === change.id
-                ? 'border-primary bg-primary/5'
+                ? 'border-primary bg-muted/40'
                 : 'border-border bg-secondary/20'
             }`}
           >

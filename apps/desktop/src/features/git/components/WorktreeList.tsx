@@ -109,7 +109,7 @@ export function WorktreeList({
               type="button"
               onClick={handleCreate}
               disabled={submitting || !newBranch.trim()}
-              className="flex-1 text-xs py-1 rounded bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90"
+              className="flex-1 text-xs py-1 rounded bg-muted/60 text-foreground disabled:opacity-50 hover:opacity-90"
             >
               {submitting ? 'Creating…' : 'Create'}
             </button>

@@ -22,7 +22,7 @@ const BUILTIN_PLUGIN_IDS = new Set([
 // Status badge colors — using semantic theme tokens
 const statusColors: Record<PluginStatus, string> = {
   idle: 'bg-muted-foreground/20 text-muted-foreground',
-  loading: 'bg-primary/20 text-primary',
+  loading: 'bg-muted text-primary',
   active: 'bg-success/20 text-success',
   error: 'bg-destructive/20 text-destructive',
   disabled: 'bg-muted-foreground/20 text-muted-foreground',
@@ -583,7 +583,7 @@ function PluginDirsManager() {
             <button
               onClick={handleAdd}
               disabled={!newDir.trim()}
-              className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-4 py-2 bg-muted/60 hover:bg-muted text-foreground text-sm rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               Add
             </button>

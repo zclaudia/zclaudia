@@ -136,7 +136,7 @@ function CommentItem({ comment }: { comment: LocalIssueComment }) {
                 type="button"
                 onClick={handleSave}
                 disabled={saving || !draft.trim()}
-                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex items-center gap-1 px-2 py-1 text-[11px] rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                 Save
@@ -193,7 +193,7 @@ function CommentComposer({ issueId }: { issueId: string }) {
             type="button"
             onClick={submit}
             disabled={sending || !body.trim()}
-            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
           >
             {sending ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquare className="w-3 h-3" />}
             Comment

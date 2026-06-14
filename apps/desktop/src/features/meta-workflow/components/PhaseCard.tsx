@@ -48,13 +48,13 @@ export function PhaseCard({ runId, phase, socket, onClick }: Props): React.React
       </div>
       <div className="flex gap-1 flex-wrap" onClick={(e) => e.stopPropagation()}>
         {canRun && (
-          <button className="px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          <button className="px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted"
                   onClick={() => sendRunPhase(socket, { runId, phaseId: phase.phaseId })}>
             Run
           </button>
         )}
         {canRerun && (
-          <button className="px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+          <button className="px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted"
                   onClick={() => sendRerunPhase(socket, { runId, phaseId: phase.phaseId })}>
             Re-run
           </button>

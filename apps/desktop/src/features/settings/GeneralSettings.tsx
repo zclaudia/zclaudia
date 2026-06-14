@@ -109,7 +109,7 @@ export function GeneralSettings({ isOpen, activeServerExists, embeddedServerPort
               <div className="flex justify-end">
                 <button
                   onClick={() => { void restartEmbeddedServer(); }}
-                  className="px-3 py-1 text-xs bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors"
+                  className="px-3 py-1 text-xs bg-muted/60 hover:bg-muted text-foreground rounded-lg font-medium transition-colors"
                 >
                   Restart Embedded Server
                 </button>
@@ -142,7 +142,7 @@ export function GeneralSettings({ isOpen, activeServerExists, embeddedServerPort
               ) : (
                 <button
                   onClick={() => invoke('open_full_disk_access_settings')}
-                  className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-colors"
+                  className="px-3 py-1 text-xs bg-muted/60 text-foreground rounded-lg hover:bg-muted font-medium transition-colors"
                 >
                   Open Settings
                 </button>
@@ -154,7 +154,7 @@ export function GeneralSettings({ isOpen, activeServerExists, embeddedServerPort
                   <span className="text-sm">Folder Access</span>
                   <button
                     onClick={() => invoke('open_files_and_folders_settings')}
-                    className="px-3 py-1 text-xs bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 font-medium transition-colors"
+                    className="px-3 py-1 text-xs bg-muted/60 text-foreground rounded-lg hover:bg-muted font-medium transition-colors"
                   >
                     Open Settings
                   </button>

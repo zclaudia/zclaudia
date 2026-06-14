@@ -213,7 +213,7 @@ export function WorktreeSelector({
             className={[
               'w-full text-left px-3 py-1.5 transition-colors',
               !hasOverride
-                ? 'bg-primary/10 text-primary font-medium'
+                ? 'bg-muted/60 text-primary font-medium'
                 : 'text-foreground hover:bg-muted active:bg-muted',
             ].join(' ')}
           >
@@ -248,7 +248,7 @@ export function WorktreeSelector({
                 className={[
                   'w-full text-left px-3 py-1.5 transition-colors',
                   isSelected
-                    ? 'bg-primary/10 text-primary font-medium'
+                    ? 'bg-muted/60 text-primary font-medium'
                     : 'text-foreground hover:bg-muted active:bg-muted',
                 ].join(' ')}
               >
@@ -292,7 +292,7 @@ export function WorktreeSelector({
                   <button
                     onClick={handleCreate}
                     disabled={!newBranch.trim() || loading}
-                    className="flex-1 text-[11px] bg-primary text-primary-foreground rounded-md px-2 py-1 disabled:opacity-50"
+                    className="flex-1 text-[11px] bg-muted/60 text-foreground rounded-md px-2 py-1 disabled:opacity-50"
                   >
                     {loading ? 'Creating...' : 'Create'}
                   </button>

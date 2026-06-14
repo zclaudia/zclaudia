@@ -143,7 +143,7 @@ export function WindowManagerWindow() {
               <div
                 key={win.label}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  win.focused ? 'bg-primary/10 border border-primary/20' : 'hover:bg-secondary/60'
+                  win.focused ? 'bg-muted/60 border border-primary/20' : 'hover:bg-secondary/60'
                 }`}
               >
                 {/* Icon + info */}
@@ -154,7 +154,7 @@ export function WindowManagerWindow() {
                   <div className="flex items-center gap-1.5">
                     <span className="text-sm font-medium truncate">{type}</span>
                     {win.focused && (
-                      <span className="text-[10px] px-1 py-0 rounded-md bg-primary/20 text-primary font-medium flex-shrink-0">
+                      <span className="text-[10px] px-1 py-0 rounded-md bg-muted text-primary font-medium flex-shrink-0">
                         focused
                       </span>
                     )}

@@ -835,7 +835,7 @@ export function MessageInput({
                   {suggestion.argumentHint && (
                     <span className="ml-auto text-xs text-muted-foreground font-mono">{suggestion.argumentHint}</span>
                   )}
-                  <span className="text-[10px] uppercase tracking-wide text-primary bg-primary/10 px-1.5 py-0.5 rounded">
+                  <span className="text-[10px] uppercase tracking-wide text-primary bg-muted/60 px-1.5 py-0.5 rounded">
                     skill{suggestion.usageCount ? ` · ${suggestion.usageCount}` : ''}
                   </span>
                   <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
@@ -1017,7 +1017,7 @@ export function MessageInput({
               <button
                 onClick={handleSend}
                 disabled={disabled || (!value.trim() && attachments.length === 0)}
-                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
+                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-muted/60 text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
                 title="Send message"
                 data-testid="send-button"
               >
@@ -1149,7 +1149,7 @@ export function MessageInput({
               data-testid="send-button"
               onClick={handleSend}
               disabled={disabled || (!value.trim() && attachments.length === 0)}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed`}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-muted/60 text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed`}
               title={advancedMode
                 ? `Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`
                 : 'Send message (Enter)'}

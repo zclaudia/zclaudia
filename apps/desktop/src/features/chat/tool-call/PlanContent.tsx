@@ -13,7 +13,7 @@ function PlanContent({ content }: { content: string }) {
 
   return (
     <div className="rounded-lg border border-border overflow-hidden">
-      <div className="px-3 py-2 bg-primary/5 text-xs space-y-0.5">
+      <div className="px-3 py-2 bg-muted/40 text-xs space-y-0.5">
         {displayLines.map((line, i) => {
           const trimmed = line.trimStart();
           // Headings

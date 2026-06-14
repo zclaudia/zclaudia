@@ -121,7 +121,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       data-testid={`${tab.id}-tab`}
       className={`flex-shrink-0 px-3 py-2 rounded-md text-sm flex items-center gap-2 transition-colors ${
         activeTab === tab.id
-          ? 'bg-primary text-primary-foreground'
+          ? 'bg-muted/60 text-foreground'
           : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
       }`}
     >
@@ -150,7 +150,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
       <div className={`relative bg-card flex flex-col ${
         isMobile
           ? 'w-full h-full safe-top-pad safe-bottom-pad'
-          : 'border border-border rounded-lg shadow-xl w-full max-w-2xl max-h-[80vh]'
+          : 'border border-border rounded-xl shadow-2xl w-[900px] max-w-[92vw] h-[82vh] max-h-[820px] min-h-[520px]'
       }`}>
         {/* Header */}
         <div className="flex items-center justify-between px-3 md:px-4 py-3 border-b border-border flex-shrink-0">
@@ -204,7 +204,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
           {/* Desktop: Tabs vertical sidebar */}
           {!isMobile && (
-            <div className="flex flex-col w-44 border-r border-border p-2 gap-0.5 shrink-0">
+            <div className="flex flex-col w-52 border-r border-border p-2 gap-0.5 shrink-0 overflow-y-auto">
               <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
                 App
               </div>
@@ -369,7 +369,7 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
 function RemoteServerBanner({ serverName, label }: { serverName: string; label: string }) {
   return (
-    <div className="flex items-center gap-2 px-3 py-2 bg-primary/10 border border-primary/20 rounded-lg text-sm">
+    <div className="flex items-center gap-2 px-3 py-2 bg-muted/60 border border-primary/20 rounded-lg text-sm">
       <svg className="w-4 h-4 text-primary shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
@@ -444,7 +444,7 @@ function ServerPickerDropdown({
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusColor}`} />
                   <span className="truncate flex-1" title={backend.name}>{backend.name}</span>
                   {isActive && (
-                    <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-[10px] rounded-md flex-shrink-0">
+                    <span className="px-1.5 py-0.5 bg-muted text-primary text-[10px] rounded-md flex-shrink-0">
                       Active
                     </span>
                   )}

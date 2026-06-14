@@ -101,7 +101,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
                 onClick={() => isDirectory ? toggleDirectory(entry.path) : onOpenFile(entry.path)}
                 className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-xs font-mono min-w-0 ${
                   isSelected
-                    ? 'bg-primary/10 text-primary'
+                    ? 'bg-muted/60 text-primary'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
                 style={entryIndent(depth)}

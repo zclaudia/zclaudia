@@ -103,7 +103,7 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
               onClick={() => handleSelect(entry)}
               className={`w-full text-left px-3 py-1.5 text-sm font-mono flex items-center gap-2 ${
                 idx === selectedIndex
-                  ? 'bg-primary/10 text-primary'
+                  ? 'bg-muted/60 text-primary'
                   : 'text-foreground hover:bg-secondary'
               }`}
             >

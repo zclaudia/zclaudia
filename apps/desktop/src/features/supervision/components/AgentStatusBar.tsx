@@ -105,7 +105,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
           <span className="text-sm text-muted-foreground">No supervision agent configured</span>
           <button
             onClick={() => setShowInitForm(true)}
-            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
+            className="px-3 py-1.5 text-sm bg-muted/60 text-foreground hover:bg-muted rounded-md"
           >
             Initialize Agent
           </button>
@@ -135,7 +135,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
               onClick={() => setInitMode('lite')}
               className={`flex-1 px-2 py-1.5 text-xs rounded-md transition-colors ${
                 initMode === 'lite'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? 'bg-muted/60 text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -145,7 +145,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
               onClick={() => setInitMode('full')}
               className={`flex-1 px-2 py-1.5 text-xs rounded-md transition-colors ${
                 initMode === 'full'
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? 'bg-muted/60 text-foreground shadow-sm'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -185,7 +185,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
                   onClick={() => setInitConfig((c) => ({ ...c, trustLevel: level }))}
                   className={`flex-1 px-2 py-1.5 text-xs rounded-md transition-colors ${
                     initConfig.trustLevel === level
-                      ? 'bg-primary text-primary-foreground shadow-sm'
+                      ? 'bg-muted/60 text-foreground shadow-sm'
                       : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
@@ -225,7 +225,7 @@ export function AgentStatusBar({ projectId, agent, onOpenSession: _onOpenSession
           <button
             onClick={handleInit}
             disabled={loading || !selectedProviderId}
-            className="px-3 py-1.5 text-sm bg-primary text-primary-foreground hover:bg-primary/90 rounded-md disabled:opacity-50"
+            className="px-3 py-1.5 text-sm bg-muted/60 text-foreground hover:bg-muted rounded-md disabled:opacity-50"
           >
             {loading ? 'Starting...' : 'Start Agent'}
           </button>

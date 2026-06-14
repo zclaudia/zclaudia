@@ -86,7 +86,7 @@ export function ReviewStep({ scan, onClose }: Props): React.ReactElement {
       </div>
       <div className="flex items-center justify-end gap-2 pt-2 border-t">
         <button
-          className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+          className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground disabled:opacity-50"
           disabled={pending.length > 0}
           title={pending.length > 0 ? 'Resolve all pending items first' : 'Finalize'}
           onClick={() => void doFinalize()}

@@ -202,7 +202,7 @@ export function SubIssueDetailScreen({
         {issue.status === 'tracked' && (
           <>
             <button
-              className="px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+              className="px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted"
               disabled={busy !== null}
               onClick={onCloseAndArchive}
             >
@@ -268,7 +268,7 @@ export function SubIssueDetailScreen({
                 <div className="flex items-center gap-1">
                   {e.statusSummary === 'pending' && (
                     <button
-                      className="px-2 py-0.5 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+                      className="px-2 py-0.5 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted"
                       disabled={busy !== null}
                       onClick={() => void doExecAction(e, api.startExecutor, 'start')}
                     >
@@ -459,7 +459,7 @@ function SpecChangeArtifactTabs({
               key={c}
               className={`px-2 py-0.5 text-xs rounded-md ${
                 selectedCap === c
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-muted/60 text-foreground'
                   : 'bg-secondary hover:bg-secondary/80'
               }`}
               onClick={() => patchView(projectId, { selectedDeltaCapability: c })}
@@ -490,7 +490,7 @@ function SpecChangeArtifactTabs({
             key={m}
             className={`px-2 py-0.5 text-xs rounded-md ${
               previewMode === m
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary hover:bg-secondary/80'
             }`}
             onClick={() => patchView(projectId, { previewMode: m })}
@@ -526,7 +526,7 @@ function SpecChangeArtifactTabs({
             </div>
             <div className="flex items-center gap-2">
               <button
-                className="px-2.5 py-1 text-xs rounded-md bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                className="px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50"
                 disabled={saving || (activeTab === 'delta' && !selectedCap)}
                 onClick={() => void save()}
               >

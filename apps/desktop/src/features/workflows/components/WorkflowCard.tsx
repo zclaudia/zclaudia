@@ -69,7 +69,7 @@ export function WorkflowCard({ workflow, latestRun, bindingBadges = [], onTrigge
   const stepCount = def.nodes.length;
 
   const badgeToneClass: Record<NonNullable<WorkflowBindingBadge['tone']>, string> = {
-    primary: 'bg-primary/10 text-primary border-primary/20',
+    primary: 'bg-muted/60 text-primary border-primary/20',
     success: 'bg-success/10 text-success border-success/20',
     muted: 'bg-muted text-muted-foreground border-border',
   };

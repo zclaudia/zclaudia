@@ -114,7 +114,7 @@ export function TerminalPanel({ projectId, workingDirectory }: TerminalPanelProp
             onClick={() => toggleCtrl(terminalId)}
             className={`px-2 py-0.5 rounded-md text-[11px] font-mono whitespace-nowrap flex-shrink-0 ${
               isCtrl
-                ? 'bg-primary text-primary-foreground'
+                ? 'bg-muted/60 text-foreground'
                 : 'bg-secondary text-secondary-foreground'
             }`}
           >
@@ -124,7 +124,7 @@ export function TerminalPanel({ projectId, workingDirectory }: TerminalPanelProp
             <button
               key={key.label}
               onClick={() => sendKey(key.data)}
-              className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-secondary text-secondary-foreground active:bg-primary active:text-primary-foreground whitespace-nowrap flex-shrink-0"
+              className="px-2 py-0.5 rounded-md text-[11px] font-mono bg-secondary text-secondary-foreground active:bg-secondary active:text-foreground whitespace-nowrap flex-shrink-0"
             >
               {key.label}
             </button>

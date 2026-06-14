@@ -46,7 +46,7 @@ export function RequirementsScreen({ projectId, run, socket }: Props): React.Rea
       <div className="flex gap-2">
         {isDraft && (
           <button
-            className="px-3 py-1.5 text-sm rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+            className="px-3 py-1.5 text-sm rounded-md bg-muted/60 text-foreground hover:bg-muted"
             onClick={() => sendSubmitRequirements(socket, { runId: run.id, requirementsPath: path })}
           >
             Submit Requirements

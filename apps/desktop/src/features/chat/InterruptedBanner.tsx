@@ -13,7 +13,7 @@ export function InterruptedBanner({ onResume, onDismiss }: InterruptedBannerProp
       <div className="ml-auto flex gap-2">
         <button
           onClick={onResume}
-          className="text-xs px-3 py-1 rounded-md bg-primary/20 text-primary hover:bg-primary/30 transition-colors"
+          className="text-xs px-3 py-1 rounded-md bg-muted text-primary hover:bg-muted transition-colors"
         >
           Resume
         </button>

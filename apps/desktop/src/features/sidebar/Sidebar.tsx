@@ -488,7 +488,7 @@ export function Sidebar({
     >
       {/* Resize handle on the right edge */}
       <div
-        className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-primary/20"
+        className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-muted"
         onMouseDown={onResizeStart}
         onTouchStart={onResizeStart}
         aria-hidden

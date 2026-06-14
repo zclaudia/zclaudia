@@ -217,7 +217,7 @@ export function WindowsSetup() {
         <div className="w-full max-w-md space-y-6">
           {/* Logo */}
           <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
               <Bot size={32} strokeWidth={1.5} className="text-primary" />
             </div>
             <h1 className="text-xl font-bold text-foreground">Welcome to ZClaudia</h1>
@@ -233,7 +233,7 @@ export function WindowsSetup() {
               onClick={() => setPath('wsl')}
               className="flex flex-col items-center gap-3 p-5 rounded-xl border border-border bg-card hover:bg-muted hover:border-primary/50 transition-all text-center group"
             >
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-muted/60 flex items-center justify-center group-hover:bg-muted transition-colors">
                 <Terminal size={24} strokeWidth={1.5} className="text-primary" />
               </div>
               <div>
@@ -254,7 +254,7 @@ export function WindowsSetup() {
               onClick={() => setPath('gateway')}
               className="flex flex-col items-center gap-3 p-5 rounded-xl border border-border bg-card hover:bg-muted hover:border-primary/50 transition-all text-center group"
             >
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+              <div className="w-12 h-12 rounded-xl bg-muted/60 flex items-center justify-center group-hover:bg-muted transition-colors">
                 <Globe size={24} strokeWidth={1.5} className="text-primary" />
               </div>
               <div>
@@ -288,7 +288,7 @@ export function WindowsSetup() {
         <PageWrapper>
           <div className="w-full max-w-sm space-y-6">
             <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
                 <Bot size={32} strokeWidth={1.5} className="text-primary" />
               </div>
               <h1 className="text-xl font-bold text-foreground">Install WSL</h1>
@@ -318,7 +318,7 @@ export function WindowsSetup() {
 
             <button
               onClick={openMicrosoftStore}
-              className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 bg-muted/60 hover:bg-muted text-foreground rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2"
             >
               <ExternalLink size={16} />
               Open Microsoft Store
@@ -345,7 +345,7 @@ export function WindowsSetup() {
       <PageWrapper>
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
               <Terminal size={32} strokeWidth={1.5} className="text-primary" />
             </div>
             <h1 className="text-xl font-bold text-foreground">WSL Server</h1>
@@ -380,7 +380,7 @@ export function WindowsSetup() {
           <button
             onClick={wslServer.start}
             disabled={isWslBusy || connecting}
-            className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full py-3 bg-muted/60 hover:bg-muted text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isWslBusy ? (
               <>
@@ -423,7 +423,7 @@ export function WindowsSetup() {
         <PageWrapper>
           <div className="w-full max-w-sm space-y-6">
             <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
                 <Globe size={32} strokeWidth={1.5} className="text-primary" />
               </div>
               <h1 className="text-xl font-bold text-foreground">Select a Server</h1>
@@ -477,7 +477,7 @@ export function WindowsSetup() {
       <PageWrapper>
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
               <Globe size={32} strokeWidth={1.5} className="text-primary" />
             </div>
             <h1 className="text-xl font-bold text-foreground">Gateway Connection</h1>
@@ -525,7 +525,7 @@ export function WindowsSetup() {
           <button
             onClick={handleGatewayConnect}
             disabled={gatewayConnecting || !gatewayUrl.trim() || !gatewaySecret.trim()}
-            className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-muted/60 hover:bg-muted text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
           >
             {gatewayConnecting ? (
               <span className="flex items-center justify-center gap-2">
@@ -559,7 +559,7 @@ export function WindowsSetup() {
       <PageWrapper>
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
-            <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-muted/60 flex items-center justify-center mx-auto mb-4">
               <Bot size={32} strokeWidth={1.5} className="text-primary" />
             </div>
             <h1 className="text-xl font-bold text-foreground">Manual Connection</h1>
@@ -591,7 +591,7 @@ export function WindowsSetup() {
           <button
             onClick={() => handleConnect(manualAddress)}
             disabled={connecting || !manualAddress.trim()}
-            className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+            className="w-full py-3 bg-muted/60 hover:bg-muted text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
           >
             {connecting ? (
               <span className="flex items-center justify-center gap-2">

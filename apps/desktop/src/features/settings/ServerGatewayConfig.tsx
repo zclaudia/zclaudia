@@ -247,7 +247,7 @@ export function ServerGatewayConfig() {
                 <span className={`w-1.5 h-1.5 rounded-full ${b.online ? 'bg-success' : 'bg-muted-foreground'}`} />
                 <span className="text-foreground">{b.name}</span>
                 {b.backendId === status?.gatewayBackendId && (
-                  <span className="px-1.5 py-0.5 bg-primary/20 text-primary text-xs rounded-md">Local</span>
+                  <span className="px-1.5 py-0.5 bg-muted text-primary text-xs rounded-md">Local</span>
                 )}
               </div>
               <span className="text-xs text-muted-foreground font-mono">{b.backendId}</span>
@@ -474,7 +474,7 @@ export function ServerGatewayConfig() {
           onClick={handleSave}
           disabled={saving}
           data-testid="save-gateway-config"
-          className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg
+          className="flex-1 px-4 py-2 bg-muted/60 hover:bg-muted text-foreground rounded-lg
                    font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {saving ? 'Saving...' : 'Save Configuration'}

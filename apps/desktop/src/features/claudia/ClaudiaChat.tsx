@@ -330,7 +330,7 @@ export function ClaudiaChat({ isMobile = false, hostProjectId, contextProjectId 
               <div className="ml-auto flex items-center gap-2">
                 <button
                   onClick={() => void handleResumeInterrupted(latestInterruptedTask)}
-                  className="rounded-md bg-primary/20 px-3 py-1 text-xs text-primary hover:bg-primary/30 transition-colors"
+                  className="rounded-md bg-muted px-3 py-1 text-xs text-primary hover:bg-muted transition-colors"
                 >
                   Resume
                 </button>
@@ -380,7 +380,7 @@ export function ClaudiaChat({ isMobile = false, hostProjectId, contextProjectId 
               }
               return (
                 <div key={item.id} className="flex justify-end">
-                  <div className="max-w-[85%] rounded-lg bg-primary/10 px-3 py-2">
+                  <div className="max-w-[85%] rounded-lg bg-muted/60 px-3 py-2">
                     <p className="text-sm whitespace-pre-wrap">{item.text}</p>
                   </div>
                 </div>
@@ -422,7 +422,7 @@ export function ClaudiaChat({ isMobile = false, hostProjectId, contextProjectId 
 
       {/* Continue mode indicator */}
       {continueTask && (
-        <div className="px-3 py-1.5 bg-primary/5 border-t border-border/30 flex items-center gap-2">
+        <div className="px-3 py-1.5 bg-muted/40 border-t border-border/30 flex items-center gap-2">
           <span className="text-[11px] text-muted-foreground">
             Continuing: <span className="font-medium text-foreground">{continueTask.title}</span>
           </span>

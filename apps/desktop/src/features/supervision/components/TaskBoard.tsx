@@ -55,7 +55,7 @@ export function TaskBoard({ projectId, tasks, changeId, title = 'Tasks' }: TaskB
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1 px-2 py-1 text-xs bg-primary text-primary-foreground hover:bg-primary/90 rounded-md"
+          className="flex items-center gap-1 px-2 py-1 text-xs bg-muted/60 text-foreground hover:bg-muted rounded-md"
         >
           <Plus size={12} /> Add Task
         </button>
