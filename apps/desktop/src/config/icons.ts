@@ -124,7 +124,7 @@ export const ICONS = {
     default: File,
   },
 
-  // System info icons — used in SystemInfoButton and SystemInfoPanel
+  // System info icons — used in SystemInfoPanel and the session-header info popover
   systemInfo: {
     model: Cpu,
     version: Package,

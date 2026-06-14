@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
+import { useSessionToolsStore } from '../../stores/sessionToolsStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 
 vi.mock('../PluginPanelRenderer', () => ({
@@ -57,7 +58,8 @@ function registerRightFileViewer(visible = true) {
 describe('RightSidebar', () => {
   beforeEach(() => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
-    useRightSidebarStore.setState({ widthPx: 380, activeTab: null });
+    useRightSidebarStore.setState({ widthPx: 380, activeTab: null, collapsed: false, unread: false });
+    useSessionToolsStore.setState({ tools: [] });
     useBottomPanelStore.setState({ activeTab: '' });
     onCloseSpy.mockClear();
     (useIsMobile as any).mockReturnValue(false);
@@ -158,6 +160,24 @@ describe('RightSidebar', () => {
     render(<RightSidebar projectId="p1" projectRoot="/test" />);
     fireEvent.click(screen.getByTitle('Hide panel'));
     expect(onCloseSpy).toHaveBeenCalled();
+  });
+
+  it('renders published session tools as pinned icon tabs and routes clicks', () => {
+    const onChanges = vi.fn();
+    registerRightTerminal(true);
+    useRightSidebarStore.setState({ activeTab: 'terminal' });
+    useSessionToolsStore.setState({
+      tools: [
+        { id: 'session-changes', label: 'Changes', iconKey: 'changes', isActive: false, onClick: onChanges },
+        { id: 'terminal', label: 'Terminal', iconKey: 'terminal', isActive: true, onClick: vi.fn() },
+      ],
+    });
+
+    render(<RightSidebar projectId="p1" projectRoot="/test" />);
+    const changesTab = screen.getByLabelText('Changes');
+    expect(changesTab).toBeInTheDocument();
+    fireEvent.click(changesTab);
+    expect(onChanges).toHaveBeenCalled();
   });
 
   it('uses widthPx from store as the sidebar width', () => {

@@ -1,4 +1,4 @@
-import { Search, Bell, SquareStack, ChevronsLeft } from 'lucide-react';
+import { Search, Bell, SquareStack, PanelLeft } from 'lucide-react';
 import { openWindowManagerWindow } from '../../utils/windowManagerWindow';
 import { PluginWindowButtons } from '../../app/PluginDock';
 
@@ -84,7 +84,7 @@ export function SidebarTopBar({
           title="Collapse sidebar"
           aria-label="Collapse sidebar"
         >
-          <ChevronsLeft size={16} strokeWidth={1.75} />
+          <PanelLeft size={16} strokeWidth={1.75} />
         </button>
       </div>
     </div>

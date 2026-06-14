@@ -1,8 +1,12 @@
 import { useState } from 'react';
-import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff, Bot, Cpu, FolderOpen, PieChart, ChevronDown } from 'lucide-react';
+import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff, Bot, Cpu, FolderOpen, PieChart, ChevronDown, Package, Shield, Key, Wrench, Monitor, Terminal, Users, PanelRight } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { Session, Project } from '@zclaudia/shared';
+import type { Session, Project, SystemInfo } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
+import { useRightSidebarStore } from '../../stores/rightSidebarStore';
+import { usePluginStore } from '../../stores/pluginStore';
+import { usePanelRegion } from '../../components/panels/usePanelRegion';
+import { activatePanel } from '../../utils/openPanel';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
 
 const DEFAULT_AGENT_LABEL = 'Default Coding Agent';
@@ -35,6 +39,7 @@ interface SessionHeaderProps {
   onPopOut: () => void;
   onToggleSessionMenu: () => void;
   contextPercent?: number | null;
+  systemInfo?: SystemInfo | null;
 }
 
 export function SessionHeader({
@@ -58,6 +63,7 @@ export function SessionHeader({
   onPopOut,
   onToggleSessionMenu,
   contextPercent = null,
+  systemInfo = null,
 }: SessionHeaderProps) {
   const [showInfo, setShowInfo] = useState(false);
   const activeServerId = useServerStore(s => s.activeServerId);
@@ -70,6 +76,29 @@ export function SessionHeader({
   const agentLabel = agent
     ? `${agent.name} (${agent.model})`
     : DEFAULT_AGENT_LABEL;
+  const modelValue = systemInfo?.model || agent?.model || null;
+  const pathValue = systemInfo?.cwd || currentSession?.workingDirectory || null;
+
+  // Right-panel toggle — a persistent affordance on desktop (like Cursor's panel toggle).
+  const rightCollapsed = useRightSidebarStore((s) => s.collapsed);
+  const rightUnread = useRightSidebarStore((s) => s.unread);
+  const toggleRightPanel = useRightSidebarStore((s) => s.toggleCollapsed);
+  const setRightCollapsed = useRightSidebarStore((s) => s.setCollapsed);
+  const rightActiveTab = useRightSidebarStore((s) => s.activeTab);
+  const { isOpen: rightHasContent } = usePanelRegion({ region: 'right', activeTab: rightActiveTab, isMobile });
+  const showRightToggle = !isMobile && currentSession.type !== 'background';
+  const rightExpanded = rightHasContent && !rightCollapsed;
+  const handleToggleRightPanel = () => {
+    if (rightHasContent) {
+      // Something is open underneath — pure show/hide.
+      toggleRightPanel();
+    } else {
+      // Empty panel — reveal a default work view rather than toggling to nothing.
+      usePluginStore.getState().updatePanelVisibility('session-changes', true);
+      activatePanel('session-changes');
+      setRightCollapsed(false);
+    }
+  };
 
   return (
     <div
@@ -151,22 +180,45 @@ export function SessionHeader({
               <div className="fixed inset-0 z-[70]" onClick={() => setShowInfo(false)} />
               <div
                 role="dialog"
-                className="absolute right-0 top-full z-[80] mt-1.5 w-64 rounded-xl border border-border/80 bg-card p-3 shadow-xl"
+                className="absolute right-0 top-full z-[80] mt-1.5 w-80 max-w-[90vw] overflow-hidden rounded-xl border border-border/80 bg-card shadow-xl"
               >
                 <div
-                  className="mb-2 truncate text-[13px] font-semibold text-foreground"
+                  className="truncate px-3 pt-3 pb-2 text-[13px] font-semibold text-foreground"
                   title={currentSession.name || 'Untitled Session'}
                 >
                   {currentSession.name || 'Untitled Session'}
                 </div>
-                <div className="flex flex-col gap-2 text-xs">
+                <div className="flex max-h-[60vh] flex-col gap-2 overflow-y-auto px-3 pb-3 text-xs">
                   <InfoRow icon={Bot} label="Agent" value={agent?.name ?? DEFAULT_AGENT_LABEL} />
-                  {agent?.model && <InfoRow icon={Cpu} label="Model" value={agent.model} />}
-                  {currentSession.workingDirectory && (
-                    <InfoRow icon={FolderOpen} label="Path" value={currentSession.workingDirectory} mono />
+                  {modelValue && (
+                    <InfoRow icon={Cpu} label="Model" value={modelValue} />
+                  )}
+                  {systemInfo?.claudeCodeVersion && (
+                    <InfoRow icon={Package} label="Version" value={systemInfo.claudeCodeVersion} />
+                  )}
+                  {systemInfo?.permissionMode && (
+                    <InfoRow icon={Shield} label="Perms" value={systemInfo.permissionMode} />
+                  )}
+                  {systemInfo?.apiKeySource && (
+                    <InfoRow icon={Key} label="API key" value={systemInfo.apiKeySource} />
+                  )}
+                  {pathValue && (
+                    <InfoRow icon={FolderOpen} label="Path" value={pathValue} mono />
                   )}
                   {contextPercent != null && (
                     <InfoRow icon={PieChart} label="Context" value={`${contextPercent}%`} />
+                  )}
+                  {systemInfo?.tools && systemInfo.tools.length > 0 && (
+                    <InfoChips icon={Wrench} label="Tools" items={systemInfo.tools} />
+                  )}
+                  {systemInfo?.mcpServers && systemInfo.mcpServers.length > 0 && (
+                    <InfoChips icon={Monitor} label="MCP Servers" items={systemInfo.mcpServers} />
+                  )}
+                  {systemInfo?.slashCommands && systemInfo.slashCommands.length > 0 && (
+                    <InfoChips icon={Terminal} label="Commands" items={systemInfo.slashCommands} />
+                  )}
+                  {systemInfo?.agents && systemInfo.agents.length > 0 && (
+                    <InfoChips icon={Users} label="Agents" items={systemInfo.agents} />
                   )}
                 </div>
               </div>
@@ -297,6 +349,21 @@ export function SessionHeader({
           )}
         </>
       )}
+      {/* Right-panel toggle (desktop) — far-right edge, beside the "..." menu */}
+      {showRightToggle && (
+        <button
+          onClick={handleToggleRightPanel}
+          className={`relative flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${rightExpanded ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
+          title={rightExpanded ? 'Hide panel' : 'Show panel'}
+          aria-label={rightExpanded ? 'Hide right panel' : 'Show right panel'}
+          aria-pressed={rightExpanded}
+        >
+          <PanelRight size={16} strokeWidth={1.75} />
+          {!rightExpanded && rightUnread && (
+            <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -322,6 +389,48 @@ function InfoRow({
       >
         {value}
       </span>
+    </div>
+  );
+}
+
+function InfoChips({
+  icon: Icon,
+  label,
+  items,
+}: {
+  icon: LucideIcon;
+  label: string;
+  items: (string | { name: string; status?: string })[];
+}) {
+  const [showAll, setShowAll] = useState(false);
+  const maxVisible = 6;
+  const display = showAll ? items : items.slice(0, maxVisible);
+  const hasMore = items.length > maxVisible;
+  return (
+    <div>
+      <div className="mb-1 flex items-center gap-2 text-muted-foreground">
+        <Icon size={14} className="shrink-0" />
+        <span>{label}</span>
+        <span className="text-muted-foreground/70">({items.length})</span>
+      </div>
+      <div className="ml-6 flex flex-wrap gap-1">
+        {display.map((item, i) => (
+          <span
+            key={i}
+            className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[10px] text-secondary-foreground"
+          >
+            {typeof item === 'string' ? item : item.name}
+          </span>
+        ))}
+        {hasMore && (
+          <button
+            onClick={() => setShowAll((v) => !v)}
+            className="text-[10px] text-primary hover:underline"
+          >
+            {showAll ? 'show less' : `+${items.length - maxVisible} more`}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

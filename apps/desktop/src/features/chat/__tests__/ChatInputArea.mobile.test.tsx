@@ -29,9 +29,6 @@ vi.mock('../TokenUsageDisplay', () => ({
   TokenUsageDisplay: () => <div data-testid="token-usage" />,
 }));
 
-vi.mock('../SystemInfoButton', () => ({
-  SystemInfoButton: () => <div data-testid="system-info" />,
-}));
 
 vi.mock('../../../services/api', () => ({
   unlockSession: vi.fn(),
@@ -201,7 +198,6 @@ const baseProps = {
     inputTokens: 0,
     outputTokens: 0,
   },
-  currentSystemInfo: null,
   advancedInput: false,
   restoreMessage: null,
   initialDraft: { content: '', attachments: [] },

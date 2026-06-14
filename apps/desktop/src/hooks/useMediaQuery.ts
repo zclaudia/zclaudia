@@ -43,6 +43,16 @@ export function useIsMobile(): boolean {
 }
 
 /**
+ * Non-reactive mobile check for use in event handlers / plain functions where
+ * a hook can't run. Mirrors {@link useIsMobile}.
+ */
+export function isMobileViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  if (hasForcedMobileViewport()) return true;
+  return window.matchMedia('(max-width: 767px)').matches;
+}
+
+/**
  * Hook to detect if the viewport is tablet-sized (768px - 1023px)
  * @returns boolean indicating if viewport is tablet
  */

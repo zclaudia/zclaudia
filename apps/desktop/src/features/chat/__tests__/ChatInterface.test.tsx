@@ -86,11 +86,19 @@ vi.mock('../MessageInput', () => ({
       data-advanced={props.advancedMode}
       data-initial-value={props.initialValue || ''}
       data-initial-attachments={JSON.stringify(props.initialAttachments || [])}
+      data-has-toggle-advanced={props.onToggleAdvanced != null ? 'true' : 'false'}
     >
       <button data-testid="send-btn" onClick={() => props.onSend?.('hello')}>Send</button>
       <button data-testid="send-empty-btn" onClick={() => props.onSend?.('')}>SendEmpty</button>
       <button data-testid="cancel-btn" onClick={() => props.onCancel?.()}>Cancel</button>
       <button data-testid="command-btn" onClick={() => props.onCommand?.('/help', '')}>Command</button>
+      {props.onToggleAdvanced && (
+        <button
+          data-testid="toggle-advanced-btn"
+          title={props.advancedMode ? 'Normal input' : 'Advanced input (Enter to newline)'}
+          onClick={() => props.onToggleAdvanced?.()}
+        >toggle advanced</button>
+      )}
     </div>
   ),
 }));
@@ -121,9 +129,6 @@ vi.mock('../ModeSelector', () => ({
       onClick={() => props.onChange?.('plan')}
     >select mode</button>
   ),
-}));
-vi.mock('../SystemInfoButton', () => ({
-  SystemInfoButton: () => <div data-testid="system-info-button" />,
 }));
 vi.mock('../PermissionSelector', () => ({
   PermissionSelector: (props: any) => (
@@ -519,11 +524,10 @@ describe('ChatInterface', () => {
     expect(container.querySelector('[data-testid="bg-task-panel"]')).toBeTruthy();
   });
 
-  it('renders toolbar selectors (mode selector, permission, system info)', () => {
+  it('renders toolbar selectors (mode selector, permission)', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     expect(container.querySelector('[data-testid="mode-selector"]')).toBeTruthy();
     expect(container.querySelector('[data-testid="permission-selector"]')).toBeTruthy();
-    expect(container.querySelector('[data-testid="system-info-button"]')).toBeTruthy();
   });
 
   it('renders token usage display in footer', () => {
@@ -1308,8 +1312,9 @@ describe('ChatInterface', () => {
 
   // ─── Advanced Input Toggle ────────────────────────────────────────────
 
-  it('renders advanced input toggle button', () => {
+  it('renders advanced input toggle button (wired into MessageInput via onToggleAdvanced)', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
+    // The toggle is now an inline control inside MessageInput, not a separate toolbar button.
     const btn = container.querySelector('button[title="Advanced input (Enter to newline)"]');
     expect(btn).toBeTruthy();
   });
@@ -1612,6 +1617,16 @@ describe('ChatInterface', () => {
     );
   });
 
+  // ─── Composer footer ──────────────────────────────────────────────────
+
+  it('renders the three selectors inside the composer footer (not a top toolbar)', () => {
+    const { container } = render(<ChatInterface sessionId="sess-1" />);
+    const footer = container.querySelector('[data-testid="composer-footer"]');
+    expect(footer).not.toBeNull();
+    expect(footer!.querySelector('[data-testid="mode-selector"]')).not.toBeNull();
+    expect(footer!.querySelector('[data-testid="permission-selector"]')).not.toBeNull();
+  });
+
   // ─── Worktree selector locked in planning mode ────────────────────────
 
   it('locks worktree selector in forced plan session', () => {
@@ -1759,13 +1774,6 @@ describe('ChatInterface', () => {
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     expect(container.querySelector('[data-testid="loading"]')).toBeTruthy();
-  });
-
-  // ─── System info button ─────────────────────────────────────────────────
-
-  it('renders system info button', () => {
-    const { container } = render(<ChatInterface sessionId="sess-1" />);
-    expect(container.querySelector('[data-testid="system-info-button"]')).toBeTruthy();
   });
 
 });

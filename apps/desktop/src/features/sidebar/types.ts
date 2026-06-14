@@ -18,6 +18,15 @@ export interface SidebarSearchProps {
   onResultSelect: (sessionId: string, messageId: string, ownerBackendId?: string) => void;
 }
 
+/** Props for SearchModal (desktop centered command-palette search) */
+export interface SearchModalProps {
+  open: boolean;
+  onClose: () => void;
+  search: SearchSidebarState;
+  sessions: Session[];
+  onResultSelect: (sessionId: string, messageId: string, ownerBackendId?: string) => void;
+}
+
 /** Props for SidebarHeader (desktop only) */
 export interface SidebarHeaderProps {
   onToggle: () => void;

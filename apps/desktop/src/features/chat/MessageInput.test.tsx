@@ -76,12 +76,6 @@ describe('MessageInput', () => {
     expect(screen.getByTitle('Add attachment (images, files)')).toBeInTheDocument();
   });
 
-  it('renders hint text', () => {
-    render(<MessageInput {...defaultProps} />);
-    expect(screen.getByText('Type / for commands and skills')).toBeInTheDocument();
-    expect(screen.getByText(/Paste images with (Cmd|Ctrl)\+V/)).toBeInTheDocument();
-  });
-
   // ── Text input ────────────────────────────────────────────────────────────
 
   it('updates value when typing', () => {
@@ -348,9 +342,9 @@ describe('MessageInput', () => {
       const textarea = screen.getByPlaceholderText(/Type a message/);
       expect(textarea.className).toContain('h-6');
       expect(textarea.className).toContain('leading-6');
-      const shell = textarea.parentElement;
-      expect(shell?.className).toContain('h-12');
-      expect(shell?.className).toContain('items-center');
+      const box = screen.getByTestId('composer-box');
+      expect(box.className).toContain('min-h-12');
+      expect(box.className).toContain('items-center');
     });
 
     it('does not send on plain Enter in advanced mode', () => {
@@ -379,11 +373,6 @@ describe('MessageInput', () => {
       textarea.selectionEnd = 5;
       fireEvent.keyDown(textarea, { key: 'Tab' });
       expect(textarea.value).toContain('  ');
-    });
-
-    it('shows advanced hint text', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      expect(screen.getByText(/Enter to send, Tab to indent/)).toBeInTheDocument();
     });
 
     it('shows send button with Cmd+Enter title', () => {
@@ -416,7 +405,6 @@ describe('MessageInput', () => {
         value: 40,
       });
       fireEvent.change(textarea, { target: { value: 'short' } });
-      expect(textarea.parentElement?.className).toContain('h-12');
       expect(textarea.style.height).toBe('24px');
     });
 
@@ -440,9 +428,9 @@ describe('MessageInput', () => {
         value: 72,
       });
       fireEvent.change(textarea, { target: { value: 'line 1\nline 2' } });
-      const row = textarea.closest('div.flex.gap-2');
-      expect(row?.className).toContain('items-center');
-      expect(row?.className).not.toContain('items-end');
+      const row = screen.getByTestId('composer-box');
+      expect(row.className).toContain('items-center');
+      expect(row.className).not.toContain('items-end');
       expect(screen.getByTitle('Add attachment (images, files)').className).not.toContain('self-end');
       expect(screen.getByTestId('send-button').className).not.toContain('self-end');
     });

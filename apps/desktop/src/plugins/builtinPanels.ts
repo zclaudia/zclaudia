@@ -35,6 +35,7 @@ export function initBuiltinPanels() {
     actions: TerminalActions,
     order: 0,
     platforms: ['desktop', 'mobile'],
+    defaultPlacement: 'right',
     alwaysMount: true,
     visible: false,
     onClose: () => {
@@ -62,6 +63,7 @@ export function initBuiltinPanels() {
     actions: FileViewerActions,
     order: 1,
     platforms: ['desktop', 'mobile'],
+    defaultPlacement: 'right',
     alwaysMount: false,
     visible: false,
     onClose: () => {
@@ -80,6 +82,7 @@ export function initBuiltinPanels() {
     actions: undefined,
     order: 2,
     platforms: ['desktop', 'mobile'],
+    defaultPlacement: 'right',
     alwaysMount: false,
     visible: false,
     onClose: () => {

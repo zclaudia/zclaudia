@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, ChangeEvent, useCallback, useMemo } from 'react';
-import { Paperclip, X, Send, File as FileIcon, ChevronRight } from 'lucide-react';
+import { Paperclip, X, Send, File as FileIcon, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { Icon } from '../../components/ui/Icon';
 import { getFileIcon } from '../../config/icons';
 import type { SlashCommand, FileEntry } from '@zclaudia/shared';
@@ -31,6 +31,7 @@ interface MessageInputProps {
   initialValue?: string;      // Initial value to set (e.g., for restoring after cancel)
   initialAttachments?: Attachment[]; // Initial attachments to restore
   advancedMode?: boolean;     // Advanced input: larger textarea, Enter=newline on desktop
+  onToggleAdvanced?: () => void; // Toggle between normal and advanced mode
   mobileToolbarSlot?: React.ReactNode; // Extra buttons rendered in mobile action row
   onRequestAdvancedMode?: () => void;
 }
@@ -113,6 +114,7 @@ export function MessageInput({
   initialValue,
   initialAttachments,
   advancedMode = false,
+  onToggleAdvanced,
   mobileToolbarSlot,
   onRequestAdvancedMode,
 }: MessageInputProps) {
@@ -132,7 +134,6 @@ export function MessageInput({
   const [mentionState, setMentionState] = useState<MentionState>(initialMentionState);
   const [isComposing, setIsComposing] = useState(false); // Track IME composition state
   const [availableViewportHeight, setAvailableViewportHeight] = useState(getAvailableViewportHeight);
-  const controlIconSize = isMobile ? 18 : 20;
   const expandedInputMaxHeight = Math.max(
     EXPANDED_INPUT_MIN_HEIGHT_PX,
     Math.min(Math.floor(availableViewportHeight * 0.4), 320)
@@ -1026,16 +1027,20 @@ export function MessageInput({
           </div>
         </div>
       ) : (
-        /* Desktop: single-row layout */
-        <div className={`flex gap-2 ${advancedMode ? 'items-end' : 'items-center min-h-12'}`}>
+        /* Desktop: single-row layout — all controls inside the bordered box */
+        <div
+          data-testid="composer-box"
+          className={`flex gap-2 rounded-2xl border border-border bg-input px-2.5 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md ${advancedMode ? 'items-end py-2' : 'items-center min-h-12'}`}
+        >
           {/* Attachment button */}
           <button
+            data-testid="attach-button"
             onClick={() => fileInputRef.current?.click()}
             disabled={disabled}
-            className={`h-12 w-12 flex-shrink-0 flex items-center justify-center ${advancedMode ? 'self-end' : ''} text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
+            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed`}
             title="Add attachment (images, files)"
           >
-            <Paperclip size={controlIconSize} strokeWidth={1.75} />
+            <Plus size={18} strokeWidth={1.75} />
           </button>
           <input
             ref={fileInputRef}
@@ -1076,7 +1081,7 @@ export function MessageInput({
                 autoCapitalize="off"
                 autoComplete="off"
                 rows={1}
-                className="w-full resize-none overflow-auto rounded-xl border border-border bg-input px-4 py-3 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none focus:border-primary/60 focus:shadow-apple-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                className="w-full resize-none overflow-auto bg-transparent border-0 px-0 py-2 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   fontSize: 'var(--chat-font-input, 0.875rem)',
                   minHeight: `${expandedInputHeight}px`,
@@ -1084,76 +1089,74 @@ export function MessageInput({
                 }}
               />
             ) : (
-              <div className="flex h-12 items-center rounded-xl border border-border bg-input px-4 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md">
-                <textarea
-                  data-testid="message-input"
-                  ref={textareaRef}
-                  value={value}
-                  onChange={handleChange}
-                  onKeyDown={handleKeyDown}
-                  onPaste={handlePaste}
-                  onCompositionStart={() => {
-                    if (compositionTimeoutRef.current) {
-                      clearTimeout(compositionTimeoutRef.current);
-                      compositionTimeoutRef.current = null;
-                    }
-                    setIsComposing(true);
-                  }}
-                  onCompositionEnd={() => {
-                    compositionTimeoutRef.current = setTimeout(() => {
-                      setIsComposing(false);
-                      compositionTimeoutRef.current = null;
-                    }, 50);
-                  }}
-                  disabled={disabled}
-                  placeholder={placeholder}
-                  spellCheck={false}
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  autoComplete="off"
-                  rows={1}
-                  className="block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-                  style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
-                />
-              </div>
+              <textarea
+                data-testid="message-input"
+                ref={textareaRef}
+                value={value}
+                onChange={handleChange}
+                onKeyDown={handleKeyDown}
+                onPaste={handlePaste}
+                onCompositionStart={() => {
+                  if (compositionTimeoutRef.current) {
+                    clearTimeout(compositionTimeoutRef.current);
+                    compositionTimeoutRef.current = null;
+                  }
+                  setIsComposing(true);
+                }}
+                onCompositionEnd={() => {
+                  compositionTimeoutRef.current = setTimeout(() => {
+                    setIsComposing(false);
+                    compositionTimeoutRef.current = null;
+                  }, 50);
+                }}
+                disabled={disabled}
+                placeholder={placeholder}
+                spellCheck={false}
+                autoCorrect="off"
+                autoCapitalize="off"
+                autoComplete="off"
+                rows={1}
+                className="block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
+              />
             )}
           </div>
+
+          {/* Multiline toggle (only when onToggleAdvanced is provided) */}
+          {onToggleAdvanced && (
+            <button
+              data-testid="advanced-toggle"
+              onClick={onToggleAdvanced}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-md ${advancedMode ? 'text-primary' : 'text-muted-foreground'} hover:bg-secondary`}
+              title={advancedMode ? 'Normal input' : 'Advanced input (Enter to newline)'}
+            >
+              {advancedMode ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronUp size={16} strokeWidth={2} />}
+            </button>
+          )}
 
           {/* Send/Cancel button */}
           {isLoading && onCancel ? (
             <button
+              data-testid="cancel-button"
               onClick={onCancel}
-              className={`h-12 w-12 flex-shrink-0 flex items-center justify-center ${advancedMode ? 'self-end' : ''} bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full transition-colors`}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90`}
               title="Cancel (Esc)"
             >
-              <X size={controlIconSize} strokeWidth={2} />
+              <X size={18} strokeWidth={2} />
             </button>
           ) : (
             <button
+              data-testid="send-button"
               onClick={handleSend}
               disabled={disabled || (!value.trim() && attachments.length === 0)}
-              className={`h-12 w-12 flex-shrink-0 flex items-center justify-center ${advancedMode ? 'self-end' : ''} bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors`}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-primary text-primary-foreground hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed`}
               title={advancedMode
                 ? `Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`
                 : 'Send message (Enter)'}
-              data-testid="send-button"
             >
-              <Send size={controlIconSize} strokeWidth={1.75} />
+              <Send size={18} strokeWidth={1.75} />
             </button>
           )}
-        </div>
-      )}
-
-      {/* Hint text — hidden on mobile to save space */}
-      {!isMobile && (
-        <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-          <span>Type / for commands and skills{projectRoot ? ', @ to reference files' : ''}</span>
-          <span>
-            {advancedMode
-              ? `${isMac ? 'Cmd' : 'Ctrl'}+Enter to send, Tab to indent`
-              : `Paste images with ${isMac ? 'Cmd' : 'Ctrl'}+V`
-            }
-          </span>
         </div>
       )}
     </div>

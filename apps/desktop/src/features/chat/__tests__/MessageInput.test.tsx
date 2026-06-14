@@ -73,19 +73,37 @@ describe('MessageInput', () => {
     expect(screen.getByTitle('Add attachment (images, files)')).toBeInTheDocument();
   });
 
-  it('renders hint text with slash command info', () => {
-    render(<MessageInput {...defaultProps} />);
-    expect(screen.getByText('Type / for commands and skills')).toBeInTheDocument();
+  // ── Composer box layout ───────────────────────────────────────────────────
+
+  it('places attach and send inside the bordered input box', () => {
+    const { getByTestId } = render(<MessageInput {...defaultProps} />);
+    const box = getByTestId('composer-box');
+    expect(box.querySelector('[data-testid="message-input"]')).not.toBeNull();
+    expect(box.querySelector('[data-testid="attach-button"]')).not.toBeNull();
+    expect(box.querySelector('[data-testid="send-button"]')).not.toBeNull();
   });
 
-  it('renders hint text with file reference info when projectRoot is provided', () => {
-    render(<MessageInput {...defaultProps} projectRoot="/my/project" />);
-    expect(screen.getByText('Type / for commands and skills, @ to reference files')).toBeInTheDocument();
+  it('shows the multiline toggle when onToggleAdvanced is provided', () => {
+    const { getByTestId } = render(<MessageInput {...defaultProps} onToggleAdvanced={() => {}} />);
+    expect(getByTestId('advanced-toggle')).toBeInTheDocument();
   });
 
-  it('renders paste hint text', () => {
-    render(<MessageInput {...defaultProps} />);
-    expect(screen.getByText(/Paste images with (Cmd|Ctrl)\+V/)).toBeInTheDocument();
+  it('hides the multiline toggle when onToggleAdvanced is not provided', () => {
+    const { queryByTestId } = render(<MessageInput {...defaultProps} />);
+    expect(queryByTestId('advanced-toggle')).toBeNull();
+  });
+
+  it('calls onToggleAdvanced when the multiline toggle is clicked', () => {
+    const onToggleAdvanced = vi.fn();
+    const { getByTestId } = render(<MessageInput {...defaultProps} onToggleAdvanced={onToggleAdvanced} />);
+    fireEvent.click(getByTestId('advanced-toggle'));
+    expect(onToggleAdvanced).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the old helper-text lines', () => {
+    const { queryByText } = render(<MessageInput {...defaultProps} />);
+    expect(queryByText(/Paste images with/)).toBeNull();
+    expect(queryByText(/Type \/ for commands and skills/)).toBeNull();
   });
 
   // ── Text input ────────────────────────────────────────────────────────────
@@ -500,13 +518,10 @@ describe('MessageInput', () => {
       expect(textarea.className).toContain('h-6');
       expect(textarea.className).toContain('leading-6');
       expect(textarea.className).toContain('resize-none');
-      const shell = textarea.parentElement;
-      expect(shell?.className).toContain('h-12');
-      expect(shell?.className).toContain('items-center');
-      const row = textarea.closest('div.flex.gap-2');
-      expect(row?.className).toContain('items-center');
-      expect(row?.className).toContain('min-h-12');
-      expect(row?.className).not.toContain('items-end');
+      const box = screen.getByTestId('composer-box');
+      expect(box.className).toContain('items-center');
+      expect(box.className).toContain('min-h-12');
+      expect(box.className).not.toContain('items-end');
     });
 
     it('pins single-line collapsed composer height to the shared control size', () => {
@@ -514,16 +529,14 @@ describe('MessageInput', () => {
       const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
       Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 40 });
       fireEvent.change(textarea, { target: { value: 'short' } });
-      expect(textarea.parentElement?.className).toContain('h-12');
       expect(textarea.style.height).toBe('24px');
     });
 
     it('keeps desktop advanced mode bottom-aligned so taller composer grows upward', () => {
       render(<MessageInput {...defaultProps} advancedMode />);
-      const textarea = screen.getByPlaceholderText(/Type a message/);
-      const row = textarea.closest('div.flex.gap-2');
-      expect(row?.className).toContain('items-end');
-      expect(row?.className).not.toContain('items-center');
+      const box = screen.getByTestId('composer-box');
+      expect(box.className).toContain('items-end');
+      expect(box.className).not.toContain('items-center');
     });
 
     it('keeps collapsed desktop composer center-aligned even once content exceeds a single line', () => {
@@ -531,9 +544,9 @@ describe('MessageInput', () => {
       const textarea = screen.getByPlaceholderText(/Type a message/) as HTMLTextAreaElement;
       Object.defineProperty(textarea, 'scrollHeight', { configurable: true, value: 72 });
       fireEvent.change(textarea, { target: { value: 'line 1\nline 2' } });
-      const row = textarea.closest('div.flex.gap-2');
-      expect(row?.className).toContain('items-center');
-      expect(row?.className).not.toContain('items-end');
+      const box = screen.getByTestId('composer-box');
+      expect(box.className).toContain('items-center');
+      expect(box.className).not.toContain('items-end');
     });
 
     it('does not send on plain Enter in advanced mode (desktop)', () => {
@@ -571,11 +584,6 @@ describe('MessageInput', () => {
       textarea.selectionEnd = 5;
       fireEvent.keyDown(textarea, { key: 'Tab' });
       expect(textarea.value).toContain('  ');
-    });
-
-    it('shows advanced hint text in advanced mode', () => {
-      render(<MessageInput {...defaultProps} advancedMode />);
-      expect(screen.getByText(/Enter to send, Tab to indent/)).toBeInTheDocument();
     });
 
     it('shows send button with Cmd+Enter title in advanced mode', () => {

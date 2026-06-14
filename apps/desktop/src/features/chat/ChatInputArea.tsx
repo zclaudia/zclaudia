@@ -1,10 +1,10 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, ChevronDown, ChevronUp, Plus, GitBranch } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, Plus } from 'lucide-react';
 import { ModeSelector } from './ModeSelector';
-import { SystemInfoButton } from './SystemInfoButton';
 import { PermissionSelector } from './PermissionSelector';
 import { WorktreeSelector } from './WorktreeSelector';
 import { TokenUsageDisplay } from './TokenUsageDisplay';
+import { ComposerFooter } from './ComposerFooter';
 import { MessageInput, type Attachment } from './MessageInput';
 import { useServerStore } from '../../stores/serverStore';
 import { useTerminalStore } from '../../stores/terminalStore';
@@ -14,9 +14,10 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useUIStore } from '../../stores/uiStore';
+import { useSessionToolsStore, type SessionTool } from '../../stores/sessionToolsStore';
 import { activatePanel, usePanelIsActive } from '../../utils/openPanel';
 import * as api from '../../services/api';
-import type { UnifiedPermissionPolicy, SlashCommand, Session, Project, SystemInfo } from '@zclaudia/shared';
+import type { UnifiedPermissionPolicy, SlashCommand, Session, Project } from '@zclaudia/shared';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
 import type { SessionDraft } from '../../stores/chatStore';
 
@@ -48,7 +49,6 @@ interface ChatInputAreaProps {
     latestCacheReadTokens?: number;
     latestCacheWriteTokens?: number;
   };
-  currentSystemInfo: SystemInfo | null;
   advancedInput: boolean;
   restoreMessage: { content: string; attachments?: Attachment[] } | null;
   initialDraft: SessionDraft | undefined;
@@ -77,7 +77,6 @@ export function ChatInputArea({
   fileReferenceBackendId,
   sessionRunId,
   currentUsage,
-  currentSystemInfo,
   advancedInput,
   restoreMessage,
   initialDraft,
@@ -101,6 +100,84 @@ export function ChatInputArea({
   const fileViewerPanelActive = usePanelIsActive('file-viewer');
   const terminalPanelActive = usePanelIsActive('terminal');
   const changesPanelActive = usePanelIsActive('session-changes');
+
+  // Tool panel open/close handlers — shared by the mobile toolbar and the desktop
+  // right-sidebar pinned tab strip (published to the store below).
+  const terminalProjectId = currentSession?.projectId;
+  const terminalSupported = useServerStore.getState().activeServerSupports('remoteTerminal');
+  const openDraftTool = useCallback(() => {
+    if (draftPanelActive) {
+      useDraftEditorStore.getState().closeEditor();
+    } else {
+      setSendCallback((content: string) => onSendMessage(content));
+      openDraftEditor(sessionId);
+    }
+  }, [draftPanelActive, setSendCallback, onSendMessage, openDraftEditor, sessionId]);
+  const openFilesTool = useCallback(() => {
+    if (fileViewerPanelActive) {
+      useFileViewerStore.getState().close();
+    } else if (fileViewerOpen) {
+      activatePanel('file-viewer');
+    } else {
+      const store = useFileViewerStore.getState();
+      store.togglePanel();
+      store.setSearchOpen(true);
+      activatePanel('file-viewer');
+    }
+  }, [fileViewerPanelActive, fileViewerOpen]);
+  const openChangesTool = useCallback(() => {
+    const store = usePluginStore.getState();
+    if (changesPanelActive) {
+      store.updatePanelVisibility('session-changes', false);
+    } else {
+      store.updatePanelVisibility('session-changes', true);
+      activatePanel('session-changes');
+    }
+  }, [changesPanelActive]);
+  const openTerminalTool = useCallback(() => {
+    if (!terminalProjectId) return;
+    const open = isDrawerOpen(terminalProjectId);
+    const active = open && terminalPanelActive;
+    if (active) {
+      setDrawerOpen(terminalProjectId, false);
+    } else if (open) {
+      activatePanel('terminal');
+    } else {
+      const store = useTerminalStore.getState();
+      if (!store.getTerminalId(terminalProjectId)) {
+        store.openTerminal(terminalProjectId);
+      }
+      setDrawerOpen(terminalProjectId, true);
+      activatePanel('terminal');
+    }
+  }, [terminalProjectId, isDrawerOpen, terminalPanelActive, setDrawerOpen]);
+
+  // The tool set for this session, in tab order: Draft / Files / Changes / Terminal.
+  const sessionTools = useMemo<SessionTool[]>(() => {
+    const tools: SessionTool[] = [];
+    if (!disabledBuiltinPanels.includes('draft')) {
+      tools.push({ id: 'draft', label: 'Draft', iconKey: 'draft', isActive: draftPanelActive, hasBadge: draftExists && !draftPanelActive, onClick: openDraftTool });
+    }
+    if (currentProject?.rootPath && !disabledBuiltinPanels.includes('file-viewer')) {
+      tools.push({ id: 'file-viewer', label: 'Files', iconKey: 'file', isActive: fileViewerPanelActive, onClick: openFilesTool });
+    }
+    if (!disabledBuiltinPanels.includes('session-changes') && currentSession) {
+      tools.push({ id: 'session-changes', label: 'Changes', iconKey: 'changes', isActive: changesPanelActive, onClick: openChangesTool });
+    }
+    if (!disabledBuiltinPanels.includes('terminal') && terminalSupported && terminalProjectId) {
+      tools.push({ id: 'terminal', label: 'Terminal', iconKey: 'terminal', isActive: isDrawerOpen(terminalProjectId) && terminalPanelActive, onClick: openTerminalTool });
+    }
+    return tools;
+  }, [disabledBuiltinPanels, draftPanelActive, draftExists, fileViewerPanelActive, changesPanelActive, terminalPanelActive, terminalSupported, terminalProjectId, isDrawerOpen, currentProject?.rootPath, currentSession, openDraftTool, openFilesTool, openChangesTool, openTerminalTool]);
+
+  // Publish to the right-sidebar pinned strip (desktop only; mobile renders inline below).
+  const setSessionTools = useSessionToolsStore((s) => s.setTools);
+  useEffect(() => {
+    if (isMobile) return;
+    setSessionTools(sessionTools);
+    return () => setSessionTools([]);
+  }, [isMobile, sessionTools, setSessionTools]);
+
   // Mobile toolbar popover state
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const mobileToolsRef = useRef<HTMLDivElement>(null);
@@ -204,148 +281,46 @@ export function ChatInputArea({
   }
 
   // Normal input mode
+  const selectorTrio = (
+    <>
+      {capabilities && (
+        <ModeSelector
+          capabilities={capabilities}
+          value={isForcedPlanSession ? 'plan' : mode}
+          onChange={(m) => {
+            if (isForcedPlanSession) return;
+            onSetMode(sessionId, m);
+          }}
+          disabled={isLoading}
+          locked={isForcedPlanSession}
+          lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
+        />
+      )}
+      <PermissionSelector
+        value={permissionOverride}
+        onChange={(policy) => onSetPermissionOverride(sessionId, policy)}
+        disabled={isLoading}
+      />
+      {currentProject?.id && currentProject?.rootPath && (
+        <WorktreeSelector
+          projectId={currentProject.id}
+          projectRootPath={currentProject.rootPath}
+          currentWorktree={currentSession?.workingDirectory || ''}
+          onChange={onWorktreeChange}
+          disabled={isLoading}
+          locked={isForcedPlanSession}
+          lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
+        />
+      )}
+    </>
+  );
+
   return (
     <div className="p-2 pb-3 md:px-4 md:pb-3 md:pt-2 safe-bottom-pad overflow-visible flex-shrink-0">
-      {/* Toolbar */}
-      <div className="mb-1.5 md:mb-2 flex items-center gap-1 md:gap-2">
-        {capabilities && (
-          <ModeSelector
-            capabilities={capabilities}
-            value={isForcedPlanSession ? 'plan' : mode}
-            onChange={(m) => {
-              if (isForcedPlanSession) return;
-              onSetMode(sessionId, m);
-            }}
-            disabled={isLoading}
-            locked={isForcedPlanSession}
-            lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
-          />
-        )}
-        <PermissionSelector
-          value={permissionOverride}
-          onChange={(policy) => onSetPermissionOverride(sessionId, policy)}
-          disabled={isLoading}
-        />
-        {currentProject?.id && currentProject?.rootPath && (
-          <WorktreeSelector
-            projectId={currentProject.id}
-            projectRootPath={currentProject.rootPath}
-            currentWorktree={currentSession?.workingDirectory || ''}
-            onChange={onWorktreeChange}
-            disabled={isLoading}
-            locked={isForcedPlanSession}
-            lockReason={isForcedPlanSession ? 'Locked by Supervisor planning mode' : undefined}
-          />
-        )}
-        <div className="flex-1 min-w-[8px]" />
-        {/* Desktop: Draft button */}
-        {!isMobile && !disabledBuiltinPanels.includes('draft') && (() => {
-          const isActive = draftPanelActive;
-          return (
-            <button
-              onClick={() => {
-                if (isActive) {
-                  useDraftEditorStore.getState().closeEditor();
-                } else {
-                  setSendCallback((content: string) => onSendMessage(content));
-                  openDraftEditor(sessionId);
-                }
-              }}
-              className={`p-1.5 rounded-md hover:bg-secondary relative ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              title={isActive ? 'Close draft editor' : 'Open draft editor'}
-            >
-              <FileEdit size={16} strokeWidth={1.75} />
-              {draftExists && !isActive && (
-                <span className="absolute top-0 right-0 w-2 h-2 bg-primary rounded-full" />
-              )}
-            </button>
-          );
-        })()}
-        {/* Desktop: File viewer button */}
-        {!isMobile && currentProject?.rootPath && !disabledBuiltinPanels.includes('file-viewer') && (
-          <button
-            onClick={() => {
-              if (fileViewerPanelActive) {
-                useFileViewerStore.getState().close();
-              } else if (fileViewerOpen) {
-                activatePanel('file-viewer');
-              } else {
-                const store = useFileViewerStore.getState();
-                store.togglePanel();
-                store.setSearchOpen(true);
-                activatePanel('file-viewer');
-              }
-            }}
-            className={`p-1.5 rounded-md hover:bg-secondary ${fileViewerPanelActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-            title={fileViewerPanelActive ? 'Close file viewer' : 'Open file viewer (Cmd+P)'}
-          >
-            <FileText size={16} strokeWidth={1.75} />
-          </button>
-        )}
-        {/* Desktop: Session changes button */}
-        {!isMobile && !disabledBuiltinPanels.includes('session-changes') && currentSession && (
-          <button
-            onClick={() => {
-              const store = usePluginStore.getState();
-              if (changesPanelActive) {
-                store.updatePanelVisibility('session-changes', false);
-              } else {
-                store.updatePanelVisibility('session-changes', true);
-                activatePanel('session-changes');
-              }
-            }}
-            className={`p-1.5 rounded-md hover:bg-secondary ${changesPanelActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-            title={changesPanelActive ? 'Hide session changes' : 'Show session changes'}
-          >
-            <FileDiff size={16} strokeWidth={1.75} />
-          </button>
-        )}
-        {/* Desktop: Terminal button */}
-        {!isMobile && !disabledBuiltinPanels.includes('terminal') && useServerStore.getState().activeServerSupports('remoteTerminal') && currentSession?.projectId && (() => {
-          const pid = currentSession.projectId;
-          const isOpen = isDrawerOpen(pid);
-          const isActive = isOpen && terminalPanelActive;
-          return (
-            <button
-              onClick={() => {
-                if (isActive) {
-                  setDrawerOpen(pid, false);
-                } else if (isOpen) {
-                  activatePanel('terminal');
-                } else {
-                  const store = useTerminalStore.getState();
-                  if (!store.getTerminalId(pid)) {
-                    store.openTerminal(pid);
-                  }
-                  setDrawerOpen(pid, true);
-                  activatePanel('terminal');
-                }
-              }}
-              className={`p-1.5 rounded-md hover:bg-secondary ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-              title={isActive ? 'Hide terminal (Ctrl+`)' : 'Open terminal (Ctrl+`)'}
-            >
-              <TerminalIcon size={16} strokeWidth={1.75} />
-            </button>
-          );
-        })()}
-        {!isMobile && (
-          <button
-            onClick={() => setAdvancedInput(!advancedInput)}
-            className={`p-1.5 rounded-md hover:bg-secondary ${advancedInput ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-            title={advancedInput ? 'Normal input' : 'Advanced input (Enter to newline)'}
-          >
-            {advancedInput ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronUp size={16} strokeWidth={2} />}
-          </button>
-        )}
-        <SystemInfoButton
-          systemInfo={currentSystemInfo}
-          sessionInfo={currentSession ? {
-            id: currentSession.id,
-            name: currentSession.name || undefined,
-            projectName: currentProject?.name || undefined,
-          } : null}
-        />
-      </div>
+      {/* Mobile-only toolbar: three selectors, JS-gated to mobile only */}
+      {isMobile && (
+        <div className="mb-1.5 flex items-center gap-1">{selectorTrio}</div>
+      )}
       <MessageInput
         key={sessionId}
         sessionId={sessionId}
@@ -497,6 +472,7 @@ export function ChatInputArea({
             </div>
           );
         })() : undefined}
+        onToggleAdvanced={!isMobile ? () => setAdvancedInput(!advancedInput) : undefined}
         placeholder={
           !isConnected
             ? 'Connecting...'
@@ -505,36 +481,30 @@ export function ChatInputArea({
             : (isForcedPlanSession || mode === 'plan')
             ? 'Plan Mode: Analyze and plan (no code changes)...'
             : advancedInput
-            ? 'Type a message... (Cmd+Enter to send)'
-            : 'Type a message... (Enter to send)'
+            ? 'Type a message  ·  / commands  ·  @ files  ·  Cmd+Enter to send'
+            : 'Type a message  ·  / commands  ·  @ files'
         }
       />
-      {/* Status strip — branch/worktree on the left, context usage on the right. */}
-      <div className="mt-1 hidden items-center gap-2 px-1 text-[11px] leading-none text-muted-foreground md:flex">
-        {currentSession?.workingDirectory && (
-          <span
-            className="inline-flex min-w-0 items-center gap-1 truncate"
-            title={currentSession.workingDirectory}
-          >
-            <GitBranch size={11} strokeWidth={1.75} className="flex-shrink-0" />
-            <span className="truncate">{currentSession.workingDirectory.split('/').filter(Boolean).pop()}</span>
-          </span>
-        )}
-        <span className="flex-1 min-w-[8px]" />
-        <TokenUsageDisplay
-          latestInputTokens={currentUsage.latestInputTokens}
-          latestOutputTokens={currentUsage.latestOutputTokens}
-          inputTokens={currentUsage.inputTokens}
-          outputTokens={currentUsage.outputTokens}
-          contextWindow={currentUsage.contextWindow}
-          contextWindowSource={currentUsage.contextWindowSource}
-          contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
-          cacheReadTokens={currentUsage.cacheReadTokens}
-          cacheWriteTokens={currentUsage.cacheWriteTokens}
-          latestCacheReadTokens={currentUsage.latestCacheReadTokens}
-          latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
+      {!isMobile && (
+        <ComposerFooter
+          left={selectorTrio}
+          right={
+            <TokenUsageDisplay
+              latestInputTokens={currentUsage.latestInputTokens}
+              latestOutputTokens={currentUsage.latestOutputTokens}
+              inputTokens={currentUsage.inputTokens}
+              outputTokens={currentUsage.outputTokens}
+              contextWindow={currentUsage.contextWindow}
+              contextWindowSource={currentUsage.contextWindowSource}
+              contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
+              cacheReadTokens={currentUsage.cacheReadTokens}
+              cacheWriteTokens={currentUsage.cacheWriteTokens}
+              latestCacheReadTokens={currentUsage.latestCacheReadTokens}
+              latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
+            />
+          }
         />
-      </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { ChevronsRight, Search, Bell, SquareStack } from 'lucide-react';
+import { PanelLeft, Search, Bell, SquareStack } from 'lucide-react';
 import { openWindowManagerWindow } from '../../utils/windowManagerWindow';
 import { PluginWindowButtons } from '../../app/PluginDock';
 
@@ -32,7 +32,7 @@ export function SidebarCollapsedBar({
       data-tauri-drag-region
     >
       <button onClick={onExpand} className={iconBtn} title="Expand sidebar" aria-label="Expand sidebar">
-        <ChevronsRight size={16} strokeWidth={1.75} />
+        <PanelLeft size={16} strokeWidth={1.75} />
       </button>
 
       <button onClick={onOpenSearch} className={iconBtn} title="Search messages" aria-label="Search messages">

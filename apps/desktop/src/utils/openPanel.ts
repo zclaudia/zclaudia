@@ -1,6 +1,17 @@
 import { usePluginStore, getEffectivePlacement } from '../stores/pluginStore';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
 import { useRightSidebarStore } from '../stores/rightSidebarStore';
+import { useIsMobile, isMobileViewport } from '../hooks/useMediaQuery';
+
+/**
+ * Effective placement, viewport-aware: mobile renders every panel through the
+ * BottomPanel overlay regardless of desktop placement (see usePanelRegion), so
+ * tab routing must target the bottom store on mobile.
+ */
+function viewportPlacement(panelId: string): 'bottom' | 'right' {
+  if (isMobileViewport()) return 'bottom';
+  return getEffectivePlacement(usePluginStore.getState(), panelId);
+}
 
 /**
  * Activate a panel in its effective placement (bottom or right).
@@ -13,9 +24,12 @@ import { useRightSidebarStore } from '../stores/rightSidebarStore';
  * draft store). This utility only handles the placement routing.
  */
 export function activatePanel(panelId: string): void {
-  const placement = getEffectivePlacement(usePluginStore.getState(), panelId);
+  const placement = viewportPlacement(panelId);
   if (placement === 'right') {
-    useRightSidebarStore.getState().setActiveTab(panelId);
+    const store = useRightSidebarStore.getState();
+    store.setActiveTab(panelId);
+    // Opened while the sidebar is collapsed → surface a dot rather than popping it open.
+    store.markUnread();
   } else {
     useBottomPanelStore.getState().setActiveTab(panelId);
   }
@@ -31,7 +45,7 @@ export function activatePanel(panelId: string): void {
  *        they reopen the panel later).
  */
 export function deactivatePanel(panelId: string): void {
-  const placement = getEffectivePlacement(usePluginStore.getState(), panelId);
+  const placement = viewportPlacement(panelId);
   if (placement === 'right') {
     // Right sidebar collapses automatically when no visible right panels remain.
     return;
@@ -48,7 +62,8 @@ export function deactivatePanel(panelId: string): void {
  * button "active" indicators so they correctly reflect what the user sees.
  */
 export function usePanelIsActive(panelId: string): boolean {
-  const placement = usePluginStore((s) => getEffectivePlacement(s, panelId));
+  const isMobile = useIsMobile();
+  const placement = usePluginStore((s) => (isMobile ? 'bottom' : getEffectivePlacement(s, panelId)));
   const isVisible = usePluginStore((s) => {
     const panel = s.panels.find((p) => p.id === panelId);
     return panel ? panel.visible !== false : false;

@@ -102,6 +102,12 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
   const triggerLabel = getTriggerLabel();
   const hasOverride = value !== null;
 
+  // Elevated = profile auto-approves file writes or shell commands
+  const isElevated = !!(
+    value?.profile &&
+    (value.profile.fileWrite === 'auto-approve' || value.profile.shellSafe === 'auto-approve')
+  );
+
   const handleSelectPreset = (preset: typeof PRESETS[number] | null) => {
     if (preset === null) {
       onChange(null);
@@ -127,6 +133,8 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
           transition-colors h-7
           ${disabled
             ? 'opacity-50 cursor-not-allowed text-muted-foreground'
+            : isElevated
+            ? 'bg-warning/10 text-warning border border-warning/40 hover:bg-warning/15 active:bg-warning/20 cursor-pointer'
             : hasOverride
             ? 'hover:bg-muted active:bg-muted/80 cursor-pointer text-primary'
             : 'hover:bg-muted active:bg-muted/80 cursor-pointer text-muted-foreground hover:text-foreground'
@@ -136,7 +144,7 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
       >
         <Shield size={14} strokeWidth={1.75} />
         <span className="hidden md:inline truncate max-w-[80px] lg:max-w-none">{triggerLabel}</span>
-        <ChevronDown size={12} className="text-muted-foreground" />
+        <ChevronDown size={12} className={isElevated ? '' : 'text-muted-foreground'} />
       </button>
 
       {isOpen && (

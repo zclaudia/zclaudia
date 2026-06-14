@@ -48,8 +48,8 @@ describe('PermissionSelector', () => {
     );
 
     const button = container.querySelector('button');
-    // When override is active, button shows text-primary styling
-    expect(button).toHaveClass('text-primary');
+    // defaultOverride auto-approves file writes (elevated), so warning styling applies
+    expect(button?.className).toContain('warning');
   });
 
   it('should NOT show ring when using project default', () => {
@@ -135,6 +135,80 @@ describe('PermissionSelector', () => {
     fireEvent.click(screen.getByText(/Project Default/));
 
     expect(handleChange).toHaveBeenCalledWith(null);
+  });
+
+  // --- Elevated (amber warning) styling tests ---
+
+  it('should show warning styling on trigger button when policy auto-approves file writes', () => {
+    const elevatedOverride: Partial<UnifiedPermissionPolicy> = {
+      enabled: true,
+      profile: {
+        fileRead: 'auto-approve',
+        fileWrite: 'auto-approve',
+        shellSafe: 'ask',
+        networkOps: 'ask',
+        destructiveOps: 'block',
+        userQuestions: 'ask',
+      },
+    };
+
+    const { container } = render(
+      <PermissionSelector value={elevatedOverride} onChange={() => {}} />
+    );
+
+    const button = container.querySelector('button');
+    expect(button?.className).toContain('warning');
+  });
+
+  it('should show warning styling on trigger button when policy auto-approves shell commands', () => {
+    const shellElevatedOverride: Partial<UnifiedPermissionPolicy> = {
+      enabled: true,
+      profile: {
+        fileRead: 'auto-approve',
+        fileWrite: 'auto-approve',
+        shellSafe: 'auto-approve',
+        networkOps: 'ask',
+        destructiveOps: 'block',
+        userQuestions: 'ask',
+      },
+    };
+
+    const { container } = render(
+      <PermissionSelector value={shellElevatedOverride} onChange={() => {}} />
+    );
+
+    const button = container.querySelector('button');
+    expect(button?.className).toContain('warning');
+  });
+
+  it('should NOT show warning styling when value is null (project default)', () => {
+    const { container } = render(
+      <PermissionSelector value={null} onChange={() => {}} />
+    );
+
+    const button = container.querySelector('button');
+    expect(button?.className).not.toContain('warning');
+  });
+
+  it('should NOT show warning styling for read-only policy (no auto-approve on writes/shell)', () => {
+    const readOnlyOverride: Partial<UnifiedPermissionPolicy> = {
+      enabled: true,
+      profile: {
+        fileRead: 'auto-approve',
+        fileWrite: 'ask',
+        shellSafe: 'ask',
+        networkOps: 'ask',
+        destructiveOps: 'block',
+        userQuestions: 'ask',
+      },
+    };
+
+    const { container } = render(
+      <PermissionSelector value={readOnlyOverride} onChange={() => {}} />
+    );
+
+    const button = container.querySelector('button');
+    expect(button?.className).not.toContain('warning');
   });
 
   it('should be disabled when disabled prop is true', () => {

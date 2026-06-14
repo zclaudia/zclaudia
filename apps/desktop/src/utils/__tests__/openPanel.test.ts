@@ -22,7 +22,7 @@ describe('openPanel utility', () => {
   beforeEach(() => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
     useBottomPanelStore.setState({ activeTab: '' });
-    useRightSidebarStore.setState({ activeTab: null, widthPx: 380 });
+    useRightSidebarStore.setState({ activeTab: null, widthPx: 380, collapsed: false, unread: false });
   });
 
   describe('activatePanel', () => {
@@ -51,6 +51,36 @@ describe('openPanel utility', () => {
       registerPanel('foo');
       activatePanel('foo');
       expect(useBottomPanelStore.getState().activeTab).toBe('foo');
+    });
+
+    it('routes right-placed panels to the bottom store on mobile', () => {
+      const orig = window.matchMedia;
+      window.matchMedia = ((query: string) => ({
+        matches: true, media: query, onchange: null,
+        addEventListener() {}, removeEventListener() {},
+        addListener() {}, removeListener() {}, dispatchEvent: () => false,
+      })) as unknown as typeof window.matchMedia;
+      try {
+        registerPanel('foo', 'right');
+        activatePanel('foo');
+        expect(useBottomPanelStore.getState().activeTab).toBe('foo');
+        expect(useRightSidebarStore.getState().activeTab).toBeNull();
+      } finally {
+        window.matchMedia = orig;
+      }
+    });
+
+    it('marks the sidebar unread when activating a right panel while collapsed', () => {
+      useRightSidebarStore.setState({ collapsed: true });
+      registerPanel('foo', 'right');
+      activatePanel('foo');
+      expect(useRightSidebarStore.getState().unread).toBe(true);
+    });
+
+    it('does not mark unread when the sidebar is expanded', () => {
+      registerPanel('foo', 'right');
+      activatePanel('foo');
+      expect(useRightSidebarStore.getState().unread).toBe(false);
     });
   });
 

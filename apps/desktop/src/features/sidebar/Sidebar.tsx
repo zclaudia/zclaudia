@@ -13,6 +13,7 @@ import { SidebarTopBar } from './SidebarTopBar';
 import { ServerSelector } from '../settings/ServerSelector';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
+import { SearchModal } from './SearchModal';
 import { ProjectListItem } from './ProjectListItem';
 import { NewProjectForm } from './NewProjectForm';
 import { SidebarFooter } from './SidebarFooter';
@@ -502,27 +503,18 @@ export function Sidebar({
           notificationUnreadCount={notificationUnreadCount}
           disableNotifications={disableNotifications}
         />
-        {searchOpen && (
-          <div className="absolute inset-x-1 top-full z-50 mt-1 overflow-hidden rounded-xl border border-border bg-card shadow-xl">
-            <SidebarSearch
-              search={search}
-              sessions={sessions}
-              onResultSelect={(sessionId, messageId, ownerBackendId) => {
-                actions.handleSearchResultSelect(sessionId, messageId, ownerBackendId);
-                setSearchOpen(false);
-              }}
-            />
-          </div>
-        )}
       </div>
 
-      {searchOpen && (
-        <div
-          className="absolute inset-0 z-40"
-          onClick={() => setSearchOpen(false)}
-          aria-hidden
-        />
-      )}
+      <SearchModal
+        open={searchOpen}
+        onClose={() => setSearchOpen(false)}
+        search={search}
+        sessions={sessions}
+        onResultSelect={(sessionId, messageId, ownerBackendId) => {
+          actions.handleSearchResultSelect(sessionId, messageId, ownerBackendId);
+          setSearchOpen(false);
+        }}
+      />
 
       <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
         {renderProjectList()}

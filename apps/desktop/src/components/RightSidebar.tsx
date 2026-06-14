@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef } from 'react';
+import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, type LucideIcon } from 'lucide-react';
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
 import { usePluginStore } from '../stores/pluginStore';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
+import { useSessionToolsStore } from '../stores/sessionToolsStore';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { PanelActions, PanelContent } from './panels/PanelRenderer';
 import { usePanelRegion } from './panels/usePanelRegion';
+
+const TOOL_ICONS: Record<string, LucideIcon> = {
+  draft: FileEdit,
+  file: FileText,
+  changes: FileDiff,
+  terminal: TerminalIcon,
+};
 
 interface RightSidebarProps {
   projectId: string | undefined;
@@ -26,9 +35,12 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
   const setPanelPlacement = usePluginStore((s) => s.setPanelPlacement);
   const widthPx = useRightSidebarStore((s) => s.widthPx);
   const activeTab = useRightSidebarStore((s) => s.activeTab);
+  const collapsed = useRightSidebarStore((s) => s.collapsed);
   const setActiveTab = useRightSidebarStore((s) => s.setActiveTab);
   const setWidth = useRightSidebarStore((s) => s.setWidth);
   const setBottomPanelTab = useBottomPanelStore((s) => s.setActiveTab);
+  // Pinned tool tabs (Draft / Files / Changes / Terminal), published by the composer.
+  const pinnedTools = useSessionToolsStore((s) => s.tools);
   const {
     visiblePanels,
     mountedPanels,
@@ -107,7 +119,13 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
   };
 
   if (isMobile) return null;
-  if (!isOpen && !hasAlwaysMount) return null;
+  const hasPinned = pinnedTools.length > 0;
+  if (!isOpen && !hasAlwaysMount && !hasPinned) return null;
+
+  // `collapsed` hides the sidebar without unmounting — alwaysMount panels (terminal
+  // xterm) keep their state while the user has it tucked away. Pinned tool tabs keep
+  // the sidebar renderable even before any panel content has been opened.
+  const expanded = !collapsed && (isOpen || hasPinned);
 
   const clampedWidth = Math.max(
     RIGHT_SIDEBAR_LIMITS.MIN_WIDTH_PX,
@@ -116,15 +134,15 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
 
   return (
     <div
-      className={`flex flex-col flex-shrink-0 bg-card ${isOpen ? 'border-l border-border' : ''} relative`}
+      className={`flex flex-col flex-shrink-0 bg-card ${expanded ? 'border-l border-border' : ''} relative`}
       style={{
-        width: isOpen ? `${clampedWidth}px` : '0px',
+        width: expanded ? `${clampedWidth}px` : '0px',
         overflow: 'hidden',
         contain: 'layout paint style',
       }}
     >
       {/* Drag handle on left edge */}
-      {isOpen && (
+      {expanded && (
         <div
           className="absolute top-0 left-0 w-1 h-full cursor-ew-resize hover:bg-primary/20 z-10"
           onMouseDown={onDragStart}
@@ -138,22 +156,43 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
         data-tauri-drag-region
       >
         <div className="flex items-center gap-0.5 flex-shrink-0 min-w-0 overflow-hidden">
-          {showTabs ? (
-            <>
-              {visiblePanels.map((panel) => (
+          {hasPinned ? (
+            pinnedTools.map((tool) => {
+              const Icon = TOOL_ICONS[tool.iconKey];
+              return (
                 <button
-                  key={panel.id}
-                  onClick={() => setActiveTab(panel.id)}
-                  className={`px-2 py-0.5 rounded-md text-xs font-medium ${
-                    effectiveTab === panel.id
-                      ? 'bg-secondary text-foreground'
-                      : 'text-muted-foreground hover:text-foreground'
+                  key={tool.id}
+                  onClick={tool.onClick}
+                  title={tool.label}
+                  aria-label={tool.label}
+                  aria-pressed={tool.isActive}
+                  className={`relative flex h-7 w-7 items-center justify-center rounded-md ${
+                    tool.isActive
+                      ? 'bg-secondary text-primary'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                   }`}
                 >
-                  {panel.label}
+                  {Icon ? <Icon size={15} strokeWidth={1.75} /> : null}
+                  {tool.hasBadge && (
+                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                  )}
                 </button>
-              ))}
-            </>
+              );
+            })
+          ) : showTabs ? (
+            visiblePanels.map((panel) => (
+              <button
+                key={panel.id}
+                onClick={() => setActiveTab(panel.id)}
+                className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                  effectiveTab === panel.id
+                    ? 'bg-secondary text-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {panel.label}
+              </button>
+            ))
           ) : (
             <span className="text-xs font-medium text-muted-foreground px-1 truncate">
               {activePanel?.label || 'Panel'}
@@ -195,7 +234,7 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
       {/* Content — alwaysMount panels stay in DOM even when hidden */}
       <div className="flex-1 overflow-hidden relative [contain:layout_paint]">
         {mountedPanels.map((panel) => (
-          <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id && isOpen ? '' : 'invisible'}`}>
+          <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id && expanded ? '' : 'invisible'}`}>
             <PanelContent panel={panel} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
           </div>
         ))}

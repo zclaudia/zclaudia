@@ -182,16 +182,18 @@ async function advanceDebounce(ms: number) {
   });
 }
 
-// Desktop search now lives in a popover opened from the header search icon.
+// Desktop search now lives in a centered modal portaled to document.body, opened
+// from the header search icon — so the input and results live outside `container`.
+const SEARCH_INPUT_SELECTOR = 'input[placeholder^="Search messages"]';
 function openSearchPopover(container: HTMLElement) {
-  if (!container.querySelector('input[placeholder="Search messages..."]')) {
+  if (!document.querySelector(SEARCH_INPUT_SELECTOR)) {
     const trigger = container.querySelector('button[title="Search messages"]');
     if (trigger) fireEvent.click(trigger);
   }
 }
 function getSearchInput(container: HTMLElement): HTMLInputElement {
   openSearchPopover(container);
-  return container.querySelector('input[placeholder="Search messages..."]') as HTMLInputElement;
+  return document.querySelector(SEARCH_INPUT_SELECTOR) as HTMLInputElement;
 }
 
 describe('Sidebar', () => {
@@ -865,7 +867,7 @@ describe('Sidebar', () => {
     });
 
     // Should show "Searching..."
-    expect(container.textContent).toContain('Searching...');
+    expect(document.body.textContent).toContain('Searching...');
   });
 
   it('shows "No results" when search returns empty', async () => {
@@ -883,7 +885,7 @@ describe('Sidebar', () => {
     // Wait for debounce (300ms)
     await advanceDebounce(350);
 
-    expect(container.textContent).toContain('No results');
+    expect(document.body.textContent).toContain('No results');
     vi.useRealTimers();
   });
 
@@ -903,8 +905,8 @@ describe('Sidebar', () => {
 
     await advanceDebounce(350);
 
-    expect(container.textContent).toContain('Test Session');
-    expect(container.textContent).toContain('Hello world');
+    expect(document.body.textContent).toContain('Test Session');
+    expect(document.body.textContent).toContain('Hello world');
     vi.useRealTimers();
   });
 
@@ -924,7 +926,7 @@ describe('Sidebar', () => {
     await advanceDebounce(350);
 
     // Click the search result
-    const resultButtons = Array.from(container.querySelectorAll('button')).filter(b => b.textContent?.includes('Test Session'));
+    const resultButtons = Array.from(document.body.querySelectorAll('button')).filter(b => b.textContent?.includes('Test Session'));
     if (resultButtons.length > 0) {
       fireEvent.click(resultButtons[0]);
       expect(selectionMocks.selectSession).toHaveBeenCalledWith('sess-1', { backendId: 'local' });
@@ -947,7 +949,7 @@ describe('Sidebar', () => {
     });
     await advanceDebounce(350);
 
-    const resultButtons = Array.from(container.querySelectorAll('button')).filter(b => b.textContent?.includes('Remote Session'));
+    const resultButtons = Array.from(document.body.querySelectorAll('button')).filter(b => b.textContent?.includes('Remote Session'));
     if (resultButtons.length > 0) {
       fireEvent.click(resultButtons[0]);
       expect(selectionMocks.selectSession).toHaveBeenCalledWith('sess-2', { backendId: 'backend-1' });
@@ -970,7 +972,7 @@ describe('Sidebar', () => {
     });
     await advanceDebounce(350);
 
-    expect(container.textContent).toContain('File');
+    expect(document.body.querySelector('[aria-label="File result"]')).toBeTruthy();
     vi.useRealTimers();
   });
 
@@ -989,7 +991,7 @@ describe('Sidebar', () => {
     });
     await advanceDebounce(350);
 
-    expect(container.textContent).toContain('Tool');
+    expect(document.body.querySelector('[aria-label="Tool result"]')).toBeTruthy();
     vi.useRealTimers();
   });
 
@@ -1009,27 +1011,27 @@ describe('Sidebar', () => {
     });
     await advanceDebounce(350);
 
-    expect(container.textContent).toContain('Load More');
+    expect(document.body.textContent).toContain('Load More');
     vi.useRealTimers();
   });
 
   it('shows search filter button', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     openSearchPopover(container);
-    const filterBtn = container.querySelector('button[title="Filters"]');
+    const filterBtn = document.body.querySelector('button[title="Filters"]');
     expect(filterBtn).toBeTruthy();
   });
 
   it('toggles search filters', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     openSearchPopover(container);
-    const filterBtn = container.querySelector('button[title="Filters"]')!;
+    const filterBtn = document.body.querySelector('button[title="Filters"]') as HTMLButtonElement;
     fireEvent.click(filterBtn);
-    expect(container.querySelector('[data-testid="search-filters"]')).toBeTruthy();
+    expect(document.body.querySelector('[data-testid="search-filters"]')).toBeTruthy();
 
     // Click again to close
     fireEvent.click(filterBtn);
-    expect(container.querySelector('[data-testid="search-filters"]')).toBeFalsy();
+    expect(document.body.querySelector('[data-testid="search-filters"]')).toBeFalsy();
   });
 
   // ---- Disconnected state ----
@@ -1469,7 +1471,7 @@ describe('Sidebar', () => {
     });
     await advanceDebounce(350);
 
-    expect(container.textContent).toContain('hello world foo');
+    expect(document.body.textContent).toContain('hello world foo');
     vi.useRealTimers();
   });
 
@@ -1488,7 +1490,7 @@ describe('Sidebar', () => {
     });
     await advanceDebounce(350);
 
-    expect(container.textContent).toContain('No preview text');
+    expect(document.body.textContent).toContain('No preview text');
     vi.useRealTimers();
   });
 
@@ -1508,8 +1510,8 @@ describe('Sidebar', () => {
     const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
-    expect(container.textContent).toContain('Recent Searches');
-    expect(container.textContent).toContain('old search');
+    expect(document.body.textContent).toContain('Recent Searches');
+    expect(document.body.textContent).toContain('old search');
     vi.useRealTimers();
   });
 
@@ -1526,7 +1528,7 @@ describe('Sidebar', () => {
     const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
-    const clearBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Clear');
+    const clearBtn = Array.from(document.body.querySelectorAll('button')).find(b => b.textContent?.trim() === 'Clear');
     if (clearBtn) {
       await act(async () => {
         fireEvent.click(clearBtn);
@@ -1550,7 +1552,7 @@ describe('Sidebar', () => {
     const searchInput = getSearchInput(container)!;
     fireEvent.focus(searchInput);
 
-    const historyBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('old search'));
+    const historyBtn = Array.from(document.body.querySelectorAll('button')).find(b => b.textContent?.includes('old search'));
     if (historyBtn) {
       fireEvent.click(historyBtn);
       // Wait for the 300ms debounce in handleSearch

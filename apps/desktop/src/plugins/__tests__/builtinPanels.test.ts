@@ -68,4 +68,18 @@ describe('initBuiltinPanels', () => {
       expect.objectContaining({ id: 'notifications', pluginId: 'com.claudia.notifications' })
     );
   });
+
+  it('places terminal, file-viewer, draft, and session-changes in the right sidebar by default', async () => {
+    const registerSpy = vi.fn();
+    usePluginStore.setState({ registerPanel: registerSpy } as any);
+
+    const { initBuiltinPanels } = await import('../builtinPanels');
+    initBuiltinPanels();
+
+    for (const id of ['terminal', 'file-viewer', 'draft', 'session-changes']) {
+      expect(registerSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ id, defaultPlacement: 'right' }),
+      );
+    }
+  });
 });

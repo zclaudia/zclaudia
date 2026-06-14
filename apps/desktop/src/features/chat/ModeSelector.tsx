@@ -68,7 +68,7 @@ export function ModeSelector({
       {open && !isDisabled && (
         <div
           role="listbox"
-          className="absolute left-0 top-full mt-1 z-50 min-w-[140px] bg-popover border border-border rounded-md shadow-lg py-1"
+          className="absolute left-0 bottom-full mb-1 z-50 min-w-[140px] bg-popover border border-border rounded-md shadow-lg py-1"
         >
           {capabilities.modes.map((m) => (
             <button
