@@ -445,3 +445,44 @@ describe('user hooks integration', () => {
     ]);
   });
 });
+
+describe('afterToolCall — tool failure loop guard', () => {
+  function makeHooks() {
+    return buildAgentHooks({
+      permissionCallback: vi.fn().mockResolvedValue({ behavior: 'allow' }),
+      autoFixHints: true,
+    } as any);
+  }
+  function failingCtx() {
+    return {
+      toolCall: { name: 'Bash' },
+      args: { command: 'npm test' },
+      result: {
+        content: [{ type: 'text', text: 'command failed' }],
+        details: { ok: false, error: 'nonzero_exit' },
+      },
+    };
+  }
+
+  it('appends a [loop] nudge and upgrades error on the 3rd identical failure', async () => {
+    const hooks = makeHooks();
+    await hooks.afterToolCall!(failingCtx() as any);
+    await hooks.afterToolCall!(failingCtx() as any);
+    const third = await hooks.afterToolCall!(failingCtx() as any);
+    const text = (third?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).toContain('[loop]');
+    expect(third?.details?.error).toBe('tool_loop_detected');
+  });
+
+  it('does not nudge when the same tool succeeds in between', async () => {
+    const hooks = makeHooks();
+    await hooks.afterToolCall!(failingCtx() as any);
+    await hooks.afterToolCall!({
+      toolCall: { name: 'Bash' }, args: { command: 'npm test' },
+      result: { content: [{ type: 'text', text: 'ok' }], details: { ok: true } },
+    } as any);
+    const after = await hooks.afterToolCall!(failingCtx() as any);
+    const text = (after?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).not.toContain('[loop]');
+  });
+});
