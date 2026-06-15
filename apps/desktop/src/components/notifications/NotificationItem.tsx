@@ -21,9 +21,11 @@ const SOURCE_ICONS: Record<string, string> = {
 interface NotificationItemProps {
   item: NotificationItemData;
   onDismiss?: (id: string) => void;
+  /** Called after a click navigates to a session (used to close the popup). */
+  onAfterSelect?: () => void;
 }
 
-export function NotificationItem({ item, onDismiss }: NotificationItemProps) {
+export function NotificationItem({ item, onDismiss, onAfterSelect }: NotificationItemProps) {
   const { selectSession } = useSelectionCoordinator();
   const { sendMessage } = useConnection();
   const statusStyle = STATUS_STYLES[item.status] || STATUS_STYLES.running;
@@ -37,6 +39,7 @@ export function NotificationItem({ item, onDismiss }: NotificationItemProps) {
     }
     if (item.sessionId) {
       selectSession(item.sessionId, { backendId: item.ownerBackendId });
+      onAfterSelect?.();
     }
   };
 
