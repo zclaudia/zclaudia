@@ -31,7 +31,12 @@ describe('NotificationsModal', () => {
   it('calls onClose on backdrop click', () => {
     const onClose = vi.fn();
     render(<NotificationsModal open onClose={onClose} />);
-    fireEvent.click(screen.getByLabelText('Close notifications backdrop'));
+    fireEvent.click(screen.getByTestId('notifications-backdrop'));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('focuses the dialog when opened (so Escape works)', () => {
+    render(<NotificationsModal open onClose={() => {}} />);
+    expect(screen.getByRole('dialog', { name: 'Notifications' })).toHaveFocus();
   });
 });

@@ -89,6 +89,7 @@ export function NotificationsPanel({ onClose }: NotificationsPanelProps = {}) {
       </div>
 
       {/* Feed list */}
+      {/* min-h-0 lets this flex child shrink so it scrolls inside the modal's capped height */}
       <div className="flex-1 min-h-0 overflow-y-auto">
         {items.length === 0 && !loading && (
           <div className="p-8 text-center text-muted-foreground text-sm">
