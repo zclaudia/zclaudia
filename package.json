@@ -44,7 +44,7 @@
     "test:components": "bash scripts/with-project-node.sh node scripts/dev/test-file-by-file.mjs \"apps/desktop/src/components\"",
     "test:utils": "bash scripts/with-project-node.sh node scripts/dev/test-file-by-file.mjs \"apps/desktop/src/utils\"",
     "preinstall": "node scripts/hooks/ensure-node-version.mjs",
-    "postinstall": "node scripts/hooks/check-native-modules.mjs"
+    "postinstall": "bash scripts/with-project-node.sh node scripts/hooks/check-native-modules.mjs"
   },
   "engines": {
     "node": ">=22.19.0",

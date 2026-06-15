@@ -5,8 +5,10 @@
   "type": "module",
   "main": "./dist/index.js",
   "scripts": {
+    "predev": "node ../scripts/hooks/check-native-modules.mjs",
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "prestart": "node ../scripts/hooks/check-native-modules.mjs",
     "start": "node dist/index.js",
     "clean": "rm -rf dist bundle",
     "bundle": "node scripts/bundle.mjs",

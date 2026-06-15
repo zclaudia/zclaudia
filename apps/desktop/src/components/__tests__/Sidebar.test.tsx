@@ -79,6 +79,7 @@ import { useInteractionStore } from '../../stores/interactionStore';
 import { useChatStore } from '../../stores/chatStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useUIStore } from '../../stores/uiStore';
+import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import * as api from '../../services/api';
 import { groupSessionsByWorktree } from '../../features/sidebar/worktreeGrouping';
 import { isAndroid } from '../../utils/platform';
@@ -162,6 +163,12 @@ function setupStores(overrides: Record<string, any> = {}) {
   useInteractionStore.setState({ interactions: {}, ...overrides.interactionStore } as any);
   useChatStore.setState({ activeRuns: {}, ...overrides.chatStore } as any);
   useSessionRunStateStore.setState({ records: {}, ...overrides.sessionRunStateStore } as any);
+  useAgentReadinessStore.setState({
+    readiness: { usable: true },
+    loading: false,
+    refresh: vi.fn().mockResolvedValue(undefined),
+    ...overrides.agentReadinessStore,
+  } as any);
   useUIStore.setState({
     poppedOutSessions: new Map(),
     requestForceScrollToBottom: vi.fn(),
@@ -579,6 +586,29 @@ describe('Sidebar', () => {
     expect(pathInput).toBeTruthy();
   });
 
+  it('blocks new project creation when readiness is initially unknown and refresh reports no usable agent', async () => {
+    const refresh = vi.fn(async () => {
+      useAgentReadinessStore.setState({ readiness: { usable: false, reason: 'no_agent' }, loading: false });
+    });
+    setupStores({
+      agentReadinessStore: {
+        readiness: null,
+        refresh,
+      },
+    });
+
+    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    fireEvent.click(newProjectBtn);
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('还没有可用的 Agent');
+    });
+    expect(refresh).toHaveBeenCalled();
+    expect(container.querySelector('input[placeholder="Project name"]')).toBeFalsy();
+  });
+
   it('creates project when form is submitted', async () => {
     const addProject = vi.fn();
     const selectProject = vi.fn();
@@ -606,6 +636,44 @@ describe('Sidebar', () => {
       type: 'code',
       rootPath: undefined,
     });
+  });
+
+  it('blocks project submit when readiness becomes unusable while the form is open', async () => {
+    let shouldFailReadiness = false;
+    const refresh = vi.fn(async () => {
+      useAgentReadinessStore.setState({
+        readiness: shouldFailReadiness
+          ? { usable: false, reason: 'no_credential' }
+          : { usable: true },
+        loading: false,
+      });
+    });
+    setupStores({
+      agentReadinessStore: {
+        readiness: { usable: true },
+        refresh,
+      },
+    });
+
+    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    fireEvent.click(newProjectBtn);
+
+    const nameInput = container.querySelector('input[placeholder="Project name"]')!;
+    fireEvent.change(nameInput, { target: { value: 'Blocked Project' } });
+    shouldFailReadiness = true;
+    useAgentReadinessStore.setState({ readiness: null, refresh } as any);
+
+    const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+    await act(async () => {
+      fireEvent.click(createBtn);
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('还没有可用的 Agent');
+    });
+    expect(api.createProject).not.toHaveBeenCalled();
   });
 
   it('cancels new project form', () => {
@@ -845,6 +913,50 @@ describe('Sidebar', () => {
         expect(api.createSession).toHaveBeenCalled();
       }
     }
+  });
+
+  it('blocks session submit when readiness becomes unusable while the form is open', async () => {
+    let shouldFailReadiness = false;
+    const refresh = vi.fn(async () => {
+      useAgentReadinessStore.setState({
+        readiness: shouldFailReadiness
+          ? { usable: false, reason: 'no_llm_profile' }
+          : { usable: true },
+        loading: false,
+      });
+    });
+    setupStores({
+      agentReadinessStore: {
+        readiness: { usable: true },
+        refresh,
+      },
+    });
+    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
+    fireEvent.click(projBtn);
+
+    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
+      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
+    });
+    fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
+    const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session')!;
+    fireEvent.click(newSessionBtn);
+
+    const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
+    fireEvent.change(sessionInput, { target: { value: 'Blocked Session' } });
+    shouldFailReadiness = true;
+    useAgentReadinessStore.setState({ readiness: null, refresh } as any);
+
+    const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+    await act(async () => {
+      fireEvent.click(createBtn);
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('还没有可用的 Agent');
+    });
+    expect(api.createSession).not.toHaveBeenCalled();
   });
 
   // ---- Search ----

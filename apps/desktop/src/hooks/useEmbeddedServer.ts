@@ -33,7 +33,7 @@ const DEV_HEALTHCHECK_URL = 'http://127.0.0.1:3100/health';
 const DEV_HEALTHCHECK_RETRY_DELAYS_MS = [150, 300, 500, 750, 1000, 1500];
 const DEV_SERVER_PATH = '../../../server/dist/index.js';
 const DEV_REPO_ROOT = '../../..';
-const DEV_NATIVE_MODULE_CHECKER = '../../../scripts/check-native-modules.mjs';
+const DEV_NATIVE_MODULE_CHECKER = '../../../scripts/hooks/check-native-modules.mjs';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => window.setTimeout(resolve, ms));

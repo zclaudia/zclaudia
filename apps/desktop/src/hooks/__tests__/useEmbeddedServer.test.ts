@@ -647,7 +647,7 @@ describe('hooks/useEmbeddedServer', () => {
       expect(Command.sidecar).toHaveBeenNthCalledWith(
         1,
         'binaries/node',
-        ['../../../scripts/check-native-modules.mjs'],
+        ['../../../scripts/hooks/check-native-modules.mjs'],
         expect.objectContaining({
           cwd: '../../..',
         })

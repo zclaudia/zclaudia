@@ -105,8 +105,6 @@ export function Sidebar({
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
-  const readiness = useAgentReadinessStore((s) => s.readiness);
-  const isAgentUsable = useAgentReadinessStore((s) => s.isUsable);
   const [agentDialogReason, setAgentDialogReason] = useState<AgentReadinessReason | undefined>(undefined);
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
@@ -327,12 +325,26 @@ export function Sidebar({
   });
 
   // Returns true if creation may proceed; otherwise opens the guidance dialog.
-  const passesAgentGate = (): boolean => {
-    if (isAgentUsable()) return true;
-    setAgentDialogReason(readiness?.reason);
+  // Refresh when readiness is unknown or currently unusable so first-load/null
+  // readiness cannot fail open, while known-good state keeps the UI instant.
+  const ensureAgentGate = useCallback(async (): Promise<boolean> => {
+    await refreshReadiness();
+    const latest = useAgentReadinessStore.getState().readiness;
+    if (latest?.usable !== false) return true;
+    setAgentDialogReason(latest.reason);
     setAgentDialogOpen(true);
     return false;
-  };
+  }, [refreshReadiness]);
+
+  const runAfterAgentGate = useCallback((action: () => void | Promise<void>, options?: { forceRefresh?: boolean }) => {
+    if (!options?.forceRefresh && useAgentReadinessStore.getState().readiness?.usable === true) {
+      void action();
+      return;
+    }
+    void ensureAgentGate().then((ok) => {
+      if (ok) void action();
+    });
+  }, [ensureAgentGate]);
 
   // --- Shared renderers ---
   const renderProjectList = () => (
@@ -386,8 +398,12 @@ export function Sidebar({
                 onNewSessionNameChange={setNewSessionName}
                 newSessionAgentProfileId={newSessionAgentProfileId}
                 onNewSessionAgentProfileIdChange={setNewSessionAgentProfileId}
-                onStartCreatingSession={() => { if (passesAgentGate()) setCreatingSessionForProject(project.id); }}
-                onCreateSession={() => actions.handleCreateSession(project.id)}
+                onStartCreatingSession={() => {
+                  runAfterAgentGate(() => setCreatingSessionForProject(project.id));
+                }}
+                onCreateSession={() => {
+                  runAfterAgentGate(() => actions.handleCreateSession(project.id), { forceRefresh: true });
+                }}
                 onCancelCreateSession={() => {
                   setCreatingSessionForProject(null);
                   setNewSessionName('');
@@ -405,14 +421,19 @@ export function Sidebar({
       <NewProjectForm
         showForm={showNewProjectForm}
         onShowForm={(show: boolean) => {
-          if (show && !passesAgentGate()) return;
-          setShowNewProjectForm(show);
+          if (!show) {
+            setShowNewProjectForm(false);
+            return;
+          }
+          runAfterAgentGate(() => setShowNewProjectForm(true));
         }}
         newProjectName={newProjectName}
         onProjectNameChange={setNewProjectName}
         newProjectRootPath={newProjectRootPath}
         onProjectRootPathChange={setNewProjectRootPath}
-        onCreateProject={actions.handleCreateProject}
+        onCreateProject={() => {
+          runAfterAgentGate(actions.handleCreateProject, { forceRefresh: true });
+        }}
         creatingProject={creatingProject}
         isConnected={isConnected}
         isMobile={isMobile}
