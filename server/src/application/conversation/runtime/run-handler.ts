@@ -226,12 +226,12 @@ export async function handleRunStart(
       error,
       formatProviderErrorMessage,
       providerRegistry: ctx!.providerRegistry,
-      handleRetry: async (nextRecoveryState?: { sessionResetRetryCount?: number; overflowRetryCount?: number }) => {
+      handleRetry: async (nextRecoveryState: { sessionResetRetryCount?: number; overflowRetryCount?: number }) => {
         await handleRunStart(
           client,
           { ...message, resend: true },
           db,
-          nextRecoveryState ?? { sessionResetRetryCount: (recoveryState.sessionResetRetryCount || 0) + 1 },
+          nextRecoveryState,
           clients,
           ctx,
         );

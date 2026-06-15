@@ -28,7 +28,7 @@ interface HandleRunExceptionInput {
     authErrorHint?: { matchAny: Array<string | string[]>; message: string },
   ) => string;
   providerRegistry?: { getPolicy(type: string): { authErrorHint?: { matchAny: Array<string | string[]>; message: string } } | undefined };
-  handleRetry: (nextRecoveryState?: { sessionResetRetryCount?: number; overflowRetryCount?: number }) => Promise<void>;
+  handleRetry: (nextRecoveryState: { sessionResetRetryCount?: number; overflowRetryCount?: number }) => Promise<void>;
   isHardQuotaExceededError: (message: string) => boolean;
   message: {
     sessionId: string;
@@ -141,7 +141,7 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
     broadcastHeartbeat();
 
     try {
-      await handleRetry();
+      await handleRetry({ sessionResetRetryCount: sessionResetRetryCount + 1, overflowRetryCount: recoveryState.overflowRetryCount });
       return { handedOffToRetry: true };
     } catch (retryError) {
       console.error('[Recovery] Auto-retry after session reset also failed:', retryError);
