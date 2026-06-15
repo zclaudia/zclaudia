@@ -22,6 +22,7 @@ const SELF_EXPLANATORY = new Set([
   'missing_code',
   'missing_pattern',
   'missing_prompt',
+  'bash_tool_routing_blocked',
 ]);
 
 function bashHint(details: NonNullable<ToolDetails>): string | undefined {
@@ -46,7 +47,7 @@ function bashHint(details: NonNullable<ToolDetails>): string | undefined {
 export function remediationForResult(toolName: string, details: ToolDetails): string | undefined {
   if (!details || details.ok !== false) return undefined;
   const code = typeof details.error === 'string' ? details.error : undefined;
-  if (code && SELF_EXPLANATORY.has(code)) return undefined;
+  if (code && (SELF_EXPLANATORY.has(code) || code.endsWith('_loop_detected'))) return undefined;
 
   switch (code) {
     case 'not_found':

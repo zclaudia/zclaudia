@@ -1,4 +1,4 @@
-import { readFile, rename, rm, writeFile } from 'fs/promises';
+import { chmod, readFile, rename, rm, stat, writeFile } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
 
@@ -11,6 +11,7 @@ export interface TextFileMetadata {
   content: string;
   encoding: TextEncoding;
   hasBom: boolean;
+  mode?: number;
 }
 
 export interface ContentDetailFields {
@@ -63,14 +64,19 @@ function encodeTextContent(content: string, encoding: TextEncoding, hasBom: bool
 }
 
 export async function readTextFileWithMetadata(filePath: string): Promise<TextFileMetadata> {
-  return decodeTextBuffer(await readFile(filePath));
+  const [buffer, fileStat] = await Promise.all([readFile(filePath), stat(filePath)]);
+  return {
+    ...decodeTextBuffer(buffer),
+    mode: fileStat.mode & 0o7777,
+  };
 }
 
-export async function writeTextFileAtomic(filePath: string, content: string, metadata?: Pick<TextFileMetadata, 'encoding' | 'hasBom'>): Promise<void> {
+export async function writeTextFileAtomic(filePath: string, content: string, metadata?: Pick<TextFileMetadata, 'encoding' | 'hasBom' | 'mode'>): Promise<void> {
   const tempPath = path.join(path.dirname(filePath), `.${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`);
   const encoded = encodeTextContent(content, metadata?.encoding ?? 'utf8', metadata?.hasBom ?? false);
   try {
-    await writeFile(tempPath, encoded);
+    await writeFile(tempPath, encoded, metadata?.mode !== undefined ? { mode: metadata.mode } : undefined);
+    if (metadata?.mode !== undefined) await chmod(tempPath, metadata.mode);
     await rename(tempPath, filePath);
   } catch (err) {
     await rm(tempPath, { force: true }).catch(() => {});

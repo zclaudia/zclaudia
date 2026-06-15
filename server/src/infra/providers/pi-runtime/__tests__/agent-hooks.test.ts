@@ -253,6 +253,7 @@ describe('buildAgentHooks Edit flood advisory', () => {
     const r4 = await callEdit(hooks, 'a.md');
     const advice = adviceText(r4);
     expect(advice).toMatch(/Edit has now run 4 times against a\.md/);
+    expect(advice).toMatch(/edits/);
     expect(advice).toMatch(/Write|patch/);
   });
 
@@ -297,6 +298,62 @@ describe('buildAgentHooks Edit flood advisory', () => {
     for (let i = 0; i < 5; i++) await callEdit(hooks, 'a.md');
     const r6 = await callEdit(hooks, 'a.md');
     expect(adviceText(r6)).toBe('');
+  });
+});
+
+describe('buildAgentHooks tool telemetry', () => {
+  function makeHooks() {
+    return buildAgentHooks({
+      permissionCallback: vi.fn().mockResolvedValue({ behavior: 'allow' }),
+      autoFixHints: true,
+    } as any);
+  }
+
+  it('adds telemetry details and an advisory on repeated reads of the same file', async () => {
+    const hooks = makeHooks();
+    const ctx = () => ({
+      toolCall: { name: 'Read' },
+      args: { path: 'src/app.ts' },
+      result: {
+        content: [{ type: 'text', text: 'file body' }],
+        details: { ok: true, path: 'src/app.ts' },
+      },
+    });
+
+    await hooks.afterToolCall!(ctx() as any);
+    const second = await hooks.afterToolCall!(ctx() as any);
+    const text = (second?.content ?? []).map((block: any) => block.text ?? '').join('\n');
+
+    expect(text).toContain('[telemetry]');
+    expect(second?.details?.toolTelemetry).toMatchObject({
+      totalCalls: 2,
+      toolCounts: { Read: 2 },
+      repeatedReads: { 'src/app.ts': 2 },
+    });
+  });
+
+  it('records Bash routing blocks in telemetry without adding generic remediation', async () => {
+    const hooks = makeHooks();
+    const result = await hooks.afterToolCall!({
+      toolCall: { name: 'Bash' },
+      args: { command: 'rg "needle" src' },
+      result: {
+        content: [{ type: 'text', text: 'Use Grep instead' }],
+        details: {
+          ok: false,
+          error: 'bash_tool_routing_blocked',
+          suggestedTool: 'Grep',
+          suggestedInput: { pattern: 'needle', path: 'src' },
+        },
+      },
+    } as any);
+    const text = (result?.content ?? []).map((block: any) => block.text ?? '').join('\n');
+
+    expect(text).not.toContain('[fix]');
+    expect(result?.details?.toolTelemetry).toMatchObject({
+      bashRoutingBlocked: 1,
+      toolCounts: { Bash: 1 },
+    });
   });
 });
 
@@ -455,8 +512,8 @@ describe('afterToolCall — tool failure loop guard', () => {
   }
   function failingCtx() {
     return {
-      toolCall: { name: 'Bash' },
-      args: { command: 'npm test' },
+      toolCall: { name: 'Grep' },
+      args: { pattern: 'TODO', path: 'src' },
       result: {
         content: [{ type: 'text', text: 'command failed' }],
         details: { ok: false, error: 'nonzero_exit' },
@@ -479,12 +536,42 @@ describe('afterToolCall — tool failure loop guard', () => {
     await hooks.afterToolCall!(failingCtx() as any);   // count 1
     await hooks.afterToolCall!(failingCtx() as any);   // count 2
     await hooks.afterToolCall!({                        // success → reset to 0
-      toolCall: { name: 'Bash' }, args: { command: 'npm test' },
+      toolCall: { name: 'Grep' }, args: { pattern: 'TODO', path: 'src' },
       result: { content: [{ type: 'text', text: 'ok' }], details: { ok: true } },
     } as any);
     const after = await hooks.afterToolCall!(failingCtx() as any); // count 1 if reset worked
     const text = (after?.content ?? []).map((b: any) => b.text ?? '').join('\n');
     expect(text).not.toContain('[loop]');
+  });
+
+  it('tracks repeated Bash failures by diagnostics fingerprint', async () => {
+    const hooks = makeHooks();
+    const bashCtx = (path: string) => ({
+      toolCall: { name: 'Bash' },
+      args: { command: 'pnpm test' },
+      result: {
+        content: [{ type: 'text', text: `${path}:1:1 - error TS2322: Type mismatch` }],
+        details: {
+          ok: false,
+          exitCode: 1,
+          diagnostics: [
+            { path, line: 1, column: 1, severity: 'error', source: 'TS2322', message: 'Type mismatch' },
+          ],
+        },
+      },
+    });
+
+    await hooks.afterToolCall!(bashCtx('src/a.ts') as any);
+    await hooks.afterToolCall!(bashCtx('src/b.ts') as any);
+    const secondA = await hooks.afterToolCall!(bashCtx('src/a.ts') as any);
+    expect((secondA?.content ?? []).map((b: any) => b.text ?? '').join('\n')).not.toContain('[loop]');
+
+    const thirdA = await hooks.afterToolCall!(bashCtx('src/a.ts') as any);
+    const text = (thirdA?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).toContain('[loop]');
+    expect(text).toContain('same diagnostics');
+    expect(thirdA?.details?.error).toBe('bash_failure_loop_detected');
+    expect(thirdA?.details?.loopKind).toBe('bash_failure');
   });
 
   it('does not add a generic [loop] when a tool already escalated to *_loop_detected', async () => {

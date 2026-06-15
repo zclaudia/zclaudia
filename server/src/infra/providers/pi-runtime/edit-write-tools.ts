@@ -22,9 +22,13 @@ import { runWithFileWriteLock } from './file-write-lock.js';
 import { parseApplyPatch } from './apply-patch.js';
 import { hashlineForLine, hashlineTag, parseHashlineOperation, replaceHashlineLine } from './hashline.js';
 import { NoopEditGuard, NOOP_EDIT_HARD_LIMIT } from './noop-edit-guard.js';
+import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 type TextBlock = { type: 'text'; text: string };
 type ToolContent = TextBlock[];
+type BatchEditInput = { oldString: string; newString: string; replaceAll: boolean };
+
+const MODEL_VISIBLE_DIFF_MAX_CHARS = 12_000;
 
 export interface FileMutationToolOptions {
   readFileState?: ReadFileStateStore;
@@ -57,27 +61,147 @@ function toolParams(first: unknown, second: unknown): Record<string, unknown> {
     : {};
 }
 
-function resolveInsideWorkspace(cwd: string, requestedPath: unknown): string {
-  const rawPath = typeof requestedPath === 'string' && requestedPath.trim()
-    ? requestedPath.trim()
-    : '.';
-  const resolved = path.resolve(cwd, rawPath);
-  const relative = path.relative(cwd, resolved);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error(`Path is outside workspace: ${rawPath}`);
-  }
-  return resolved;
+function truncateForModel(text: string, maxChars = MODEL_VISIBLE_DIFF_MAX_CHARS): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n... [diff truncated, ${text.length - maxChars} chars omitted]`;
 }
 
-function toWorkspaceRelative(cwd: string, filePath: string): string {
-  return path.relative(cwd, path.resolve(filePath)).split(path.sep).join('/');
+function formatLineChanges(lineChanges: unknown): string | undefined {
+  if (!lineChanges || typeof lineChanges !== 'object') return undefined;
+  const changes = lineChanges as { additions?: unknown; deletions?: unknown; changes?: unknown };
+  if (typeof changes.additions !== 'number' || typeof changes.deletions !== 'number') return undefined;
+  const total = typeof changes.changes === 'number' ? `, ${changes.changes} changed` : '';
+  return `+${changes.additions} -${changes.deletions}${total}`;
+}
+
+function formatFirstChangedLine(value: unknown): string | undefined {
+  return typeof value === 'number' ? String(value) : undefined;
+}
+
+function formatPerFileResults(perFileResults: unknown): string[] {
+  if (!Array.isArray(perFileResults) || perFileResults.length === 0) return [];
+  return perFileResults.map((raw, index) => {
+    const result = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+    const pathValue = typeof result.path === 'string' ? result.path : `operation ${index + 1}`;
+    if (result.ok === false) {
+      const error = typeof result.error === 'string' ? result.error : 'failed';
+      const message = typeof result.message === 'string' ? `: ${result.message}` : '';
+      return `- ${pathValue}: failed (${error})${message}`;
+    }
+    if (result.type === 'rename') {
+      const originalPath = typeof result.originalPath === 'string' ? result.originalPath : pathValue;
+      return `- rename ${originalPath} -> ${pathValue}`;
+    }
+    const type = typeof result.type === 'string' ? result.type : 'update';
+    const firstChanged = formatFirstChangedLine(result.firstChangedLine);
+    const changes = formatLineChanges(result.lineChanges);
+    return [
+      `- ${type} ${pathValue}`,
+      firstChanged ? `line ${firstChanged}` : undefined,
+      changes,
+    ].filter(Boolean).join(' ');
+  });
+}
+
+function buildMutationResultText(input: {
+  action: string;
+  path?: string;
+  type?: string;
+  preview?: boolean;
+  replaced?: number;
+  editCount?: number;
+  fileCount?: number;
+  firstChangedLine?: unknown;
+  lineChanges?: unknown;
+  diff?: string;
+  perFileResults?: unknown;
+  snapshotUpdated?: boolean;
+}): string {
+  const headlineParts = [input.action];
+  if (input.path) headlineParts.push(input.path);
+  if (input.type) headlineParts.push(`(${input.type})`);
+
+  const lines = [headlineParts.join(' ')];
+  if (typeof input.fileCount === 'number') lines.push(`Files changed: ${input.fileCount}`);
+  if (typeof input.editCount === 'number') lines.push(`Edits applied: ${input.editCount}`);
+  if (typeof input.replaced === 'number') lines.push(`Replacements: ${input.replaced}`);
+
+  const firstChanged = formatFirstChangedLine(input.firstChangedLine);
+  if (firstChanged) lines.push(`First changed line: ${firstChanged}`);
+
+  const changes = formatLineChanges(input.lineChanges);
+  if (changes) lines.push(`Line changes: ${changes}`);
+
+  const perFileLines = formatPerFileResults(input.perFileResults);
+  if (perFileLines.length > 0) lines.push('Files:', ...perFileLines);
+
+  if (input.preview) {
+    lines.push('Disk: not modified (preview_only:true).');
+  } else if (input.snapshotUpdated !== false) {
+    lines.push('Result: mutation is reflected in the diff below; do not call Read again only to verify it.');
+    lines.push('Snapshot: internal file state updated for subsequent Edit/Write calls.');
+  } else if (!input.action.toLowerCase().includes('failed')) {
+    lines.push('Result: mutation is reflected in the diff below; do not call Read again only to verify it.');
+  }
+
+  const diff = typeof input.diff === 'string' ? input.diff.trim() : '';
+  lines.push(diff ? `Diff:\n${truncateForModel(diff)}` : 'Diff: (no textual changes)');
+  return lines.join('\n');
+}
+
+function parseBatchEdits(value: unknown): { ok: true; edits: BatchEditInput[] } | { ok: false; code: string; message: string; details?: Record<string, unknown> } | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) {
+    return { ok: false, code: 'invalid_edits', message: 'Edit edits must be an array of { old_string, new_string, replace_all? } objects' };
+  }
+  if (value.length === 0) {
+    return { ok: false, code: 'invalid_edits', message: 'Edit edits must include at least one replacement' };
+  }
+  const edits: BatchEditInput[] = [];
+  for (let index = 0; index < value.length; index += 1) {
+    const entry = value[index];
+    if (!entry || typeof entry !== 'object') {
+      return { ok: false, code: 'invalid_edits', message: `edits[${index}] must be an object`, details: { editIndex: index } };
+    }
+    const edit = entry as Record<string, unknown>;
+    if (typeof edit.old_string !== 'string' || typeof edit.new_string !== 'string') {
+      return {
+        ok: false,
+        code: 'missing_strings',
+        message: `edits[${index}] requires old_string and new_string`,
+        details: { editIndex: index },
+      };
+    }
+    if (edit.old_string === edit.new_string) {
+      return {
+        ok: false,
+        code: 'no_op',
+        message: `edits[${index}].old_string and new_string are identical`,
+        details: { editIndex: index },
+      };
+    }
+    edits.push({
+      oldString: edit.old_string,
+      newString: edit.new_string,
+      replaceAll: edit.replace_all === true,
+    });
+  }
+  return { ok: true, edits };
+}
+
+async function runWithFileWriteLocks<T>(filePaths: string[], operation: () => Promise<T>): Promise<T> {
+  const uniquePaths = [...new Set(filePaths.map(filePath => path.resolve(filePath)))].sort();
+  return uniquePaths.reduceRight(
+    (next, filePath) => () => runWithFileWriteLock(filePath, next),
+    operation,
+  )();
 }
 
 export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOptions): AgentTool<any> {
   return {
     name: 'Write',
     label: 'Write',
-    description: 'Write (create or overwrite) a file in the workspace. Creates parent directories as needed.',
+    description: 'Write (create or overwrite) a file in the workspace. Creates parent directories as needed. Successful results include a model-visible diff and update the internal file snapshot, so do not call Read again only to verify the write.',
     parameters: {
       type: 'object',
       properties: {
@@ -159,7 +283,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
             ? scheduleDeferredDiagnostics(options?.diagnosticsProvider, lifecycleInput)
             : await runDiagnosticsProvider(options?.diagnosticsProvider, lifecycleInput),
         );
-        return textResult(`Wrote ${relPath}`, {
+        const details = {
           ok: true,
           type: writeType,
           path: relPath,
@@ -170,7 +294,15 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
           ...buildContentDetailFields(originalContent, content),
           ...(backup ? { backup } : {}),
           ...(lifecycle ? { lifecycle } : {}),
-        });
+        };
+        return textResult(buildMutationResultText({
+          action: 'Wrote',
+          path: relPath,
+          type: writeType,
+          diff: diff.diff,
+          firstChangedLine: diff.firstChangedLine,
+          lineChanges: diff.lineChanges,
+        }), details);
         });
       } catch (err) {
         return errorResult('write_failed', err instanceof Error ? err.message : String(err), { path: String(requested) });
@@ -183,7 +315,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
   return {
     name: 'Edit',
     label: 'Edit',
-    description: 'Replace an exact string in an existing file, or apply a small multi-file patch. For structurally-sensitive files (Markdown tables, JSON arrays, indented YAML/TOML, aligned diffs) where one bad Edit can break the layout and cascade into more Edits, prefer a single Write that rewrites the file. To bundle several independent changes across one or more files atomically, pass them through the `patch` parameter in apply_patch format instead of issuing repeated Edit calls.',
+    description: 'Replace exact strings in existing files. For several replacements in the same file, pass `edits` so the file is read, checked, and written once. For small multi-file changes, use `patch`. For structurally-sensitive rewrites (Markdown tables, JSON arrays, indented YAML/TOML), prefer a single Write. Successful mutation results include a model-visible diff and update the internal file snapshot, so do not call Read again only to verify the edit.',
     parameters: {
       type: 'object',
       properties: {
@@ -191,6 +323,19 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         old_string: { type: 'string', description: 'Exact text to replace (required unless `patch` or `hashline_operation` is given)' },
         new_string: { type: 'string', description: 'Replacement text (required unless `patch` is given)' },
         replace_all: { type: 'boolean', default: false },
+        edits: {
+          type: 'array',
+          description: 'Optional same-file batch replacements. Use this instead of multiple Edit calls against one file.',
+          items: {
+            type: 'object',
+            properties: {
+              old_string: { type: 'string' },
+              new_string: { type: 'string' },
+              replace_all: { type: 'boolean', default: false },
+            },
+            required: ['old_string', 'new_string'],
+          },
+        },
         patch: { type: 'string', description: 'Optional apply_patch-style multi-file patch. When provided, file_path/old_string/new_string are ignored.' },
         hashline_line: { type: 'string', description: 'Optional line hash from Read(hashline:true)' },
         hashline_operation: { type: 'string', description: 'Optional hashline operation, such as replace:<line-hash>' },
@@ -204,15 +349,86 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           const operations = parseApplyPatch(args.patch);
           const perFileResults = [];
           const previewOnly = args.preview_only === true;
+          if (!previewOnly) {
+            const editTool = createEditBridgeTool(cwd, options) as any;
+            const preflight = await editTool.execute(`${toolCallId}:preflight`, {
+              patch: args.patch,
+              preview_only: true,
+            });
+            if (preflight.details?.ok === false) {
+              return textResult(buildMutationResultText({
+                action: 'Patch failed preflight',
+                perFileResults: preflight.details.perFileResults,
+                diff: typeof preflight.details.diff === 'string' ? preflight.details.diff : undefined,
+                snapshotUpdated: false,
+              }), {
+                ...preflight.details,
+                preview: false,
+              });
+            }
+          }
           for (const operation of operations) {
             if (operation.type === 'add') {
+              let filePath: string;
+              try {
+                filePath = resolveInsideWorkspace(cwd, operation.path);
+              } catch (err) {
+                const failure = { ok: false, error: 'path_outside_workspace', message: err instanceof Error ? err.message : String(err), path: operation.path, type: 'create' };
+                if (perFileResults.length === 0) return textResult(failure.message, failure);
+                perFileResults.push(failure);
+                break;
+              }
+              const relPath = toWorkspaceRelative(cwd, filePath);
+              const contentGuard = validateMutationContent(filePath, operation.content);
+              if (contentGuard) {
+                const failure = { ok: false, error: contentGuard.code, message: contentGuard.message, path: relPath, type: 'create' };
+                if (perFileResults.length === 0) return textResult(failure.message, failure);
+                perFileResults.push(failure);
+                break;
+              }
+              const filenameMarker = findAutoGeneratedMarker(filePath, null);
+              if (filenameMarker) {
+                const failure = { ok: false, error: 'auto_generated_file', message: buildAutoGeneratedMessage(relPath, filenameMarker), path: relPath, type: 'create' };
+                if (perFileResults.length === 0) return textResult(failure.message, failure);
+                perFileResults.push(failure);
+                break;
+              }
+              let existed = false;
+              let originalContent: string | null = null;
+              try {
+                const targetStat = await stat(filePath);
+                if (!targetStat.isFile()) {
+                  const failure = { ok: false, error: 'not_a_file', message: `Path is not a file: ${relPath}`, path: relPath, type: 'create' };
+                  if (perFileResults.length === 0) return textResult(failure.message, failure);
+                  perFileResults.push(failure);
+                  break;
+                }
+                existed = true;
+                const originalMetadata = await readTextFileWithMetadata(filePath);
+                originalContent = originalMetadata.content;
+                const generatedMarker = findAutoGeneratedMarker(filePath, originalContent);
+                if (generatedMarker) {
+                  const failure = { ok: false, error: 'auto_generated_file', message: buildAutoGeneratedMessage(relPath, generatedMarker), path: relPath, type: 'create' };
+                  if (perFileResults.length === 0) return textResult(failure.message, failure);
+                  perFileResults.push(failure);
+                  break;
+                }
+                const readCheck = await options?.readFileState?.assertSafeToWrite(filePath, originalContent);
+                if (readCheck && !readCheck.ok) {
+                  const failure = { ok: false, error: readCheck.code, message: readCheck.message, path: relPath, type: 'create' };
+                  if (perFileResults.length === 0) return textResult(failure.message, failure);
+                  perFileResults.push(failure);
+                  break;
+                }
+              } catch (err) {
+                if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+              }
               if (previewOnly) {
-                const relPath = operation.path;
-                const diff = buildFileDiff(relPath, '', operation.content);
+                const diff = buildFileDiff(relPath, originalContent ?? '', operation.content);
                 perFileResults.push({
                   ok: true,
                   preview: true,
-                  type: 'create',
+                  type: existed ? 'update' : 'create',
                   path: relPath,
                   diff: diff.diff,
                   firstChangedLine: diff.firstChangedLine,
@@ -239,6 +455,14 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               const filePath = resolveInsideWorkspace(cwd, operation.path);
               const originalMetadata = await readTextFileWithMetadata(filePath);
               const original = originalMetadata.content;
+              const generatedMarker = findAutoGeneratedMarker(filePath, original);
+              if (generatedMarker) {
+                const message = buildAutoGeneratedMessage(operation.path, generatedMarker);
+                const failure = { ok: false, error: 'auto_generated_file', message, path: operation.path, type: 'delete' };
+                if (perFileResults.length === 0) return textResult(message, failure);
+                perFileResults.push(failure);
+                break;
+              }
               const readCheck = await options?.readFileState?.assertSafeToWrite(filePath, original);
               if (readCheck && !readCheck.ok) {
                 const failure = { ok: false, error: readCheck.code, message: readCheck.message, path: operation.path, type: 'delete' };
@@ -249,7 +473,10 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               const diff = buildFileDiff(operation.path, original, '');
               const backup = previewOnly ? undefined : await recordFileBackup(operation.path, original, filePath);
               if (!previewOnly) {
-                await rm(filePath);
+                await runWithFileWriteLock(filePath, async () => {
+                  await rm(filePath);
+                });
+                options?.noopGuard?.clear(filePath);
               }
               perFileResults.push({
                 ok: true,
@@ -279,6 +506,14 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               }
               const originalMetadata = await readTextFileWithMetadata(fromPath);
               const original = originalMetadata.content;
+              const generatedMarker = findAutoGeneratedMarker(fromPath, original);
+              if (generatedMarker) {
+                const message = buildAutoGeneratedMessage(operation.from, generatedMarker);
+                const failure = { ok: false, error: 'auto_generated_file', message, path: operation.to, originalPath: operation.from, type: 'rename' };
+                if (perFileResults.length === 0) return textResult(message, failure);
+                perFileResults.push(failure);
+                break;
+              }
               const readCheck = await options?.readFileState?.assertSafeToWrite(fromPath, original);
               if (readCheck && !readCheck.ok) {
                 const failure = { ok: false, error: readCheck.code, message: readCheck.message, path: operation.to, originalPath: operation.from, type: 'rename' };
@@ -288,9 +523,13 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               }
               const backup = previewOnly ? undefined : await recordFileBackup(operation.from, original, fromPath);
               if (!previewOnly) {
-                await mkdir(path.dirname(toPath), { recursive: true });
-                await rename(fromPath, toPath);
+                await runWithFileWriteLocks([fromPath, toPath], async () => {
+                  await mkdir(path.dirname(toPath), { recursive: true });
+                  await rename(fromPath, toPath);
+                });
                 await options?.readFileState?.recordWrite(toPath, original);
+                options?.noopGuard?.clear(fromPath);
+                options?.noopGuard?.clear(toPath);
               }
               perFileResults.push({
                 ok: true,
@@ -318,18 +557,32 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             perFileResults.push({ ...result.details, type: 'update', path: operation.path });
           }
           const failed = perFileResults.some((result: any) => result.ok === false);
+          const patchDiff = perFileResults.map((result: any) => result.diff).filter(Boolean).join('\n');
           if (failed) {
-            return textResult('Patch partially failed', {
+            return textResult(buildMutationResultText({
+              action: 'Patch partially failed',
+              perFileResults,
+              diff: patchDiff,
+              snapshotUpdated: false,
+            }), {
               ok: false,
               error: 'patch_partial_failure',
               perFileResults,
             });
           }
-          return textResult(`Applied patch to ${perFileResults.length} file(s)`, {
+          return textResult(buildMutationResultText({
+            action: previewOnly ? 'Previewed patch' : 'Applied patch',
+            fileCount: perFileResults.length,
+            perFileResults,
+            diff: patchDiff,
+            firstChangedLine: perFileResults.find((result: any) => result.firstChangedLine)?.firstChangedLine,
+            preview: previewOnly,
+            snapshotUpdated: false,
+          }), {
             ok: true,
             ...(previewOnly ? { preview: true } : {}),
             perFileResults,
-            diff: perFileResults.map((result: any) => result.diff).filter(Boolean).join('\n'),
+            diff: patchDiff,
             firstChangedLine: perFileResults.find((result: any) => result.firstChangedLine)?.firstChangedLine,
           });
         } catch (err) {
@@ -340,19 +593,27 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
       if (typeof requested !== 'string' || !requested.trim()) {
         return errorResult('missing_path', 'Edit requires file_path');
       }
+      const batchEditsResult = parseBatchEdits(args.edits);
+      if (batchEditsResult?.ok === false) {
+        return errorResult(batchEditsResult.code, batchEditsResult.message, batchEditsResult.details ?? {});
+      }
+      const batchEdits = batchEditsResult?.ok === true ? batchEditsResult.edits : undefined;
       const hashlineOperation = parseHashlineOperation(args.hashline_operation);
       const hashlineLine = hashlineOperation?.hash ?? (typeof args.hashline_line === 'string' ? args.hashline_line.trim() : '');
       const isHashlineEdit = Boolean(hashlineLine);
-      if (!isHashlineEdit && (typeof args.old_string !== 'string' || typeof args.new_string !== 'string')) {
+      if (batchEdits && isHashlineEdit) {
+        return errorResult('invalid_edit_mode', 'Edit cannot combine edits with hashline_operation/hashline_line');
+      }
+      if (!isHashlineEdit && !batchEdits && (typeof args.old_string !== 'string' || typeof args.new_string !== 'string')) {
         return errorResult('missing_strings', 'Edit requires old_string and new_string');
       }
-      if (!isHashlineEdit && args.old_string === args.new_string) {
+      if (!isHashlineEdit && !batchEdits && args.old_string === args.new_string) {
         return errorResult('no_op', 'old_string and new_string are identical');
       }
-      if (typeof args.new_string !== 'string') {
+      if (!batchEdits && typeof args.new_string !== 'string') {
         return errorResult('missing_strings', 'Edit requires new_string');
       }
-      const newString = args.new_string;
+      const newString = typeof args.new_string === 'string' ? args.new_string : '';
       const oldString = typeof args.old_string === 'string' ? args.old_string : '';
       const replaceAll = args.replace_all === true;
       let filePath: string;
@@ -361,9 +622,14 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
       } catch (err) {
         return errorResult('path_outside_workspace', err instanceof Error ? err.message : String(err));
       }
-      const replacementGuard = validateMutationContent(filePath, newString);
-      if (replacementGuard) {
-        return errorResult(replacementGuard.code, replacementGuard.message, { path: toWorkspaceRelative(cwd, filePath) });
+      const replacementGuard = batchEdits
+        ? batchEdits.map((edit, index) => ({ index, guard: validateMutationContent(filePath, edit.newString) })).find(entry => entry.guard)
+        : { index: undefined, guard: validateMutationContent(filePath, newString) };
+      if (replacementGuard?.guard) {
+        return errorResult(replacementGuard.guard.code, replacementGuard.guard.message, {
+          path: toWorkspaceRelative(cwd, filePath),
+          ...(replacementGuard.index !== undefined ? { editIndex: replacementGuard.index } : {}),
+        });
       }
       try {
         return await runWithFileWriteLock(filePath, async () => {
@@ -402,6 +668,114 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         if (readCheck && !readCheck.ok) {
           return errorResult(readCheck.code, readCheck.message, { path: toWorkspaceRelative(cwd, filePath) });
         }
+        if (batchEdits) {
+          const relPath = toWorkspaceRelative(cwd, filePath);
+          let updated = original;
+          let totalReplaced = 0;
+          const appliedEdits: Array<{ index: number; replaced: number; replaceAll: boolean }> = [];
+          for (let index = 0; index < batchEdits.length; index += 1) {
+            const edit = batchEdits[index];
+            const actual = findActualString(updated, edit.oldString);
+            if (actual === null) {
+              const attempts = options?.noopGuard?.record(filePath, `batch_not_found:${index}:${hashlineForLine(edit.oldString)}`) ?? 0;
+              if (attempts >= NOOP_EDIT_HARD_LIMIT) {
+                return errorResult('edit_loop_detected',
+                  `This batch edit has failed ${attempts} times — edits[${index}].old_string does not exist in ${relPath}. `
+                    + 'Read the file again to see its current content before retrying.',
+                  { path: relPath, editIndex: index, attempts });
+              }
+              return errorResult('not_found', `edits[${index}].old_string not found in file`, { path: relPath, editIndex: index });
+            }
+            const occurrences = countOccurrences(updated, actual);
+            if (!edit.replaceAll && occurrences > 1) {
+              return errorResult('not_unique', `edits[${index}].old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
+                path: relPath,
+                editIndex: index,
+                occurrences,
+              });
+            }
+            const replaced = edit.replaceAll ? occurrences : 1;
+            updated = applyEdit(updated, actual, edit.newString, edit.replaceAll);
+            totalReplaced += replaced;
+            appliedEdits.push({ index, replaced, replaceAll: edit.replaceAll });
+          }
+
+          if (updated === original) {
+            const attempts = options?.noopGuard?.record(filePath, `batch_noop:${batchEdits.length}`) ?? 0;
+            if (attempts >= NOOP_EDIT_HARD_LIMIT) {
+              return errorResult('edit_loop_detected',
+                `This batch edit leaves ${relPath} unchanged and has been repeated ${attempts} times. `
+                  + 'Read the file — the change may already be in place.',
+                { path: relPath, attempts });
+            }
+            return errorResult('no_op', 'Batch edits leave the file unchanged', { path: relPath });
+          }
+
+          const diff = buildFileDiff(relPath, original, updated);
+          const detailsBase = {
+            ok: true,
+            path: relPath,
+            replaced: totalReplaced,
+            editCount: batchEdits.length,
+            edits: appliedEdits,
+            diff: diff.diff,
+            firstChangedLine: diff.firstChangedLine,
+            structuredPatch: diff.structuredPatch,
+            lineChanges: diff.lineChanges,
+            ...buildContentDetailFields(original, updated),
+          };
+          if (args.preview_only === true) {
+            return textResult(buildMutationResultText({
+              action: 'Previewed edit',
+              path: relPath,
+              replaced: totalReplaced,
+              editCount: batchEdits.length,
+              diff: diff.diff,
+              firstChangedLine: diff.firstChangedLine,
+              lineChanges: diff.lineChanges,
+              preview: true,
+              snapshotUpdated: false,
+            }), {
+              ...detailsBase,
+              preview: true,
+            });
+          }
+
+          const backup = await recordFileBackup(relPath, original, filePath);
+          await writeTextFileAtomic(filePath, applyLineEndingStyle(updated, lineEndingFor(original)), originalMetadata);
+          await options?.readFileState?.recordWrite(filePath, updated);
+          options?.noopGuard?.clear(filePath);
+          const lifecycleInput = {
+            operation: 'edit',
+            type: 'update',
+            path: relPath,
+            absolutePath: filePath,
+            originalContent: original,
+            updatedContent: updated,
+            diff: diff.diff,
+            ...(diff.firstChangedLine !== undefined ? { firstChangedLine: diff.firstChangedLine } : {}),
+          } as const;
+          const lifecycle = mergeWriteLifecycleResults(
+            await runWriteLifecycle(options?.writeLifecycle, lifecycleInput),
+            options?.diagnosticsMode === 'deferred'
+              ? scheduleDeferredDiagnostics(options?.diagnosticsProvider, lifecycleInput)
+              : await runDiagnosticsProvider(options?.diagnosticsProvider, lifecycleInput),
+          );
+          return textResult(buildMutationResultText({
+            action: 'Edited',
+            path: relPath,
+            replaced: totalReplaced,
+            editCount: batchEdits.length,
+            diff: diff.diff,
+            firstChangedLine: diff.firstChangedLine,
+            lineChanges: diff.lineChanges,
+          }), {
+            ...detailsBase,
+            backup,
+            ...(lifecycle ? { lifecycle } : {}),
+          });
+        }
+
         const actual = isHashlineEdit ? null : findActualString(original, oldString);
         if (isHashlineEdit) {
           // The snapshot (file as the model last saw it) disambiguates duplicate lines.
@@ -426,7 +800,16 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           }
           const diff = buildFileDiff(relPath, original, updated);
           if (args.preview_only === true) {
-            return textResult(`Previewed edit ${relPath}`, {
+            return textResult(buildMutationResultText({
+              action: 'Previewed edit',
+              path: relPath,
+              replaced: 1,
+              diff: diff.diff,
+              firstChangedLine: diff.firstChangedLine,
+              lineChanges: diff.lineChanges,
+              preview: true,
+              snapshotUpdated: false,
+            }), {
               ok: true,
               preview: true,
               path: relPath,
@@ -453,7 +836,14 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           const backup = await recordFileBackup(relPath, original, filePath);
           await writeTextFileAtomic(filePath, applyLineEndingStyle(updated, lineEndingFor(original)), originalMetadata);
           await options?.readFileState?.recordWrite(filePath, updated);
-          return textResult(`Edited ${relPath}`, {
+          return textResult(buildMutationResultText({
+            action: 'Edited',
+            path: relPath,
+            replaced: 1,
+            diff: diff.diff,
+            firstChangedLine: diff.firstChangedLine,
+            lineChanges: diff.lineChanges,
+          }), {
             ok: true,
             path: relPath,
             replaced: 1,
@@ -488,7 +878,16 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         const relPath = toWorkspaceRelative(cwd, filePath);
         const diff = buildFileDiff(relPath, original, updated);
         if (args.preview_only === true) {
-          return textResult(`Previewed edit ${relPath}`, {
+          return textResult(buildMutationResultText({
+            action: 'Previewed edit',
+            path: relPath,
+            replaced: replaceAll ? occurrences : 1,
+            diff: diff.diff,
+            firstChangedLine: diff.firstChangedLine,
+            lineChanges: diff.lineChanges,
+            preview: true,
+            snapshotUpdated: false,
+          }), {
             ok: true,
             preview: true,
             path: relPath,
@@ -520,7 +919,14 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             ? scheduleDeferredDiagnostics(options?.diagnosticsProvider, lifecycleInput)
             : await runDiagnosticsProvider(options?.diagnosticsProvider, lifecycleInput),
         );
-        return textResult(`Edited ${relPath}`, {
+        return textResult(buildMutationResultText({
+          action: 'Edited',
+          path: relPath,
+          replaced: replaceAll ? occurrences : 1,
+          diff: diff.diff,
+          firstChangedLine: diff.firstChangedLine,
+          lineChanges: diff.lineChanges,
+        }), {
           ok: true,
           path: relPath,
           replaced: replaceAll ? occurrences : 1,

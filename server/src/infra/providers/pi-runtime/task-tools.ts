@@ -1,6 +1,7 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
+import type { TaskResult } from '@zclaudia/shared/core/task';
 import { closeSync, openSync, readSync, statSync } from 'fs';
 
 import { TaskRepository } from '../../../domains/tasks/repository.js';
@@ -8,6 +9,8 @@ import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import { CommandTaskExecutor, commandTaskLogPath, pidAlive } from '../../../domains/tasks/executors/command-executor.js';
 import { errorResult, jsonResult, textResult, toolParams, truncateText } from './tool-common.js';
+import { extractBashOutputInsights, formatBashResultText, type FormatBashResultInput } from './bash-output.js';
+import { toWorkspaceRelative } from './workspace-paths.js';
 
 function readLogWindow(filePath: string, offset: number, length: number): string {
   const fd = openSync(filePath, 'r');
@@ -24,6 +27,35 @@ function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
   if (typeof args.description === 'string' && args.description.trim()) return args.description.trim();
   if (typeof args.prompt === 'string' && args.prompt.trim()) return truncateText(args.prompt.trim(), 120);
   return undefined;
+}
+
+function commandExitCode(result: TaskResult | undefined, status: string): number | null {
+  if (status === 'completed' && !result?.text?.includes('unknown')) return 0;
+  const exitCodeMatch = result?.error?.match(/exit code (\d+)/);
+  return exitCodeMatch ? Number(exitCodeMatch[1]) : null;
+}
+
+function commandTaskCwd(taskMetadata: unknown): string {
+  if (!taskMetadata || typeof taskMetadata !== 'object') return '.';
+  const metadata = taskMetadata as Record<string, unknown>;
+  const cwd = typeof metadata.cwd === 'string' && metadata.cwd ? metadata.cwd : undefined;
+  const workspaceRoot = typeof metadata.workspaceRoot === 'string' && metadata.workspaceRoot ? metadata.workspaceRoot : undefined;
+  if (!cwd) return '.';
+  return workspaceRoot ? toWorkspaceRelative(workspaceRoot, cwd) || '.' : cwd;
+}
+
+function commandTaskStatus(status: string): FormatBashResultInput['status'] {
+  if (status === 'completed') return 'success';
+  if (status === 'failed') return 'failed';
+  if (status === 'running') return 'running';
+  if (status === 'queued') return 'queued';
+  if (status === 'stopped') return 'stopped';
+  return 'failed';
+}
+
+function commandTaskDurationMs(createdAt: number, updatedAt: number, status: string): number {
+  const terminal = status === 'completed' || status === 'failed' || status === 'stopped';
+  return Math.max(0, (terminal ? updatedAt : Date.now()) - createdAt);
 }
 
 export function createAgentTool(
@@ -163,15 +195,42 @@ export function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
           }
         } catch { /* no log yet - empty output */ }
         const eof = args.tail_lines !== undefined || size <= requestedOffset + Buffer.byteLength(output, 'utf8');
-        const exitCodeMatch = current.result?.error?.match(/exit code (\d+)/);
-        return textResult(output, {
+        const metadata = (current.metadata ?? {}) as Record<string, unknown>;
+        const command = typeof metadata.command === 'string' && metadata.command
+          ? metadata.command
+          : typeof current.executorRef?.command === 'string'
+            ? current.executorRef.command
+            : '<unknown>';
+        const exitCode = commandExitCode(current.result, current.status);
+        const truncated = args.tail_lines !== undefined
+          ? size > Buffer.byteLength(output, 'utf8')
+          : size - requestedOffset > Buffer.byteLength(output, 'utf8');
+        const insights = extractBashOutputInsights(output);
+        const text = formatBashResultText({
+          command,
+          cwd: commandTaskCwd(current.metadata),
+          output,
+          fullOutput: output,
+          exitCode,
+          durationMs: commandTaskDurationMs(current.createdAt, current.updatedAt, current.status),
+          truncated,
+          timedOut: false,
+          sandboxed: metadata.sandboxed === true,
+          status: commandTaskStatus(current.status),
+          ...(truncated ? { fullOutputPath: logPath } : {}),
+        }, insights);
+        return textResult(text, {
           ok: true,
           taskId: current.id,
           status: current.status,
-          ...(current.status === 'completed' && !current.result?.text?.includes('unknown') ? { exitCode: 0 } : {}),
-          ...(exitCodeMatch ? { exitCode: Number(exitCodeMatch[1]) } : {}),
+          ...(exitCode !== null ? { exitCode } : {}),
           nextOffset: size,
           eof,
+          logPath,
+          logSize: size,
+          rawOutput: output,
+          ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
+          ...(insights.failedTests.length ? { failedTests: insights.failedTests } : {}),
         });
       }
 

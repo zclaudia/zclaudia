@@ -11,8 +11,9 @@ import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import { CommandTaskExecutor, commandTaskLogPath } from '../../../domains/tasks/executors/command-executor.js';
 import type { PermissionCallback } from '../types.js';
-import { findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
-import { killProcessTree, runBash, type BashRunOptions } from './bash-runner.js';
+import { findBashFileBypass, findBashToolRoutingSuggestion, findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
+import { killProcessTree, runBash, type BashRunOptions, type BashRunResult } from './bash-runner.js';
+import { extractBashOutputInsights, formatBashResultText } from './bash-output.js';
 import { registerInflightForegroundCommand } from './inflight-bash-registry.js';
 import * as sandbox from './sandbox.js';
 import { detectSandboxDenial, MAX_ESCALATION_ITERATIONS, SANDBOX_NETWORK_ESCALATION_TOOL } from './sandbox-denial.js';
@@ -39,6 +40,17 @@ export function detectSandboxFsDenial(
     return readOnly ? 'read_only' : 'write_outside_workspace';
   }
   return undefined;
+}
+
+async function persistFullOutputIfTruncated(result: Pick<BashRunResult, 'truncated' | 'fullOutput'>): Promise<string | undefined> {
+  if (!result.truncated) return undefined;
+  const candidate = path.join(os.tmpdir(), `zclaudia-bash-${randomUUID()}.log`);
+  try {
+    await writeFile(candidate, result.fullOutput, 'utf8');
+    return candidate;
+  } catch {
+    return undefined;
+  }
 }
 
 export interface BashBridgeToolOptions {
@@ -115,10 +127,44 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         return errorResult('cwd_not_found', `Working directory does not exist: ${toWorkspaceRelative(cwd, runCwd) || '.'}`);
       }
 
+      if (args.run_in_background === true && options?.sandboxReadOnly === true) {
+        return errorResult('background_not_allowed_plan_mode', 'Background commands are not available in plan mode (read-only).');
+      }
+
+      const fileBypass = findBashFileBypass(command);
+      if (fileBypass) {
+        const toolName = fileBypass.suggestedTool;
+        const message = fileBypass.kind === 'file_read'
+          ? `Bash file read blocked: ${fileBypass.reason}. Use ${toolName} for workspace source/config files so file state stays visible to the model.`
+          : `Bash file mutation blocked: ${fileBypass.reason}. Use ${toolName} for workspace source/config files so diffs, backups, diagnostics, and read-state guards run.`;
+        return errorResult(
+          fileBypass.kind === 'file_read' ? 'bash_file_read_blocked' : 'bash_file_mutation_blocked',
+          message,
+          {
+            reason: fileBypass.reason,
+            suggestedTool: toolName,
+            kind: fileBypass.kind,
+          },
+        );
+      }
+
+      const routing = findBashToolRoutingSuggestion(command);
+      if (routing) {
+        return errorResult(
+          'bash_tool_routing_blocked',
+          `Bash command blocked: ${routing.reason}. Use ${routing.suggestedTool} with ${JSON.stringify(routing.suggestedInput)} instead so results are structured and visible to tool governance.`,
+          {
+            reason: routing.reason,
+            suggestedTool: routing.suggestedTool,
+            suggestedInput: routing.suggestedInput,
+            kind: 'tool_routing',
+          },
+        );
+      }
+
+      const sandboxRequired = Boolean(critical);
+
       if (args.run_in_background === true) {
-        if (options?.sandboxReadOnly === true) {
-          return errorResult('background_not_allowed_plan_mode', 'Background commands are not available in plan mode (read-only).');
-        }
         const db = options?.db;
         if (!db) return errorResult('missing_db_context', 'Background execution requires database context');
         const repo = new TaskRepository(db);
@@ -130,7 +176,13 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
           runId: options?.runId,
           parentToolUseId: toolCallId,
           title: truncateText(command, 80),
-          metadata: { command, cwd: runCwd },
+          metadata: {
+            command,
+            cwd: runCwd,
+            workspaceRoot: cwd,
+            sandboxAllowedDomains: [...grantedDomains],
+            ...(sandboxRequired ? { sandboxRequired: true } : {}),
+          },
         });
         try {
           const started = await executor.start(task);
@@ -192,6 +244,13 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
       if (!wrap.sandboxed && options?.sandboxReadOnly === true) {
         return errorResult('sandbox_unavailable_plan_mode', 'Read-only Bash requires the sandbox, which is not active for this command');
       }
+      if (!wrap.sandboxed && sandboxRequired) {
+        return errorResult(
+          'sandbox_required_for_critical_command',
+          'Command requires sandbox isolation because it matched a critical-risk Bash pattern, but the sandbox is unavailable.',
+          { reason: critical?.reason },
+        );
+      }
       let result = await runForegroundBash({
         command, cwd: runCwd, timeoutSec, signal, onChunk, autoBackgroundMs,
         sandbox: wrap.sandboxed ? { argv: wrap.argv!, env: wrap.env! } : undefined,
@@ -247,7 +306,15 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             runId: options?.runId,
             parentToolUseId: toolCallId,
             title: truncateText(command, 80),
-            metadata: { command, cwd: runCwd, autoBackgrounded: true },
+            metadata: {
+              command,
+              cwd: runCwd,
+              workspaceRoot: cwd,
+              autoBackgrounded: true,
+              sandboxAllowedDomains: [...grantedDomains],
+              sandboxed: wrap.sandboxed,
+              ...(sandboxRequired ? { sandboxRequired: true } : {}),
+            },
           });
           handoff.detach();
           const adopted = executor.adopt(task, handoff.child, result.fullOutput);
@@ -277,24 +344,48 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
       }
 
       if (result.aborted) {
-        return textResult(result.output || '', { ok: false, aborted: true, exitCode: null });
+        const fullOutputPath = await persistFullOutputIfTruncated(result);
+        const insights = extractBashOutputInsights(result.fullOutput);
+        const text = formatBashResultText({
+          command,
+          cwd: toWorkspaceRelative(cwd, runCwd) || '.',
+          output: result.output,
+          fullOutput: result.fullOutput,
+          exitCode: null,
+          durationMs: result.durationMs,
+          truncated: result.truncated,
+          timedOut: false,
+          sandboxed: wrap.sandboxed,
+          ...(fullOutputPath ? { fullOutputPath } : {}),
+          aborted: true,
+        }, insights);
+        return textResult(text, {
+          ok: false,
+          aborted: true,
+          exitCode: null,
+          truncated: result.truncated,
+          durationMs: result.durationMs,
+          sandboxed: wrap.sandboxed,
+          ...(fullOutputPath ? { fullOutputPath } : {}),
+          ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
+          ...(insights.failedTests.length ? { failedTests: insights.failedTests } : {}),
+        });
       }
 
-      let fullOutputPath: string | undefined;
-      if (result.truncated) {
-        const candidate = path.join(os.tmpdir(), `zclaudia-bash-${randomUUID()}.log`);
-        try { await writeFile(candidate, result.fullOutput, 'utf8'); fullOutputPath = candidate; }
-        catch { fullOutputPath = undefined; }
-      }
-
-      const footers: string[] = [];
-      if (result.truncated && fullOutputPath) footers.push(`Output truncated (showing tail). Full output: ${fullOutputPath}`);
-      if (result.timedOut) footers.push(`Command timed out after ${timeoutSec} seconds`);
-      else if (result.exitCode !== 0 && result.exitCode !== null) footers.push(`Exit code: ${result.exitCode}`);
-
-      let text = result.output;
-      if (footers.length) text = `${text ? text + '\n\n' : ''}[${footers.join('. ')}]`;
-      if (!text) text = '(no output)';
+      const fullOutputPath = await persistFullOutputIfTruncated(result);
+      const insights = extractBashOutputInsights(result.fullOutput);
+      const text = formatBashResultText({
+        command,
+        cwd: toWorkspaceRelative(cwd, runCwd) || '.',
+        output: result.output,
+        fullOutput: result.fullOutput,
+        exitCode: result.exitCode,
+        durationMs: result.durationMs,
+        truncated: result.truncated,
+        timedOut: result.timedOut,
+        sandboxed: wrap.sandboxed,
+        ...(fullOutputPath ? { fullOutputPath } : {}),
+      }, insights);
 
       const sandboxFsDenied = result.exitCode !== 0 && !result.timedOut
         ? detectSandboxFsDenial(result.fullOutput, wrap.sandboxed, options?.sandboxReadOnly === true)
@@ -308,6 +399,8 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         ...(fullOutputPath ? { fullOutputPath } : {}),
         durationMs: result.durationMs,
         sandboxed: wrap.sandboxed,
+        ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
+        ...(insights.failedTests.length ? { failedTests: insights.failedTests } : {}),
         ...(sandboxFsDenied ? { sandboxFsDenied } : {}),
       });
     },

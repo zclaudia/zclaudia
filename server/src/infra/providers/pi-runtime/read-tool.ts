@@ -8,13 +8,14 @@ import { buildHashlineEntries, formatHashlineOutput, hashlineSnapshotId, hashlin
 import { compressImageToLimit, extractPdfText, renderNotebook } from './rich-read.js';
 import { errorResult, textResult, toolParams } from './tool-common.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
+import { MAX_TEXT_MUTATION_FILE_BYTES } from './write-guards.js';
 
 export interface ReadToolOptions {
   supportsVision?: boolean;
   readFileState?: ReadFileStateStore;
 }
 
-const DEFAULT_READ_MAX_BYTES = 512 * 1024;
+const DEFAULT_READ_MAX_BYTES = MAX_TEXT_MUTATION_FILE_BYTES;
 const IMAGE_MIME_BY_EXT: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',

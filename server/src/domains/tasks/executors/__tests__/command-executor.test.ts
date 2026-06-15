@@ -25,6 +25,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (prevDataDir === undefined) {
     delete process.env.ZCLAUDIA_DATA_DIR;
   } else {
@@ -145,6 +146,50 @@ describe('CommandTaskExecutor', () => {
     service.startTask(task.id, { executorRef: started.executorRef });
     await new Promise(r => setTimeout(r, 700));
     expect(readFileSync(markerPath, 'utf8')).toContain('BG_SANDBOXED');
-    vi.restoreAllMocks();
+  });
+
+  it('rejects sandbox-required tasks when wrapping is unavailable', async () => {
+    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: false });
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const task = service.createTask({
+      type: 'command',
+      metadata: {
+        command: 'echo should-not-run',
+        cwd: dataDir,
+        workspaceRoot: dataDir,
+        sandboxRequired: true,
+      },
+    });
+
+    await expect(executor.start(task)).rejects.toThrow(/sandbox required/);
+  });
+
+  it('passes workspace root and allowed domains to sandbox wrapping', async () => {
+    const wrap = vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({
+      sandboxed: true,
+      argv: ['sh', '-c', 'echo domain-test'],
+      env: process.env,
+    });
+    const repo = new TaskRepository(db);
+    const service = new TaskService(repo);
+    const executor = new CommandTaskExecutor(repo);
+    const task = service.createTask({
+      type: 'command',
+      metadata: {
+        command: 'echo original',
+        cwd: dataDir,
+        workspaceRoot: join(dataDir, 'workspace-root'),
+        sandboxAllowedDomains: ['example.test'],
+      },
+    });
+
+    await executor.start(task);
+
+    expect(wrap).toHaveBeenCalledWith('echo original', expect.objectContaining({
+      workspaceRoot: join(dataDir, 'workspace-root'),
+      extraAllowedDomains: ['example.test'],
+    }));
   });
 });

@@ -45,12 +45,32 @@ export class CommandTaskExecutor implements TaskExecutor {
   }
 
   async start(task: TaskRecord): Promise<TaskExecutorUpdate> {
-    const meta = (task.metadata ?? {}) as { command?: unknown; cwd?: unknown };
+    const meta = (task.metadata ?? {}) as {
+      command?: unknown;
+      cwd?: unknown;
+      workspaceRoot?: unknown;
+      sandboxAllowedDomains?: unknown;
+      sandboxReadOnly?: unknown;
+      sandboxRequired?: unknown;
+    };
     const command = typeof meta.command === 'string' ? meta.command.trim() : '';
     if (!command) throw new Error('command task requires metadata.command');
     const cwd = typeof meta.cwd === 'string' && meta.cwd ? meta.cwd : process.cwd();
+    const workspaceRoot = typeof meta.workspaceRoot === 'string' && meta.workspaceRoot
+      ? meta.workspaceRoot
+      : cwd;
+    const sandboxAllowedDomains = Array.isArray(meta.sandboxAllowedDomains)
+      ? meta.sandboxAllowedDomains.filter((domain): domain is string => typeof domain === 'string' && domain.trim().length > 0)
+      : [];
 
-    const wrap = await sandbox.wrapCommand(command, { workspaceRoot: cwd });
+    const wrap = await sandbox.wrapCommand(command, {
+      workspaceRoot,
+      readOnly: meta.sandboxReadOnly === true,
+      extraAllowedDomains: sandboxAllowedDomains,
+    });
+    if (!wrap.sandboxed && meta.sandboxRequired === true) {
+      throw new Error('sandbox required for this command, but the sandbox is unavailable');
+    }
 
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });

@@ -1,6 +1,7 @@
 import path from 'path';
 
-export const MAX_EDIT_FILE_BYTES = 1024 * 1024 * 1024;
+export const MAX_TEXT_MUTATION_FILE_BYTES = 512 * 1024;
+export const MAX_EDIT_FILE_BYTES = MAX_TEXT_MUTATION_FILE_BYTES;
 
 const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,

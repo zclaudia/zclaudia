@@ -8,6 +8,7 @@ import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
 import { measureTextBytes, persistToolResultText } from './tool-result-store.js';
 import { remediationForResult } from './remediation.js';
 import { ToolFailureLoopGuard, TOOL_FAILURE_HARD_LIMIT } from './tool-failure-loop-guard.js';
+import { ToolCallTelemetry } from './tool-telemetry.js';
 
 export const DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
@@ -177,6 +178,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
   // Reset on shouldStopAfterTurn alongside turnSpentBytes.
   const editAttemptsByPath = new Map<string, number>();
   const toolFailureGuard = new ToolFailureLoopGuard();
+  const toolTelemetry = new ToolCallTelemetry();
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -224,6 +226,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       const toolName: string = toolCall?.name ?? '';
       let content = result.content;
       let hookAppended = false;
+      let telemetryUpdated = false;
       // Auto-fix: append a concrete next step for recognizable failures so the
       // model self-corrects instead of blindly retrying.
       let remediationAppended = false;
@@ -247,7 +250,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           const next = (editAttemptsByPath.get(key) ?? 0) + 1;
           editAttemptsByPath.set(key, next);
           if (next >= EDIT_FLOOD_THRESHOLD) {
-            const advisory = `Edit has now run ${next} times against ${key} this turn. If you're fighting a structural file (Markdown tables, JSON arrays, indented YAML), Edits cascade — switch to a single Write to rewrite the file, or pass all the changes through Edit's \`patch\` parameter in one atomic call.`;
+            const advisory = `Edit has now run ${next} times against ${key} this turn. For several replacements in this same file, use one Edit call with the \`edits\` array so the file is written once. If you're rewriting a structural file (Markdown tables, JSON arrays, indented YAML), switch to a single Write; for multi-file changes, use Edit's \`patch\` parameter.`;
             content = [...content, { type: 'text', text: `[fix] ${advisory}` }];
             remediationAppended = true;
           }
@@ -280,22 +283,57 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         typeof result?.details?.error === 'string' &&
         result.details.error.endsWith('_loop_detected');
       if (isFailure && !alreadyLoopDetected) {
-        const attempts = toolFailureGuard.recordFailure(toolName, args as Record<string, unknown> | undefined);
+        const loopAttempt = toolFailureGuard.recordFailureWithResult(
+          toolName,
+          args as Record<string, unknown> | undefined,
+          result.details as Record<string, unknown> | undefined,
+        );
+        const attempts = loopAttempt.attempts;
         if (attempts >= TOOL_FAILURE_HARD_LIMIT) {
+          const bashDetails = loopAttempt.kind === 'bash_failure' ? result.details as Record<string, unknown> | undefined : undefined;
+          const sameFailure = Array.isArray(bashDetails?.diagnostics) && bashDetails.diagnostics.length > 0
+            ? 'the same diagnostics'
+            : Array.isArray(bashDetails?.failedTests) && bashDetails.failedTests.length > 0
+              ? 'the same failed tests'
+              : 'the same failure result';
+          const loopText = loopAttempt.kind === 'bash_failure'
+            ? `This Bash command has failed ${attempts} times with ${sameFailure}. Stop re-running it unchanged — inspect the reported files/tests, edit the underlying cause, or run a different diagnostic command.`
+            : `This tool call has failed ${attempts} times with identical inputs. Stop retrying the same call — change the approach, inspect prerequisites, or ask the user.`;
           content = [
             ...content,
             {
               type: 'text',
-              text: `[loop] This tool call has failed ${attempts} times with identical inputs. Stop retrying the same call — change the approach, inspect prerequisites, or ask the user.`,
+              text: `[loop] ${loopText}`,
             },
           ];
           // Upgrade the error code so remediationForResult stays silent (it's in
           // SELF_EXPLANATORY) and downstream readers can detect the loop.
-          result.details = { ...result.details, error: 'tool_loop_detected' };
+          result.details = {
+            ...result.details,
+            error: loopAttempt.kind === 'bash_failure' ? 'bash_failure_loop_detected' : 'tool_loop_detected',
+            loopAttempts: attempts,
+            loopKind: loopAttempt.kind,
+          };
           remediationAppended = true; // also covers [loop] nudge — ensures modified result is returned
         }
       } else if (result?.details?.ok === true) {
         toolFailureGuard.recordSuccess(toolName, args as Record<string, unknown> | undefined);
+      }
+
+      const telemetry = toolTelemetry.record(toolName, args as Record<string, unknown> | undefined, {
+        content,
+        details: result.details as Record<string, unknown> | undefined,
+      });
+      if (telemetry.advisories.length > 0) {
+        content = [
+          ...content,
+          ...telemetry.advisories.map(text => ({ type: 'text', text: `[telemetry] ${text}` })),
+        ];
+        telemetryUpdated = true;
+      }
+      if (telemetry.notable) {
+        result.details = { ...(result.details ?? {}), toolTelemetry: telemetry.snapshot };
+        telemetryUpdated = true;
       }
 
       const truncated = truncateContent(content, toolName, limit);
@@ -332,13 +370,14 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
               budgetExceeded: true,
               persistedPath: persisted.filePath,
               originalSize: persisted.size,
+              ...(telemetryUpdated ? { toolTelemetry: telemetry.snapshot } : {}),
             },
           };
         }
       }
       turnSpentBytes += finalSize;
 
-      if (!truncated.didTruncate && !hookAppended && !remediationAppended) return undefined;
+      if (!truncated.didTruncate && !hookAppended && !remediationAppended && !telemetryUpdated) return undefined;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         content: finalContent as any,

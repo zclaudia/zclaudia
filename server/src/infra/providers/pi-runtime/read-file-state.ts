@@ -90,10 +90,9 @@ export function createReadFileStateStore(): ReadFileStateStore {
       const entry = entries.get(normalizeStateKey(filePath));
       if (!entry) return readCheck;
 
-      const fileStat = await stat(filePath);
-      if (fileStat.mtimeMs <= entry.timestamp) return { ok: true };
-
       if (normalizeContent(currentContent) === entry.content) return { ok: true };
+
+      await stat(filePath);
 
       return {
         ok: false,

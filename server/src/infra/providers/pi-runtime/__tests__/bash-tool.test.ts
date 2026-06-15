@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -37,8 +37,38 @@ describe('Bash bridge tool module', () => {
 
     const result = await bash.execute('bash-1', { command: 'printf hello' });
 
+    expect(result.content[0].text).toContain('Command: printf hello');
+    expect(result.content[0].text).toContain('Status: success');
+    expect(result.content[0].text).toContain('Output:');
     expect(result.content[0].text).toContain('hello');
     expect(result.details).toMatchObject({ ok: true, exitCode: 0 });
+  });
+
+  it('returns extracted diagnostics for failed compiler-style output', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    const bash = createBashBridgeTool(dir) as any;
+
+    const result = await bash.execute('bash-diagnostics', {
+      command: "printf 'src/app.ts:2:7 - error TS2322: Type mismatch\\n' >&2; exit 1",
+    });
+
+    await rm(dir, { recursive: true, force: true });
+    expect(result.details).toMatchObject({
+      ok: false,
+      exitCode: 1,
+      diagnostics: [
+        {
+          path: 'src/app.ts',
+          line: 2,
+          column: 7,
+          severity: 'error',
+          source: 'TS2322',
+          message: 'Type mismatch',
+        },
+      ],
+    });
+    expect(result.content[0].text).toContain('Status: failed (Exit code: 1)');
+    expect(result.content[0].text).toContain('Diagnostics:');
   });
 
   it('errors when the command is empty', async () => {
@@ -58,5 +88,75 @@ describe('Bash bridge tool module', () => {
     const result = await bash.execute('bash-1', { command: 'pwd', cwd: '..' });
 
     expect(result.details).toMatchObject({ ok: false, error: 'path_outside_workspace' });
+  });
+
+  it('blocks pure listing commands and suggests LS', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    await mkdir(path.join(dir, 'src'));
+    const bash = createBashBridgeTool(dir) as any;
+
+    const result = await bash.execute('bash-route-ls', { command: 'ls src' });
+
+    await rm(dir, { recursive: true, force: true });
+    expect(result.details).toMatchObject({
+      ok: false,
+      error: 'bash_tool_routing_blocked',
+      suggestedTool: 'LS',
+      suggestedInput: { path: 'src' },
+      kind: 'tool_routing',
+    });
+  });
+
+  it('blocks pure search commands and suggests Grep', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    await mkdir(path.join(dir, 'src'));
+    const bash = createBashBridgeTool(dir) as any;
+
+    const result = await bash.execute('bash-route-rg', { command: 'rg "needle" src' });
+
+    await rm(dir, { recursive: true, force: true });
+    expect(result.details).toMatchObject({
+      ok: false,
+      error: 'bash_tool_routing_blocked',
+      suggestedTool: 'Grep',
+      suggestedInput: { pattern: 'needle', path: 'src' },
+      kind: 'tool_routing',
+    });
+  });
+
+  it('blocks direct source file reads through shell commands', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    await mkdir(path.join(dir, 'src'));
+    await writeFile(path.join(dir, 'src', 'secret.ts'), 'export const secret = "hidden";\n');
+    const bash = createBashBridgeTool(dir) as any;
+
+    const result = await bash.execute('bash-read-bypass', { command: 'cat src/secret.ts' });
+
+    await rm(dir, { recursive: true, force: true });
+    expect(result.details).toMatchObject({
+      ok: false,
+      error: 'bash_file_read_blocked',
+      suggestedTool: 'Read',
+    });
+    expect(result.content[0].text).not.toContain('hidden');
+  });
+
+  it('blocks direct source file mutations through shell commands', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    await mkdir(path.join(dir, 'src'));
+    const filePath = path.join(dir, 'src', 'app.ts');
+    await writeFile(filePath, 'export const value = 1;\n');
+    const bash = createBashBridgeTool(dir) as any;
+
+    const result = await bash.execute('bash-write-bypass', { command: 'echo "export const value = 2;" > src/app.ts' });
+    const onDisk = await readFile(filePath, 'utf8');
+
+    await rm(dir, { recursive: true, force: true });
+    expect(result.details).toMatchObject({
+      ok: false,
+      error: 'bash_file_mutation_blocked',
+      suggestedTool: 'Write',
+    });
+    expect(onDisk).toBe('export const value = 1;\n');
   });
 });

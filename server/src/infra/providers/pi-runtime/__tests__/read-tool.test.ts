@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { mkdtemp, writeFile } from 'fs/promises';
+import { mkdtemp, symlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 
@@ -84,6 +84,18 @@ describe('Read bridge tool module', () => {
 
     expect(result.details).toMatchObject({ ok: false, error: 'binary_file' });
     expect(result.content[0].text).toContain('Refusing to read binary file');
+  });
+
+  it('rejects symlinks that resolve outside the workspace', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-symlink-root-'));
+    const outside = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-symlink-outside-'));
+    await writeFile(path.join(outside, 'secret.txt'), 'outside\n');
+    await symlink(path.join(outside, 'secret.txt'), path.join(root, 'link.txt'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-symlink', { path: 'link.txt' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'path_outside_workspace' });
   });
 
   it('returns a text notice for images when the model lacks vision', async () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, utimesSync, truncateSync } from 'fs';
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, statSync, symlinkSync, utimesSync, truncateSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -780,6 +780,21 @@ describe('Write bridge tool', () => {
     expect(res.details.error).toBe('path_outside_workspace');
   });
 
+  it('rejects writing through a symlinked parent outside the workspace', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const outside = mkdtempSync(path.join(tmpdir(), 'zc-write-outside-'));
+    symlinkSync(outside, path.join(dir, 'outside-link'), 'dir');
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-symlink-parent', { file_path: 'outside-link/escape.txt', content: 'x' });
+    const outsideChanged = existsSync(path.join(outside, 'escape.txt'));
+
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+    expect(res.details.error).toBe('path_outside_workspace');
+    expect(outsideChanged).toBe(false);
+  });
+
   it('rejects writing obvious private key material', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
@@ -869,6 +884,10 @@ describe('Write bridge tool', () => {
     expect(res.details.diff).toContain('+++ f.ts');
     expect(res.details.diff).toContain('-const b = 2;');
     expect(res.details.diff).toContain('+const b = 3;');
+    expect(res.content[0].text).toContain('Wrote f.ts (update)');
+    expect(res.content[0].text).toContain('Snapshot: internal file state updated');
+    expect(res.content[0].text).toContain('-const b = 2;');
+    expect(res.content[0].text).toContain('+const b = 3;');
     expect(res.details.structuredPatch).toEqual([
       expect.objectContaining({
         oldStart: 1,
@@ -1191,6 +1210,26 @@ describe('Write bridge tool', () => {
     expect(onDisk).toBe('const external = true;\n');
   });
 
+  it('rejects overwriting when content changed even if mtime did not advance', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-stale-mtime', { path: 'f.ts' });
+    writeFileSync(filePath, 'const external = true;\n');
+    const past = new Date(Date.now() - 5000);
+    utimesSync(filePath, past, past);
+    const res = await write.execute('w-stale-mtime', { file_path: 'f.ts', content: 'const a = 2;\n' });
+    const onDisk = readFileSync(filePath, 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_modified_since_read');
+    expect(onDisk).toBe('const external = true;\n');
+  });
+
   it('allows overwriting when only mtime changed after a full read', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const filePath = path.join(dir, 'f.ts');
@@ -1224,6 +1263,24 @@ describe('Write bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
     expect(onDisk).toBe('const a = 1;\r\nconst b = 3;\r\n');
+  });
+
+  it('preserves file mode when overwriting an existing file atomically', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-mode-'));
+    const filePath = path.join(dir, 'script.sh');
+    writeFileSync(filePath, '#!/bin/sh\necho old\n');
+    chmodSync(filePath, 0o755);
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-mode', { path: 'script.sh' });
+    const res = await write.execute('w-mode', { file_path: 'script.sh', content: '#!/bin/sh\necho new\n' });
+    const mode = statSync(filePath).mode & 0o777;
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(mode).toBe(0o755);
   });
 
   it('preserves UTF-16LE encoding when overwriting an existing UTF-16LE file', async () => {
@@ -1276,6 +1333,11 @@ describe('Edit bridge tool', () => {
       expect.objectContaining({ path: 'a.ts', type: 'update', ok: true }),
       expect.objectContaining({ path: 'b.ts', type: 'create', ok: true }),
     ]);
+    expect(res.content[0].text).toContain('Applied patch');
+    expect(res.content[0].text).toContain('Files changed: 2');
+    expect(res.content[0].text).toContain('- update a.ts');
+    expect(res.content[0].text).toContain('- create b.ts');
+    expect(res.content[0].text).toContain('+const a = 2;');
     expect(a).toBe('const a = 2;\n');
     expect(b).toBe('export const b = 1;\n');
   });
@@ -1379,6 +1441,35 @@ describe('Edit bridge tool', () => {
     ]);
   });
 
+  it('preflights patch updates before writing so later failures do not leave partial changes', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-patch-atomic-a', { path: 'a.ts' });
+    const res = await edit.execute('e-apply-patch-atomic', {
+      patch: [
+        '*** Begin Patch',
+        '*** Update File: a.ts',
+        '@@',
+        '-const a = 1;',
+        '+const a = 2;',
+        '*** Update File: missing.ts',
+        '@@',
+        '-missing',
+        '+still missing',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    const a = readFileSync(path.join(dir, 'a.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'patch_partial_failure' });
+    expect(a).toBe('const a = 1;\n');
+  });
+
   it('rejects patch updates when the target file was not read first', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
@@ -1436,6 +1527,10 @@ describe('Edit bridge tool', () => {
     expect(res.details.diff).toContain('+++ f.ts');
     expect(res.details.diff).toContain('-const b = 2;');
     expect(res.details.diff).toContain('+const b = 3;');
+    expect(res.content[0].text).toContain('Edited f.ts');
+    expect(res.content[0].text).toContain('Snapshot: internal file state updated');
+    expect(res.content[0].text).toContain('-const b = 2;');
+    expect(res.content[0].text).toContain('+const b = 3;');
     expect(res.details.structuredPatch).toEqual([
       expect.objectContaining({
         oldStart: 1,
@@ -1446,6 +1541,65 @@ describe('Edit bridge tool', () => {
       }),
     ]);
     expect(res.details.lineChanges).toEqual({ additions: 1, deletions: 1, changes: 2 });
+  });
+
+  it('applies same-file batch edits in one Edit call and keeps the snapshot current', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), [
+      'const a = 1;',
+      'const b = 2;',
+      'const c = 3;',
+      '',
+    ].join('\n'));
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-batch-edit', { path: 'f.ts' });
+    const res = await edit.execute('e-batch', {
+      file_path: 'f.ts',
+      edits: [
+        { old_string: 'const a = 1;', new_string: 'const a = 10;' },
+        { old_string: 'const b = 2;', new_string: 'const b = 20;' },
+      ],
+    });
+    const followup = await edit.execute('e-batch-followup-no-read', {
+      file_path: 'f.ts',
+      old_string: 'const c = 3;',
+      new_string: 'const c = 30;',
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: true, editCount: 2, replaced: 2 });
+    expect(res.content[0].text).toContain('Edits applied: 2');
+    expect(res.content[0].text).toContain('Snapshot: internal file state updated');
+    expect(res.content[0].text).toContain('-const a = 1;');
+    expect(res.content[0].text).toContain('+const a = 10;');
+    expect(followup.details.ok).toBe(true);
+    expect(onDisk).toBe('const a = 10;\nconst b = 20;\nconst c = 30;\n');
+  });
+
+  it('does not partially write batch edits when a later replacement fails', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-batch-fail', { path: 'f.ts' });
+    const res = await edit.execute('e-batch-fail', {
+      file_path: 'f.ts',
+      edits: [
+        { old_string: 'const a = 1;', new_string: 'const a = 10;' },
+        { old_string: 'const missing = true;', new_string: 'const missing = false;' },
+      ],
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'not_found', editIndex: 1 });
+    expect(onDisk).toBe('const a = 1;\nconst b = 2;\n');
   });
 
   it('previews an edit without writing to disk', async () => {
@@ -1900,7 +2054,7 @@ describe('Bash bridge tool', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashtool-'));
     mkdirSync(path.join(dir, 'sub'));
     writeFileSync(path.join(dir, 'sub', 'marker.txt'), 'x');
-    const res = await bashTool(dir).execute('b3', { command: 'ls', cwd: 'sub' });
+    const res = await bashTool(dir).execute('b3', { command: 'test -f marker.txt && printf marker.txt', cwd: 'sub' });
     rmSync(dir, { recursive: true, force: true });
     expect(res.content[0].text).toContain('marker.txt');
   });
@@ -2045,6 +2199,7 @@ describe('Bash background execution', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     if (prevDataDir === undefined) {
       delete process.env.ZCLAUDIA_DATA_DIR;
     } else {
@@ -2089,6 +2244,34 @@ describe('Bash background execution', () => {
     expect(res.details.error).toBe('background_not_allowed_plan_mode');
     expect(existed).toBe(false);
   });
+
+  it('passes the session workspace root and granted domains into background sandbox wrapping', async () => {
+    const wrap = vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({
+      sandboxed: true,
+      argv: ['sh', '-c', 'echo bg-wrapped'],
+      env: process.env,
+    });
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bashbg-'));
+    mkdirSync(path.join(dir, 'sub'));
+    const bash = buildTools(dir, {
+      enabled: ['Bash'],
+      db,
+      sandboxAllowedDomains: ['example.test'],
+    }).find((t: any) => t.name === 'Bash') as any;
+
+    const res = await bash.execute('bg-sandbox-meta', {
+      command: 'echo bg-original',
+      cwd: 'sub',
+      run_in_background: true,
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(wrap).toHaveBeenCalledWith('echo bg-original', expect.objectContaining({
+      workspaceRoot: dir,
+      extraAllowedDomains: ['example.test'],
+    }));
+  });
 });
 
 describe('TaskOutput for command tasks', () => {
@@ -2128,12 +2311,15 @@ describe('TaskOutput for command tasks', () => {
     const r1 = await taskOutput.execute('to2', { task_id: taskId });
     expect(r1.details.ok).toBe(true);
     expect(r1.content[0].text).toContain('first-line');
+    expect(r1.content[0].text).toContain('Status: running');
+    expect(r1.details.rawOutput).toContain('first-line');
     expect(r1.details.nextOffset).toBeGreaterThan(0);
     expect(r1.details.status).toBe('running');
     expect(r1.details.eof).toBe(true);
 
     const r2 = await taskOutput.execute('to3', { task_id: taskId, output_offset: r1.details.nextOffset });
-    expect(r2.content[0].text).toBe('');
+    expect(r2.details.rawOutput).toBe('');
+    expect(r2.content[0].text).toContain('Output:\n(no output)');
     expect(r2.details.eof).toBe(true);
 
     await new CommandTaskExecutor(new TaskRepository(db)).stop(taskId); // no leaked sleep
@@ -2150,9 +2336,50 @@ describe('TaskOutput for command tasks', () => {
     await new Promise(r => setTimeout(r, 700));
 
     const res = await taskOutput.execute('to5', { task_id: taskId, tail_lines: 2 });
-    expect(res.content[0].text.trim().split('\n')).toEqual(['l2', 'l3']);
+    expect(res.details.rawOutput.trim().split('\n')).toEqual(['l2', 'l3']);
+    expect(res.content[0].text).toContain('Output:\nl2\nl3');
     expect(['completed', 'running']).toContain(res.details.status);
     rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('returns structured diagnostics for failed command task output', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-tobg-'));
+    const tools = buildTools(dir, { enabled: ['Bash', 'TaskOutput'], db });
+    const bash = tools.find((t: any) => t.name === 'Bash') as any;
+    const taskOutput = tools.find((t: any) => t.name === 'TaskOutput') as any;
+    const started = await bash.execute('to-diagnostics-start', {
+      command: "printf 'src/app.ts:2:7 - error TS2322: Type mismatch\\n' >&2; exit 1",
+      run_in_background: true,
+    });
+    const taskId = started.details.taskId as string;
+    const repo = new TaskRepository(db);
+    for (let i = 0; i < 20; i++) {
+      const task = repo.findById(taskId);
+      if (task?.status === 'failed') break;
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    const res = await taskOutput.execute('to-diagnostics-read', { task_id: taskId });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      status: 'failed',
+      exitCode: 1,
+      diagnostics: [
+        {
+          path: 'src/app.ts',
+          line: 2,
+          column: 7,
+          severity: 'error',
+          source: 'TS2322',
+          message: 'Type mismatch',
+        },
+      ],
+    });
+    expect(res.content[0].text).toContain('Command: printf');
+    expect(res.content[0].text).toContain('Status: failed (Exit code: 1)');
+    expect(res.content[0].text).toContain('Diagnostics:');
   });
 });
 
@@ -2223,6 +2450,19 @@ describe('Bash sandbox wiring (foreground)', () => {
     expect(res.content[0].text).not.toContain('shouldnotrun');
   });
 
+  it('critical approved commands still fail closed when the sandbox is unavailable', async () => {
+    vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: false });
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
+    const permissionCallback = vi.fn().mockResolvedValue({ behavior: 'allow' });
+    const bash = buildTools(dir, { enabled: ['Bash'], permissionCallback }).find((t: any) => t.name === 'Bash') as any;
+
+    const res = await bash.execute('s-critical-no-sandbox', { command: 'sudo rm package.json' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(permissionCallback).toHaveBeenCalled();
+    expect(res.details.error).toBe('sandbox_required_for_critical_command');
+  });
+
   it('sandboxed → runs via the wrapped argv', async () => {
     vi.spyOn(sandbox, 'wrapCommand').mockResolvedValue({ sandboxed: true, argv: ['sh', '-c', 'echo VIAARGV'], env: process.env });
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-bsbx-'));
@@ -2230,6 +2470,6 @@ describe('Bash sandbox wiring (foreground)', () => {
     const res = await bash.execute('s3', { command: 'echo original' });
     rmSync(dir, { recursive: true, force: true });
     expect(res.content[0].text).toContain('VIAARGV');
-    expect(res.content[0].text).not.toContain('original');
+    expect(res.content[0].text.split('Output:\n')[1]).not.toContain('original');
   });
 });
