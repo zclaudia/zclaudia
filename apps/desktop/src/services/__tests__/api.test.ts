@@ -265,7 +265,8 @@ describe('api', () => {
       mockControlPlaneMode = 'gateway-direct';
       mockResponse({ id: 'p9', name: 'Remote', type: 'code' });
       await createProject({ name: 'Remote' }, 'gw:backend-1');
-      expect(mockFetch.mock.calls[0][0]).not.toMatch(/localhost:3100/);
+      expect(mockFetch.mock.calls[0][0]).toContain('gw:backend-1');
+      expect(mockFetch.mock.calls[0][0]).not.toContain('server-1');
     });
 
     it('createProject without a backend falls back to the active server', async () => {
@@ -341,7 +342,8 @@ describe('api', () => {
       mockControlPlaneMode = 'gateway-direct';
       mockResponse({ id: 's2', projectId: 'remote-project' });
       await createSession({ projectId: 'remote-project' });
-      expect(mockFetch.mock.calls[0][0]).not.toMatch(/localhost:3100/);
+      expect(mockFetch.mock.calls[0][0]).toContain('gw:backend-1');
+      expect(mockFetch.mock.calls[0][0]).not.toContain('server-1');
     });
 
     it('createSession for a local project hits the local server', async () => {
