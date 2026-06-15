@@ -27,6 +27,7 @@ import {
 } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
+import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import * as api from '../../services/api';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
@@ -474,6 +475,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
       }
 
       await loadData();
+      void useAgentReadinessStore.getState().refresh();
       resetForm();
     } catch (error) {
       console.error('Failed to save agent profile:', error);
@@ -503,6 +505,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     try {
       await api.deleteAgentProfile(id);
       await loadData();
+      void useAgentReadinessStore.getState().refresh();
     } catch (error) {
       console.error('Failed to delete agent profile:', error);
       const message = error instanceof Error ? error.message : String(error);
@@ -518,6 +521,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     try {
       await api.setDefaultAgentProfile(id);
       await loadData();
+      void useAgentReadinessStore.getState().refresh();
     } catch (error) {
       console.error('Failed to set default agent profile:', error);
       const message = error instanceof Error ? error.message : String(error);

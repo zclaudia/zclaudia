@@ -5,6 +5,7 @@ import { LLM_PROVIDER_TYPES } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
+import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
 import * as api from '../../services/api';
 import type { LlmProfilePreviewInput } from '../../services/api/llm-profiles';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
@@ -480,6 +481,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       }
 
       await loadProfiles();
+      void useAgentReadinessStore.getState().refresh();
       if (opts.keepEditing) {
         setEditingProfile(saved);
       } else {
@@ -653,6 +655,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       // Server auto-picks a replacement default when the deleted profile was
       // the default — refetch so the badge moves to the right row.
       if (wasDefault) void loadProfiles();
+      void useAgentReadinessStore.getState().refresh();
       return;
     }
 
@@ -684,6 +687,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     try {
       await api.setDefaultLlmProfile(id);
       await loadProfiles();
+      void useAgentReadinessStore.getState().refresh();
     } catch (error) {
       console.error('Failed to set default provider:', error);
     }
