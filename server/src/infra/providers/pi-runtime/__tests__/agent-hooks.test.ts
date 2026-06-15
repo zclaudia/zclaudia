@@ -474,14 +474,15 @@ describe('afterToolCall — tool failure loop guard', () => {
     expect(third?.details?.error).toBe('tool_loop_detected');
   });
 
-  it('does not nudge when the same tool succeeds in between', async () => {
+  it('resets the counter on success so a later identical failure does not nudge', async () => {
     const hooks = makeHooks();
-    await hooks.afterToolCall!(failingCtx() as any);
-    await hooks.afterToolCall!({
+    await hooks.afterToolCall!(failingCtx() as any);   // count 1
+    await hooks.afterToolCall!(failingCtx() as any);   // count 2
+    await hooks.afterToolCall!({                        // success → reset to 0
       toolCall: { name: 'Bash' }, args: { command: 'npm test' },
       result: { content: [{ type: 'text', text: 'ok' }], details: { ok: true } },
     } as any);
-    const after = await hooks.afterToolCall!(failingCtx() as any);
+    const after = await hooks.afterToolCall!(failingCtx() as any); // count 1 if reset worked
     const text = (after?.content ?? []).map((b: any) => b.text ?? '').join('\n');
     expect(text).not.toContain('[loop]');
   });
