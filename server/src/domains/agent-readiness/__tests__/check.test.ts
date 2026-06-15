@@ -21,18 +21,18 @@ afterEach(() => {
   for (const k of ENV) { if (SAVED[k] === undefined) delete process.env[k]; else process.env[k] = SAVED[k]; }
 });
 
-function seedLlm(apiKey?: string): string {
+function seedLlm(apiKey?: string, models?: { modelId: string }[]): string {
   const llmRepo = new LlmProfileRepository(db);
-  const lp = llmRepo.create({ name: 'test-llm', providerType: 'anthropic', apiKey, isDefault: true });
+  const lp = llmRepo.create({ name: 'test-llm', providerType: 'anthropic', apiKey, isDefault: true, models });
   return lp.id;
 }
 
-function seedAgent(llmProfileId: string) {
+function seedAgent(llmProfileId: string, model = 'claude-sonnet-4-6') {
   const agentRepo = new AgentProfileRepository(db);
   agentRepo.create({
     name: 'test-agent',
     llmProfileId,
-    model: 'claude-sonnet-4-6',
+    model,
     systemPrompt: '',
     enabledTools: ['read'],
     isDefault: true,
@@ -62,5 +62,24 @@ describe('resolveAgentReadiness', () => {
     seedAgent(seedLlm(undefined));
     process.env.ANTHROPIC_API_KEY = 'sk-ant';
     expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_credential' });
+  });
+
+  it('no_model when the agent model is blank even though a credential exists', () => {
+    seedAgent(seedLlm('sk-x'), '');
+    expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_model' });
+  });
+  it('no_model when the profile declares models and the agent model is not among them', () => {
+    // openai/kimi-style profile that only serves kimi-k2.6, but the agent still
+    // points at a Claude id the endpoint will reject.
+    seedAgent(seedLlm('sk-x', [{ modelId: 'kimi-k2.6' }]), 'claude-sonnet-4-6');
+    expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_model' });
+  });
+  it('usable when the agent model is among the profile declared models', () => {
+    seedAgent(seedLlm('sk-x', [{ modelId: 'kimi-k2.6' }]), 'kimi-k2.6');
+    expect(resolveAgentReadiness(db)).toEqual({ usable: true });
+  });
+  it('usable when the profile declares no models (cannot statically validate → trust it)', () => {
+    seedAgent(seedLlm('sk-x'), 'some-custom-proxy-model');
+    expect(resolveAgentReadiness(db)).toEqual({ usable: true });
   });
 });

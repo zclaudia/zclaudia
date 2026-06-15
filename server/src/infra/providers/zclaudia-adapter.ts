@@ -20,6 +20,7 @@ import {
   withStreamRetry,
   type BuiltModel,
 } from './pi-runtime/index.js';
+import { resolveEnvModel } from './pi-runtime/env-model.js';
 import { CodexOAuthError } from '../../domains/llm-profiles/codex-oauth-errors.js';
 import { ALL_TOOL_NAMES, READ_ONLY_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
 import { isSandboxAvailable } from './pi-runtime/sandbox.js';
@@ -34,8 +35,6 @@ const PLAN_MODE_SYSTEM_PROMPT_SUFFIX =
   '\n\nYou are in PLAN mode. Produce a concrete plan for the user to review and approve. ' +
   'Do not modify files or execute side-effecting commands; only read-only or clarification tools are available. ' +
   'Once the plan is ready, end your turn and wait for the user to confirm before executing anything.';
-
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 const manifest: PCPProviderManifest = {
   id: 'zclaudia',
@@ -283,16 +282,14 @@ export class ZClaudiaAdapter implements ProviderAdapter {
   ): AsyncGenerator<ClaudeMessage, void, void> {
     const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
     // ctx.model surfaces in init.systemInfo (the UI's "Model:" badge) and in the
-    // captured context snapshot. Resolution order mirrors buildModel:
-    //   1. agent profile's model (the canonical surface — the editor writes it here)
-    //   2. PI_MODEL env knob (dev-time override)
-    //   3. DEFAULT_MODEL fallback
-    // The literal built by buildModel below may further normalize this (registry
-    // hits use the registry's `id` for the wire call), so after a successful
-    // build we refresh ctx.model from modelInfo.model.id to match what was sent.
+    // captured context snapshot. Resolution mirrors buildModel: the agent
+    // profile's model (the canonical surface the editor writes), else the shared
+    // env-knob fallback (PI_MODEL → OPENAI_MODEL → default). This is the value
+    // shown if buildModel throws before normalization; on a successful build we
+    // refresh ctx.model from modelInfo.model.id to match what was actually sent.
     const ctx: TranslateContext = {
       sessionId,
-      model: options.agentProfile?.model || process.env.PI_MODEL || DEFAULT_MODEL,
+      model: options.agentProfile?.model || resolveEnvModel(),
       cwd: options.cwd,
       permissionMode: options.mode === 'plan' ? 'plan' : 'default',
     };
