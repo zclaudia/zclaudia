@@ -10,7 +10,6 @@ import { SortableList, SortableItem } from '../../components/SortableList';
 import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
-import { ServerSelector } from '../settings/ServerSelector';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
@@ -657,10 +656,6 @@ export function Sidebar({
         <ActiveSessionsPanel
           onSessionSelect={actions.handleActiveSessionSelect}
         />
-      </div>
-
-      <div className="flex-shrink-0 border-t border-border/50 px-2 py-2">
-        <ServerSelector placement="up" />
       </div>
 
       <SidebarFooter
