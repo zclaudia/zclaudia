@@ -7,6 +7,7 @@ import { isLegacyLocalBackendId, resolveCanonicalBackendId } from '../../utils/c
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import type { Project, Session } from '@zclaudia/shared';
 import * as api from '../../services/api';
+import { ApiError } from '../../services/api';
 import { reorderProjects } from '../../services/api/projects';
 import { reorderSessions } from '../../services/api/sessions';
 
@@ -33,6 +34,7 @@ interface UseSidebarActionsOptions {
   newProjectRootPath: string;
   newSessionName: string;
   newSessionAgentProfileId: string;
+  onAgentNotReady?: (details?: unknown) => void;
 }
 
 /**
@@ -61,6 +63,7 @@ export function useSidebarActions({
   newProjectRootPath,
   newSessionName,
   newSessionAgentProfileId,
+  onAgentNotReady,
 }: UseSidebarActionsOptions) {
   const requestMessageJump = useUIStore((s) => s.requestMessageJump);
   const {
@@ -95,11 +98,15 @@ export function useSidebarActions({
       setExpandedProjects((prev) => new Set(prev).add(project.id));
       selectProject(project.id);
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'AGENT_NOT_READY') {
+        onAgentNotReady?.(error.details);
+        return;
+      }
       console.error('Failed to create project:', error);
     } finally {
       setCreatingProject(false);
     }
-  }, [newProjectName, newProjectRootPath, isConnected, addProject, selectProject, setCreatingProject, setExpandedProjects, setNewProjectName, setNewProjectRootPath, setShowNewProjectForm]);
+  }, [newProjectName, newProjectRootPath, isConnected, addProject, selectProject, setCreatingProject, setExpandedProjects, setNewProjectName, setNewProjectRootPath, setShowNewProjectForm, onAgentNotReady]);
 
   const handleCreateSession = useCallback(async (projectId: string) => {
     if (!isConnected) return;
@@ -115,9 +122,13 @@ export function useSidebarActions({
       setCreatingSessionForProject(null);
       selectSession(session.id);
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'AGENT_NOT_READY') {
+        onAgentNotReady?.(error.details);
+        return;
+      }
       console.error('Failed to create session:', error);
     }
-  }, [isConnected, newSessionName, newSessionAgentProfileId, addSession, selectSession, setNewSessionName, setNewSessionAgentProfileId, setCreatingSessionForProject]);
+  }, [isConnected, newSessionName, newSessionAgentProfileId, addSession, selectSession, setNewSessionName, setNewSessionAgentProfileId, setCreatingSessionForProject, onAgentNotReady]);
 
   const handleDeleteProject = useCallback(async (projectId: string) => {
     if (!isConnected) return;

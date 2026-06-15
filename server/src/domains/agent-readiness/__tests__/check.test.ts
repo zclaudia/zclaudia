@@ -78,8 +78,12 @@ describe('resolveAgentReadiness', () => {
     seedAgent(seedLlm('sk-x', [{ modelId: 'kimi-k2.6' }]), 'kimi-k2.6');
     expect(resolveAgentReadiness(db)).toEqual({ usable: true });
   });
-  it('usable when the profile declares no models (cannot statically validate → trust it)', () => {
-    seedAgent(seedLlm('sk-x'), 'some-custom-proxy-model');
+  it('usable when the profile declares no models but the model exists in the registry', () => {
+    seedAgent(seedLlm('sk-x'), 'claude-sonnet-4-6');
     expect(resolveAgentReadiness(db)).toEqual({ usable: true });
+  });
+  it('no_model when the profile declares no models and the model is not in the registry', () => {
+    seedAgent(seedLlm('sk-x'), 'totally-unregistered-model-id');
+    expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_model' });
   });
 });

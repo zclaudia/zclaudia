@@ -3,7 +3,7 @@
 
 // Base utilities
 export { AuthError, getBaseUrl, getAuthHeaders, fetchApi, fetchLocalApi } from './api/base';
-export { apiCall, apiCallVoid } from './api/unwrap';
+export { ApiError, apiCall, apiCallVoid } from './api/unwrap';
 
 // Domain APIs
 export * from './api/projects';

@@ -5,6 +5,21 @@
  */
 import { fetchApi, fetchApiForBackend } from './base';
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+function throwApiError(result: { error?: { code?: string; message?: string; details?: unknown } }, fallback: string): never {
+  throw new ApiError(result.error?.message || fallback, result.error?.code, result.error?.details);
+}
+
 /**
  * Call fetchApi and unwrap the ApiResponse — throws on failure, returns data on success.
  * Replaces the 3-line pattern:
@@ -15,7 +30,7 @@ import { fetchApi, fetchApiForBackend } from './base';
 export async function apiCall<T>(path: string, options?: RequestInit): Promise<T> {
   const result = await fetchApi<T>(path, options);
   if (!result.success) {
-    throw new Error(result.error?.message || `API call failed: ${options?.method || 'GET'} ${path}`);
+    throwApiError(result, `API call failed: ${options?.method || 'GET'} ${path}`);
   }
   return result.data as T;
 }
@@ -27,7 +42,7 @@ export async function apiCallForBackend<T>(
 ): Promise<T> {
   const result = await fetchApiForBackend<T>(path, backendId, options);
   if (!result.success) {
-    throw new Error(result.error?.message || `API call failed: ${options?.method || 'GET'} ${path}`);
+    throwApiError(result, `API call failed: ${options?.method || 'GET'} ${path}`);
   }
   return result.data as T;
 }
@@ -39,7 +54,7 @@ export async function apiCallForBackend<T>(
 export async function apiCallVoid(path: string, options?: RequestInit): Promise<void> {
   const result = await fetchApi<void>(path, options);
   if (!result.success) {
-    throw new Error(result.error?.message || `API call failed: ${options?.method || 'GET'} ${path}`);
+    throwApiError(result, `API call failed: ${options?.method || 'GET'} ${path}`);
   }
 }
 
@@ -50,6 +65,6 @@ export async function apiCallVoidForBackend(
 ): Promise<void> {
   const result = await fetchApiForBackend<void>(path, backendId, options);
   if (!result.success) {
-    throw new Error(result.error?.message || `API call failed: ${options?.method || 'GET'} ${path}`);
+    throwApiError(result, `API call failed: ${options?.method || 'GET'} ${path}`);
   }
 }

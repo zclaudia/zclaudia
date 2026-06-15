@@ -15,6 +15,8 @@ import {
   buildProjectPatch,
   isProjectValidationError,
 } from './model.js';
+import { resolveAgentReadinessForSession } from '../agent-readiness/check.js';
+import { sendApiError } from '../../interfaces/http/response.js';
 
 export type ProjectChangeEvent =
   | { type: 'project_upsert'; project: Project }
@@ -28,6 +30,13 @@ export function createProjectRoutes(
   const repo = new ProjectRepository(db);
   const workflowRepo = new WorkflowRepository(db);
   const worktreeService = new ProjectWorktreeService(db);
+
+  function hasAgentReadinessSchema(): boolean {
+    const llmTable = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'llm_profiles'").get();
+    if (!llmTable) return false;
+    const agentCols = db.prepare('PRAGMA table_info(agent_profiles)').all() as Array<{ name: string }>;
+    return agentCols.some((col) => col.name === 'llm_profile_id');
+  }
 
   function validatePermissionWorkflowOverride(permissionWorkflowOverrideId: string | undefined): string | null {
     if (!permissionWorkflowOverrideId) return null;
@@ -98,6 +107,19 @@ export function createProjectRoutes(
 
   router.post('/', (req: Request, res: Response) => {
     try {
+      if (hasAgentReadinessSchema()) {
+        const readiness = resolveAgentReadinessForSession(db, {});
+        if (!readiness.usable) {
+          sendApiError(
+            res,
+            409,
+            'AGENT_NOT_READY',
+            'No usable agent profile is available. Create an agent or configure an LLM profile first.',
+            readiness,
+          );
+          return;
+        }
+      }
       const sortOrder = repo.findNextSortOrder();
       const createState = buildProjectCreateState(req.body ?? {}, sortOrder);
       const overrideError = validatePermissionWorkflowOverride(createState.permissionWorkflowOverrideId);

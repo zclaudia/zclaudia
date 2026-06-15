@@ -15,6 +15,7 @@ import type { SessionEventPublisherPort } from './session-event-port.js';
 import { hasForegroundActiveRunForSession, findForegroundActiveRunIdForSession, hasAnyActiveRunForSession } from '../../utils/run-state.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 import { NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
+import { resolveAgentReadinessForSession } from '../agent-readiness/check.js';
 import type { ActiveRun } from '../../application/conversation/transport/types.js';
 
 type ActiveRunsMap = Map<string, ActiveRun>;
@@ -152,6 +153,24 @@ export function createSessionRoutes(
   // Create session
   router.post('/', (req: Request, res: Response) => {
     try {
+      const requestedType = req.body?.type;
+      const sessionType = requestedType === 'background' || requestedType === 'agent' ? requestedType : 'regular';
+      if (sessionType === 'regular') {
+        const readiness = resolveAgentReadinessForSession(db, {
+          explicitAgentId: typeof req.body?.agentProfileId === 'string' ? req.body.agentProfileId : undefined,
+          projectId: typeof req.body?.projectId === 'string' ? req.body.projectId : undefined,
+        });
+        if (!readiness.usable) {
+          sendApiError(
+            res,
+            409,
+            'AGENT_NOT_READY',
+            'No usable agent profile is available. Create an agent or configure an LLM profile first.',
+            readiness,
+          );
+          return;
+        }
+      }
       const session = lifecycleService.createSession(req.body ?? {});
       res.status(201).json({ success: true, data: session } as ApiResponse<Session>);
     } catch (error) {

@@ -31,6 +31,14 @@ import type { GitWorktree } from '@zclaudia/shared';
 import type { WorktreeGroup } from './worktreeGrouping';
 import { runWithToast } from '../git/runWithToast';
 
+function agentReadinessReasonFromDetails(details: unknown): AgentReadinessReason | undefined {
+  if (!details || typeof details !== 'object') return undefined;
+  const reason = (details as { reason?: unknown }).reason;
+  return reason === 'no_agent' || reason === 'no_llm_profile' || reason === 'no_credential' || reason === 'no_model'
+    ? reason
+    : undefined;
+}
+
 interface SidebarProps {
   collapsed: boolean;
   onToggle: () => void;
@@ -189,6 +197,11 @@ export function Sidebar({
   }, [agentLoaded, agentLoading, loadAllAgents]);
   const agents = Object.values(agentProfiles);
 
+  const showAgentRequiredDialog = useCallback((reason: AgentReadinessReason | undefined) => {
+    setAgentDialogReason(reason);
+    setAgentDialogOpen(true);
+  }, []);
+
   // --- Actions ---
   const actions = useSidebarActions({
     isConnected,
@@ -213,6 +226,10 @@ export function Sidebar({
     newProjectRootPath,
     newSessionName,
     newSessionAgentProfileId,
+    onAgentNotReady: (details) => {
+      showAgentRequiredDialog(agentReadinessReasonFromDetails(details));
+      void refreshReadiness();
+    },
   });
 
   const settingsProject = settingsProjectId ? visibleProjects.find(p => p.id === settingsProjectId) || null : null;
@@ -331,10 +348,9 @@ export function Sidebar({
     await refreshReadiness();
     const latest = useAgentReadinessStore.getState().readiness;
     if (latest?.usable !== false) return true;
-    setAgentDialogReason(latest.reason);
-    setAgentDialogOpen(true);
+    showAgentRequiredDialog(latest.reason);
     return false;
-  }, [refreshReadiness]);
+  }, [refreshReadiness, showAgentRequiredDialog]);
 
   const runAfterAgentGate = useCallback((action: () => void | Promise<void>, options?: { forceRefresh?: boolean }) => {
     if (!options?.forceRefresh && useAgentReadinessStore.getState().readiness?.usable === true) {

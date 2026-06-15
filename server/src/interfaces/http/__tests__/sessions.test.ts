@@ -150,13 +150,19 @@ describe('sessions routes', () => {
       END;
     `);
 
-    // Create a test project + default agent profile (required by SessionRepository.create auto-resolve)
+    // Create a test project + usable default agent/profile pair (required by
+    // SessionRepository.create auto-resolve and regular-session readiness gate).
     const now = Date.now();
     db.prepare(`
       INSERT INTO projects (id, name, type, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?)
     `).run('project-1', 'Test Project', 'code', now, now);
-    seedDefaultAgent(db);
+    db.prepare(`
+      INSERT INTO llm_profiles (id, name, provider_type, api_key, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 1, ?, ?)
+    `).run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
+    const agentId = seedDefaultAgent(db);
+    db.prepare('UPDATE agent_profiles SET llm_profile_id = ? WHERE id = ?').run('llm-default', agentId);
   });
 
   describe('GET /api/sessions', () => {
@@ -393,17 +399,60 @@ describe('sessions routes', () => {
       expect(created.agent_profile_id).toBe('agent-explicit');
     });
 
-    it('returns 400 NO_AGENT when no agent profile available', async () => {
+    it('returns 409 AGENT_NOT_READY when no agent profile available', async () => {
       db.prepare('DELETE FROM agent_profiles').run();
 
       const res = await request(app)
         .post('/api/sessions')
         .send({ projectId: 'project-1', name: 'No Agent' });
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(409);
       expect(res.body.success).toBe(false);
-      expect(res.body.error.code).toBe('NO_AGENT');
-      expect(res.body.error.message).toMatch(/No agent profile available/);
+      expect(res.body.error.code).toBe('AGENT_NOT_READY');
+      expect(res.body.error.details).toEqual({ usable: false, reason: 'no_agent' });
+    });
+
+    it('returns 409 AGENT_NOT_READY when the default agent has no usable LLM credential', async () => {
+      db.prepare('UPDATE llm_profiles SET api_key = NULL WHERE id = ?').run('llm-default');
+
+      const res = await request(app)
+        .post('/api/sessions')
+        .send({ projectId: 'project-1', name: 'No Credential' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('AGENT_NOT_READY');
+      expect(res.body.error.details).toEqual({ usable: false, reason: 'no_credential' });
+    });
+
+    it('returns 409 AGENT_NOT_READY when the resolved agent model is not usable even if another agent is usable', async () => {
+      const now = Date.now();
+      db.prepare('UPDATE agent_profiles SET model = ? WHERE id = ?').run('totally-unregistered-model-id', 'default-agent');
+      db.prepare(`
+        INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, ?, ?)
+      `).run('agent-good', 'Good Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
+
+      const res = await request(app)
+        .post('/api/sessions')
+        .send({ projectId: 'project-1', name: 'Bad Default Model' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('AGENT_NOT_READY');
+      expect(res.body.error.details).toEqual({ usable: false, reason: 'no_model' });
+    });
+
+    it('allows non-regular internal agent sessions even when no user-ready agent exists', async () => {
+      db.prepare('UPDATE llm_profiles SET api_key = NULL WHERE id = ?').run('llm-default');
+
+      const res = await request(app)
+        .post('/api/sessions')
+        .send({ projectId: 'project-1', name: 'Internal Agent', type: 'agent' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.type).toBe('agent');
     });
   });
 

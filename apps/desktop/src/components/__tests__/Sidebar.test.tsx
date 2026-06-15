@@ -52,7 +52,11 @@ vi.mock('../../services/api', async (importOriginal) => {
   const mod = await importOriginal<Record<string, any>>();
   const stubbed: Record<string, any> = {};
   for (const key of Object.keys(mod)) {
-    stubbed[key] = typeof mod[key] === 'function' ? vi.fn(() => Promise.resolve(null)) : mod[key];
+    stubbed[key] = key === 'ApiError'
+      ? mod[key]
+      : typeof mod[key] === 'function'
+        ? vi.fn(() => Promise.resolve(null))
+        : mod[key];
   }
   stubbed.getProjectWorktrees = vi.fn(() => neverSettles);
   stubbed.searchSessions = vi.fn().mockResolvedValue({ results: [], total: 0 });
@@ -957,6 +961,39 @@ describe('Sidebar', () => {
       expect(document.body.textContent).toContain('还没有可用的 Agent');
     });
     expect(api.createSession).not.toHaveBeenCalled();
+  });
+
+  it('shows agent setup dialog when createSession API rejects with AGENT_NOT_READY', async () => {
+    setupStores({
+      agentReadinessStore: {
+        readiness: { usable: true },
+      },
+    });
+    (api.createSession as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new api.ApiError('No usable agent profile is available.', 'AGENT_NOT_READY', { usable: false, reason: 'no_credential' }),
+    );
+
+    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
+    fireEvent.click(projBtn);
+
+    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
+      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
+    });
+    fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
+    const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session')!;
+    fireEvent.click(newSessionBtn);
+
+    const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
+    await act(async () => {
+      fireEvent.click(createBtn);
+    });
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('模型 Provider 还缺少 API Key');
+    });
+    expect(selectionMocks.selectSession).not.toHaveBeenCalledWith('new-sess');
   });
 
   // ---- Search ----

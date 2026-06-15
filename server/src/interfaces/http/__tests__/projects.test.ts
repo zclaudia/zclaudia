@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import Database from 'better-sqlite3';
@@ -273,6 +273,97 @@ describe('projects routes', () => {
           name: 'Callback Project',
         }),
       });
+    });
+  });
+
+  describe('POST /api/projects readiness gate', () => {
+    let gatedDb: Database.Database;
+    let gatedApp: ReturnType<typeof express>;
+
+    beforeEach(() => {
+      gatedDb = createTestDb();
+      gatedDb.exec(`
+        CREATE TABLE IF NOT EXISTS llm_profiles (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          provider_type TEXT NOT NULL DEFAULT 'anthropic',
+          api_key TEXT,
+          is_default INTEGER DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS agent_profiles (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          llm_profile_id TEXT,
+          model TEXT NOT NULL DEFAULT 'claude-sonnet-4-6',
+          enabled_tools TEXT NOT NULL DEFAULT '[]',
+          is_default INTEGER DEFAULT 0,
+          created_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL
+        );
+      `);
+      gatedApp = createTestApp(gatedDb);
+    });
+
+    afterEach(() => {
+      gatedDb?.close();
+    });
+
+    it('returns 409 AGENT_NOT_READY when no usable agent exists', async () => {
+      const res = await request(gatedApp)
+        .post('/api/projects')
+        .send({ name: 'Blocked Project' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('AGENT_NOT_READY');
+      expect(res.body.error.details).toEqual({ usable: false, reason: 'no_agent' });
+    });
+
+    it('allows project creation when a usable agent exists', async () => {
+      const now = Date.now();
+      gatedDb.prepare(`
+        INSERT INTO llm_profiles (id, name, provider_type, api_key, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?)
+      `).run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
+      gatedDb.prepare(`
+        INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?)
+      `).run('agent-default', 'Default Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
+
+      const res = await request(gatedApp)
+        .post('/api/projects')
+        .send({ name: 'Allowed Project' });
+
+      expect(res.status).toBe(201);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.name).toBe('Allowed Project');
+    });
+
+    it('rejects project creation when the default agent model is invalid even if another agent is usable', async () => {
+      const now = Date.now();
+      gatedDb.prepare(`
+        INSERT INTO llm_profiles (id, name, provider_type, api_key, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?)
+      `).run('llm-default', 'Default LLM', 'anthropic', 'sk-test', now, now);
+      gatedDb.prepare(`
+        INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 1, ?, ?)
+      `).run('agent-bad', 'Bad Default Agent', 'llm-default', 'totally-unregistered-model-id', now, now);
+      gatedDb.prepare(`
+        INSERT INTO agent_profiles (id, name, llm_profile_id, model, is_default, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 0, ?, ?)
+      `).run('agent-good', 'Good Agent', 'llm-default', 'claude-sonnet-4-6', now, now);
+
+      const res = await request(gatedApp)
+        .post('/api/projects')
+        .send({ name: 'Blocked Project' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('AGENT_NOT_READY');
+      expect(res.body.error.details).toEqual({ usable: false, reason: 'no_model' });
     });
   });
 
