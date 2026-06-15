@@ -1,20 +1,51 @@
 import type Database from 'better-sqlite3';
 import { newId } from '../../utils/uuid.js';
 import { systemTaskRegistry } from '../../application/services/system-task-registry.js';
+import { resolveEnvCredential } from './env-credential.js';
 
 let tempFileCleanupTimer: ReturnType<typeof setInterval> | null = null;
 
 export function autoDetectProviders(db: Database.Database): void {
-  const existing = db.prepare('SELECT id FROM llm_profiles LIMIT 1').get() as { id: string } | undefined;
-  if (existing) return;
-
+  const cred = resolveEnvCredential();
   const now = Date.now();
-  db.prepare(`
-    INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, is_default, created_at, updated_at)
-    VALUES (?, ?, 'anthropic', NULL, NULL, NULL, 1, ?, ?)
-  `).run(newId(), 'ZClaudia Agent', now, now);
 
-  console.log('   Registered default ZClaudia agent runtime');
+  const existing = db.prepare('SELECT id FROM llm_profiles LIMIT 1').get() as { id: string } | undefined;
+  if (!existing) {
+    // Seed the default profile, materializing the env credential when present.
+    db.prepare(`
+      INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, is_default, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, NULL, 1, ?, ?)
+    `).run(
+      newId(),
+      'ZClaudia Agent',
+      cred?.providerType ?? 'anthropic',
+      cred?.baseUrl ?? null,
+      cred?.apiKey ?? null,
+      now,
+      now,
+    );
+    console.log('   Registered default ZClaudia agent runtime');
+    return;
+  }
+
+  // Backfill: fill a keyless default profile from env (bootstrap convenience →
+  // profile becomes the source of truth). Never overwrite an existing credential.
+  if (!cred) return;
+  const def = db.prepare(`
+    SELECT id, provider_type, api_key, oauth_credentials FROM llm_profiles
+    WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1
+  `).get() as { id: string; provider_type: string; api_key: string | null; oauth_credentials: string | null } | undefined;
+  if (!def) return;
+  // Never touch a codex profile: it is legitimately keyless while the user is
+  // completing OAuth; backfilling would convert it and break the OAuth flow.
+  if (def.provider_type === 'openai-codex') return;
+  const keyless = (def.api_key == null || def.api_key.trim() === '') && def.oauth_credentials == null;
+  if (!keyless) return;
+
+  db.prepare(`
+    UPDATE llm_profiles SET provider_type = ?, base_url = ?, api_key = ?, updated_at = ? WHERE id = ?
+  `).run(cred.providerType, cred.baseUrl ?? null, cred.apiKey, now, def.id);
+  console.log('   Backfilled default ZClaudia agent credential from environment');
 }
 
 export function startTempFileCleanup(): void {

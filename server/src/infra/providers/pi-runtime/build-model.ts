@@ -231,16 +231,14 @@ export function buildModel(
   }
   applyModelEntryOverrides(model, modelEntry);
 
-  // API key resolution priority:
-  //   1. Explicit `profile.apiKey` always wins (the editor is the canonical
-  //      surface for credentials).
-  //   2. When `OPENAI_BASE_URL` is set (dev-time env knob), surface
-  //      `OPENAI_API_KEY` so the openai-compat path has a key even when
-  //      there's no profile.
-  //   3. When no registry hit landed (literal openai-compat path), still
-  //      surface `OPENAI_API_KEY` as a sane secondary source.
-  //   4. Otherwise leave `getApiKey` undefined and let pi-ai own env
-  //      resolution for known providers (ANTHROPIC_API_KEY etc.).
+  // API key resolution: the llm-profile is the single source of truth.
+  //   1. openai-codex → OAuth access token (refreshed).
+  //   2. Explicit `profile.apiKey` (the canonical, editable surface).
+  //   3. Otherwise leave `getApiKey` undefined. Env credentials are materialized
+  //      onto profiles at startup (resolveEnvCredential / autoDetectProviders);
+  //      we do not read env for a credential here. pi-ai still owns its own env
+  //      fallback for a keyless profile, but that path is unreachable once the
+  //      profile carries the key.
   let getApiKey: BuiltModel['getApiKey'];
   if (profile?.providerType === 'openai-codex') {
     getApiKey = async () => {
@@ -249,8 +247,6 @@ export function buildModel(
     };
   } else if (profile?.apiKey) {
     getApiKey = async () => profile.apiKey!;
-  } else if (process.env.OPENAI_BASE_URL || !registryHit) {
-    getApiKey = async () => process.env.OPENAI_API_KEY ?? '';
   }
 
   return { model, getApiKey };
