@@ -25,7 +25,7 @@ export interface CompactionContext {
   /** Optional usage from the most recent assistant turn (currently unused — reserved for future smarter triggering). */
   lastAssistantUsage?: Usage;
   customInstructions?: string;
-  source: 'auto' | 'manual';
+  source: 'auto' | 'manual' | 'overflow';
   signal?: AbortSignal;
   /** Injectable clock (ms since epoch). Defaults to Date.now(). */
   now?: number;
@@ -118,6 +118,38 @@ export async function forceCompact(ctx: CompactionContext): Promise<CompactionOu
     // call recordFailure — they do not trip the auto-compaction breaker.
     const message = err instanceof Error ? err.message : String(err);
     return { outcome: 'failed', compacted: false, reason: `error: ${message}` };
+  }
+}
+
+/**
+ * Overflow-recovery entry — invoked from handleRunException when the provider
+ * rejected a turn for exceeding the context window. Breaker-gated (so a
+ * compaction that itself keeps failing won't storm), but SKIPS the
+ * `shouldCompact` threshold gate: the provider already told us we're over, and
+ * our local chars/4 estimate is exactly the thing that disagreed. Records
+ * breaker success/failure like `maybeCompact`.
+ *
+ * Returns `skipped('no_cut_point')` when the most recent turn alone exceeds the
+ * keep-recent budget — the caller must then fall through to normal failure
+ * (retrying would just overflow again).
+ */
+export async function compactForOverflow(ctx: CompactionContext): Promise<CompactionOutcome> {
+  const now = ctx.now ?? Date.now();
+  const decision = compactionCircuitBreaker.evaluate(ctx.sessionId, now);
+  if (decision.action === 'skip') {
+    return skipped('circuit_open', undefined, {
+      breaker: { ...compactionCircuitBreaker.snapshot(ctx.sessionId), breakerOpen: true },
+    });
+  }
+  try {
+    const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
+    if (messages.length === 0) return skipped('no_messages');
+    const tokens = estimateContextTokens(messages).tokens;
+    const result = await runCompaction(ctx, messages, dbIds, tokens);
+    if (result.outcome === 'compacted') compactionCircuitBreaker.recordSuccess(ctx.sessionId);
+    return result;
+  } catch (err) {
+    return classifyFailure(ctx, err, now);
   }
 }
 

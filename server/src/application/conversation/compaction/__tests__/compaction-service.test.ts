@@ -4,7 +4,7 @@ import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { SessionCompactionRepository } from '../../../../domains/sessions/compaction-repository.js';
-import { maybeCompact, forceCompact } from '../compaction-service.js';
+import { maybeCompact, forceCompact, compactForOverflow } from '../compaction-service.js';
 import { compactionCircuitBreaker } from '../circuit-breaker.js';
 import * as pi from '@earendil-works/pi-agent-core';
 
@@ -259,5 +259,68 @@ describe('maybeCompact circuit breaker', () => {
     const out = await forceCompact({ db, sessionId: 's1', agentProfile, llmProfile, source: 'manual' });
     expect(out.outcome).toBe('compacted');
     expect(compactionCircuitBreaker.size()).toBe(0);
+  });
+});
+
+describe('compactForOverflow', () => {
+  beforeEach(() => {
+    compactionCircuitBreaker.clear();
+    vi.mocked(pi.generateSummary).mockReset();
+    vi.mocked(pi.generateSummary).mockResolvedValue({ ok: true, value: 'MOCKED-SUMMARY' } as any);
+  });
+
+  it('compacts even below the auto threshold (skips shouldCompact gate)', async () => {
+    // Use a fresh db+session with a unique sessionId to avoid cross-test breaker state.
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    // seedSession always uses sessionId='s1'; use a new db for isolation.
+    const { agentProfile, llmProfile } = seedSession(db, 100);
+    // Use default llmProfile (no contextWindow override) → tokens would be below
+    // the auto threshold for a large window, but compactForOverflow must compact anyway.
+    const result = await compactForOverflow({
+      db, sessionId: 's1', agentProfile, llmProfile, source: 'overflow',
+    });
+    expect(result.outcome).toBe('compacted');
+    expect(result.compacted).toBe(true);
+  });
+
+  it('respects an open circuit breaker and returns circuit_open', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const { agentProfile, llmProfile } = seedSession(db, 100);
+    // Use a unique sessionId for this test to avoid cross-talk.
+    const sessionId = 'overflow-breaker-test';
+    const now = 1_000_000;
+    // Trip the breaker past maxFailures (3).
+    for (let i = 0; i < 3; i++) compactionCircuitBreaker.recordFailure(sessionId, now);
+    const result = await compactForOverflow({
+      db, sessionId, agentProfile, llmProfile, source: 'overflow', now,
+    });
+    expect(result.outcome).toBe('skipped');
+    expect(result.reason).toBe('circuit_open');
+    // Cleanup.
+    compactionCircuitBreaker.reset(sessionId);
+  });
+
+  it('records breaker success on a successful compaction', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const { agentProfile, llmProfile } = seedSession(db, 100);
+    const sessionId = 'overflow-success-test';
+    // Pre-seed one failure so we can verify it gets cleared.
+    compactionCircuitBreaker.recordFailure(sessionId, 1);
+    // Insert messages into the db under the unique sessionId.
+    // seedSession hardcodes 's1', so we copy the rows into a new session row.
+    db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
+      .run(sessionId, 'p1', 'ap1', 0, 0);
+    for (let i = 0; i < 100; i++) {
+      db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
+        .run(`mo${i + 1}`, sessionId, i % 2 === 0 ? 'user' : 'assistant', 'x'.repeat(2000), i * 1000, i + 1);
+    }
+    const result = await compactForOverflow({
+      db, sessionId, agentProfile, llmProfile, source: 'overflow',
+    });
+    expect(result.outcome).toBe('compacted');
+    expect(compactionCircuitBreaker.snapshot(sessionId).consecutiveFailures).toBe(0);
   });
 });
