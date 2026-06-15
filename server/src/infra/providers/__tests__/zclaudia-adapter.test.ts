@@ -537,6 +537,23 @@ describe('ZClaudiaAdapter.run', () => {
     expect(out[1].error).toMatch(/unknown model/);
   });
 
+  it('error-path init reports the env-resolved model id (OPENAI_MODEL), not the hardcoded default', async () => {
+    const prevPi = process.env.PI_MODEL;
+    const prevOpenai = process.env.OPENAI_MODEL;
+    delete process.env.PI_MODEL;
+    process.env.OPENAI_MODEL = 'invalid-model'; // mock getModel throws → buildModel throws
+    try {
+      const adapter = new ZClaudiaAdapter();
+      const out = await collect(adapter, 'hi', {});
+      expect(out.map(m => m.type)).toEqual(['init', 'error']);
+      // The badge must reflect the model that actually failed, not claude-sonnet-4-6.
+      expect(out[0].systemInfo?.model).toBe('invalid-model');
+    } finally {
+      if (prevPi === undefined) delete process.env.PI_MODEL; else process.env.PI_MODEL = prevPi;
+      if (prevOpenai === undefined) delete process.env.OPENAI_MODEL; else process.env.OPENAI_MODEL = prevOpenai;
+    }
+  });
+
   it('LLM error: yields error(isComplete) at end of stream', async () => {
     scriptNextAgent([
       { type: 'agent_start' },

@@ -3,9 +3,9 @@ import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/co
 import { tryGetRegistryModel, findInRegistryCrossProvider, type RegistryHit } from './registry-search.js';
 import { refreshIfNeeded } from '../../../domains/llm-profiles/codex-oauth-service.js';
 import { getLlmProfileWriter } from '../../../domains/llm-profiles/repository-registry.js';
+import { resolveEnvModel } from './env-model.js';
 
 const DEFAULT_PROVIDER = 'anthropic';
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
 
 /**
  * Default context window for the openai-compat literal path (no registry
@@ -154,14 +154,10 @@ export function buildModel(
     profile?.providerType
     ?? process.env.PI_PROVIDER
     ?? (process.env.OPENAI_BASE_URL ? 'openai' : DEFAULT_PROVIDER);
-  // OPENAI_MODEL is a legacy env knob from the dev scripts that survives
-  // alongside PI_MODEL; honour it as a secondary fallback when no profile
-  // override is supplied. PI_MODEL still wins to keep the documented dev
-  // env surface predictable.
-  const modelId = modelOverride
-    ?? process.env.PI_MODEL
-    ?? process.env.OPENAI_MODEL
-    ?? DEFAULT_MODEL;
+  // When no explicit override is supplied, fall back to the dev-time env knobs
+  // (PI_MODEL wins, then the legacy OPENAI_MODEL, then the default). Shared with
+  // the default-agent seed so a seeded agent's model matches what we request.
+  const modelId = modelOverride ?? resolveEnvModel();
 
   // 1) same-provider lookup; 2) cross-provider sweep.
   const registryHit: RegistryHit | undefined =
