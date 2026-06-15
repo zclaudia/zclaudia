@@ -98,5 +98,18 @@ describe('remediationForResult', () => {
         fullOutputPath: '/tmp/output.log',
       } as any)).toBeUndefined();
     });
+
+    it('suppresses the Bash fullOutputPath hint when the loop guard fires (load-bearing)', () => {
+      // Without tool_loop_detected in SELF_EXPLANATORY this Bash failure would
+      // return the "full output is at ..." hint; membership must short-circuit it.
+      expect(
+        remediationForResult('Bash', {
+          ok: false,
+          error: 'tool_loop_detected',
+          exitCode: 1,
+          fullOutputPath: '/tmp/x.txt',
+        } as any),
+      ).toBeUndefined();
+    });
   });
 });
