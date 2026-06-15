@@ -86,4 +86,30 @@ describe('remediationForResult', () => {
   it('returns undefined for unknown error codes', () => {
     expect(remediationForResult('Grep', det({ ok: false, error: 'some_novel_error' }))).toBeUndefined();
   });
+
+  describe('remediationForResult — tool_loop_detected', () => {
+    it('returns undefined (self-explanatory) for tool_loop_detected even with a fallback-triggered hint context', () => {
+      // With a .fullOutputPath that would normally trigger a hint for generic Bash failure,
+      // tool_loop_detected should still suppress it (it's self-explanatory).
+      expect(remediationForResult('Bash', {
+        ok: false,
+        error: 'tool_loop_detected',
+        exitCode: 1,
+        fullOutputPath: '/tmp/output.log',
+      } as any)).toBeUndefined();
+    });
+
+    it('suppresses the Bash fullOutputPath hint when the loop guard fires (load-bearing)', () => {
+      // Without tool_loop_detected in SELF_EXPLANATORY this Bash failure would
+      // return the "full output is at ..." hint; membership must short-circuit it.
+      expect(
+        remediationForResult('Bash', {
+          ok: false,
+          error: 'tool_loop_detected',
+          exitCode: 1,
+          fullOutputPath: '/tmp/x.txt',
+        } as any),
+      ).toBeUndefined();
+    });
+  });
 });

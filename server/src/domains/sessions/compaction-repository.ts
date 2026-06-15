@@ -7,7 +7,7 @@ export interface SessionCompaction {
   firstKeptMessageId: string;
   tokensBefore: number;
   details: { readFiles: string[]; modifiedFiles: string[] } | null;
-  source: 'auto' | 'manual';
+  source: 'auto' | 'manual' | 'overflow';
   customInstructions: string | null;
   createdAt: number;
 }
@@ -19,7 +19,7 @@ export interface CreateSessionCompactionInput {
   firstKeptMessageId: string;
   tokensBefore: number;
   details?: { readFiles: string[]; modifiedFiles: string[] };
-  source: 'auto' | 'manual';
+  source: 'auto' | 'manual' | 'overflow';
   customInstructions?: string;
   createdAt: number;
 }
@@ -36,7 +36,7 @@ export class SessionCompactionRepository {
       firstKeptMessageId: row.first_kept_message_id,
       tokensBefore: row.tokens_before,
       details: row.details ? JSON.parse(row.details) : null,
-      source: row.source as 'auto' | 'manual',
+      source: row.source as 'auto' | 'manual' | 'overflow',
       customInstructions: row.custom_instructions ?? null,
       createdAt: row.created_at,
     };

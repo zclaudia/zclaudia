@@ -445,3 +445,67 @@ describe('user hooks integration', () => {
     ]);
   });
 });
+
+describe('afterToolCall — tool failure loop guard', () => {
+  function makeHooks() {
+    return buildAgentHooks({
+      permissionCallback: vi.fn().mockResolvedValue({ behavior: 'allow' }),
+      autoFixHints: true,
+    } as any);
+  }
+  function failingCtx() {
+    return {
+      toolCall: { name: 'Bash' },
+      args: { command: 'npm test' },
+      result: {
+        content: [{ type: 'text', text: 'command failed' }],
+        details: { ok: false, error: 'nonzero_exit' },
+      },
+    };
+  }
+
+  it('appends a [loop] nudge and upgrades error on the 3rd identical failure', async () => {
+    const hooks = makeHooks();
+    await hooks.afterToolCall!(failingCtx() as any);
+    await hooks.afterToolCall!(failingCtx() as any);
+    const third = await hooks.afterToolCall!(failingCtx() as any);
+    const text = (third?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).toContain('[loop]');
+    expect(third?.details?.error).toBe('tool_loop_detected');
+  });
+
+  it('resets the counter on success so a later identical failure does not nudge', async () => {
+    const hooks = makeHooks();
+    await hooks.afterToolCall!(failingCtx() as any);   // count 1
+    await hooks.afterToolCall!(failingCtx() as any);   // count 2
+    await hooks.afterToolCall!({                        // success → reset to 0
+      toolCall: { name: 'Bash' }, args: { command: 'npm test' },
+      result: { content: [{ type: 'text', text: 'ok' }], details: { ok: true } },
+    } as any);
+    const after = await hooks.afterToolCall!(failingCtx() as any); // count 1 if reset worked
+    const text = (after?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).not.toContain('[loop]');
+  });
+
+  it('does not add a generic [loop] when a tool already escalated to *_loop_detected', async () => {
+    const hooks = makeHooks();
+    const editLoopCtx = () => ({
+      toolCall: { name: 'Edit' },
+      args: { file_path: '/p/a.ts', old_string: 'x' },
+      result: {
+        content: [{ type: 'text', text: 'edit failed' }],
+        details: { ok: false, error: 'edit_loop_detected' },
+      },
+    });
+    // Even after many identical edit-loop-detected results, no generic [loop]
+    // is appended and the specific error code is preserved.
+    let last: any;
+    for (let i = 0; i < 4; i++) last = await hooks.afterToolCall!(editLoopCtx() as any);
+    const text = (last?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).not.toContain('[loop]');
+    // error code is NOT overwritten to tool_loop_detected (when a result obj is returned)
+    if (last?.details?.error !== undefined) {
+      expect(last.details.error).toBe('edit_loop_detected');
+    }
+  });
+});

@@ -7,6 +7,7 @@ import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks
 import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
 import { measureTextBytes, persistToolResultText } from './tool-result-store.js';
 import { remediationForResult } from './remediation.js';
+import { ToolFailureLoopGuard, TOOL_FAILURE_HARD_LIMIT } from './tool-failure-loop-guard.js';
 
 export const DEFAULT_OUTPUT_LIMIT_BYTES = 64 * 1024;
 
@@ -175,6 +176,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
   // Tracks how many times Edit has hit each file path in the current turn.
   // Reset on shouldStopAfterTurn alongside turnSpentBytes.
   const editAttemptsByPath = new Map<string, number>();
+  const toolFailureGuard = new ToolFailureLoopGuard();
 
   return {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -269,6 +271,33 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           hookAppended = true;
         }
       }
+
+      // Tool failure loop guard: track consecutive identical failures; once the
+      // hard limit is reached, append a [loop] nudge and upgrade the error code
+      // so the model knows it must change strategy rather than retry blindly.
+      const isFailure = result?.details?.ok === false;
+      const alreadyLoopDetected =
+        typeof result?.details?.error === 'string' &&
+        result.details.error.endsWith('_loop_detected');
+      if (isFailure && !alreadyLoopDetected) {
+        const attempts = toolFailureGuard.recordFailure(toolName, args as Record<string, unknown> | undefined);
+        if (attempts >= TOOL_FAILURE_HARD_LIMIT) {
+          content = [
+            ...content,
+            {
+              type: 'text',
+              text: `[loop] This tool call has failed ${attempts} times with identical inputs. Stop retrying the same call — change the approach, inspect prerequisites, or ask the user.`,
+            },
+          ];
+          // Upgrade the error code so remediationForResult stays silent (it's in
+          // SELF_EXPLANATORY) and downstream readers can detect the loop.
+          result.details = { ...result.details, error: 'tool_loop_detected' };
+          remediationAppended = true; // also covers [loop] nudge — ensures modified result is returned
+        }
+      } else if (result?.details?.ok === true) {
+        toolFailureGuard.recordSuccess(toolName, args as Record<string, unknown> | undefined);
+      }
+
       const truncated = truncateContent(content, toolName, limit);
       const finalContent = truncated.didTruncate ? truncated.content : content;
       const finalSize = measureTextBytes(finalContent);

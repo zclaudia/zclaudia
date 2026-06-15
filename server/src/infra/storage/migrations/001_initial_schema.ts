@@ -657,7 +657,7 @@ CREATE TABLE IF NOT EXISTS session_compactions (
   first_kept_message_id TEXT NOT NULL,
   tokens_before INTEGER NOT NULL,
   details TEXT,
-  source TEXT NOT NULL CHECK(source IN ('auto', 'manual')) DEFAULT 'auto',
+  source TEXT NOT NULL CHECK(source IN ('auto', 'manual', 'overflow')) DEFAULT 'auto',
   custom_instructions TEXT,
   created_at INTEGER NOT NULL,
   FOREIGN KEY (first_kept_message_id) REFERENCES messages(id) ON DELETE CASCADE

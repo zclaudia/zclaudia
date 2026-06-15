@@ -37,7 +37,7 @@ export async function handleRunStart(
   client: ConnectedClient,
   message: RunStartMessage,
   db: ReturnType<typeof initDatabase>,
-  recoveryState: { sessionResetRetryCount?: number } = {},
+  recoveryState: { sessionResetRetryCount?: number; overflowRetryCount?: number } = {},
   clients?: Map<string, ConnectedClient>,
   ctx?: RunHandlerContext,
 ): Promise<void> {
@@ -226,12 +226,12 @@ export async function handleRunStart(
       error,
       formatProviderErrorMessage,
       providerRegistry: ctx!.providerRegistry,
-      handleRetry: async () => {
+      handleRetry: async (nextRecoveryState: { sessionResetRetryCount?: number; overflowRetryCount?: number }) => {
         await handleRunStart(
           client,
           { ...message, resend: true },
           db,
-          { sessionResetRetryCount: (recoveryState.sessionResetRetryCount || 0) + 1 },
+          nextRecoveryState,
           clients,
           ctx,
         );

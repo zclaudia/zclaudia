@@ -90,7 +90,7 @@ export interface CompactionMarker {
   compactionId: string;
   summary: string;
   tokensBefore: number;
-  source: 'auto' | 'manual';
+  source: 'auto' | 'manual' | 'overflow';
   customInstructions?: string;
   readFiles: string[];
   modifiedFiles: string[];

@@ -26,7 +26,7 @@ import { isSandboxAvailable } from './pi-runtime/sandbox.js';
 import { SANDBOX_NETWORK_ESCALATION_TOOL } from './pi-runtime/sandbox-denial.js';
 import { loadSessionSandboxDomains } from '../../application/conversation/agent/permission-memory.js';
 import { resolveContextWindow } from '../../application/conversation/compaction/context-windows.js';
-import { captureContextSnapshot, recordContextUsage } from './context-snapshot.js';
+import { captureContextSnapshot, recordContextUsage, diffPrefixForCacheAudit } from './context-snapshot.js';
 import { resolveImageAttachments } from '../../application/conversation/runtime/resolve-image-attachments.js';
 import { getFileStore } from '../storage/fileStore.js';
 
@@ -517,6 +517,21 @@ export class ZClaudiaAdapter implements ProviderAdapter {
           parameters: t.parameters,
         })),
       });
+      if (process.env.ZCLAUDIA_CACHE_AUDIT === '1') {
+        const audit = diffPrefixForCacheAudit(
+          options.claudiaSessionId,
+          (options.systemPrompt ?? '') + externalProviderCatalog + (isPlanMode ? PLAN_MODE_SYSTEM_PROMPT_SUFFIX : ''),
+          skillCatalog + activeSkillContext,
+          tools.map((t) => ({ name: t.name, description: t.description, parameters: t.parameters })),
+        );
+        if (!audit.firstRun && (!audit.promptStable || !audit.toolsStable)) {
+          console.warn(
+            `[CacheAudit] session=${options.claudiaSessionId} PREFIX CHANGED promptStable=${audit.promptStable} toolsStable=${audit.toolsStable} (prompt=${audit.promptHash} tools=${audit.toolsHash}) — provider prefix cache invalidated at this run boundary`,
+          );
+        } else {
+          console.log(`[CacheAudit] session=${options.claudiaSessionId} prefix stable=${!audit.firstRun} prompt=${audit.promptHash} tools=${audit.toolsHash}`);
+        }
+      }
     }
 
     // Queue is created before agentOpts so the onRetry callback can push
@@ -608,6 +623,14 @@ export class ZClaudiaAdapter implements ProviderAdapter {
               cacheRead: lastCallUsage.cacheRead ?? 0,
               cacheWrite: lastCallUsage.cacheWrite ?? 0,
             });
+            if (process.env.ZCLAUDIA_CACHE_AUDIT === '1') {
+              const read = lastCallUsage.cacheRead ?? 0;
+              const write = lastCallUsage.cacheWrite ?? 0;
+              const input = lastCallUsage.input ?? 0;
+              const cacheableBase = read + write + input;
+              const hitPct = cacheableBase > 0 ? Math.round((read / cacheableBase) * 1000) / 10 : 0;
+              console.log(`[CacheAudit] session=${options.claudiaSessionId} cacheRead=${read} cacheWrite=${write} input=${input} hit=${hitPct}%`);
+            }
           }
         }
 

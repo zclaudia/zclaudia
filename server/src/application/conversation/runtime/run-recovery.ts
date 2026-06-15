@@ -6,7 +6,9 @@ import type { ProcessMonitor } from '../../../utils/process-monitor.js';
 import type { ConnectedClient } from '../transport/types.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import { broadcastRunMessage, sendMessage } from '../transport/broadcast.js';
-import { MAX_SESSION_RESET_RETRIES } from '../transport/types.js';
+import { MAX_SESSION_RESET_RETRIES, MAX_OVERFLOW_RETRIES } from '../transport/types.js';
+import { compactForOverflow } from '../compaction/compaction-service.js';
+import { ContextOverflowError } from './context-overflow.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
 import { postRunFailedNotification } from './run-terminal-notifications.js';
@@ -26,7 +28,7 @@ interface HandleRunExceptionInput {
     authErrorHint?: { matchAny: Array<string | string[]>; message: string },
   ) => string;
   providerRegistry?: { getPolicy(type: string): { authErrorHint?: { matchAny: Array<string | string[]>; message: string } } | undefined };
-  handleRetry: () => Promise<void>;
+  handleRetry: (nextRecoveryState: { sessionResetRetryCount?: number; overflowRetryCount?: number }) => Promise<void>;
   isHardQuotaExceededError: (message: string) => boolean;
   message: {
     sessionId: string;
@@ -34,7 +36,7 @@ interface HandleRunExceptionInput {
   notificationService: NotificationSender;
   notificationsService?: NotificationService;
   processMonitor: ProcessMonitor | null;
-  recoveryState: { sessionResetRetryCount?: number };
+  recoveryState: { sessionResetRetryCount?: number; overflowRetryCount?: number };
   runId: string;
   sdkSessionId?: string;
   sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
@@ -72,6 +74,46 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
     : undefined;
   const formattedErrMsg = formatProviderErrorMessage(errMsg, activeRun.providerType, authHint);
   const sessionResetRetryCount = recoveryState.sessionResetRetryCount || 0;
+  const overflowRetryCount = recoveryState.overflowRetryCount || 0;
+  if (
+    error instanceof ContextOverflowError
+    && activeRun.agentProfile
+    && activeRun.llmProfile
+    && overflowRetryCount < MAX_OVERFLOW_RETRIES
+  ) {
+    const outcome = await compactForOverflow({
+      db: input.db,
+      sessionId: message.sessionId,
+      agentProfile: activeRun.agentProfile,
+      llmProfile: activeRun.llmProfile,
+      source: 'overflow',
+      signal: activeRun.abortController?.signal,
+    });
+    if (outcome.outcome === 'compacted') {
+      console.log(`[Overflow] session=${message.sessionId} compacted; retrying turn`);
+      sendRunEvent({
+        type: 'delta',
+        runId,
+        sessionId: activeRun.sessionId,
+        content: '⚠️ Context limit reached — compacted the conversation and retrying automatically…',
+      });
+      if (activeRun.saveInterval) {
+        clearInterval(activeRun.saveInterval);
+        activeRun.saveInterval = undefined;
+      }
+      cleanupPendingPermissions(activeRun, 'Overflow recovery retry');
+      activeRuns.delete(runId);
+      broadcastHeartbeat();
+      try {
+        await handleRetry({ overflowRetryCount: overflowRetryCount + 1, sessionResetRetryCount: recoveryState.sessionResetRetryCount });
+        return { handedOffToRetry: true };
+      } catch (retryError) {
+        console.error('[Overflow] retry after compaction also failed:', retryError);
+      }
+    }
+    // Not compacted (no_cut_point / circuit_open / failed) → fall through to
+    // the normal failure path below; retrying would just overflow again.
+  }
 
   if (
     errMsg.includes('process exited with code')
@@ -99,7 +141,7 @@ export async function handleRunException(input: HandleRunExceptionInput): Promis
     broadcastHeartbeat();
 
     try {
-      await handleRetry();
+      await handleRetry({ sessionResetRetryCount: sessionResetRetryCount + 1, overflowRetryCount: recoveryState.overflowRetryCount });
       return { handedOffToRetry: true };
     } catch (retryError) {
       console.error('[Recovery] Auto-retry after session reset also failed:', retryError);

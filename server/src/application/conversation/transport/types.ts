@@ -137,6 +137,7 @@ export interface MessageSender {
 // PERMISSION_TIMEOUT_POLICIES removed — timeout logic is now handled by the permission workflow template.
 
 export const MAX_SESSION_RESET_RETRIES = 1;
+export const MAX_OVERFLOW_RETRIES = 1;
 
 export const PERIODIC_SAVE_INTERVAL_MS = 5000;
 

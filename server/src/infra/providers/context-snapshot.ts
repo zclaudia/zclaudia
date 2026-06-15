@@ -1,5 +1,6 @@
 import type { ContextUsagePayload } from '@zclaudia/shared';
 import type { ContextWindowSource } from '@zclaudia/shared/wire/messages/core';
+import { createHash } from 'crypto';
 
 /**
  * Per-session context-composition snapshots backing the /context command.
@@ -43,6 +44,46 @@ export interface CaptureContextSnapshotInput {
 }
 
 const snapshots = new Map<string, ContextSnapshot>();
+
+interface PrefixHashes { promptHash: string; toolsHash: string }
+const prefixHashes = new Map<string, PrefixHashes>();
+
+export interface PrefixCacheAuditResult {
+  firstRun: boolean;
+  promptStable: boolean;
+  toolsStable: boolean;
+  promptHash: string;
+  toolsHash: string;
+}
+
+function sha(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16);
+}
+
+/**
+ * Compares this run's cache-relevant prefix (system prompt + skill catalog, and
+ * the tool set) against the previous run for the same session. A changed hash
+ * means the provider's prompt prefix cache is invalidated at the run boundary.
+ * Pure-ish: mutates only the module-local prefixHashes store, like snapshots.
+ */
+export function diffPrefixForCacheAudit(
+  sessionId: string,
+  systemPromptText: string,
+  skillCatalogText: string,
+  tools: ReadonlyArray<{ name: string; description?: string; parameters?: unknown }>,
+): PrefixCacheAuditResult {
+  const promptHash = sha(systemPromptText + ' ' + skillCatalogText);
+  const toolsHash = sha(JSON.stringify(tools.map((t) => [t.name, t.description ?? '', t.parameters ?? null])));
+  const prev = prefixHashes.get(sessionId);
+  prefixHashes.set(sessionId, { promptHash, toolsHash });
+  return {
+    firstRun: !prev,
+    promptStable: prev ? prev.promptHash === promptHash : true,
+    toolsStable: prev ? prev.toolsHash === toolsHash : true,
+    promptHash,
+    toolsHash,
+  };
+}
 
 /** Rough token estimate: ceil(chars / 4). Good enough for a breakdown view. */
 export function estimateTokens(text: string): number {

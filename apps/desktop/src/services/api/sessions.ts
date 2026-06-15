@@ -15,7 +15,7 @@ export interface SessionCompactionResponse {
   firstKeptMessageId: string;
   tokensBefore: number;
   details: { readFiles: string[]; modifiedFiles: string[] } | null;
-  source: 'auto' | 'manual';
+  source: 'auto' | 'manual' | 'overflow';
   customInstructions: string | null;
   createdAt: number;
 }
