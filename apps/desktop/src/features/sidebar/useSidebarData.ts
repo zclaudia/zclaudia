@@ -13,6 +13,7 @@ import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useClaudiaStatus } from '../../hooks/useClaudiaStatus';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
+import { selectProjectIdsForBackend } from './projectGrouping';
 
 /**
  * Aggregates all store selectors and derived data for the Sidebar.
@@ -75,14 +76,9 @@ export function useSidebarData() {
   }, [sessionRunRecords]);
 
   const ownershipStore = useOwnershipStore();
+  const localBackendId = useFacadeStore((s) => s.localBackendId);
 
-  const visibleProjects = useMemo(() => {
-    if (!activeServerId) return projects;
-    return projects.filter((project) => {
-      const ownerBackendId = ownershipStore.getProjectBackendId(project.id);
-      return !ownerBackendId || ownerBackendId === activeServerId;
-    });
-  }, [activeServerId, ownershipStore, projects]);
+  const visibleProjects = projects;
 
   useEffect(() => {
     for (const project of visibleProjects) {
@@ -108,14 +104,8 @@ export function useSidebarData() {
   );
 
   const visibleSessions = useMemo(() => {
-    if (!activeServerId) return sessions;
-    return sessions.filter((session) => {
-      const ownerBackendId =
-        ownershipStore.getSessionBackendId(session.id)
-        ?? ownershipStore.getProjectBackendId(session.projectId);
-      return (!ownerBackendId || ownerBackendId === activeServerId) && visibleProjectIds.has(session.projectId);
-    });
-  }, [activeServerId, ownershipStore, sessions, visibleProjectIds]);
+    return sessions.filter((session) => visibleProjectIds.has(session.projectId));
+  }, [sessions, visibleProjectIds]);
 
   const internalProjectIds = useMemo(
     () => new Set(visibleProjects.filter(p => p.isInternal).map(p => p.id)),
@@ -153,12 +143,26 @@ export function useSidebarData() {
     return parts[parts.length - 1] || undefined;
   }, []);
 
+  const getProjectsForBackend = useCallback((backendId: string) => {
+    const ids = new Set(
+      selectProjectIdsForBackend(
+        filteredProjects,
+        backendId,
+        (projectId) => ownershipStore.getProjectBackendId(projectId),
+        localBackendId,
+      ),
+    );
+    return filteredProjects.filter((p) => ids.has(p.id));
+  }, [filteredProjects, ownershipStore, localBackendId]);
+
   return {
     projects,
     sessions,
     visibleProjects,
     visibleSessions,
     filteredProjects,
+    localBackendId,
+    getProjectsForBackend,
     selectedSessionId,
     activeServerId,
     isConnected,
