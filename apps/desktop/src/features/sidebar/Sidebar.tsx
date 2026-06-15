@@ -15,6 +15,9 @@ import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
 import { ProjectListItem } from './ProjectListItem';
+import { BackendRow } from './BackendRow';
+import { useOnlineBackends } from './onlineBackends';
+import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
 import { NewProjectForm } from './NewProjectForm';
 import { SidebarFooter } from './SidebarFooter';
 import { useSidebarData } from './useSidebarData';
@@ -72,11 +75,11 @@ export function Sidebar({
 }: SidebarProps) {
   const data = useSidebarData();
   const {
-    projects,
     sessions,
     visibleProjects,
     visibleSessions,
     filteredProjects,
+    getProjectsForBackend,
     selectedSessionId,
     isConnected,
     supervisorAgents,
@@ -98,6 +101,22 @@ export function Sidebar({
     storeReorderProjects,
     storeReorderSessions,
   } = data;
+
+  const onlineBackends = useOnlineBackends();
+  const expandedBackendIds = useSidebarExpansionStore((s) => s.expandedBackendIds);
+  const toggleBackend = useSidebarExpansionStore((s) => s.toggleBackend);
+  const expandBackend = useSidebarExpansionStore((s) => s.expandBackend);
+  const autoExpandedRef = useRef(false);
+
+  // Auto-expand the first online backend once per session if nothing is expanded
+  // (single-backend users see their projects immediately; doesn't fight manual collapse).
+  useEffect(() => {
+    if (autoExpandedRef.current) return;
+    if (expandedBackendIds.length === 0 && onlineBackends.length > 0) {
+      autoExpandedRef.current = true;
+      expandBackend(onlineBackends[0].backendId);
+    }
+  }, [expandedBackendIds.length, onlineBackends, expandBackend]);
 
   // --- Local state ---
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -363,25 +382,19 @@ export function Sidebar({
   }, [ensureAgentGate]);
 
   // --- Shared renderers ---
-  const renderProjectList = () => (
-    <>
-      {projects.length === 0 ? (
-        <p className="text-sm text-muted-foreground px-2">No projects yet</p>
-      ) : filteredProjects.length === 0 ? (
-        <p className="text-sm text-muted-foreground px-2">No active sessions</p>
-      ) : (
-        <SortableList
-          items={filteredProjects.map((p) => p.id)}
-          onReorder={actions.handleReorderProjects}
-          className="space-y-2"
+  const renderProjectItems = (backendProjects: typeof filteredProjects) => (
+    <SortableList
+      items={backendProjects.map((p) => p.id)}
+      onReorder={actions.handleReorderProjects}
+      className="space-y-2"
+    >
+      {backendProjects.map((project) => (
+        <SortableItem
+          key={project.id}
+          id={project.id}
+          wrapperClassName="items-start"
+          dragHandleClassName="w-4 h-4 -ml-1 mr-0.5 mt-2"
         >
-          {filteredProjects.map((project) => (
-            <SortableItem
-              key={project.id}
-              id={project.id}
-              wrapperClassName="items-start"
-              dragHandleClassName="w-4 h-4 -ml-1 mr-0.5 mt-2"
-            >
               <ProjectListItem
                 project={project}
                 isExpanded={expandedProjects.has(project.id)}
@@ -429,9 +442,37 @@ export function Sidebar({
                 agents={agents}
                 onPopOutSession={actions.handlePopOutSession}
               />
-            </SortableItem>
-          ))}
-        </SortableList>
+        </SortableItem>
+      ))}
+    </SortableList>
+  );
+
+  const renderProjectList = () => (
+    <>
+      {onlineBackends.length === 0 ? (
+        <p className="text-sm text-muted-foreground px-2">No backends online</p>
+      ) : (
+        <div className="space-y-2">
+          {onlineBackends.map((backend) => {
+            const backendProjects = getProjectsForBackend(backend.backendId);
+            const expanded = expandedBackendIds.includes(backend.backendId);
+            return (
+              <BackendRow
+                key={backend.backendId}
+                name={backend.name}
+                online={backend.online}
+                expanded={expanded}
+                onToggle={() => toggleBackend(backend.backendId)}
+              >
+                {backendProjects.length === 0 ? (
+                  <p className="px-2 py-1 text-xs text-muted-foreground">No projects yet</p>
+                ) : (
+                  renderProjectItems(backendProjects)
+                )}
+              </BackendRow>
+            );
+          })}
+        </div>
       )}
 
       <NewProjectForm

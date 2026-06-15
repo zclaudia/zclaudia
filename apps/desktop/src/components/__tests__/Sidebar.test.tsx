@@ -84,6 +84,7 @@ import { useChatStore } from '../../stores/chatStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
 import * as api from '../../services/api';
 import { groupSessionsByWorktree } from '../../features/sidebar/worktreeGrouping';
 import { isAndroid } from '../../utils/platform';
@@ -153,7 +154,7 @@ function setupStores(overrides: Record<string, any> = {}) {
   useFacadeStore.setState({
     connectionState: 'connected',
     backends: [
-      { backendId: LOCAL_BACKEND_ID, runtimeState: 'ready', name: 'Local', isThisInstance: true, channel: 'local' },
+      { backendId: LOCAL_BACKEND_ID, runtimeState: 'ready', online: true, name: 'Local', isThisInstance: true, channel: 'local' },
     ],
     localBackendId: LOCAL_BACKEND_ID,
     currentInstanceId: null,
@@ -210,6 +211,9 @@ function getSearchInput(container: HTMLElement): HTMLInputElement {
 describe('Sidebar', () => {
   beforeEach(() => {
     setupStores();
+    // Reset persisted backend-row expansion so the Sidebar's auto-expand effect
+    // fires fresh each test (it only runs when nothing is expanded).
+    useSidebarExpansionStore.setState({ expandedBackendIds: [] });
     vi.clearAllMocks();
     vi.mocked(isAndroid).mockReturnValue(false);
     (api.getSearchHistory as ReturnType<typeof vi.fn>).mockImplementation(() => neverSettles);
@@ -266,7 +270,7 @@ describe('Sidebar', () => {
       },
       facadeStore: {
         connectionState: 'connected',
-        backends: [{ backendId: 'backend-a', runtimeState: 'ready', name: 'Backend A' }],
+        backends: [{ backendId: 'backend-a', runtimeState: 'ready', online: true, name: 'Backend A' }],
       },
     });
     useOwnershipStore.setState({
@@ -313,7 +317,7 @@ describe('Sidebar', () => {
     expect(container.textContent).toContain('No projects yet');
   });
 
-  it('shows "No active sessions" when all projects are internal', () => {
+  it('shows "No projects yet" under the backend when all projects are internal', () => {
     setupStores({
       projectStore: {
         projects: [{ ...baseProject, isInternal: true }],
@@ -321,7 +325,9 @@ describe('Sidebar', () => {
       },
     });
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    expect(container.textContent).toContain('No active sessions');
+    // Internal projects are filtered out, so the online backend's subtree is empty.
+    expect(container.textContent).toContain('No projects yet');
+    expect(container.textContent).not.toContain('Project One');
   });
 
   it('disables new project creation when backend is not ready', () => {
