@@ -36,7 +36,7 @@ export class SessionCompactionRepository {
       firstKeptMessageId: row.first_kept_message_id,
       tokensBefore: row.tokens_before,
       details: row.details ? JSON.parse(row.details) : null,
-      source: row.source as 'auto' | 'manual',
+      source: row.source as 'auto' | 'manual' | 'overflow',
       customInstructions: row.custom_instructions ?? null,
       createdAt: row.created_at,
     };
