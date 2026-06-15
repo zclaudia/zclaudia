@@ -18,6 +18,7 @@ import type { NotificationService } from '../../../domains/notification-feed/ind
 import { postRunCompletedNotification, postRunFailedNotification } from './run-terminal-notifications.js';
 import { setPhase, recomputePhase, isTerminalPhase, computeBlockers } from './active-run-phase.js';
 import { compactionEventFor } from './compaction-events.js';
+import { isContextOverflowError, ContextOverflowError } from './context-overflow.js';
 
 export interface ProviderEventState {
   sdkSessionId?: string;
@@ -584,6 +585,16 @@ export function handleProviderEvent({
 
     case 'error': {
       const rawProviderError = (msg.error || 'Provider error') as string;
+
+      // Context-window overflow: do NOT fail here. Throw a sentinel so the
+      // synchronous call stack unwinds to handleRunStart's catch → handleRunException,
+      // which compacts and retries. handleProviderEvent is sync (: void), so this
+      // throw propagates through consume-provider-stream's while-loop.
+      if (isContextOverflowError(rawProviderError, msg.errorCode) && !isTerminalPhase(activeRun.phase)) {
+        console.warn(`[Overflow] runId=${runId} provider rejected turn for context overflow; deferring to recovery`);
+        throw new ContextOverflowError(rawProviderError);
+      }
+
       const authHint = activeRun.providerType
         ? providerRegistry.getPolicy(activeRun.providerType)?.authErrorHint
         : undefined;
