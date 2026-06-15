@@ -20,8 +20,8 @@ export async function createProject(data: {
   type?: 'chat_only' | 'code';
   llmProfileId?: string;
   rootPath?: string;
-}): Promise<Project> {
-  return apiCall<Project>('/api/projects', {
+}, backendId?: string | null): Promise<Project> {
+  return apiCallForBackend<Project>(backendId ?? null, '/api/projects', {
     method: 'POST',
     body: JSON.stringify(data)
   });

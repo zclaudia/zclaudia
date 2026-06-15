@@ -67,7 +67,7 @@ export async function createSession(data: {
   parentSessionId?: string;
   workingDirectory?: string;
 }): Promise<Session> {
-  return apiCall<Session>('/api/sessions', {
+  return apiCallForBackend<Session>(getBackendIdForProject(data.projectId), '/api/sessions', {
     method: 'POST',
     body: JSON.stringify(data)
   });

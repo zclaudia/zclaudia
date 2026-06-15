@@ -261,6 +261,19 @@ describe('api', () => {
       );
     });
 
+    it('createProject targets an explicit backend when given one', async () => {
+      mockControlPlaneMode = 'gateway-direct';
+      mockResponse({ id: 'p9', name: 'Remote', type: 'code' });
+      await createProject({ name: 'Remote' }, 'gw:backend-1');
+      expect(mockFetch.mock.calls[0][0]).not.toMatch(/localhost:3100/);
+    });
+
+    it('createProject without a backend falls back to the active server', async () => {
+      mockResponse({ id: 'p10', name: 'Local', type: 'code' });
+      await createProject({ name: 'Local' });
+      expect(mockFetch.mock.calls[0][0]).toMatch(/localhost:3100/);
+    });
+
     it('updateProject updates project', async () => {
       mockResponse(undefined);
 
@@ -322,6 +335,19 @@ describe('api', () => {
       const result = await createSession({ projectId: 'p1', name: 'Session' });
 
       expect(result).toEqual(session);
+    });
+
+    it('createSession routes to the project owner backend', async () => {
+      mockControlPlaneMode = 'gateway-direct';
+      mockResponse({ id: 's2', projectId: 'remote-project' });
+      await createSession({ projectId: 'remote-project' });
+      expect(mockFetch.mock.calls[0][0]).not.toMatch(/localhost:3100/);
+    });
+
+    it('createSession for a local project hits the local server', async () => {
+      mockResponse({ id: 's3', projectId: 'project-1' });
+      await createSession({ projectId: 'project-1' });
+      expect(mockFetch.mock.calls[0][0]).toMatch(/localhost:3100/);
     });
 
     it('updateSession updates session', async () => {
