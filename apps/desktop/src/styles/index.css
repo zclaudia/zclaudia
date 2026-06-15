@@ -22,16 +22,16 @@
     --primary: 211 100% 50%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary colors — Apple systemGray6 */
-    --secondary: 240 6% 95%;
+    /* Secondary colors — Apple systemGray6 (deepened for stronger button/surface contrast) */
+    --secondary: 240 6% 91%;
     --secondary-foreground: 0 0% 20%;
 
-    /* Muted colors — Apple systemFill */
-    --muted: 240 5% 96%;
+    /* Muted colors — Apple systemFill (deepened for stronger button/surface contrast) */
+    --muted: 240 5% 92%;
     --muted-foreground: 240 3% 46%;
 
-    /* Accent colors */
-    --accent: 240 6% 93%;
+    /* Accent colors (deepened — used as the prominent neutral fill for primary actions) */
+    --accent: 240 6% 88%;
     --accent-foreground: 0 0% 20%;
 
     /* Destructive colors — Apple System Red */
@@ -50,9 +50,9 @@
     --thinking: 265 60% 55%;
     --thinking-foreground: 265 80% 98%;
 
-    /* Border and input — Apple subtle separator */
-    --border: 240 6% 90%;
-    --input: 240 6% 90%;
+    /* Border and input — Apple subtle separator (deepened to match darker surfaces) */
+    --border: 240 6% 86%;
+    --input: 240 6% 86%;
     --ring: 211 100% 50%;
 
     /* Border radius — Apple-like larger corners */
