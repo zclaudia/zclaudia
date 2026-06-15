@@ -66,4 +66,16 @@ describe('autoDetectProviders — env materialization', () => {
     autoDetectProviders(db);
     expect(defaultProfile().apiKey).toBe('sk-first');
   });
+  it('backfill never touches an openai-codex default profile (keyless during OAuth)', () => {
+    // seed a codex default profile directly (keyless, mid-OAuth)
+    db.prepare(`
+      INSERT INTO llm_profiles (id, name, provider_type, base_url, api_key, compat, is_default, created_at, updated_at)
+      VALUES ('codex1', 'Codex', 'openai-codex', NULL, NULL, NULL, 1, 0, 0)
+    `).run();
+    process.env.ANTHROPIC_API_KEY = 'sk-ant';
+    autoDetectProviders(db);
+    const p = defaultProfile();
+    expect(p.providerType).toBe('openai-codex');
+    expect(p.apiKey == null || p.apiKey === '').toBe(true);
+  });
 });

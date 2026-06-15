@@ -32,10 +32,13 @@ export function autoDetectProviders(db: Database.Database): void {
   // profile becomes the source of truth). Never overwrite an existing credential.
   if (!cred) return;
   const def = db.prepare(`
-    SELECT id, api_key, oauth_credentials FROM llm_profiles
+    SELECT id, provider_type, api_key, oauth_credentials FROM llm_profiles
     WHERE is_default = 1 ORDER BY updated_at DESC LIMIT 1
-  `).get() as { id: string; api_key: string | null; oauth_credentials: string | null } | undefined;
+  `).get() as { id: string; provider_type: string; api_key: string | null; oauth_credentials: string | null } | undefined;
   if (!def) return;
+  // Never touch a codex profile: it is legitimately keyless while the user is
+  // completing OAuth; backfilling would convert it and break the OAuth flow.
+  if (def.provider_type === 'openai-codex') return;
   const keyless = (def.api_key == null || def.api_key.trim() === '') && def.oauth_credentials == null;
   if (!keyless) return;
 
