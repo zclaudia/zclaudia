@@ -325,14 +325,27 @@ describe('buildModel', () => {
     expect(model.baseUrl).toBe('https://api.deepseek.com/v1');
     expect(model.id).toBe('deepseek-chat');
     expect(model.api).toBe('openai-completions');
-    expect(typeof getApiKey).toBe('function');
+    // build-model no longer reads OPENAI_API_KEY from env for a profile-less
+    // model; getApiKey is undefined and pi-ai owns env resolution.
+    expect(getApiKey).toBeUndefined();
   });
 
-  it('OPENAI_BASE_URL custom model: getApiKey returns OPENAI_API_KEY', async () => {
+  it('OPENAI_BASE_URL custom model with no profile: getApiKey is undefined (pi-ai owns env)', () => {
     process.env.OPENAI_BASE_URL = 'https://example.com/v1';
     process.env.OPENAI_API_KEY = 'sk-real-key';
     const { getApiKey } = buildModel();
-    expect(await getApiKey!('whatever')).toBe('sk-real-key');
+    expect(getApiKey).toBeUndefined();
+  });
+
+  it('credential comes from the profile, never env: profile.apiKey wins and env is ignored', async () => {
+    process.env.OPENAI_BASE_URL = 'https://example.com/v1';
+    process.env.OPENAI_API_KEY = 'sk-env-should-be-ignored';
+    const { getApiKey } = buildModel({
+      id: 'p1', name: 'P', providerType: 'openai',
+      baseUrl: 'https://example.com/v1', apiKey: 'sk-from-profile',
+      createdAt: 0, updatedAt: 0,
+    } as any);
+    expect(await getApiKey!('whatever')).toBe('sk-from-profile');
   });
 
   it('OPENAI_BASE_URL custom model: reasoning is true so pi enables thinking-format-specific knobs', () => {
