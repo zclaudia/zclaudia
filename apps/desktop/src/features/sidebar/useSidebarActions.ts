@@ -82,7 +82,7 @@ export function useSidebarActions({
     selectSessionOnBackend(backendId, sessionId);
   }, [selectSessionOnBackend]);
 
-  const handleCreateProject = useCallback(async () => {
+  const handleCreateProject = useCallback(async (backendId?: string | null) => {
     if (!newProjectName.trim() || !isConnected) return;
     setCreatingProject(true);
     try {
@@ -90,7 +90,7 @@ export function useSidebarActions({
         name: newProjectName.trim(),
         type: 'code',
         rootPath: newProjectRootPath.trim() || undefined,
-      });
+      }, backendId ?? null);
       addProject(project);
       setNewProjectName('');
       setNewProjectRootPath('');

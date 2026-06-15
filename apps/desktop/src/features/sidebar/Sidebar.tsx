@@ -127,6 +127,7 @@ export function Sidebar({
   const [showNewProjectForm, setShowNewProjectForm] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [newProjectRootPath, setNewProjectRootPath] = useState('');
+  const [newProjectBackendId, setNewProjectBackendId] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
   const [creatingSessionForProject, setCreatingSessionForProject] = useState<string | null>(null);
   const [newSessionName, setNewSessionName] = useState('');
@@ -190,6 +191,13 @@ export function Sidebar({
   useEffect(() => {
     if (isConnected) void refreshReadiness();
   }, [isConnected, refreshReadiness]);
+
+  // Default the new-project backend to the first online backend when the form opens.
+  useEffect(() => {
+    if (showNewProjectForm && !newProjectBackendId && onlineBackends.length > 0) {
+      setNewProjectBackendId(onlineBackends[0].backendId);
+    }
+  }, [showNewProjectForm, newProjectBackendId, onlineBackends]);
 
   // Focus the search input when the desktop search popover opens.
   useEffect(() => {
@@ -493,11 +501,14 @@ export function Sidebar({
         newProjectRootPath={newProjectRootPath}
         onProjectRootPathChange={setNewProjectRootPath}
         onCreateProject={() => {
-          runAfterAgentGate(actions.handleCreateProject, { forceRefresh: true });
+          runAfterAgentGate(() => actions.handleCreateProject(newProjectBackendId), { forceRefresh: true });
         }}
         creatingProject={creatingProject}
         isConnected={isConnected}
         isMobile={isMobile}
+        backends={onlineBackends}
+        selectedBackendId={newProjectBackendId}
+        onSelectedBackendIdChange={setNewProjectBackendId}
       />
     </>
   );

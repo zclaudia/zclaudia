@@ -101,6 +101,9 @@ export interface NewProjectFormProps {
   creatingProject: boolean;
   isConnected: boolean;
   isMobile?: boolean;
+  backends: { backendId: string; name: string; online: boolean }[];
+  selectedBackendId: string | null;
+  onSelectedBackendIdChange: (backendId: string) => void;
 }
 
 /** Props for SidebarFooter */

@@ -11,6 +11,9 @@ export function NewProjectForm({
   creatingProject,
   isConnected,
   isMobile,
+  backends,
+  selectedBackendId,
+  onSelectedBackendIdChange,
 }: NewProjectFormProps) {
   const inputClass = isMobile
     ? 'w-full px-3 py-2.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50'
@@ -38,6 +41,18 @@ export function NewProjectForm({
   if (showForm) {
     return (
       <div className="mt-1 px-1">
+        {backends.length > 1 && (
+          <select
+            aria-label="Create in backend"
+            value={selectedBackendId ?? backends[0]?.backendId ?? ''}
+            onChange={(e) => onSelectedBackendIdChange(e.target.value)}
+            className="mb-2 w-full rounded-md border border-border bg-card px-2 py-1.5 text-sm text-foreground focus:outline-none"
+          >
+            {backends.map((b) => (
+              <option key={b.backendId} value={b.backendId}>{b.name}</option>
+            ))}
+          </select>
+        )}
         <input
           type="text"
           value={newProjectName}

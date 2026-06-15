@@ -645,7 +645,7 @@ describe('Sidebar', () => {
       name: 'My New Project',
       type: 'code',
       rootPath: undefined,
-    });
+    }, 'local-standalone');
   });
 
   it('blocks project submit when readiness becomes unusable while the form is open', async () => {
@@ -741,7 +741,7 @@ describe('Sidebar', () => {
       name: 'Test Project',
       type: 'code',
       rootPath: '/tmp/test',
-    });
+    }, 'local-standalone');
   });
 
   // ---- Context menu ----
