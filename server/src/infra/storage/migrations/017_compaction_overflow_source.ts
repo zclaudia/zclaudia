@@ -10,9 +10,11 @@ import type { Migration } from './types.js';
 export const migration: Migration = {
   name: '017_compaction_overflow_source',
   sql: `
+BEGIN;
+
 PRAGMA foreign_keys = OFF;
 
-CREATE TABLE session_compactions_new (
+CREATE TABLE IF NOT EXISTS session_compactions_new (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
   summary TEXT NOT NULL,
@@ -38,5 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_session_compactions_session_created
   ON session_compactions(session_id, created_at DESC);
 
 PRAGMA foreign_keys = ON;
+
+COMMIT;
   `,
 };

@@ -282,6 +282,8 @@ describe('compactForOverflow', () => {
     });
     expect(result.outcome).toBe('compacted');
     expect(result.compacted).toBe(true);
+    const created = new SessionCompactionRepository(db).getLatest('s1')!;
+    expect(created.source).toBe('overflow');
   });
 
   it('respects an open circuit breaker and returns circuit_open', async () => {
