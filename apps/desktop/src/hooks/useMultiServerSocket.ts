@@ -12,6 +12,8 @@ import { useServerStore } from '../stores/serverStore';
 import { useGatewayConnection } from './useGatewayConnection';
 import { useFacadeStore } from '../stores/facadeStore';
 import { getUsableMobileBackendIds, isMobileBackendUsable } from '../services/mobileConnectionState';
+import { useOwnershipStore } from '../stores/ownershipStore';
+import { resolveMessageTarget } from '../utils/messageRouting';
 
 export function useMultiServerSocket() {
   const gatewayConnection = useGatewayConnection();
@@ -47,11 +49,17 @@ export function useMultiServerSocket() {
   }, [facade, gatewayConnection]);
 
   const sendMessage = useCallback((message: ClientMessage) => {
-    if (!activeServerId) {
-      console.error('[Socket] Cannot send message: no active server');
+    const ownership = useOwnershipStore.getState();
+    const target = resolveMessageTarget(message, {
+      getSessionBackendId: (id) => ownership.getSessionBackendId(id),
+      getProjectBackendId: (id) => ownership.getProjectBackendId(id),
+      fallbackBackendId: activeServerId,
+    });
+    if (!target) {
+      console.error('[Socket] Cannot send message: no target backend');
       return;
     }
-    sendToServer(activeServerId, message);
+    sendToServer(target, message);
   }, [activeServerId, sendToServer]);
 
   const isServerConnected = useCallback((backendId: string) => {

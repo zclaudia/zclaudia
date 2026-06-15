@@ -16,6 +16,8 @@ const {
   mockUseRecoveryStore,
   mockIsBackendReady,
   mockIsAndroid,
+  mockOwnershipState,
+  mockUseOwnershipStore,
 } = vi.hoisted(() => {
   const serverState: Record<string, any> = {
     activeServerId: null,
@@ -57,6 +59,16 @@ const {
   });
   recoveryHook.getState = vi.fn(() => recoveryState);
 
+  const ownershipState: { sessionOwners: Record<string, string>; projectOwners: Record<string, string> } = {
+    sessionOwners: {},
+    projectOwners: {},
+  };
+  const ownershipHook: any = vi.fn((selector?: any) => (selector ? selector(ownershipState) : ownershipState));
+  ownershipHook.getState = vi.fn(() => ({
+    getSessionBackendId: (id?: string | null) => (id ? ownershipState.sessionOwners[id] ?? null : null),
+    getProjectBackendId: (id?: string | null) => (id ? ownershipState.projectOwners[id] ?? null : null),
+  }));
+
   return {
     mockServerStoreState: serverState,
     mockUseServerStore: serverHook,
@@ -68,6 +80,8 @@ const {
     mockUseRecoveryStore: recoveryHook,
     mockIsBackendReady: vi.fn(() => false),
     mockIsAndroid: vi.fn(() => false),
+    mockOwnershipState: ownershipState,
+    mockUseOwnershipStore: ownershipHook,
   };
 });
 
@@ -94,6 +108,10 @@ vi.mock('../../utils/platform', () => ({
   isAndroid: mockIsAndroid,
 }));
 
+vi.mock('../../stores/ownershipStore', () => ({
+  useOwnershipStore: mockUseOwnershipStore,
+}));
+
 // ---- Tests ----
 
 describe('hooks/useMultiServerSocket', () => {
@@ -114,6 +132,9 @@ describe('hooks/useMultiServerSocket', () => {
     mockGatewayConnection.isBackendConnected.mockReturnValue(false);
     mockIsBackendReady.mockReturnValue(false);
     mockIsAndroid.mockReturnValue(false);
+
+    mockOwnershipState.sessionOwners = {};
+    mockOwnershipState.projectOwners = {};
   });
 
   describe('initialization', () => {
@@ -274,8 +295,14 @@ describe('hooks/useMultiServerSocket', () => {
     });
   });
 
-  describe('sendMessage (active server)', () => {
-    it('logs error when no active server is set', () => {
+  describe('sendMessage routing', () => {
+    const mockFacade = {
+      openBackend: vi.fn(),
+      closeBackend: vi.fn(),
+      sendToBackend: vi.fn(),
+    };
+
+    it('logs error when there is no owner and no active server', () => {
       mockServerStoreState.activeServerId = null;
 
       const { result } = renderHook(() => useMultiServerSocket());
@@ -285,16 +312,11 @@ describe('hooks/useMultiServerSocket', () => {
       });
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('no active server')
+        expect.stringContaining('no target backend')
       );
     });
 
-    it('sends to active server via facade when facade present', () => {
-      const mockFacade = {
-        openBackend: vi.fn(),
-        closeBackend: vi.fn(),
-        sendToBackend: vi.fn(),
-      };
+    it('falls back to the active server for messages without an owner', () => {
       mockFacadeStoreState.facade = mockFacade;
       mockServerStoreState.activeServerId = 'server-1';
 
@@ -307,17 +329,55 @@ describe('hooks/useMultiServerSocket', () => {
       expect(mockFacade.sendToBackend).toHaveBeenCalledWith('server-1', { type: 'ping' });
     });
 
-    it('sends to active server via gateway when no facade', () => {
-      mockFacadeStoreState.facade = null;
-      mockServerStoreState.activeServerId = 'server-1';
+    it('routes to the session owner instead of the active server', () => {
+      mockFacadeStoreState.facade = mockFacade;
+      mockServerStoreState.activeServerId = 'server-a';
+      mockOwnershipState.sessionOwners = { s1: 'server-b' };
 
       const { result } = renderHook(() => useMultiServerSocket());
 
       act(() => {
-        result.current.sendMessage({ type: 'ping' } as any);
+        result.current.sendMessage({ type: 'rename_session', sessionId: 's1', name: 'x' } as any);
       });
 
-      expect(mockGatewayConnection.sendToBackend).toHaveBeenCalledWith('server-1', { type: 'ping' });
+      expect(mockFacade.sendToBackend).toHaveBeenCalledWith(
+        'server-b',
+        { type: 'rename_session', sessionId: 's1', name: 'x' },
+      );
+    });
+
+    it('routes to the project owner when there is no sessionId', () => {
+      mockFacadeStoreState.facade = mockFacade;
+      mockServerStoreState.activeServerId = 'server-a';
+      mockOwnershipState.projectOwners = { p1: 'server-c' };
+
+      const { result } = renderHook(() => useMultiServerSocket());
+
+      act(() => {
+        result.current.sendMessage({ type: 'create_session', projectId: 'p1' } as any);
+      });
+
+      expect(mockFacade.sendToBackend).toHaveBeenCalledWith(
+        'server-c',
+        { type: 'create_session', projectId: 'p1' },
+      );
+    });
+
+    it('routes an owned message via gateway when no facade is present', () => {
+      mockFacadeStoreState.facade = null;
+      mockServerStoreState.activeServerId = 'server-a';
+      mockOwnershipState.sessionOwners = { s1: 'server-b' };
+
+      const { result } = renderHook(() => useMultiServerSocket());
+
+      act(() => {
+        result.current.sendMessage({ type: 'rename_session', sessionId: 's1', name: 'x' } as any);
+      });
+
+      expect(mockGatewayConnection.sendToBackend).toHaveBeenCalledWith(
+        'server-b',
+        { type: 'rename_session', sessionId: 's1', name: 'x' },
+      );
     });
   });
 
