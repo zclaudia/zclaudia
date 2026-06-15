@@ -105,6 +105,7 @@ export function Sidebar({
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
+  const readiness = useAgentReadinessStore((s) => s.readiness);
   const isAgentUsable = useAgentReadinessStore((s) => s.isUsable);
   const [agentDialogReason, setAgentDialogReason] = useState<AgentReadinessReason | undefined>(undefined);
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
@@ -328,7 +329,7 @@ export function Sidebar({
   // Returns true if creation may proceed; otherwise opens the guidance dialog.
   const passesAgentGate = (): boolean => {
     if (isAgentUsable()) return true;
-    setAgentDialogReason(useAgentReadinessStore.getState().readiness?.reason);
+    setAgentDialogReason(readiness?.reason);
     setAgentDialogOpen(true);
     return false;
   };
