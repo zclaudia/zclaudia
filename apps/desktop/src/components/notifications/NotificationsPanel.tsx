@@ -1,9 +1,15 @@
 import { useEffect, useCallback } from 'react';
+import { X } from 'lucide-react';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { NotificationItem } from './NotificationItem';
 
-export function NotificationsPanel() {
+interface NotificationsPanelProps {
+  /** When provided, renders a close button and closes the panel on navigate. */
+  onClose?: () => void;
+}
+
+export function NotificationsPanel({ onClose }: NotificationsPanelProps = {}) {
   const { items, hasMore, loading, unreadCount, hydrated, setLoading, clearRead, removeItem } = useNotificationFeedStore();
   const { sendMessage } = useConnection();
 
@@ -70,11 +76,20 @@ export function NotificationsPanel() {
               Mark all read
             </button>
           )}
+          {onClose && (
+            <button
+              onClick={onClose}
+              aria-label="Close notifications"
+              className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+            >
+              <X size={15} strokeWidth={1.75} />
+            </button>
+          )}
         </div>
       </div>
 
       {/* Feed list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-0 overflow-y-auto">
         {items.length === 0 && !loading && (
           <div className="p-8 text-center text-muted-foreground text-sm">
             <p>No notifications yet.</p>
@@ -84,7 +99,7 @@ export function NotificationsPanel() {
 
         <div className="divide-y divide-border/50">
           {items.map((item) => (
-            <NotificationItem key={item.id} item={item} onDismiss={handleDismiss} />
+            <NotificationItem key={item.id} item={item} onDismiss={handleDismiss} onAfterSelect={onClose} />
           ))}
         </div>
 
