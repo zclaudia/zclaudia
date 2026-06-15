@@ -317,6 +317,9 @@ export function ChatInputArea({
 
   return (
     <div className="p-2 pb-3 md:px-4 md:pb-3 md:pt-2 safe-bottom-pad overflow-visible flex-shrink-0">
+      {/* Centered column matching the message reading column (ChatMessagePane) so
+          the composer aligns with the chat content instead of stretching edge-to-edge. */}
+      <div className="mx-auto w-full max-w-3xl">
       {/* Mobile-only toolbar: three selectors, JS-gated to mobile only */}
       {isMobile && (
         <div className="mb-1.5 flex items-center gap-1">{selectorTrio}</div>
@@ -505,6 +508,7 @@ export function ChatInputArea({
           }
         />
       )}
+      </div>
     </div>
   );
 }

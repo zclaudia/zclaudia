@@ -1122,15 +1122,16 @@ export function MessageInput({
             )}
           </div>
 
-          {/* Multiline toggle (only when onToggleAdvanced is provided) */}
+          {/* Multiline toggle (only when onToggleAdvanced is provided) — kept
+              visually light: small bare icon, no hover box, sits close to Send. */}
           {onToggleAdvanced && (
             <button
               data-testid="advanced-toggle"
               onClick={onToggleAdvanced}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-md ${advancedMode ? 'text-primary' : 'text-muted-foreground'} hover:bg-secondary`}
+              className={`flex h-6 w-6 flex-shrink-0 items-center justify-center -mr-1 transition-colors ${advancedMode ? 'self-end' : ''} ${advancedMode ? 'text-primary' : 'text-muted-foreground/50 hover:text-foreground'}`}
               title={advancedMode ? 'Normal input' : 'Advanced input (Enter to newline)'}
             >
-              {advancedMode ? <ChevronDown size={16} strokeWidth={2} /> : <ChevronUp size={16} strokeWidth={2} />}
+              {advancedMode ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronUp size={14} strokeWidth={2} />}
             </button>
           )}
 
