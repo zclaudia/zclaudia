@@ -14,6 +14,7 @@ type ToolDetails = Record<string, any> | undefined;
 /** Error codes that already carry their own escalation/guidance — don't pile on. */
 const SELF_EXPLANATORY = new Set([
   'edit_loop_detected',
+  'tool_loop_detected',
   'critical_command_blocked',
   'auto_background_failed',
   'missing_command',
