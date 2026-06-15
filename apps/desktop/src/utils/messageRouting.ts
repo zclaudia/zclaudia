@@ -9,7 +9,7 @@ export interface MessageTargetResolver {
 }
 
 function stringField(message: ClientMessage, key: 'sessionId' | 'projectId'): string | undefined {
-  const value = (message as Record<string, unknown>)[key];
+  const value = (message as unknown as Record<string, unknown>)[key];
   return typeof value === 'string' ? value : undefined;
 }
 
