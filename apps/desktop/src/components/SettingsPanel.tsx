@@ -53,10 +53,11 @@ function getViewStateLabel(viewState: MobileBackendViewState): string | null {
 interface SettingsPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: SettingsTab;
 }
 
-export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProps) {
+  const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab ?? 'general');
   const [serverPickerOpen, setServerPickerOpen] = useState(false);
   const [mobileShowContent, setMobileShowContent] = useState(false);
   const isMobile = useIsMobile();
@@ -87,6 +88,10 @@ export function SettingsPanel({ isOpen, onClose }: SettingsPanelProps) {
 
   const appTabs = getAppTabs(!!isMobile);
   const serverTabs = getServerTabs({ isActiveLocalBackend, pluginSettingsTabs });
+
+  useEffect(() => {
+    if (isOpen && initialTab) setActiveTab(initialTab);
+  }, [isOpen, initialTab]);
 
   useEffect(() => {
     if (!isActiveLocalBackend && !isMobile && activeTab === 'gateway') {

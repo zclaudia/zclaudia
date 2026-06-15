@@ -21,6 +21,10 @@ import { useSidebarData } from './useSidebarData';
 import { useSidebarActions } from './useSidebarActions';
 import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../../stores/sidebarWidthStore';
+import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { AgentRequiredDialog } from '../agent/AgentRequiredDialog';
+import type { AgentReadinessReason } from '@zclaudia/shared/core/agent-readiness';
+import type { SettingsTab } from '../settings/settingsTabDefs';
 
 import * as api from '../../services/api';
 import type { GitWorktree } from '@zclaudia/shared';
@@ -100,6 +104,12 @@ export function Sidebar({
   const [contextMenuPos, setContextMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
+  const readiness = useAgentReadinessStore((s) => s.readiness);
+  const isAgentUsable = useAgentReadinessStore((s) => s.isUsable);
+  const [agentDialogReason, setAgentDialogReason] = useState<AgentReadinessReason | undefined>(undefined);
+  const [agentDialogOpen, setAgentDialogOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
   const search = useSearchSidebar();
   // Controlled-or-uncontrolled search popover state.
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
@@ -146,6 +156,11 @@ export function Sidebar({
   const [expandedWorktrees, setExpandedWorktrees] = useState<Set<string>>(new Set());
   const [regularSessionsCollapsed, setRegularSessionsCollapsed] = useState<Set<string>>(new Set());
   const [worktreesByProject, setWorktreesByProject] = useState<Map<string, GitWorktree[]>>(new Map());
+
+  // Fetch agent readiness whenever the connection is established.
+  useEffect(() => {
+    if (isConnected) void refreshReadiness();
+  }, [isConnected, refreshReadiness]);
 
   // Focus the search input when the desktop search popover opens.
   useEffect(() => {
@@ -311,6 +326,14 @@ export function Sidebar({
     threshold: 60,
   });
 
+  // Returns true if creation may proceed; otherwise opens the guidance dialog.
+  const passesAgentGate = (): boolean => {
+    if (isAgentUsable()) return true;
+    setAgentDialogReason(readiness?.reason);
+    setAgentDialogOpen(true);
+    return false;
+  };
+
   // --- Shared renderers ---
   const renderProjectList = () => (
     <>
@@ -363,7 +386,7 @@ export function Sidebar({
                 onNewSessionNameChange={setNewSessionName}
                 newSessionAgentProfileId={newSessionAgentProfileId}
                 onNewSessionAgentProfileIdChange={setNewSessionAgentProfileId}
-                onStartCreatingSession={() => setCreatingSessionForProject(project.id)}
+                onStartCreatingSession={() => { if (passesAgentGate()) setCreatingSessionForProject(project.id); }}
                 onCreateSession={() => actions.handleCreateSession(project.id)}
                 onCancelCreateSession={() => {
                   setCreatingSessionForProject(null);
@@ -381,7 +404,10 @@ export function Sidebar({
 
       <NewProjectForm
         showForm={showNewProjectForm}
-        onShowForm={setShowNewProjectForm}
+        onShowForm={(show: boolean) => {
+          if (show && !passesAgentGate()) return;
+          setShowNewProjectForm(show);
+        }}
         newProjectName={newProjectName}
         onProjectNameChange={setNewProjectName}
         newProjectRootPath={newProjectRootPath}
@@ -407,9 +433,23 @@ export function Sidebar({
       {showSettings && createPortal(
         <SettingsPanel
           isOpen={showSettings}
-          onClose={() => setShowSettings(false)}
+          initialTab={settingsInitialTab}
+          onClose={() => { setShowSettings(false); setSettingsInitialTab(undefined); void refreshReadiness(); }}
         />,
         document.body
+      )}
+      {agentDialogOpen && createPortal(
+        <AgentRequiredDialog
+          open={agentDialogOpen}
+          reason={agentDialogReason}
+          onClose={() => setAgentDialogOpen(false)}
+          onConfigure={(tab) => {
+            setAgentDialogOpen(false);
+            setSettingsInitialTab(tab);
+            setShowSettings(true);
+          }}
+        />,
+        document.body,
       )}
       {createPortal(<PluginPermissionDialog />, document.body)}
     </>

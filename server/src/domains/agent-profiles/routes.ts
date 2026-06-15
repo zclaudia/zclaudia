@@ -8,6 +8,7 @@ import {
   AgentProfileInUseError,
   AgentProfileNotFoundError,
 } from './agent-profile-deletion-service.js';
+import { resolveAgentReadiness } from '../agent-readiness/check.js';
 
 const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
 
@@ -24,6 +25,18 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       res.status(500).json({
         success: false,
         error: { code: 'DB_ERROR', message: 'Failed to fetch agent profiles' },
+      });
+    }
+  });
+
+  router.get('/readiness', (_req: Request, res: Response) => {
+    try {
+      res.json({ success: true, data: resolveAgentReadiness(db) } as ApiResponse<ReturnType<typeof resolveAgentReadiness>>);
+    } catch (error) {
+      console.error('Error checking agent readiness:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'DB_ERROR', message: 'Failed to check agent readiness' },
       });
     }
   });
