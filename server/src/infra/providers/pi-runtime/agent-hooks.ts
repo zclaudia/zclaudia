@@ -276,7 +276,10 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       // hard limit is reached, append a [loop] nudge and upgrade the error code
       // so the model knows it must change strategy rather than retry blindly.
       const isFailure = result?.details?.ok === false;
-      if (isFailure) {
+      const alreadyLoopDetected =
+        typeof result?.details?.error === 'string' &&
+        result.details.error.endsWith('_loop_detected');
+      if (isFailure && !alreadyLoopDetected) {
         const attempts = toolFailureGuard.recordFailure(toolName, args as Record<string, unknown> | undefined);
         if (attempts >= TOOL_FAILURE_HARD_LIMIT) {
           content = [
@@ -289,7 +292,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           // Upgrade the error code so remediationForResult stays silent (it's in
           // SELF_EXPLANATORY) and downstream readers can detect the loop.
           result.details = { ...result.details, error: 'tool_loop_detected' };
-          remediationAppended = true;
+          remediationAppended = true; // also covers [loop] nudge — ensures modified result is returned
         }
       } else if (result?.details?.ok === true) {
         toolFailureGuard.recordSuccess(toolName, args as Record<string, unknown> | undefined);

@@ -486,4 +486,26 @@ describe('afterToolCall — tool failure loop guard', () => {
     const text = (after?.content ?? []).map((b: any) => b.text ?? '').join('\n');
     expect(text).not.toContain('[loop]');
   });
+
+  it('does not add a generic [loop] when a tool already escalated to *_loop_detected', async () => {
+    const hooks = makeHooks();
+    const editLoopCtx = () => ({
+      toolCall: { name: 'Edit' },
+      args: { file_path: '/p/a.ts', old_string: 'x' },
+      result: {
+        content: [{ type: 'text', text: 'edit failed' }],
+        details: { ok: false, error: 'edit_loop_detected' },
+      },
+    });
+    // Even after many identical edit-loop-detected results, no generic [loop]
+    // is appended and the specific error code is preserved.
+    let last: any;
+    for (let i = 0; i < 4; i++) last = await hooks.afterToolCall!(editLoopCtx() as any);
+    const text = (last?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+    expect(text).not.toContain('[loop]');
+    // error code is NOT overwritten to tool_loop_detected (when a result obj is returned)
+    if (last?.details?.error !== undefined) {
+      expect(last.details.error).toBe('edit_loop_detected');
+    }
+  });
 });
