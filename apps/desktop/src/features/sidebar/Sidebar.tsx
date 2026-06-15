@@ -17,6 +17,7 @@ import { SearchModal } from './SearchModal';
 import { ProjectListItem } from './ProjectListItem';
 import { BackendRow } from './BackendRow';
 import { useOnlineBackends } from './onlineBackends';
+import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
 import { NewProjectForm } from './NewProjectForm';
 import { SidebarFooter } from './SidebarFooter';
@@ -107,6 +108,9 @@ export function Sidebar({
   const toggleBackend = useSidebarExpansionStore((s) => s.toggleBackend);
   const expandBackend = useSidebarExpansionStore((s) => s.expandBackend);
   const autoExpandedRef = useRef(false);
+
+  // Lazily connect/disconnect remote backends as their rows expand/collapse.
+  useBackendConnectionLifecycle();
 
   // Auto-expand the first online backend once per session if nothing is expanded
   // (single-backend users see their projects immediately; doesn't fight manual collapse).

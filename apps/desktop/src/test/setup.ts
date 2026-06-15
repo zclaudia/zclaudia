@@ -202,6 +202,9 @@ vi.mock('@/contexts/ConnectionContext', () => ({
     sendMessage: vi.fn(),
     connect: vi.fn(),
     disconnect: vi.fn(),
+    connectServer: vi.fn(),
+    disconnectServer: vi.fn(),
+    isServerConnected: vi.fn(() => false),
   })),
   ConnectionProvider: ({ children }: { children: React.ReactNode }) => children,
 }));
