@@ -39,6 +39,12 @@ describe('hasLlmCredential', () => {
     process.env.OPENAI_API_KEY = 'sk-proxy';
     expect(hasLlmCredential(profile({ providerType: 'anthropic', baseUrl: 'https://proxy/v1' }))).toBe(true);
   });
+  it('env OPENAI_BASE_URL routes through OPENAI_API_KEY', () => {
+    process.env.OPENAI_BASE_URL = 'https://proxy/v1';
+    expect(hasLlmCredential(profile({ providerType: 'anthropic' }))).toBe(false);
+    process.env.OPENAI_API_KEY = 'sk-proxy';
+    expect(hasLlmCredential(profile({ providerType: 'anthropic' }))).toBe(true);
+  });
   it('unknown provider type is generously usable', () => {
     expect(hasLlmCredential(profile({ providerType: 'some-future-provider' as any }))).toBe(true);
   });

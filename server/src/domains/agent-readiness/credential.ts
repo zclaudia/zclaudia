@@ -20,6 +20,9 @@ export function hasLlmCredential(profile: LlmProfileConfig): boolean {
 
   // Env fallback. A custom baseUrl (profile-level or OPENAI_BASE_URL) forces the
   // OpenAI-compat path → OPENAI_API_KEY (build-model.ts:252-253).
+  // Note: build-model also surfaces OPENAI_API_KEY on its `!registryHit` arm
+  // (unregistered model id, line 252); that's a runtime-lookup detail this pure
+  // predicate intentionally does not replicate — the run-start error is the backstop.
   if (nonEmpty(profile.baseUrl) || nonEmpty(process.env.OPENAI_BASE_URL)) {
     return nonEmpty(process.env.OPENAI_API_KEY);
   }
