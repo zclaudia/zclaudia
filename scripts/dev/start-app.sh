@@ -17,6 +17,14 @@ ok()   { echo -e "\033[0;32m+\033[0m $*"; }
 warn() { echo -e "\033[0;33m!\033[0m $*"; }
 die()  { echo -e "\033[0;31mx\033[0m $*" >&2; exit 1; }
 
+# --- Pin the WHOLE script to the project's Node (.node-version) up front ---
+# Re-execs this script once under the project Node so every node/pnpm/npx below
+# — install, native-module rebuild check, builds, and the pre-launched server —
+# runs on the exact Node the server uses. Without it, a newer bare-shell Node
+# could rebuild better-sqlite3 to a mismatched ABI and the server dies with
+# NODE_MODULE_VERSION / ERR_DLOPEN_FAILED.
+source "$SCRIPT_DIR/../lib/use-project-node.sh"
+
 # --- Source .env files (auto-export). Order: most general first, most specific last (later wins). ---
 source_env() {
   local file=$1

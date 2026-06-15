@@ -12,6 +12,12 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Pin to the project's Node up front. fnm exec puts a stable versioned bin dir
+# first on PATH, so `run_clean_env`'s `env -i ... PATH=$PATH` sandbox still
+# resolves `node`/`pnpm` to the project Node.
+source "$SCRIPT_DIR/../lib/use-project-node.sh"
+
 DESKTOP_DIR="$PROJECT_ROOT/apps/desktop"
 TAURI_CONFIG_OVERRIDE="$DESKTOP_DIR/src-tauri/tauri.clean.conf.json"
 VITE_PORT="1420"

@@ -14,6 +14,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+# Pin to the project's Node before parsing args (so the re-exec keeps "$@") and
+# before any pnpm/node use, so `node server/dist/index.js` runs on the right ABI.
+source "$SCRIPT_DIR/../lib/use-project-node.sh"
+
 DATA_DIR="$HOME/.zclaudia-dev"
 PID_FILE="$DATA_DIR/.server.pid"
 LOG_FILE="$DATA_DIR/server.log"
