@@ -58,9 +58,9 @@ describe('resolveAgentReadiness', () => {
     seedAgent(seedLlm('sk-x'));
     expect(resolveAgentReadiness(db)).toEqual({ usable: true });
   });
-  it('usable when a key is available via env even with no stored key', () => {
+  it('NOT usable when only an env key is set (no profile key)', () => {
     seedAgent(seedLlm(undefined));
     process.env.ANTHROPIC_API_KEY = 'sk-ant';
-    expect(resolveAgentReadiness(db)).toEqual({ usable: true });
+    expect(resolveAgentReadiness(db)).toEqual({ usable: false, reason: 'no_credential' });
   });
 });
