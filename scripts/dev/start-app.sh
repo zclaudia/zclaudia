@@ -114,21 +114,25 @@ wait_for_url() {
   die "$label did not become ready at $url within ${timeout}s"
 }
 
-# --- Ensure native modules work with the Tauri sidecar Node ---
+# --- Ensure better-sqlite3 matches the project Node that runs the dev server ---
+# Both dev modes run the server under the fnm project Node (.node-version), NOT
+# the Tauri sidecar: tauri mode pre-launches `node server/dist/index.js` and
+# standalone mode uses `tsx watch`. If better-sqlite3 was built under a different
+# Node (e.g. a bare shell on a newer Homebrew Node), its native ABI won't load
+# and the server dies on startup with ERR_DLOPEN_FAILED / NODE_MODULE_VERSION
+# mismatch. Detect that against the project Node and rebuild so this script is
+# self-healing — no need to run scripts/with-project-node.sh by hand.
+# Precondition: setup_node has already selected the project Node on PATH.
 ensure_native_modules() {
-  local sidecar
-  sidecar=$(ls "$PROJECT_ROOT/apps/desktop/src-tauri/binaries/node-"* 2>/dev/null | head -1 || true)
-
-  if [[ -n "$sidecar" && -x "$sidecar" ]]; then
-    if ! "$sidecar" -e "require('module').createRequire(process.cwd()+'/package.json')('better-sqlite3')" 2>/dev/null; then
-      info "Rebuilding native modules for sidecar Node ($("$sidecar" --version))..."
-      (cd "$PROJECT_ROOT" && pnpm rebuild better-sqlite3)
-      if "$sidecar" -e "require('module').createRequire(process.cwd()+'/package.json')('better-sqlite3')" 2>/dev/null; then
-        ok "Native modules rebuilt for sidecar"
-      else
-        warn "Native module rebuild may not have matched sidecar ABI — app might fail to start"
-      fi
-    fi
+  if (cd "$PROJECT_ROOT" && node -e "require('better-sqlite3')") >/dev/null 2>&1; then
+    return 0
+  fi
+  warn "better-sqlite3 native ABI does not match project Node ($(node --version)); rebuilding..."
+  (cd "$PROJECT_ROOT" && pnpm rebuild better-sqlite3)
+  if (cd "$PROJECT_ROOT" && node -e "require('better-sqlite3')") >/dev/null 2>&1; then
+    ok "Native modules rebuilt for project Node ($(node --version))"
+  else
+    die "better-sqlite3 still fails to load under project Node after rebuild. Try: rm -rf node_modules && bash scripts/with-project-node.sh pnpm install"
   fi
 }
 
