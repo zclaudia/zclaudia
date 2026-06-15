@@ -1,7 +1,6 @@
 import { useEffect, useState, useRef, useMemo, useCallback, lazy, Suspense } from 'react';
-import { emit as emitTauri } from '@tauri-apps/api/event';
-import { NOTCH_EVENT } from './services/notchBridge';
 import { Sidebar } from './features/sidebar/Sidebar';
+import { NotificationsModal } from './features/sidebar/NotificationsModal';
 import { SidebarCollapsedBar } from './features/sidebar/SidebarCollapsedBar';
 import { SessionChatLayout } from './features/chat/SessionChatLayout';
 import { MobileSetup } from './components/setup/MobileSetup';
@@ -35,6 +34,7 @@ import { useFileViewerStore } from './stores/fileViewerStore';
 import { usePluginStore } from './stores/pluginStore';
 import { useRecoveryStore } from './stores/recoveryStore';
 import { useNotificationFeedStore } from './stores/notificationFeedStore';
+import { useNotificationsModalStore } from './stores/notificationsModalStore';
 import { useGatewayStore } from './stores/gatewayStore';
 import { useShortcutStore } from './stores/shortcutStore';
 import { isDesktopTauri } from './utils/platform';
@@ -72,6 +72,7 @@ function AppContent() {
   const setAgentExpanded = useClaudiaStore((s) => s.setExpanded);
   const disabledBuiltinPanels = usePluginStore((s) => s.disabledBuiltinPanels);
   const notificationUnreadCount = useNotificationFeedStore((s) => s.unreadCount);
+  const notificationsModalOpen = useNotificationsModalStore((s) => s.isOpen);
   const directGatewayUrl = useGatewayStore((s) => s.directGatewayUrl);
   const fileViewerFullscreen = useFileViewerStore((s) => s.fullscreen);
   const fileViewerFilePath = useFileViewerStore((s) => s.filePath);
@@ -130,7 +131,7 @@ function AppContent() {
     if (isMobile) {
       setFeedOpen((current) => !current);
     } else {
-      void emitTauri(NOTCH_EVENT.toggle, {});
+      useNotificationsModalStore.getState().toggle();
     }
   }, [isMobile, setAgentExpanded]);
 
@@ -318,7 +319,7 @@ function AppContent() {
           onOpenNotifications={openNotifications}
           searchOpen={!isMobile ? sidebarSearchOpen : undefined}
           onSearchOpenChange={!isMobile ? setSidebarSearchOpen : undefined}
-          isNotificationsOpen={isMobile ? isFeedOpen : false}
+          isNotificationsOpen={isMobile ? isFeedOpen : notificationsModalOpen}
           onOpenDashboard={(projectId) => {
             selectProjectRoute(projectId);
             selectSession(null);
@@ -327,6 +328,13 @@ function AppContent() {
           }}
           onOpenAutomations={openAutomationWindowFn}
         />
+
+        {!isMobile && (
+          <NotificationsModal
+            open={notificationsModalOpen}
+            onClose={() => useNotificationsModalStore.getState().close()}
+          />
+        )}
 
         <main ref={swipeOpenClaudiaRef} className="flex-1 flex flex-col overflow-hidden relative">
           <div className="flex-1 overflow-hidden relative">
