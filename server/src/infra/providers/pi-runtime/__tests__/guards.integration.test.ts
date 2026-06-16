@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, rmSync, existsSync } from 'fs';
+import { mkdtempSync, writeFileSync, rmSync, existsSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { buildTools } from '../tool-bridge.js';
@@ -237,5 +237,65 @@ describe('decoupled mutation caps', () => {
     const res = await tools.Write.execute('w1', { file_path: 'ok.txt', content });
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
+  });
+});
+
+describe('Edit whitespace-safe matching', () => {
+  it('edits a CRLF file with an LF old_string', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'crlf.ts'), 'const a = 1;\r\nconst b = 2;\r\n');
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'crlf.ts' });
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'crlf.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 42;',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: true, matchStrategy: 'whitespace' });
+  });
+
+  it('edits with wrong indentation, re-indents the replacement to the file indent', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'f.ts'), 'function f() {\n    return 1;\n}\n');
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'f.ts' });
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'f.ts',
+      old_string: '  return 1;',
+      new_string: '  return 2;',
+    });
+    const after = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: true, matchStrategy: 'whitespace' });
+    expect(after).toBe('function f() {\n    return 2;\n}\n');
+  });
+
+  it('reports not_unique when the match is ambiguous', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'f.ts'), 'x = 1;\ny = 2;\nx = 1;\n');
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'f.ts' });
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'f.ts',
+      old_string: 'x = 1;',
+      new_string: 'x = 9;',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'not_unique' });
+  });
+
+  it('exact matches report matchStrategy exact (whitespace matcher not consulted)', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'f.ts' });
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'f.ts',
+      old_string: 'const a = 1;',
+      new_string: 'const a = 2;',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: true, matchStrategy: 'exact' });
   });
 });

@@ -2,7 +2,7 @@ import type { AgentTool } from '@earendil-works/pi-agent-core';
 import { lstat, mkdir, rename, rm, stat } from 'fs/promises';
 import * as path from 'path';
 
-import { findActualString, countOccurrences, applyEdit } from './edit-match.js';
+import { findActualString, countOccurrences, applyEdit, findWhitespaceMatch } from './edit-match.js';
 import { buildFileDiff, type FileDiffHunk, type FileDiffResult } from './diff.js';
 import type { ReadFileStateStore } from './read-file-state.js';
 import {
@@ -823,6 +823,18 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             const edit = batchEdits[index];
             const actual = findActualString(updated, edit.oldString);
             if (actual === null) {
+              const ws = findWhitespaceMatch(updated, edit.oldString, edit.newString);
+              if (ws.ok) {
+                updated = updated.slice(0, ws.match.start) + ws.match.adjustedNewString + updated.slice(ws.match.end);
+                totalReplaced += 1;
+                appliedEdits.push({ index, replaced: 1, replaceAll: edit.replaceAll });
+                continue;
+              }
+              if (ws.reason === 'ambiguous') {
+                return errorResult('not_unique',
+                  `edits[${index}].old_string matches ${ws.count} locations after whitespace-normalization; add more surrounding context`,
+                  { path: relPath, editIndex: index, occurrences: ws.count });
+              }
               const attempts = options?.noopGuard?.record(filePath, `batch_not_found:${index}:${hashlineForLine(edit.oldString)}`) ?? 0;
               if (attempts >= NOOP_EDIT_HARD_LIMIT) {
                 return errorResult('edit_loop_detected',
@@ -923,7 +935,30 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           });
         }
 
-        const actual = isHashlineEdit ? null : findActualString(original, oldString);
+        // Only accept an exact/quote match when every occurrence is at a clean
+        // LF line boundary (preceded by \n or start-of-file, followed by \n or
+        // end-of-file). This rejects mid-line substring matches (e.g. a 2-space
+        // search string matching inside a 4-space-indented line) and CRLF-file
+        // matches where the line ends with \r\n but the search string has LF-only
+        // endings — both are better handled by the whitespace-safe fallback.
+        function isAtLineBoundaries(content: string, needle: string): boolean {
+          if (!needle) return false;
+          let pos = 0;
+          let found = false;
+          for (;;) {
+            const i = content.indexOf(needle, pos);
+            if (i === -1) break;
+            found = true;
+            const startOk = i === 0 || content[i - 1] === '\n';
+            const endPos = i + needle.length;
+            const endOk = endPos >= content.length || content[endPos] === '\n';
+            if (!startOk || !endOk) return false;
+            pos = i + needle.length;
+          }
+          return found;
+        }
+        const rawActual = isHashlineEdit ? null : findActualString(original, oldString);
+        const actual = rawActual !== null && isAtLineBoundaries(original, rawActual) ? rawActual : null;
         if (isHashlineEdit) {
           // The snapshot (file as the model last saw it) disambiguates duplicate lines.
           const snapshot = options?.readFileState?.get(filePath)?.content;
@@ -1000,25 +1035,42 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             backup,
           });
         }
+        let updated: string;
+        let replaced: number;
+        let matchStrategy: 'exact' | 'quote' | 'whitespace';
         if (actual === null) {
-          const relPath = toWorkspaceRelative(cwd, filePath);
-          const attempts = options?.noopGuard?.record(filePath, `not_found:${hashlineForLine(oldString)}`) ?? 0;
-          if (attempts >= NOOP_EDIT_HARD_LIMIT) {
-            return errorResult('edit_loop_detected',
-              `This exact edit has failed ${attempts} times — old_string does not exist in ${relPath}. `
-                + 'Read the file again to see its current content before retrying.',
-              { path: relPath, attempts });
+          const relPathNF = toWorkspaceRelative(cwd, filePath);
+          const ws = findWhitespaceMatch(original, oldString, newString);
+          if (ws.ok) {
+            updated = original.slice(0, ws.match.start) + ws.match.adjustedNewString + original.slice(ws.match.end);
+            replaced = 1;
+            matchStrategy = 'whitespace';
+          } else if (ws.reason === 'ambiguous') {
+            return errorResult('not_unique',
+              `old_string matches ${ws.count} locations after whitespace-normalization; add more surrounding context`,
+              { path: relPathNF, occurrences: ws.count });
+          } else {
+            const attempts = options?.noopGuard?.record(filePath, `not_found:${hashlineForLine(oldString)}`) ?? 0;
+            if (attempts >= NOOP_EDIT_HARD_LIMIT) {
+              return errorResult('edit_loop_detected',
+                `This exact edit has failed ${attempts} times — old_string does not exist in ${relPathNF}. `
+                  + 'Read the file again to see its current content before retrying.',
+                { path: relPathNF, attempts });
+            }
+            return errorResult('not_found', 'old_string not found in file', { path: relPathNF });
           }
-          return errorResult('not_found', 'old_string not found in file', { path: relPath });
+        } else {
+          const occurrences = countOccurrences(original, actual);
+          if (!replaceAll && occurrences > 1) {
+            return errorResult('not_unique', `old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
+              path: toWorkspaceRelative(cwd, filePath),
+              occurrences,
+            });
+          }
+          updated = applyEdit(original, actual, newString, replaceAll);
+          replaced = replaceAll ? occurrences : 1;
+          matchStrategy = actual === oldString ? 'exact' : 'quote';
         }
-        const occurrences = countOccurrences(original, actual);
-        if (!replaceAll && occurrences > 1) {
-          return errorResult('not_unique', `old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
-            path: toWorkspaceRelative(cwd, filePath),
-            occurrences,
-          });
-        }
-        const updated = applyEdit(original, actual, newString, replaceAll);
         const relPath = toWorkspaceRelative(cwd, filePath);
         const updatedGuard = validateUpdatedContent(filePath, updated, { path: relPath });
         if (!updatedGuard.ok) return updatedGuard.result;
@@ -1029,14 +1081,14 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           originalContent: original,
           updatedContent: updated,
           extra: {
-            replaced: replaceAll ? occurrences : 1,
+            replaced,
           },
         });
         if (args.preview_only === true) {
           return textResult(buildMutationResultText({
             action: 'Previewed edit',
             path: relPath,
-            replaced: replaceAll ? occurrences : 1,
+            replaced,
             diff: diff.diff,
             firstChangedLine: diff.firstChangedLine,
             lineChanges: diff.lineChanges,
@@ -1044,6 +1096,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             snapshotUpdated: false,
           }), {
             ...detailsBase,
+            matchStrategy,
             preview: true,
           });
         }
@@ -1070,12 +1123,13 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         return textResult(buildMutationResultText({
           action: 'Edited',
           path: relPath,
-          replaced: replaceAll ? occurrences : 1,
+          replaced,
           diff: diff.diff,
           firstChangedLine: diff.firstChangedLine,
           lineChanges: diff.lineChanges,
         }), {
           ...detailsBase,
+          matchStrategy,
           backup,
           ...(lifecycle ? { lifecycle } : {}),
         });
