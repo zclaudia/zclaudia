@@ -412,43 +412,47 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const lines = text.split(/\r?\n/);
           if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
           const totalLines = lines.length;
-          const userGaveWindow = args.offset !== undefined || args.limit !== undefined;
-          const summaryEligible = !userGaveWindow
-            && args.hashline !== true
-            && args.full !== true
-            && totalLines >= SUMMARY_MIN_LINES
-            && totalLines <= SUMMARY_MAX_LINES
-            && buffer.length <= SUMMARY_MAX_BYTES;
-          if (summaryEligible) {
-            const provider = getOutlineProvider(fileExt);
-            if (provider) {
-              const folds = await provider.findFolds(text, filePath);
-              const foldedLines = folds.reduce((sum, f) => sum + (f.endLine - f.startLine + 1), 0);
-              if (foldedLines / totalLines >= SUMMARY_MIN_SAVINGS) {
-                const skeleton = renderSkeleton(lines, folds, totalLines, relPath);
-                await options?.readFileState?.recordRead(filePath, {
-                  content: text,
-                  offset: 1,
-                  limit: totalLines,
-                  totalLines,
-                  returnedLines: skeleton.visibleLines,
-                  isPartialView: true,
-                  hasFullContent: true,
-                  timestamp: fileStat.mtimeMs,
-                });
-                return textResult(skeleton.text, {
-                  ok: true,
-                  path: relPath,
-                  format: 'outline',
-                  totalLines,
-                  foldedLines,
-                  foldedBodies: folds.length,
-                  elidedRanges: folds.map(f => [f.startLine, f.endLine]),
-                  returnedLines: skeleton.visibleLines,
-                  size: fileStat.size,
-                });
+          try {
+            const userGaveWindow = args.offset !== undefined || args.limit !== undefined;
+            const summaryEligible = !userGaveWindow
+              && args.hashline !== true
+              && args.full !== true
+              && totalLines >= SUMMARY_MIN_LINES
+              && totalLines <= SUMMARY_MAX_LINES
+              && buffer.length <= SUMMARY_MAX_BYTES;
+            if (summaryEligible) {
+              const provider = getOutlineProvider(fileExt);
+              if (provider) {
+                const folds = await provider.findFolds(text, filePath);
+                const foldedLines = folds.reduce((sum, f) => sum + (f.endLine - f.startLine + 1), 0);
+                if (foldedLines / totalLines >= SUMMARY_MIN_SAVINGS) {
+                  const skeleton = renderSkeleton(lines, folds, totalLines, relPath);
+                  await options?.readFileState?.recordRead(filePath, {
+                    content: text,
+                    offset: 1,
+                    limit: totalLines,
+                    totalLines,
+                    returnedLines: skeleton.visibleLines,
+                    isPartialView: true,
+                    hasFullContent: true,
+                    timestamp: fileStat.mtimeMs,
+                  });
+                  return textResult(skeleton.text, {
+                    ok: true,
+                    path: relPath,
+                    format: 'outline',
+                    totalLines,
+                    foldedLines,
+                    foldedBodies: folds.length,
+                    elidedRanges: folds.map(f => [f.startLine, f.endLine]),
+                    returnedLines: skeleton.visibleLines,
+                    size: fileStat.size,
+                  });
+                }
               }
             }
+          } catch {
+            // summary is best-effort: fall through to the normal read
           }
           const selected = lines.slice(offset - 1, offset - 1 + limit);
           const isHashline = args.hashline === true;

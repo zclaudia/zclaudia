@@ -382,4 +382,50 @@ describe('Read bridge tool module', () => {
     const writeCheck = await readFileState.assertSafeToWrite(filePath, content);
     expect(writeCheck).toMatchObject({ ok: false, code: 'partial_read' });
   });
+
+  it('does not summarize a file above the 2MB byte cap', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-bigbytes-'));
+    // > 2MB but < 20000 lines (long body lines) so the BYTE cap is what suppresses it.
+    const blocks: string[] = [];
+    for (let f = 0; f < 1200; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 10; b++) blocks.push(`  const v${f}_${b} = ${'x'.repeat(180)};`);
+      blocks.push('}');
+    }
+    const content = blocks.join('\n');
+    expect(content.length).toBeGreaterThan(2 * 1024 * 1024);
+    expect(content.split('\n').length).toBeLessThan(20_000);
+    await writeFile(path.join(root, 'huge.ts'), content);
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'huge.ts' });
+    expect(result.details.format).toBeUndefined();
+  });
+
+  it('does not summarize when hashline is requested on a large source file', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-hashline-'));
+    const blocks: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 8; b++) blocks.push(`  const v${f}_${b} = ${b};`);
+      blocks.push('}');
+    }
+    await writeFile(path.join(root, 'big.ts'), blocks.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'big.ts', hashline: true });
+    expect(result.details.format).toBeUndefined();
+    expect(result.details.hashline).toBeDefined();
+  });
+
+  it('does not summarize a large file of a non-outline extension', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-nonoutline-'));
+    const lines = Array.from({ length: 300 }, (_, i) => `line ${i} of plain text content here`);
+    await writeFile(path.join(root, 'notes.txt'), lines.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'notes.txt' });
+    expect(result.details.format).toBeUndefined();
+    expect(result.details).toMatchObject({ ok: true, returnedLines: 300 });
+  });
 });
