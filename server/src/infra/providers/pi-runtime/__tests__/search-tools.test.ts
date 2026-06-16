@@ -39,6 +39,61 @@ describe('search and listing tools', () => {
     expect(payload.results.some((entry: any) => entry.isMatch)).toBe(true);
   });
 
+  it('Grep treats option-like patterns as search text', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-options-'));
+    await writeFile(path.join(root, 'a.ts'), 'plain beta only\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-option-pattern', {
+      pattern: '--regexp=beta',
+      max_results: 10,
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(result.details).toMatchObject({ ok: true, pattern: '--regexp=beta', total: 0 });
+    expect(payload.results).toEqual([]);
+  });
+
+  it('Grep returns file paths for content and count searches scoped to one file', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-single-file-'));
+    await writeFile(path.join(root, 'single.ts'), 'target line\nother\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const contentResult = await grep.execute('grep-single-content', {
+      pattern: 'target',
+      path: 'single.ts',
+    });
+    const countResult = await grep.execute('grep-single-count', {
+      pattern: 'target',
+      path: 'single.ts',
+      output_mode: 'count',
+    });
+
+    const contentPayload = JSON.parse(contentResult.content[0].text);
+    const countPayload = JSON.parse(countResult.content[0].text);
+    expect(contentPayload.results).toEqual([
+      expect.objectContaining({ file: 'single.ts', line: 1, preview: 'target line', isMatch: true }),
+    ]);
+    expect(countPayload.counts).toEqual([
+      { file: 'single.ts', count: 1 },
+    ]);
+  });
+
+  it('Grep keeps the matching line when context output is capped', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-grep-context-cap-'));
+    await writeFile(path.join(root, 'a.ts'), 'before\ntarget\nafter\n');
+    const grep = createGrepBridgeTool(root) as any;
+
+    const result = await grep.execute('grep-context-cap', {
+      pattern: 'target',
+      context: 1,
+      max_results: 1,
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.results.some((entry: any) => entry.preview === 'target' && entry.isMatch)).toBe(true);
+  });
+
   it('LS lists entries alphabetically with a trailing slash on directories', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-ls-module-'));
     await mkdir(path.join(root, 'src'));
@@ -50,6 +105,36 @@ describe('search and listing tools', () => {
 
     expect(result.content[0].text.split('\n')).toEqual(['a.txt', 'b.txt', 'src/']);
     expect(result.details).toMatchObject({ ok: true, path: '.', total: 3, truncated: false });
+  });
+
+  it('LS reports the full entry count when output is truncated', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-ls-truncated-'));
+    await writeFile(path.join(root, 'a.txt'), 'a');
+    await writeFile(path.join(root, 'b.txt'), 'b');
+    await writeFile(path.join(root, 'c.txt'), 'c');
+    const ls = createLsBridgeTool(root) as any;
+
+    const result = await ls.execute('ls-truncated', { limit: 2 });
+
+    expect(result.content[0].text.split('\n')).toEqual(['a.txt', 'b.txt']);
+    expect(result.details).toMatchObject({ ok: true, path: '.', total: 3, returned: 2, truncated: true });
+  });
+
+  it('Glob reports full match count and truncation in the payload', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-glob-truncated-'));
+    await writeFile(path.join(root, 'a.ts'), 'a');
+    await writeFile(path.join(root, 'b.ts'), 'b');
+    const glob = createGlobTool(root) as any;
+
+    const result = await glob.execute('glob-truncated', {
+      pattern: '*.ts',
+      max_results: 1,
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.results).toHaveLength(1);
+    expect(payload).toMatchObject({ total: 2, returned: 1, truncated: true });
+    expect(result.details).toMatchObject({ ok: true, total: 2, returned: 1, truncated: true });
   });
 
   it('LSPTool returns structured ripgrep fallback results', async () => {

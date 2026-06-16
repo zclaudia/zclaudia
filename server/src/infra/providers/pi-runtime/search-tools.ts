@@ -27,11 +27,24 @@ function parseRipgrepLines(cwd: string, stdout: string, maxResults: number): Arr
 }
 
 function parseRipgrepContextLines(cwd: string, stdout: string, maxResults: number): Array<{ file: string; line: number; preview: string; isMatch: boolean }> {
-  return stdout
-    .split('\n')
-    .filter(line => Boolean(line) && line !== '--')
-    .slice(0, maxResults)
-    .flatMap((line) => {
+  const groups: string[][] = [];
+  let currentGroup: string[] = [];
+  for (const line of stdout.split('\n')) {
+    if (!line) continue;
+    if (line === '--') {
+      if (currentGroup.length > 0) groups.push(currentGroup);
+      currentGroup = [];
+      continue;
+    }
+    currentGroup.push(line);
+  }
+  if (currentGroup.length > 0) groups.push(currentGroup);
+
+  const results: Array<{ file: string; line: number; preview: string; isMatch: boolean }> = [];
+  let matchCount = 0;
+  for (const group of groups) {
+    if (matchCount >= maxResults) break;
+    const parsedGroup = group.flatMap((line) => {
       const match = /^(.*?)([:-])(\d+)\2(.*)$/.exec(line);
       if (!match) return [];
       return [{
@@ -41,6 +54,12 @@ function parseRipgrepContextLines(cwd: string, stdout: string, maxResults: numbe
         isMatch: match[2] === ':',
       }];
     });
+    const groupMatches = parsedGroup.filter((entry) => entry.isMatch).length;
+    if (groupMatches === 0) continue;
+    results.push(...parsedGroup);
+    matchCount += groupMatches;
+  }
+  return results;
 }
 
 async function ripgrepSearch(
@@ -58,6 +77,8 @@ async function ripgrepSearch(
     '--max-count',
     String(maxResults),
     ...(include ? ['--glob', include] : []),
+    '--with-filename',
+    '--',
     query,
     searchRoot,
   ];
@@ -112,7 +133,7 @@ export function createGrepBridgeTool(cwd: string): AgentTool<any> {
       try {
         if (mode === 'files_with_matches') {
           const { lines, truncated, exitCode, stderr } = await runRipgrep(
-            ['--files-with-matches', '--color', 'never', ...ci, ...include, pattern, searchRoot],
+            ['--files-with-matches', '--color', 'never', '--with-filename', ...ci, ...include, '--', pattern, searchRoot],
             { maxLines: maxResults, signal },
           );
           if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
@@ -122,12 +143,13 @@ export function createGrepBridgeTool(cwd: string): AgentTool<any> {
         }
         if (mode === 'count') {
           const { lines, truncated, exitCode, stderr } = await runRipgrep(
-            ['--count', '--no-messages', '--color', 'never', ...ci, ...include, pattern, searchRoot],
+            ['--count', '--no-messages', '--color', 'never', '--with-filename', ...ci, ...include, '--', pattern, searchRoot],
             { maxLines: maxResults, signal },
           );
           if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
-          const counts = lines.map((l) => {
+          const counts = lines.flatMap((l) => {
             const idx = l.lastIndexOf(':');
+            if (idx < 0) return [];
             return { file: toWorkspaceRelative(cwd, l.slice(0, idx)), count: Number(l.slice(idx + 1)) || 0 };
           });
           const total = counts.reduce((sum, c) => sum + c.count, 0);
@@ -135,7 +157,7 @@ export function createGrepBridgeTool(cwd: string): AgentTool<any> {
             { ok: true, pattern, path: relPath, total, truncated });
         }
         const { lines, truncated, exitCode, stderr } = await runRipgrep(
-          ['--line-number', '--no-heading', '--color', 'never', ...ci, ...(context > 0 ? ['-C', String(context)] : []), ...include, pattern, searchRoot],
+          ['--line-number', '--no-heading', '--color', 'never', '--with-filename', ...ci, ...(context > 0 ? ['-C', String(context)] : []), ...include, '--', pattern, searchRoot],
           { maxLines: maxResults * (context > 0 ? context * 2 + 1 : 1) + maxResults, signal },
         );
         if (exitCode === 2) return errorResult('grep_failed', stderr || 'ripgrep error', { pattern });
@@ -192,9 +214,9 @@ export function createLsBridgeTool(cwd: string): AgentTool<any> {
         }
         const relPath = toWorkspaceRelative(cwd, dirPath) || '.';
         if (lines.length === 0) {
-          return textResult('(empty directory)', { ok: true, path: relPath, total: 0, truncated });
+          return textResult('(empty directory)', { ok: true, path: relPath, total: 0, returned: 0, truncated });
         }
-        return textResult(lines.join('\n'), { ok: true, path: relPath, total: lines.length, truncated });
+        return textResult(lines.join('\n'), { ok: true, path: relPath, total: entries.length, returned: lines.length, truncated });
       } catch (err) {
         return errorResult('ls_failed', err instanceof Error ? err.message : String(err), { path: String(args.path ?? '.') });
       }
@@ -245,11 +267,12 @@ export function createGlobTool(cwd: string): AgentTool<any> {
         const all = lines.map((file) => toWorkspaceRelative(cwd, file));
         const results = all.slice(0, maxResults);
         const truncated = streamTruncated || all.length > maxResults;
-        return textResult(JSON.stringify({ pattern, path: relPath, results, total: results.length }, null, 2), {
+        return textResult(JSON.stringify({ pattern, path: relPath, results, total: all.length, returned: results.length, truncated }, null, 2), {
           ok: true,
           pattern,
           path: relPath,
-          total: results.length,
+          total: all.length,
+          returned: results.length,
           truncated,
         });
       } catch (err) {
