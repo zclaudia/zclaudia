@@ -7,6 +7,7 @@ export interface ReadFileStateEntry {
   offset?: number;
   limit?: number;
   isPartialView: boolean;
+  hasFullContent: boolean;
 }
 
 export interface ReadFileStateStore {
@@ -18,6 +19,7 @@ export interface ReadFileStateStore {
     totalLines: number;
     returnedLines: number;
     isPartialView?: boolean;
+    hasFullContent?: boolean;
     timestamp?: number;
   }): Promise<void>;
   recordWrite(filePath: string, content: string): Promise<void>;
@@ -25,6 +27,10 @@ export interface ReadFileStateStore {
   assertSafeToWrite(filePath: string, currentContent: string): Promise<
     { ok: true } | { ok: false; code: 'file_not_read' | 'partial_read' | 'file_modified_since_read'; message: string }
   >;
+  assertEditable(filePath: string, currentContent: string):
+    { ok: true } | { ok: false; code: 'file_not_read' | 'partial_read' | 'file_modified_since_read'; message: string };
+  assertEditableHashline(filePath: string):
+    { ok: true } | { ok: false; code: 'file_not_read' | 'partial_read'; message: string };
 }
 
 function normalizeStateKey(filePath: string): string {
@@ -52,6 +58,7 @@ export function createReadFileStateStore(): ReadFileStateStore {
         offset: input.offset,
         limit: input.limit,
         isPartialView: input.isPartialView ?? !fullRange,
+        hasFullContent: input.hasFullContent ?? fullRange,
       });
     },
 
@@ -61,6 +68,7 @@ export function createReadFileStateStore(): ReadFileStateStore {
         content: normalizeContent(content),
         timestamp: fileStat.mtimeMs,
         isPartialView: false,
+        hasFullContent: true,
       });
     },
 
@@ -99,6 +107,29 @@ export function createReadFileStateStore(): ReadFileStateStore {
         code: 'file_modified_since_read',
         message: 'File has been modified since it was read. Read it again before editing or overwriting it.',
       };
+    },
+
+    assertEditable(filePath, currentContent) {
+      const entry = entries.get(normalizeStateKey(filePath));
+      if (!entry) {
+        return { ok: false, code: 'file_not_read', message: 'File has not been read yet. Read it before editing it.' };
+      }
+      if (!entry.hasFullContent) {
+        return { ok: false, code: 'partial_read', message: 'Only a partial window was captured (large/streamed file). Read it again before editing.' };
+      }
+      if (normalizeContent(currentContent) === entry.content) return { ok: true };
+      return { ok: false, code: 'file_modified_since_read', message: 'File has been modified since it was read. Read it again before editing.' };
+    },
+
+    assertEditableHashline(filePath) {
+      const entry = entries.get(normalizeStateKey(filePath));
+      if (!entry) {
+        return { ok: false, code: 'file_not_read', message: 'File has not been read yet. Read it before editing it.' };
+      }
+      if (!entry.hasFullContent) {
+        return { ok: false, code: 'partial_read', message: 'Only a partial window was captured (large/streamed file). Read it again before editing.' };
+      }
+      return { ok: true };
     },
   };
 }
