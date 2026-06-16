@@ -809,8 +809,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           hashlineTagDrift = hashlineTag(original) !== args.hashline_tag.trim();
         }
         const readCheck = isHashlineEdit
-          ? options?.readFileState?.assertFullRead(filePath)
-          : await options?.readFileState?.assertSafeToWrite(filePath, original);
+          ? options?.readFileState?.assertEditableHashline(filePath)
+          : options?.readFileState?.assertEditable(filePath, original);
         if (readCheck && !readCheck.ok) {
           return errorResult(readCheck.code, readCheck.message, { path: toWorkspaceRelative(cwd, filePath) });
         }

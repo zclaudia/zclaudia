@@ -138,3 +138,69 @@ describe('critical Bash command guard (integration)', () => {
     expect(asked).toBe(0);
   });
 });
+
+describe('edit-after-summary / edit-after-range guard (Option B)', () => {
+  function bigTs(): string {
+    const blocks: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 8; b++) blocks.push(`  const v${f}_${b} = ${b};`);
+      blocks.push('}');
+    }
+    return blocks.join('\n');
+  }
+
+  it('Edit succeeds after a structural summary read (no full re-read)', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'big.ts'), bigTs());
+    const tools = getTools(dir);
+    const read = await tools.Read.execute('r1', { path: 'big.ts' });
+    expect(read.details.format).toBe('outline');
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'big.ts',
+      old_string: 'const v0_0 = 0;',
+      new_string: 'const v0_0 = 42;',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+  });
+
+  it('Edit succeeds after a ranged read (no full re-read)', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'main.ts'), 'const a = "old";\nconst b = 2;\n');
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'main.ts', offset: 1, limit: 1 });
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'main.ts',
+      old_string: 'const a = "old";',
+      new_string: 'const a = "new";',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+  });
+
+  it('Write is still blocked after only a summary read', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'big.ts'), bigTs());
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'big.ts' });
+    const res = await tools.Write.execute('w1', { file_path: 'big.ts', content: 'package\n' });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'partial_read' });
+  });
+
+  it('Edit is blocked when the file changed since the read', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'm.ts'), 'const a = "old";\n');
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'm.ts' });
+    writeFileSync(path.join(dir, 'm.ts'), 'const a = "drifted";\n');
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'm.ts',
+      old_string: 'const a = "drifted";',
+      new_string: 'const a = "new";',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'file_modified_since_read' });
+  });
+});
