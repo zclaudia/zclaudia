@@ -281,4 +281,105 @@ describe('Read bridge tool module', () => {
     expect(result.details).toMatchObject({ ok: false, path: 'tiny.png', mimeType: 'image/png' });
     expect(result.content[0].text).toContain('current model does not support vision');
   });
+
+  it('returns a structural summary for a large source file with no selector', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-'));
+    const blocks: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 8; b++) blocks.push(`  const v${f}_${b} = ${b};`);
+      blocks.push('}');
+    }
+    await writeFile(path.join(root, 'big.ts'), blocks.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'big.ts' });
+
+    expect(result.details).toMatchObject({ ok: true, format: 'outline' });
+    expect(result.details.foldedBodies).toBeGreaterThanOrEqual(20);
+    expect(result.content[0].text).toContain('… (+8 lines)');
+    expect(result.content[0].text).toContain('Structural summary');
+    expect(result.content[0].text).toContain('1|function fn0() {');
+  });
+
+  it('does not summarize when the savings gate is not met', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-nosavings-'));
+    const lines = Array.from({ length: 300 }, (_, i) => `const x${i} = ${i};`);
+    await writeFile(path.join(root, 'flat.ts'), lines.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'flat.ts' });
+
+    expect(result.details.format).toBeUndefined();
+    expect(result.details).toMatchObject({ ok: true, returnedLines: 300 });
+  });
+
+  it('does not summarize below the line threshold', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-small-'));
+    const blocks: string[] = [];
+    for (let f = 0; f < 10; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 8; b++) blocks.push(`  const v${f}_${b} = ${b};`);
+      blocks.push('}');
+    }
+    await writeFile(path.join(root, 'small.ts'), blocks.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'small.ts' });
+    expect(result.details.format).toBeUndefined();
+  });
+
+  it('full:true forces a verbatim read of an otherwise-summarizable file', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-full-'));
+    const blocks: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 8; b++) blocks.push(`  const v${f}_${b} = ${b};`);
+      blocks.push('}');
+    }
+    await writeFile(path.join(root, 'big.ts'), blocks.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'big.ts', full: true });
+    expect(result.details.format).toBeUndefined();
+    expect(result.details.returnedLines).toBe(300);
+  });
+
+  it('an explicit offset suppresses the summary', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-offset-'));
+    const blocks: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 8; b++) blocks.push(`  const v${f}_${b} = ${b};`);
+      blocks.push('}');
+    }
+    await writeFile(path.join(root, 'big.ts'), blocks.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-1', { path: 'big.ts', offset: 5, limit: 3 });
+    expect(result.details.format).toBeUndefined();
+    expect(result.details).toMatchObject({ offset: 5, returnedLines: 3 });
+  });
+
+  it('records a summary read as partial-view but full-content', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-summary-state-'));
+    const blocks: string[] = [];
+    for (let f = 0; f < 30; f++) {
+      blocks.push(`function fn${f}() {`);
+      for (let b = 0; b < 8; b++) blocks.push(`  const v${f}_${b} = ${b};`);
+      blocks.push('}');
+    }
+    const content = blocks.join('\n');
+    await writeFile(path.join(root, 'big.ts'), content);
+    const readFileState = createReadFileStateStore();
+    const read = createReadBridgeTool(root, { readFileState }) as any;
+
+    const result = await read.execute('read-1', { path: 'big.ts' });
+    const filePath = path.join(root, 'big.ts');
+
+    expect(result.details.format).toBe('outline');
+    expect(readFileState.assertEditable(filePath, content)).toEqual({ ok: true });
+    const writeCheck = await readFileState.assertSafeToWrite(filePath, content);
+    expect(writeCheck).toMatchObject({ ok: false, code: 'partial_read' });
+  });
 });

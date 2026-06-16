@@ -3,6 +3,7 @@ import { readFile, stat } from 'fs/promises';
 import * as path from 'path';
 
 import type { ReadFileStateStore } from './read-file-state.js';
+import { getOutlineProvider, type FoldSpan } from './read-outline.js';
 import { decodeTextBuffer } from './text-io.js';
 import { buildHashlineEntries, formatHashlineOutput, hashlineSnapshotId, hashlineTag } from './hashline.js';
 import { readLineWindowStreaming } from './read-window.js';
@@ -22,6 +23,10 @@ export interface ReadToolOptions {
 const READ_FAST_PATH_BYTES = 10 * 1024 * 1024; // whole-file read below this
 const MAX_READ_FILE_BYTES = 256 * 1024 * 1024; // hard ceiling, streamed above fast path
 const MAX_READ_OUTPUT_TOKENS = 25_000; // cap a single Read's text output
+const SUMMARY_MIN_LINES = 250;       // lower trigger (line-count; long lines are handled by column truncation)
+const SUMMARY_MAX_LINES = 20_000;    // upper bound (parse cost)
+const SUMMARY_MAX_BYTES = 2 * 1024 * 1024; // upper bound (parse cost)
+const SUMMARY_MIN_SAVINGS = 0.30;    // fold >= 30% of lines, else read verbatim
 const IMAGE_MIME_BY_EXT: Record<string, string> = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
@@ -190,6 +195,40 @@ function renderTextWindow(
   };
 }
 
+// Renders an in-place folded skeleton: visible lines keep their original line
+// numbers; each fold becomes one self-describing marker line. Reuses the
+// column-clip + token-cap backstops used by the normal window renderer.
+function renderSkeleton(
+  lines: string[],
+  folds: FoldSpan[],
+  totalLines: number,
+  relPath: string,
+): { text: string; visibleLines: number } {
+  const sorted = [...folds].sort((a, b) => a.startLine - b.startLine);
+  const out: string[] = [];
+  let visible = 0;
+  let foldIndex = 0;
+  let line = 1;
+  while (line <= totalLines) {
+    const fold = sorted[foldIndex];
+    if (fold && line === fold.startLine) {
+      const count = fold.endLine - fold.startLine + 1;
+      const indent = lines[fold.startLine - 1].match(/^\s*/)?.[0] ?? '';
+      out.push(`${indent}… (+${count} lines)  →  offset=${fold.startLine} limit=${count}`);
+      line = fold.endLine + 1;
+      foldIndex += 1;
+      continue;
+    }
+    out.push(`${line}|${truncateDisplayLine(lines[line - 1], READ_MAX_LINE_COLUMNS).text}`);
+    visible += 1;
+    line += 1;
+  }
+  const { lines: capped } = capLinesByTokens(out, MAX_READ_OUTPUT_TOKENS);
+  const elided = totalLines - visible;
+  const footer = `\n\n[Structural summary of ${relPath} — ${totalLines} lines, ${folds.length} bod${folds.length === 1 ? 'y' : 'ies'} folded, ${elided} lines elided. Re-read any body with offset/limit, or pass full:true for the whole file.]`;
+  return { text: capped.join('\n') + footer, visibleLines: visible };
+}
+
 function renderHashlineWindow(
   relPath: string,
   text: string,
@@ -245,6 +284,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         limit: { type: 'number', default: 2000 },
         pages: { type: 'string', description: 'For PDFs: page range like "1-5" or "2,7" (max 20 pages per call)' },
         hashline: { type: 'boolean', description: 'For text files: return content-addressed line hashes for precise edits' },
+        full: { type: 'boolean', description: 'Read the entire file verbatim instead of a structural summary' },
       },
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
@@ -372,6 +412,44 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const lines = text.split(/\r?\n/);
           if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
           const totalLines = lines.length;
+          const userGaveWindow = args.offset !== undefined || args.limit !== undefined;
+          const summaryEligible = !userGaveWindow
+            && args.hashline !== true
+            && args.full !== true
+            && totalLines >= SUMMARY_MIN_LINES
+            && totalLines <= SUMMARY_MAX_LINES
+            && buffer.length <= SUMMARY_MAX_BYTES;
+          if (summaryEligible) {
+            const provider = getOutlineProvider(fileExt);
+            if (provider) {
+              const folds = await provider.findFolds(text, filePath);
+              const foldedLines = folds.reduce((sum, f) => sum + (f.endLine - f.startLine + 1), 0);
+              if (foldedLines / totalLines >= SUMMARY_MIN_SAVINGS) {
+                const skeleton = renderSkeleton(lines, folds, totalLines, relPath);
+                await options?.readFileState?.recordRead(filePath, {
+                  content: text,
+                  offset: 1,
+                  limit: totalLines,
+                  totalLines,
+                  returnedLines: skeleton.visibleLines,
+                  isPartialView: true,
+                  hasFullContent: true,
+                  timestamp: fileStat.mtimeMs,
+                });
+                return textResult(skeleton.text, {
+                  ok: true,
+                  path: relPath,
+                  format: 'outline',
+                  totalLines,
+                  foldedLines,
+                  foldedBodies: folds.length,
+                  elidedRanges: folds.map(f => [f.startLine, f.endLine]),
+                  returnedLines: skeleton.visibleLines,
+                  size: fileStat.size,
+                });
+              }
+            }
+          }
           const selected = lines.slice(offset - 1, offset - 1 + limit);
           const isHashline = args.hashline === true;
           const view = renderTextWindow(selected, offset, totalLines);
@@ -383,6 +461,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
             limit,
             totalLines,
             returnedLines,
+            hasFullContent: true,
             timestamp: fileStat.mtimeMs,
           });
           return textResult(
@@ -426,6 +505,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           totalLines: window.totalLines,
           returnedLines: view.returnedLines,
           isPartialView: true,
+          hasFullContent: false,
           timestamp: fileStat.mtimeMs,
         });
         return textResult(view.text, {
