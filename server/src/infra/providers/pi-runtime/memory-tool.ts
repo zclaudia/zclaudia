@@ -1,91 +1,32 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
-import * as fs from 'fs';
-import * as path from 'path';
 
 import { errorResult, textResult, truncateText } from './tool-common.js';
+import {
+  FileSystemMemoryProvider,
+  VIRTUAL_MEMORY_ROOT,
+  type MemoryError,
+  type MemoryProvider,
+} from './memory-provider.js';
 
 export interface MemoryToolOptions {
-  memoryDir: string;
+  memoryDir?: string;
+  provider?: MemoryProvider;
 }
 
-const VIRTUAL_ROOT = '/memories';
-
-const DESCRIPTION = `Persistent project memory, mounted at ${VIRTUAL_ROOT}. Files here survive across sessions — this is how you remember things for future conversations.
+const DESCRIPTION = `Persistent project memory, mounted at ${VIRTUAL_MEMORY_ROOT}. Files here survive across sessions — this is how you remember things for future conversations.
 
 What to save: user corrections and preferences, project decisions or constraints not derivable from the code, hard-won debugging lessons, pointers to external resources. What NOT to save: anything discoverable from the codebase or git history, or details only relevant to the current session.
 
-Conventions: one fact per markdown file with a one-line "description:" frontmatter. ${VIRTUAL_ROOT}/MEMORY.md is the index (one line per memory: "- [title](file.md) — hook") and is injected into your system prompt each session. After creating, renaming, or deleting a memory file, update MEMORY.md in the same turn. Update or delete stale memories instead of duplicating them.`;
+Conventions: one fact per markdown file with a one-line "description:" frontmatter. ${VIRTUAL_MEMORY_ROOT}/MEMORY.md is the index (one line per memory: "- [title](file.md) — hook") and is injected into your system prompt each session. After creating, renaming, or deleting a memory file, update MEMORY.md in the same turn. Update or delete stale memories instead of duplicating them.`;
 
-type Resolved = { abs: string };
-type ResolveFailure = { error: { code: string; message: string } };
-
-/** Walk up from abs toward root, returning the nearest ancestor that already exists on disk. */
-function nearestExistingAncestor(root: string, abs: string): string {
-  let p = path.dirname(abs);
-  while (p !== root && p.startsWith(root + path.sep) && !fs.existsSync(p)) {
-    p = path.dirname(p);
-  }
-  return p;
+function resultError(result: MemoryError) {
+  return errorResult(result.error, result.message, result.details);
 }
 
-function resolveVirtualPath(memoryDir: string, raw: unknown): Resolved | ResolveFailure {
-  if (typeof raw !== 'string' || !raw.trim()) {
-    return { error: { code: 'invalid_path', message: `path is required and must start with ${VIRTUAL_ROOT}/` } };
-  }
-  const trimmed = raw.trim();
-  if (trimmed !== VIRTUAL_ROOT && !trimmed.startsWith(`${VIRTUAL_ROOT}/`)) {
-    return { error: { code: 'invalid_path', message: `path must start with ${VIRTUAL_ROOT}/ (got: ${trimmed})` } };
-  }
-  const rel = trimmed === VIRTUAL_ROOT ? '' : trimmed.slice(VIRTUAL_ROOT.length + 1);
-  const root = path.resolve(memoryDir);
-  const abs = path.resolve(root, rel);
-  if (abs !== root && !abs.startsWith(root + path.sep)) {
-    return { error: { code: 'path_escape', message: 'path escapes the memory directory' } };
-  }
-  const lst = fs.lstatSync(abs, { throwIfNoEntry: false });
-  if (lst?.isSymbolicLink()) {
-    return { error: { code: 'symlink_not_allowed', message: 'symlinks are not allowed in memory' } };
-  }
-  // Guard against symlinked intermediate directories: an intermediate dir replaced by a symlink
-  // would redirect mkdirSync/writeFileSync outside the root (only when abs is strictly inside root).
-  if (abs !== root) {
-    const existingParent = nearestExistingAncestor(root, abs);
-    if (existingParent !== root && existingParent.startsWith(root + path.sep) && fs.existsSync(existingParent)) {
-      const realParent = fs.realpathSync(existingParent);
-      const realRoot = fs.existsSync(root) ? fs.realpathSync(root) : root;
-      if (realParent !== realRoot && !realParent.startsWith(realRoot + path.sep)) {
-        return { error: { code: 'symlink_not_allowed', message: 'memory path resolves outside the memory directory' } };
-      }
-    }
-  }
-  return { abs };
-}
-
-function isFailure(r: Resolved | ResolveFailure): r is ResolveFailure {
-  return 'error' in r;
-}
-
-function listFiles(root: string): string {
-  if (!fs.existsSync(root)) return '(no memories yet)';
-  const entries = fs.readdirSync(root, { recursive: true, withFileTypes: true })
-    .filter((e) => e.isFile())
-    .map((e) => {
-      const full = path.join(e.parentPath, e.name);
-      const rel = path.relative(root, full);
-      const size = fs.statSync(full).size;
-      return `${VIRTUAL_ROOT}/${rel} (${size} bytes)`;
-    })
-    .sort();
-  return entries.length ? entries.join('\n') : '(no memories yet)';
-}
-
-function numberedLines(content: string, range?: [number, number]): string {
-  const lines = content.split('\n');
-  const [start, end] = range ?? [1, lines.length];
-  return lines
-    .slice(Math.max(0, start - 1), end)
-    .map((line, i) => `${start + i}\t${line}`)
-    .join('\n');
+function resolveProvider(options: MemoryToolOptions): MemoryProvider {
+  if (options.provider) return options.provider;
+  if (options.memoryDir) return new FileSystemMemoryProvider(options.memoryDir);
+  throw new Error('createMemoryTool requires either memoryDir or provider');
 }
 
 // Concurrency invariant: every command below uses only synchronous fs calls
@@ -94,11 +35,7 @@ function numberedLines(content: string, range?: [number, number]): string {
 // worst case last-write-wins). Converting to fs.promises would break this —
 // add locking (see file-write-lock.ts) before doing so.
 export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
-  if (!options.memoryDir) {
-    // An empty memoryDir would resolve the /memories root to process cwd — refuse loudly.
-    throw new Error('createMemoryTool requires a non-empty memoryDir');
-  }
-  const { memoryDir } = options;
+  const provider = resolveProvider(options);
   return {
     name: 'Memory',
     label: 'Memory',
@@ -111,7 +48,7 @@ export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
           enum: ['view', 'create', 'str_replace', 'insert', 'delete', 'rename'],
           description: 'Operation to perform on the memory directory',
         },
-        path: { type: 'string', description: `Path inside ${VIRTUAL_ROOT}, e.g. ${VIRTUAL_ROOT}/MEMORY.md` },
+        path: { type: 'string', description: `Path inside ${VIRTUAL_MEMORY_ROOT}, e.g. ${VIRTUAL_MEMORY_ROOT}/MEMORY.md` },
         view_range: { type: 'array', items: { type: 'number' }, description: 'Optional [startLine, endLine] for view' },
         file_text: { type: 'string', description: 'Full file content for create' },
         old_str: { type: 'string', description: 'Exact text to replace (must be unique in the file)' },
@@ -129,76 +66,47 @@ export function createMemoryTool(options: MemoryToolOptions): AgentTool<any> {
       try {
         switch (command) {
           case 'view': {
-            const target = args.path === undefined ? VIRTUAL_ROOT : args.path;
-            const resolved = resolveVirtualPath(memoryDir, target);
-            if (isFailure(resolved)) return errorResult(resolved.error.code, resolved.error.message);
-            const isRoot = resolved.abs === path.resolve(memoryDir);
-            if (!fs.existsSync(resolved.abs)) {
-              if (isRoot) return textResult(listFiles(resolved.abs), { ok: true, kind: 'directory' });
-              return errorResult('not_found', `${String(target)} does not exist`);
-            }
-            if (fs.statSync(resolved.abs).isDirectory()) {
-              return textResult(truncateText(listFiles(resolved.abs)), { ok: true, kind: 'directory' });
-            }
+            const target = typeof args.path === 'string' ? args.path : VIRTUAL_MEMORY_ROOT;
             const vr = args.view_range;
             const range = Array.isArray(vr) && vr.length === 2
               && Number.isInteger(Number(vr[0])) && Number.isInteger(Number(vr[1]))
               ? [Number(vr[0]), Number(vr[1])] as [number, number]
               : undefined;
-            return textResult(truncateText(numberedLines(fs.readFileSync(resolved.abs, 'utf8'), range)), { ok: true, kind: 'file' });
+            const result = await provider.read({ path: target }, range);
+            if (!result.ok) return resultError(result);
+            return textResult(truncateText(result.text), { ok: true, kind: result.kind });
           }
           case 'create': {
-            const resolved = resolveVirtualPath(memoryDir, args.path);
-            if (isFailure(resolved)) return errorResult(resolved.error.code, resolved.error.message);
             if (typeof args.file_text !== 'string') return errorResult('invalid_params', 'create requires file_text');
-            fs.mkdirSync(path.dirname(resolved.abs), { recursive: true });
-            fs.writeFileSync(resolved.abs, args.file_text, 'utf8');
+            const result = await provider.create({ path: String(args.path ?? '') }, args.file_text);
+            if (!result.ok) return resultError(result);
             return textResult(`Created ${String(args.path)}`, { ok: true });
           }
           case 'str_replace': {
-            const resolved = resolveVirtualPath(memoryDir, args.path);
-            if (isFailure(resolved)) return errorResult(resolved.error.code, resolved.error.message);
             if (typeof args.old_str !== 'string' || typeof args.new_str !== 'string') {
               return errorResult('invalid_params', 'str_replace requires old_str and new_str');
             }
-            if (!fs.existsSync(resolved.abs)) return errorResult('not_found', `${String(args.path)} does not exist`);
-            const content = fs.readFileSync(resolved.abs, 'utf8');
-            const occurrences = content.split(args.old_str).length - 1;
-            if (occurrences === 0) return errorResult('not_found', 'old_str not found in file — view the file and retry with exact text');
-            if (occurrences > 1) return errorResult('not_unique', `old_str appears ${occurrences} times — include more surrounding context to make it unique`);
-            fs.writeFileSync(resolved.abs, content.replace(args.old_str, args.new_str), 'utf8');
+            const result = await provider.replace({ path: String(args.path ?? '') }, args.old_str, args.new_str);
+            if (!result.ok) return resultError(result);
             return textResult(`Replaced text in ${String(args.path)}`, { ok: true });
           }
           case 'insert': {
-            const resolved = resolveVirtualPath(memoryDir, args.path);
-            if (isFailure(resolved)) return errorResult(resolved.error.code, resolved.error.message);
             const line = Number(args.insert_line);
             if (!Number.isInteger(line) || line < 0 || typeof args.insert_text !== 'string') {
               return errorResult('invalid_params', 'insert requires insert_line (>= 0) and insert_text');
             }
-            if (!fs.existsSync(resolved.abs)) return errorResult('not_found', `${String(args.path)} does not exist`);
-            const lines = fs.readFileSync(resolved.abs, 'utf8').split('\n');
-            if (line > lines.length) return errorResult('invalid_params', `insert_line ${line} is beyond end of file (${lines.length} lines)`);
-            lines.splice(line, 0, args.insert_text);
-            fs.writeFileSync(resolved.abs, lines.join('\n'), 'utf8');
+            const result = await provider.insert({ path: String(args.path ?? '') }, line, args.insert_text);
+            if (!result.ok) return resultError(result);
             return textResult(`Inserted text at line ${line} in ${String(args.path)}`, { ok: true });
           }
           case 'delete': {
-            const resolved = resolveVirtualPath(memoryDir, args.path);
-            if (isFailure(resolved)) return errorResult(resolved.error.code, resolved.error.message);
-            if (resolved.abs === path.resolve(memoryDir)) return errorResult('cannot_delete_root', `cannot delete ${VIRTUAL_ROOT} itself`);
-            if (!fs.existsSync(resolved.abs)) return errorResult('not_found', `${String(args.path)} does not exist`);
-            fs.rmSync(resolved.abs, { recursive: true });
+            const result = await provider.delete({ path: String(args.path ?? '') });
+            if (!result.ok) return resultError(result);
             return textResult(`Deleted ${String(args.path)}`, { ok: true });
           }
           case 'rename': {
-            const from = resolveVirtualPath(memoryDir, args.old_path);
-            if (isFailure(from)) return errorResult(from.error.code, from.error.message);
-            const to = resolveVirtualPath(memoryDir, args.new_path);
-            if (isFailure(to)) return errorResult(to.error.code, to.error.message);
-            if (!fs.existsSync(from.abs)) return errorResult('not_found', `${String(args.old_path)} does not exist`);
-            fs.mkdirSync(path.dirname(to.abs), { recursive: true });
-            fs.renameSync(from.abs, to.abs);
+            const result = await provider.rename({ path: String(args.old_path ?? '') }, { path: String(args.new_path ?? '') });
+            if (!result.ok) return resultError(result);
             return textResult(`Renamed ${String(args.old_path)} to ${String(args.new_path)}`, { ok: true });
           }
           default:

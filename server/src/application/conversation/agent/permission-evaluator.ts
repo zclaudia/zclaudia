@@ -327,9 +327,14 @@ function isDangerousCommand(toolInput: unknown, detail: string): boolean {
 export function classify(toolName: string, toolInput: unknown, detail: string): PermissionCategory {
   if (toolName === 'AskUserQuestion') return 'userQuestions';
   if (isBlockingInteractionTool(toolName)) return 'userQuestions';
-  // Memory only mutates its own per-project directory (path safety enforced
-  // inside the tool) — treat as fileRead so default profiles auto-approve.
-  if (toolName === 'Memory') return 'fileRead';
+  if (toolName === 'Memory') {
+    const input = toolInput && typeof toolInput === 'object' ? toolInput as Record<string, unknown> : {};
+    const command = typeof input.command === 'string' ? input.command : '';
+    if (command === 'view') return 'fileRead';
+    if (command === 'delete') return 'destructiveOps';
+    if (command === 'create' || command === 'str_replace' || command === 'insert' || command === 'rename') return 'fileWrite';
+    return 'fileWrite';
+  }
   if (READONLY_TOOLS.includes(toolName)) return 'fileRead';
   if (EDIT_TOOLS.includes(toolName)) return 'fileWrite';
   if (toolName.startsWith('mcp__')) return 'networkOps';

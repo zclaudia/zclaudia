@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { createMemoryTool } from '../memory-tool.js';
+import type { MemoryProvider } from '../memory-provider.js';
 
 let memoryDir: string;
 let tool: ReturnType<typeof createMemoryTool>;
@@ -29,6 +30,53 @@ describe('Memory tool', () => {
   it('create writes a file and mkdirs parents', async () => {
     await run({ command: 'create', path: '/memories/notes/a.md', file_text: 'hello' });
     expect(fs.readFileSync(path.join(memoryDir, 'notes/a.md'), 'utf8')).toBe('hello');
+  });
+
+  it('can run against an injected memory provider', async () => {
+    const calls: string[] = [];
+    const provider: MemoryProvider = {
+      async read(target) {
+        calls.push(`read:${target.path}`);
+        return { ok: true, kind: 'file', text: '1\tfrom provider' };
+      },
+      async list(target) {
+        calls.push(`list:${target.path}`);
+        return { ok: true, kind: 'directory', text: '/memories/from-provider.md (13 bytes)' };
+      },
+      async create(target, content) {
+        calls.push(`create:${target.path}:${content}`);
+        return { ok: true };
+      },
+      async replace() {
+        return { ok: true };
+      },
+      async insert() {
+        return { ok: true };
+      },
+      async delete() {
+        return { ok: true };
+      },
+      async rename() {
+        return { ok: true };
+      },
+    };
+    const injected = createMemoryTool({ provider }) as any;
+
+    const viewed = await injected.execute('tc-provider', { command: 'view', path: '/memories/from-provider.md' });
+    await injected.execute('tc-provider', { command: 'create', path: '/memories/new.md', file_text: 'remember this' });
+
+    expect(text(viewed)).toContain('from provider');
+    expect(calls).toEqual([
+      'read:/memories/from-provider.md',
+      'create:/memories/new.md:remember this',
+    ]);
+  });
+
+  it('create refuses to overwrite an existing memory', async () => {
+    await run({ command: 'create', path: '/memories/a.md', file_text: 'first' });
+    const result = await run({ command: 'create', path: '/memories/a.md', file_text: 'second' });
+    expect((result.details as any).error).toBe('already_exists');
+    expect(fs.readFileSync(path.join(memoryDir, 'a.md'), 'utf8')).toBe('first');
   });
 
   it('view on directory lists files; on file shows numbered lines', async () => {
@@ -81,6 +129,27 @@ describe('Memory tool', () => {
     await run({ command: 'rename', old_path: '/memories/a.md', new_path: '/memories/b.md' });
     expect(fs.existsSync(path.join(memoryDir, 'b.md'))).toBe(true);
     expect(fs.existsSync(path.join(memoryDir, 'a.md'))).toBe(false);
+  });
+
+  it('rename refuses to overwrite an existing target', async () => {
+    await run({ command: 'create', path: '/memories/a.md', file_text: 'source' });
+    await run({ command: 'create', path: '/memories/b.md', file_text: 'target' });
+    const result = await run({ command: 'rename', old_path: '/memories/a.md', new_path: '/memories/b.md' });
+    expect((result.details as any).error).toBe('target_exists');
+    expect(fs.readFileSync(path.join(memoryDir, 'b.md'), 'utf8')).toBe('target');
+  });
+
+  it('delete refuses directories by default', async () => {
+    await run({ command: 'create', path: '/memories/dir/a.md', file_text: 'x' });
+    const result = await run({ command: 'delete', path: '/memories/dir' });
+    expect((result.details as any).error).toBe('cannot_delete_directory');
+    expect(fs.existsSync(path.join(memoryDir, 'dir/a.md'))).toBe(true);
+  });
+
+  it('rejects oversized memory writes', async () => {
+    const result = await run({ command: 'create', path: '/memories/large.md', file_text: 'x'.repeat(1024 * 1024 + 1) });
+    expect((result.details as any).error).toBe('content_too_large');
+    expect((result.details as any).maxBytes).toBe(1024 * 1024);
   });
 
   it('rejects path traversal, absolute escapes, and non-/memories paths', async () => {

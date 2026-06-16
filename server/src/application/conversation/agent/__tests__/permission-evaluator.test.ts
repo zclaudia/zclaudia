@@ -194,8 +194,13 @@ describe('classify', () => {
     expect(classify('ExitPlanMode', {}, '')).toBe('userQuestions' as PermissionCategory);
   });
 
-  it('classifies Memory as fileRead (own-directory writes, auto-approved by default profile)', () => {
-    expect(classify('Memory', { command: 'create', path: '/memories/a.md' }, '')).toBe('fileRead');
+  it('classifies Memory permissions by command risk', () => {
+    expect(classify('Memory', { command: 'view', path: '/memories/a.md' }, '')).toBe('fileRead');
+    expect(classify('Memory', { command: 'create', path: '/memories/a.md' }, '')).toBe('fileWrite');
+    expect(classify('Memory', { command: 'str_replace', path: '/memories/a.md' }, '')).toBe('fileWrite');
+    expect(classify('Memory', { command: 'insert', path: '/memories/a.md' }, '')).toBe('fileWrite');
+    expect(classify('Memory', { command: 'rename', old_path: '/memories/a.md', new_path: '/memories/b.md' }, '')).toBe('fileWrite');
+    expect(classify('Memory', { command: 'delete', path: '/memories/a.md' }, '')).toBe('destructiveOps');
   });
 
   it('should classify unknown tools as shellSafe', () => {
