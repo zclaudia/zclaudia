@@ -1,6 +1,10 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 
-import { normalizeTodoItems } from '../../../application/conversation/interactions/todo-normalizer.js';
+import {
+  MAX_TODO_CONTENT_CHARS,
+  MAX_TODO_ITEMS,
+  validateTodoItems,
+} from '../../../application/conversation/interactions/todo-normalizer.js';
 import type { PermissionCallback } from '../types.js';
 import { errorResult, jsonResult, textResult, toolParams } from './tool-common.js';
 
@@ -29,10 +33,11 @@ export function createTodoWriteTool(): AgentTool<any> {
       properties: {
         todos: {
           type: 'array',
+          maxItems: MAX_TODO_ITEMS,
           items: {
             type: 'object',
             properties: {
-              content: { type: 'string' },
+              content: { type: 'string', maxLength: MAX_TODO_CONTENT_CHARS },
               status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'cancelled'] },
             },
             required: ['content', 'status'],
@@ -43,7 +48,11 @@ export function createTodoWriteTool(): AgentTool<any> {
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
-      const todos = normalizeTodoItems(args);
+      const validation = validateTodoItems(args);
+      if (!validation.ok) {
+        return errorResult(validation.code, validation.message, validation.details);
+      }
+      const todos = validation.todos;
       return jsonResult({ success: true, count: todos.length, todos });
     },
   } as unknown as AgentTool<any>;

@@ -93,6 +93,28 @@ describe('normalizeFromToolUse', () => {
     expect(result).toBeNull();
   });
 
+  it('returns null when TodoWrite payload exceeds normalization budgets', () => {
+    const tooMany = normalizeFromToolUse({
+      sessionId: 'session-1',
+      toolUseId: 'tool-many',
+      toolName: 'TodoWrite',
+      toolInput: {
+        todos: Array.from({ length: 101 }, (_, i) => ({ content: `Task ${i}`, status: 'pending' })),
+      },
+    });
+    const tooLong = normalizeFromToolUse({
+      sessionId: 'session-1',
+      toolUseId: 'tool-long',
+      toolName: 'TodoWrite',
+      toolInput: {
+        todos: [{ content: 'x'.repeat(1001), status: 'pending' }],
+      },
+    });
+
+    expect(tooMany).toBeNull();
+    expect(tooLong).toBeNull();
+  });
+
   it('returns null when toolUseId is missing', () => {
     const result = normalizeFromToolUse({
       sessionId: 'session-1',

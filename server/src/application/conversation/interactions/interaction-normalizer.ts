@@ -10,7 +10,7 @@ import type {
   InteractionPromptMessage,
   TodoUpdateInteractionMessage,
 } from '@zclaudia/shared/interaction/forms';
-import { normalizeTodoItems } from './todo-normalizer.js';
+import { validateTodoItems } from './todo-normalizer.js';
 
 // ============================================
 // TodoWrite → interaction_todo_update
@@ -43,10 +43,11 @@ export function normalizeFromToolUse(args: NormalizeToolUseArgs): TodoUpdateInte
     return null;
   }
 
-  const todos = normalizeTodoItems(args.toolInput);
-  if (todos.length === 0) {
+  const validation = validateTodoItems(args.toolInput);
+  if (!validation.ok) {
     return null;
   }
+  const todos = validation.todos;
 
   return {
     type: 'interaction_todo_update',

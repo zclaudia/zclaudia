@@ -11,6 +11,12 @@
 import type { NormalizedTodoItem } from '@zclaudia/shared/interaction/forms';
 
 const VALID_STATUSES = new Set(['pending', 'in_progress', 'completed', 'cancelled']);
+export const MAX_TODO_ITEMS = 100;
+export const MAX_TODO_CONTENT_CHARS = 1000;
+
+export type TodoValidationResult =
+  | { ok: true; todos: NormalizedTodoItem[] }
+  | { ok: false; code: 'invalid_todos' | 'too_many_todos' | 'todo_content_too_large'; message: string; details: Record<string, unknown> };
 
 function coerceStatus(value: unknown): NormalizedTodoItem['status'] {
   const s = typeof value === 'string' ? value : 'pending';
@@ -66,4 +72,38 @@ export function normalizeTodoItems(value: unknown): NormalizedTodoItem[] {
   }
 
   return [];
+}
+
+export function validateTodoItems(value: unknown): TodoValidationResult {
+  const todos = normalizeTodoItems(value);
+  if (todos.length === 0) {
+    return {
+      ok: false,
+      code: 'invalid_todos',
+      message: 'TodoWrite requires at least one todo item with non-empty content',
+      details: {},
+    };
+  }
+  if (todos.length > MAX_TODO_ITEMS) {
+    return {
+      ok: false,
+      code: 'too_many_todos',
+      message: `TodoWrite supports at most ${MAX_TODO_ITEMS} todo items`,
+      details: { count: todos.length, max: MAX_TODO_ITEMS },
+    };
+  }
+  const oversizedIndex = todos.findIndex((todo) => todo.content.length > MAX_TODO_CONTENT_CHARS);
+  if (oversizedIndex >= 0) {
+    return {
+      ok: false,
+      code: 'todo_content_too_large',
+      message: `Todo content must be <= ${MAX_TODO_CONTENT_CHARS} characters`,
+      details: {
+        index: oversizedIndex,
+        length: todos[oversizedIndex].content.length,
+        maxChars: MAX_TODO_CONTENT_CHARS,
+      },
+    };
+  }
+  return { ok: true, todos };
 }

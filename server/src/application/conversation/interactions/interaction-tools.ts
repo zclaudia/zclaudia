@@ -15,7 +15,7 @@ import { newId } from '../../../utils/uuid.js';
 import http from 'http';
 import { toolRegistry } from '../../../application/plugins/index.js';
 import { interactionDispatcher } from './interaction-dispatcher.js';
-import { normalizeTodoItems } from './todo-normalizer.js';
+import { MAX_TODO_CONTENT_CHARS, MAX_TODO_ITEMS, validateTodoItems } from './todo-normalizer.js';
 import { trackAndAutoComplete } from './todo-state-tracker.js';
 import type { TodoUpdateInteractionMessage, InteractionPromptMessage, ApprovalInteractionMessage } from '@zclaudia/shared/interaction/forms';
 
@@ -66,11 +66,12 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
           properties: {
             todos: {
               type: 'array',
+              maxItems: MAX_TODO_ITEMS,
               items: {
                 type: 'object',
                 properties: {
-                  content: { type: 'string', description: 'Task description' },
-                  status: { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Task status' },
+                  content: { type: 'string', maxLength: MAX_TODO_CONTENT_CHARS, description: 'Task description' },
+                  status: { type: 'string', enum: ['pending', 'in_progress', 'completed', 'cancelled'], description: 'Task status' },
                 },
                 required: ['content', 'status'],
               },
@@ -84,7 +85,16 @@ export function registerInteractionTools(config?: InteractionToolsConfig): void 
     handler: async (args, context) => {
       const sessionId = (context?.sessionId as string) || '';
       const interactionId = newId();
-      const todos = normalizeTodoItems(args.todos);
+      const validation = validateTodoItems(args.todos);
+      if (!validation.ok) {
+        return JSON.stringify({
+          success: false,
+          error: validation.code,
+          message: validation.message,
+          ...validation.details,
+        });
+      }
+      const todos = validation.todos;
 
       // Auto-complete items in previous todo lists that disappeared from the new list
       for (const update of trackAndAutoComplete(sessionId, interactionId, todos)) {
