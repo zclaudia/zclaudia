@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
-import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync, unlinkSync, writeFileSync } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
@@ -37,7 +37,9 @@ export interface BashHandoff {
 export interface BashRunResult {
   exitCode: number | null;        // null when killed (timeout/abort) or spawn error
   output: string;                 // truncated (tail) display text
-  fullOutput: string;             // complete merged output
+  // In-memory merged output. Complete when small; once it exceeds maxBytes it is
+  // tail-capped (same as `output`) and the complete content lives at fullOutputPath.
+  fullOutput: string;
   truncated: boolean;
   timedOut: boolean;
   aborted: boolean;
@@ -61,9 +63,35 @@ function resolveDataDir(): string {
     : path.join(os.homedir(), '.zclaudia');
 }
 
+// Spilled bash logs are kept only long enough for the model to Read them back
+// within the session; without a sweep they accumulate forever (one file per
+// command whose output exceeds maxBytes). 24h TTL, swept opportunistically on
+// each new write — no background timer.
+const BASH_LOG_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function sweepStaleBashLogs(dir: string, maxAgeMs: number): void {
+  let entries: string[];
+  try {
+    entries = readdirSync(dir);
+  } catch {
+    return;
+  }
+  const cutoff = Date.now() - maxAgeMs;
+  for (const name of entries) {
+    if (!name.endsWith('.log')) continue;
+    const filePath = path.join(dir, name);
+    try {
+      if (statSync(filePath).mtimeMs < cutoff) unlinkSync(filePath);
+    } catch {
+      // file vanished or is locked — ignore, this is best-effort
+    }
+  }
+}
+
 export function persistBashFullOutput(content: string): string {
   const dir = path.join(resolveDataDir(), 'bash-logs');
   mkdirSync(dir, { recursive: true });
+  sweepStaleBashLogs(dir, BASH_LOG_MAX_AGE_MS);
   const filePath = path.join(dir, `${randomUUID()}.log`);
   writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 });
   return filePath;

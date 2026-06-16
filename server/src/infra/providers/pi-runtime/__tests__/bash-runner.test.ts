@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, utimesSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { runBash } from '../bash-runner.js';
+import { runBash, persistBashFullOutput } from '../bash-runner.js';
 
 const TMP = () => mkdtempSync(join(tmpdir(), 'zc-bash-'));
 
@@ -101,16 +101,52 @@ describe('runBash', () => {
     expect(result.fullOutput).toContain('out');
   });
 
-  it('caps stderr capture at 64KB while allowing command to succeed', async () => {
+  it('caps stderr at 64KB and spills the complete output to disk when capped', async () => {
     const dir = TMP();
-    const result = await runBash({
-      command: "python3 -c \"import sys; sys.stderr.write('e' * 100000)\" ; exit 0",
-      cwd: dir,
-      timeoutSec: 10
-    });
-    rmSync(dir, { recursive: true, force: true });
-    expect(result.exitCode).toBe(0);
-    expect(result.stderrOutput.length).toBeLessThanOrEqual(66 * 1024); // ~64KB cap + some allowance
-    expect(result.fullOutput.length).toBeGreaterThan(99000); // fullOutput has essentially all of it
+    const dataDir = mkdtempSync(join(tmpdir(), 'zc-bashdata-'));
+    const prev = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+    try {
+      const result = await runBash({
+        command: "python3 -c \"import sys; sys.stderr.write('e' * 100000)\" ; exit 0",
+        cwd: dir,
+        timeoutSec: 10
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stderrOutput.length).toBeLessThanOrEqual(66 * 1024); // ~64KB capture cap (+ at most one chunk)
+      // Output exceeds the in-memory cap: fullOutput is the tail, complete content on disk.
+      expect(result.truncated).toBe(true);
+      expect(result.fullOutputPath).toBeDefined();
+      expect(result.fullOutput.length).toBeLessThanOrEqual(52 * 1024);
+      expect(readFileSync(result.fullOutputPath!, 'utf8').length).toBeGreaterThan(99000);
+    } finally {
+      if (prev === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
+      else process.env.ZCLAUDIA_DATA_DIR = prev;
+      rmSync(dataDir, { recursive: true, force: true });
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('sweeps spilled bash logs older than the TTL on the next persist', () => {
+    const dataDir = mkdtempSync(join(tmpdir(), 'zc-bashlogs-'));
+    const prev = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+    try {
+      const fresh = persistBashFullOutput('fresh'); // creates the dir + a recent file
+      const stale = join(dataDir, 'bash-logs', 'stale-old.log');
+      writeFileSync(stale, 'old');
+      const backdated = Date.now() / 1000 - 25 * 60 * 60; // 25h ago, past the 24h TTL
+      utimesSync(stale, backdated, backdated);
+
+      const newer = persistBashFullOutput('newer'); // triggers the sweep
+
+      expect(existsSync(stale)).toBe(false); // swept
+      expect(existsSync(fresh)).toBe(true);  // recent, kept
+      expect(existsSync(newer)).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
+      else process.env.ZCLAUDIA_DATA_DIR = prev;
+      rmSync(dataDir, { recursive: true, force: true });
+    }
   });
 });
