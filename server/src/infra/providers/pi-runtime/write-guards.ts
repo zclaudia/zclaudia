@@ -1,7 +1,13 @@
 import path from 'path';
 
-export const MAX_TEXT_MUTATION_FILE_BYTES = 512 * 1024;
-export const MAX_EDIT_FILE_BYTES = MAX_TEXT_MUTATION_FILE_BYTES;
+// Write `content` is authored by the model in the tool call, so it is bounded by
+// output capacity (it can never realistically reach megabytes). This is a sanity
+// ceiling for the secret-scan / diff / backup we run on the content, not a real
+// limit on the model.
+export const MAX_WRITE_CONTENT_BYTES = 2 * 1024 * 1024;
+// Edit sends a tiny diff against a possibly-large file. Aligns with
+// READ_FAST_PATH_BYTES: "if it can be whole-file read, it can be edited."
+export const MAX_EDIT_FILE_BYTES = 10 * 1024 * 1024;
 
 const SECRET_PATTERNS = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
@@ -38,11 +44,11 @@ export function hasUnsafeSettingsChange(filePath: string, content: string): bool
 
 export function validateMutationContent(filePath: string, content: string): GuardFailure | undefined {
   const size = Buffer.byteLength(content, 'utf8');
-  if (size > MAX_TEXT_MUTATION_FILE_BYTES) {
+  if (size > MAX_WRITE_CONTENT_BYTES) {
     return {
       code: 'content_too_large',
-      message: `File mutation content is too large (${size} bytes); maximum is ${MAX_TEXT_MUTATION_FILE_BYTES} bytes.`,
-      details: { size, maxBytes: MAX_TEXT_MUTATION_FILE_BYTES },
+      message: `File mutation content is too large (${size} bytes); maximum is ${MAX_WRITE_CONTENT_BYTES} bytes.`,
+      details: { size, maxBytes: MAX_WRITE_CONTENT_BYTES },
     };
   }
   if (containsObviousSecret(content)) {

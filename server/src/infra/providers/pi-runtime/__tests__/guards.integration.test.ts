@@ -204,3 +204,38 @@ describe('edit-after-summary / edit-after-range guard (Option B)', () => {
     expect(res.details).toMatchObject({ ok: false, error: 'file_modified_since_read' });
   });
 });
+
+describe('decoupled mutation caps', () => {
+  it('edits a file larger than the old 512KB cap (now allowed under the 10MB Edit cap)', async () => {
+    const dir = makeWorkspace();
+    const body = Array.from({ length: 10_000 }, (_, i) => `const v${i} = ${i};`).join('\n');
+    writeFileSync(path.join(dir, 'big.ts'), `const target = 1;\n${body}\n`);
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'big.ts' });
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'big.ts',
+      old_string: 'const target = 1;',
+      new_string: 'const target = 2;',
+    });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+  });
+
+  it('rejects Write content larger than the 2MB Write cap', async () => {
+    const dir = makeWorkspace();
+    const tools = getTools(dir);
+    const content = 'x'.repeat(2 * 1024 * 1024 + 1);
+    const res = await tools.Write.execute('w1', { file_path: 'big.txt', content });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'content_too_large' });
+  });
+
+  it('accepts Write content under the 2MB cap', async () => {
+    const dir = makeWorkspace();
+    const tools = getTools(dir);
+    const content = 'x'.repeat(1024 * 1024);
+    const res = await tools.Write.execute('w1', { file_path: 'ok.txt', content });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+  });
+});

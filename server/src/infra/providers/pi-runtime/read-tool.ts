@@ -16,10 +16,9 @@ export interface ReadToolOptions {
   readFileState?: ReadFileStateStore;
 }
 
-// Read's own size budget is intentionally decoupled from the Write/Edit
-// mutation cap (MAX_TEXT_MUTATION_FILE_BYTES, 512KB): reading is non-destructive
-// and the model often needs to inspect generated bundles, lock files, or logs
-// far larger than anything it should rewrite.
+// Read's own size budget is intentionally decoupled from the mutation caps in
+// write-guards.ts (Write content 2MB, Edit file 10MB): reading is non-destructive
+// and the model often needs to inspect generated bundles, lock files, or logs.
 const READ_FAST_PATH_BYTES = 10 * 1024 * 1024; // whole-file read below this
 const MAX_READ_FILE_BYTES = 256 * 1024 * 1024; // hard ceiling, streamed above fast path
 const MAX_READ_OUTPUT_TOKENS = 25_000; // cap a single Read's text output
