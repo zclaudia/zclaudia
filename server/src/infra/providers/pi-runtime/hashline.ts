@@ -25,9 +25,9 @@ export function hashlineForLine(text: string): string {
   return createHash('sha256').update(text).digest('hex').slice(0, 12);
 }
 
-export function buildHashlineEntries(lines: string[]): HashlineEntry[] {
+export function buildHashlineEntries(lines: string[], startLine = 1): HashlineEntry[] {
   return lines.map((text, index) => ({
-    line: index + 1,
+    line: startLine + index,
     hash: hashlineForLine(text),
     text,
   }));

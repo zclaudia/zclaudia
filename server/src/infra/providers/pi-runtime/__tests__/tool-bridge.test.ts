@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { mkdtemp, rm, mkdir, writeFile } from 'fs/promises';
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, statSync, symlinkSync, utimesSync, truncateSync } from 'fs';
+import { chmodSync, lstatSync, mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync, existsSync, statSync, symlinkSync, utimesSync, truncateSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import Database from 'better-sqlite3';
@@ -772,6 +772,45 @@ describe('Write bridge tool', () => {
     expect(onDisk).toBe('hello');
   });
 
+  it('rejects writing content larger than the mutation cap', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-large-content-'));
+    const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
+
+    const res = await write.execute('w-large-content', {
+      file_path: 'large.txt',
+      content: 'x'.repeat(512 * 1024 + 1),
+    });
+    const exists = existsSync(path.join(dir, 'large.txt'));
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: false,
+      error: 'content_too_large',
+      maxBytes: 512 * 1024,
+    });
+    expect(exists).toBe(false);
+  });
+
+  it('caps large write diff details and structured patch output', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-diff-cap-'));
+    const original = Array.from({ length: 1_000 }, (_, i) => `old-${i}`.padEnd(45, 'a')).join('\n') + '\n';
+    const updated = Array.from({ length: 1_000 }, (_, i) => `new-${i}`.padEnd(45, 'b')).join('\n') + '\n';
+    writeFileSync(path.join(dir, 'large-diff.ts'), original);
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-write-diff-cap', { path: 'large-diff.ts' });
+    const res = await write.execute('w-diff-cap', { file_path: 'large-diff.ts', content: updated });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.diff.length).toBeLessThan(90_000);
+    expect(res.details.diffTruncated).toBe(true);
+    expect(res.details.structuredPatchTruncated).toBe(true);
+    expect(res.details.structuredPatch[0].lines.length).toBeLessThanOrEqual(400);
+  });
+
   it('rejects writing outside the workspace', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-'));
     const write = buildTools(dir, { enabled: ['Write'] }).find((t: any) => t.name === 'Write') as any;
@@ -793,6 +832,25 @@ describe('Write bridge tool', () => {
     rmSync(outside, { recursive: true, force: true });
     expect(res.details.error).toBe('path_outside_workspace');
     expect(outsideChanged).toBe(false);
+  });
+
+  it('rejects writing directly to a symlink path without replacing the symlink', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-symlink-'));
+    writeFileSync(path.join(dir, 'target.txt'), 'old\n');
+    symlinkSync(path.join(dir, 'target.txt'), path.join(dir, 'link.txt'));
+    const tools = buildTools(dir, { enabled: ['Read', 'Write'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const write = tools.find((t: any) => t.name === 'Write') as any;
+
+    await read.execute('r-link', { path: 'link.txt' });
+    const res = await write.execute('w-link', { file_path: 'link.txt', content: 'new\n' });
+    const linkStillSymlink = lstatSync(path.join(dir, 'link.txt')).isSymbolicLink();
+    const targetContent = readFileSync(path.join(dir, 'target.txt'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('symlink_path');
+    expect(linkStillSymlink).toBe(true);
+    expect(targetContent).toBe('old\n');
   });
 
   it('rejects writing obvious private key material', async () => {

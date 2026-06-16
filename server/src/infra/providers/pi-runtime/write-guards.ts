@@ -20,6 +20,7 @@ const UNSAFE_SETTINGS_PATTERNS = [
 export interface GuardFailure {
   code: string;
   message: string;
+  details?: Record<string, unknown>;
 }
 
 export function containsObviousSecret(content: string): boolean {
@@ -36,6 +37,14 @@ export function hasUnsafeSettingsChange(filePath: string, content: string): bool
 }
 
 export function validateMutationContent(filePath: string, content: string): GuardFailure | undefined {
+  const size = Buffer.byteLength(content, 'utf8');
+  if (size > MAX_TEXT_MUTATION_FILE_BYTES) {
+    return {
+      code: 'content_too_large',
+      message: `File mutation content is too large (${size} bytes); maximum is ${MAX_TEXT_MUTATION_FILE_BYTES} bytes.`,
+      details: { size, maxBytes: MAX_TEXT_MUTATION_FILE_BYTES },
+    };
+  }
   if (containsObviousSecret(content)) {
     return {
       code: 'secret_detected',
