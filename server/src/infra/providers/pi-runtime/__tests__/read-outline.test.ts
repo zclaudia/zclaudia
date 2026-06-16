@@ -45,3 +45,40 @@ describe('read-outline AST provider (JS/TS)', () => {
     expect(getOutlineProvider('.json')).toBeUndefined();
   });
 });
+
+describe('read-outline heuristic providers', () => {
+  it('folds a brace-family body (Go) by brace depth', async () => {
+    const provider = getOutlineProvider('.go')!;
+    expect(provider.kind).toBe('heuristic');
+    const code = [
+      'func handle(x int) int {',
+      '\ta := x + 1',
+      '\tb := a * 2',
+      '\tc := b - 3',
+      '\treturn c',
+      '}',
+    ].join('\n');
+    expect(await provider.findFolds(code, 'h.go')).toEqual([{ startLine: 2, endLine: 5 }]);
+  });
+
+  it('folds an indent-family body (Python) by indentation', async () => {
+    const provider = getOutlineProvider('.py')!;
+    expect(provider.kind).toBe('heuristic');
+    const code = [
+      'def handle(x):',
+      '    a = x + 1',
+      '    b = a * 2',
+      '    c = b - 3',
+      '    return c',
+      '',
+      'y = 1',
+    ].join('\n');
+    expect(await provider.findFolds(code, 'h.py')).toEqual([{ startLine: 2, endLine: 5 }]);
+  });
+
+  it('does not fold short heuristic bodies', async () => {
+    const provider = getOutlineProvider('.go')!;
+    const code = 'func f() {\n\treturn 1\n}\n';
+    expect(await provider.findFolds(code, 'f.go')).toEqual([]);
+  });
+});

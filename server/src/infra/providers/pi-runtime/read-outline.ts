@@ -18,6 +18,8 @@ export const OUTLINE_MIN_BODY_LINES = 4;
 export const OUTLINE_MIN_COMMENT_LINES = 6;
 
 const AST_EXTS = new Set(['.js', '.mjs', '.cjs', '.jsx', '.ts', '.mts', '.cts', '.tsx']);
+const BRACE_EXTS = new Set(['.go', '.rs', '.java', '.c', '.h', '.cc', '.cpp', '.hpp', '.cs', '.php', '.m', '.mm', '.kt', '.swift', '.scala']);
+const INDENT_EXTS = new Set(['.py', '.pyi', '.rb', '.coffee']);
 
 // tree-sitter (JS/TS) node kinds whose interior is a collapsible body.
 const BODY_KINDS = new Set(['statement_block', 'class_body', 'object', 'array']);
@@ -73,8 +75,77 @@ const astProvider: OutlineProvider = {
   },
 };
 
+// Naive brace-depth fold: collapses the interior of each outermost {...} block.
+// Best-effort — braces inside strings/comments can miscount (acceptable; full:true escapes).
+function braceFolds(lines: string[]): FoldSpan[] {
+  const folds: FoldSpan[] = [];
+  let depth = 0;
+  let openLine = -1; // 1-based line where the outermost block opened
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    let opens = 0;
+    let closes = 0;
+    for (const ch of line) {
+      if (ch === '{') opens++;
+      else if (ch === '}') closes++;
+    }
+    const before = depth;
+    depth = Math.max(0, depth + opens - closes);
+    if (before === 0 && depth > 0 && openLine === -1) {
+      openLine = i + 1;
+    } else if (before > 0 && depth === 0 && openLine !== -1) {
+      const startLine = openLine + 1;
+      const endLine = i; // line i+1 is the close brace; interior ends the line before
+      if (endLine - startLine + 1 >= OUTLINE_MIN_BODY_LINES) folds.push({ startLine, endLine });
+      openLine = -1;
+    }
+  }
+  return folds;
+}
+
+// Naive indentation fold: a header line ending in ':' followed by a more-indented block.
+function indentFolds(lines: string[]): FoldSpan[] {
+  const folds: FoldSpan[] = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (!/:\s*(#.*)?$/.test(lines[i].trimEnd())) continue;
+    const headerIndent = lines[i].length - lines[i].trimStart().length;
+    let j = i + 1;
+    let lastNonBlank = i;
+    while (j < lines.length) {
+      if (lines[j].trim() === '') { j++; continue; }
+      const indent = lines[j].length - lines[j].trimStart().length;
+      if (indent <= headerIndent) break;
+      lastNonBlank = j;
+      j++;
+    }
+    const startLine = i + 2;          // header is line i+1; body starts next
+    const endLine = lastNonBlank + 1;
+    if (endLine - startLine + 1 >= OUTLINE_MIN_BODY_LINES) {
+      folds.push({ startLine, endLine });
+      i = lastNonBlank; // outermost only
+    }
+  }
+  return folds;
+}
+
+const braceProvider: OutlineProvider = {
+  kind: 'heuristic',
+  async findFolds(content) {
+    return normalizeFolds(braceFolds(content.split(/\r?\n/)));
+  },
+};
+
+const indentProvider: OutlineProvider = {
+  kind: 'heuristic',
+  async findFolds(content) {
+    return normalizeFolds(indentFolds(content.split(/\r?\n/)));
+  },
+};
+
 export function getOutlineProvider(fileExt: string): OutlineProvider | undefined {
   const ext = fileExt.toLowerCase();
   if (AST_EXTS.has(ext)) return astProvider;
+  if (BRACE_EXTS.has(ext)) return braceProvider;
+  if (INDENT_EXTS.has(ext)) return indentProvider;
   return undefined;
 }
