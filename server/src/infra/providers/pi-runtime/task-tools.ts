@@ -23,6 +23,56 @@ function readLogWindow(filePath: string, offset: number, length: number): string
   }
 }
 
+export type TaskOutputWindowParams =
+  | { ok: true; outputOffset: number; tailLines?: number }
+  | { ok: false; code: 'invalid_output_offset' | 'invalid_tail_lines'; message: string; details: Record<string, unknown> };
+
+function parseIntegerParam(value: unknown, name: string, options: { min: number; max?: number }): { ok: true; value: number } | { ok: false; message: string } {
+  if (typeof value !== 'number' || !Number.isInteger(value) || !Number.isFinite(value)) {
+    return { ok: false, message: `${name} must be an integer` };
+  }
+  if (value < options.min) {
+    return { ok: false, message: `${name} must be >= ${options.min}` };
+  }
+  if (options.max !== undefined && value > options.max) {
+    return { ok: false, message: `${name} must be <= ${options.max}` };
+  }
+  return { ok: true, value };
+}
+
+export function parseTaskOutputWindowParams(args: Record<string, unknown>): TaskOutputWindowParams {
+  const offsetValue = args.output_offset;
+  const tailValue = args.tail_lines;
+  const outputOffset = offsetValue === undefined
+    ? 0
+    : parseIntegerParam(offsetValue, 'output_offset', { min: 0 });
+  if (typeof outputOffset !== 'number' && !outputOffset.ok) {
+    return {
+      ok: false,
+      code: 'invalid_output_offset',
+      message: outputOffset.message,
+      details: { value: offsetValue },
+    };
+  }
+  if (tailValue === undefined) {
+    return { ok: true, outputOffset: typeof outputOffset === 'number' ? outputOffset : outputOffset.value };
+  }
+  const tailLines = parseIntegerParam(tailValue, 'tail_lines', { min: 1, max: 2_000 });
+  if (!tailLines.ok) {
+    return {
+      ok: false,
+      code: 'invalid_tail_lines',
+      message: tailLines.message,
+      details: { value: tailValue, max: 2_000 },
+    };
+  }
+  return {
+    ok: true,
+    outputOffset: typeof outputOffset === 'number' ? outputOffset : outputOffset.value,
+    tailLines: tailLines.value,
+  };
+}
+
 function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
   if (typeof args.description === 'string' && args.description.trim()) return args.description.trim();
   if (typeof args.prompt === 'string' && args.prompt.trim()) return truncateText(args.prompt.trim(), 120);
@@ -175,12 +225,16 @@ export function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
         }
         const logPath = commandTaskLogPath(task.id);
         const CAP = 50 * 1024;
-        const requestedOffset = Math.max(0, Number(args.output_offset ?? 0) || 0);
+        const windowParams = parseTaskOutputWindowParams(args);
+        if (!windowParams.ok) {
+          return errorResult(windowParams.code, windowParams.message, windowParams.details);
+        }
+        const requestedOffset = windowParams.outputOffset;
         let output = '';
         let size = 0;
         try {
           size = statSync(logPath).size;
-          const tailLines = args.tail_lines !== undefined ? Math.max(1, Number(args.tail_lines) || 1) : undefined;
+          const tailLines = windowParams.tailLines;
           if (tailLines !== undefined) {
             const start = Math.max(0, size - CAP);
             output = readLogWindow(logPath, start, size - start);

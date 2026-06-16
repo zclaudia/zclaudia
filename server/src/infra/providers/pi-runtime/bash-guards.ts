@@ -28,6 +28,11 @@ export interface BashToolRoutingSuggestion {
   suggestedInput: Record<string, unknown>;
 }
 
+export interface BashSensitivePathMatch {
+  path: string;
+  reason: string;
+}
+
 const CRITICAL_BASH_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }> = [
   // Recursive destruction.
   { pattern: /\brm\s+-[a-z]*[rRfF][a-z]*\s+\//i, reason: 'recursive delete of a root-level path' },
@@ -72,6 +77,33 @@ const CRITICAL_BASH_PATTERNS: ReadonlyArray<{ pattern: RegExp; reason: string }>
 
 const SOURCE_OR_CONFIG_PATH = /(?:^|\/)(?:package(?:-lock)?\.json|pnpm-lock\.yaml|yarn\.lock|tsconfig[^/]*\.json|vite\.config\.[cm]?[jt]s|vitest\.config\.[cm]?[jt]s|AGENTS\.md|README\.md|[.\w-]+\.(?:ts|tsx|js|jsx|mjs|cjs|json|md|mdx|yaml|yml|toml|css|scss|html|rs|go|py|java|kt|c|cc|cpp|h|hpp|sh|sql|txt))$/i;
 const GENERATED_OR_TEMP_PATH = /(?:^|\/)(?:node_modules|dist|build|coverage|target|\.next|\.turbo|\.cache|tmp|temp|logs?)(?:\/|$)/i;
+
+const SENSITIVE_HOME_PATHS: ReadonlyArray<RegExp> = [
+  /^~\/\.ssh(?:\/|$)/,
+  /^~\/\.gnupg(?:\/|$)/,
+  /^~\/\.aws\/credentials$/,
+  /^~\/\.config\/gcloud(?:\/|$)/,
+  /^~\/\.azure(?:\/|$)/,
+  /^~\/\.docker\/config\.json$/,
+  /^~\/\.kube\/config$/,
+  /^~\/\.config\/gh\/hosts\.yml$/,
+  /^~\/\.npmrc$/,
+  /^~\/\.pypirc$/,
+  /^~\/\.cargo\/credentials\.toml$/,
+  /^~\/\.netrc$/,
+  /^~\/\.vault-token$/,
+  /^~\/\.terraformrc$/,
+  /^~\/\.(?:bash_history|zsh_history|zhistory)$/,
+  /^~\/Library\/Safari(?:\/|$)/,
+  /^~\/Library\/Application Support\/(?:Google\/Chrome|Firefox\/Profiles)(?:\/|$)/,
+];
+
+const SENSITIVE_HOME_ALLOW_BACK: ReadonlyArray<RegExp> = [
+  /^~\/\.ssh\/(?:config|known_hosts|known_hosts\.old)$/,
+  /^~\/\.ssh\/[^/]+\.pub$/,
+  /^~\/\.aws\/config$/,
+  /^~\/\.config\/gh\/config\.yml$/,
+];
 
 function unquote(value: string): string {
   return value.replace(/^(['"])(.*)\1$/, '$2');
@@ -120,6 +152,26 @@ function findQuotedSourceLikePath(command: string): string | undefined {
     if (isWorkspaceSourceLikePath(value)) return value;
   }
   return undefined;
+}
+
+function normalizeHomePath(value: string): string {
+  const unquoted = unquote(value)
+    .replace(/^\\(["'])/, '$1')
+    .replace(/\\"/g, '"')
+    .replace(/\\'/g, "'")
+    .replace(/^\$HOME(?=\/)/, '~')
+    .replace(/^\$\{HOME\}(?=\/)/, '~');
+  const home = process.env.HOME?.replace(/\/+$/, '');
+  if (home && (unquoted === home || unquoted.startsWith(`${home}/`))) {
+    return `~${unquoted.slice(home.length)}`;
+  }
+  return unquoted;
+}
+
+function isSensitiveHomePath(value: string): boolean {
+  const normalized = normalizeHomePath(value);
+  if (SENSITIVE_HOME_ALLOW_BACK.some(pattern => pattern.test(normalized))) return false;
+  return SENSITIVE_HOME_PATHS.some(pattern => pattern.test(normalized));
 }
 
 function executableName(value: string): string {
@@ -253,6 +305,27 @@ export function findBashToolRoutingSuggestion(command: string): BashToolRoutingS
     return grepSuggestion(words, exe);
   }
 
+  return undefined;
+}
+
+export function findBashSensitivePathAccess(command: string): BashSensitivePathMatch | undefined {
+  const pathPattern = /(~\/(?:[^"'\s;&|)\\]+|Library\/(?:Safari|Application Support\/(?:Google\/Chrome|Firefox\/Profiles))(?:\/[^"'\s;&|)\\]*)?)|\$HOME\/[^"'\s;&|)\\]+|\$\{HOME\}\/[^"'\s;&|)\\]+)/g;
+  const home = process.env.HOME?.replace(/\/+$/, '');
+  const absoluteHomePattern = home
+    ? new RegExp(`${home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\/[^"'\\s;&|)\\\\]+`, 'g')
+    : undefined;
+  for (const pattern of [pathPattern, absoluteHomePattern].filter((value): value is RegExp => Boolean(value))) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(command))) {
+      const candidate = normalizeHomePath(match[0]);
+      if (isSensitiveHomePath(candidate)) {
+        return {
+          path: candidate,
+          reason: `Bash command accesses sensitive home path ${candidate}`,
+        };
+      }
+    }
+  }
   return undefined;
 }
 

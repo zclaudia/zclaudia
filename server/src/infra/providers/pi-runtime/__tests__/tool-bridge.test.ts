@@ -1528,6 +1528,44 @@ describe('Edit bridge tool', () => {
     expect(a).toBe('const a = 1;\n');
   });
 
+  it('preflights patch add symlink failures before writing earlier updates', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-patch-symlink-'));
+    writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
+    writeFileSync(path.join(dir, 'target.ts'), 'target\n');
+    symlinkSync(path.join(dir, 'target.ts'), path.join(dir, 'link.ts'));
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-patch-symlink-a', { path: 'a.ts' });
+    await read.execute('r-patch-symlink-link', { path: 'link.ts' });
+    const res = await edit.execute('e-apply-patch-symlink', {
+      patch: [
+        '*** Begin Patch',
+        '*** Update File: a.ts',
+        '@@',
+        '-const a = 1;',
+        '+const a = 2;',
+        '*** Add File: link.ts',
+        '+replacement',
+        '*** End Patch',
+      ].join('\n'),
+    });
+    const a = readFileSync(path.join(dir, 'a.ts'), 'utf8');
+    const linkStillSymlink = lstatSync(path.join(dir, 'link.ts')).isSymbolicLink();
+    const target = readFileSync(path.join(dir, 'target.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: false, error: 'patch_partial_failure' });
+    expect(res.details.perFileResults).toEqual([
+      expect.objectContaining({ path: 'a.ts', ok: true, preview: true }),
+      expect.objectContaining({ path: 'link.ts', ok: false, error: 'symlink_path' }),
+    ]);
+    expect(a).toBe('const a = 1;\n');
+    expect(linkStillSymlink).toBe(true);
+    expect(target).toBe('target\n');
+  });
+
   it('rejects patch updates when the target file was not read first', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
@@ -1601,6 +1639,30 @@ describe('Edit bridge tool', () => {
     expect(res.details.lineChanges).toEqual({ additions: 1, deletions: 1, changes: 2 });
   });
 
+  it('caps large edit diff details and structured patch output', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-diff-cap-'));
+    const original = Array.from({ length: 1_000 }, (_, i) => `old-${i}`.padEnd(45, 'a')).join('\n') + '\n';
+    const updated = Array.from({ length: 1_000 }, (_, i) => `new-${i}`.padEnd(45, 'b')).join('\n') + '\n';
+    writeFileSync(path.join(dir, 'large-diff.ts'), original);
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-diff-cap', { path: 'large-diff.ts' });
+    const res = await edit.execute('e-diff-cap', {
+      file_path: 'large-diff.ts',
+      old_string: original,
+      new_string: updated,
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.ok).toBe(true);
+    expect(res.details.diff.length).toBeLessThan(90_000);
+    expect(res.details.diffTruncated).toBe(true);
+    expect(res.details.structuredPatchTruncated).toBe(true);
+    expect(res.details.structuredPatch[0].lines.length).toBeLessThanOrEqual(400);
+  });
+
   it('applies same-file batch edits in one Edit call and keeps the snapshot current', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'f.ts'), [
@@ -1658,6 +1720,33 @@ describe('Edit bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({ ok: false, error: 'not_found', editIndex: 1 });
     expect(onDisk).toBe('const a = 1;\nconst b = 2;\n');
+  });
+
+  it('rejects batch edits whose final content exceeds the mutation cap', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-final-cap-'));
+    const original = 'prefix\n';
+    writeFileSync(path.join(dir, 'f.txt'), original);
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-final-cap', { path: 'f.txt' });
+    const res = await edit.execute('e-final-cap', {
+      file_path: 'f.txt',
+      edits: [
+        { old_string: 'prefix', new_string: 'x'.repeat(300_000) },
+        { old_string: '\n', new_string: `${'y'.repeat(300_000)}\n` },
+      ],
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.txt'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: false,
+      error: 'content_too_large',
+      maxBytes: 512 * 1024,
+    });
+    expect(onDisk).toBe(original);
   });
 
   it('previews an edit without writing to disk', async () => {
@@ -1744,6 +1833,29 @@ describe('Edit bridge tool', () => {
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
     expect(onDisk).toBe('const a = 1;\nconst b = 3;\n');
+  });
+
+  it('rejects editing directly through a symlink path without replacing it', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-symlink-'));
+    writeFileSync(path.join(dir, 'target.txt'), 'old\n');
+    symlinkSync(path.join(dir, 'target.txt'), path.join(dir, 'link.txt'));
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-link', { path: 'link.txt' });
+    const res = await edit.execute('e-edit-link', {
+      file_path: 'link.txt',
+      old_string: 'old',
+      new_string: 'new',
+    });
+    const linkStillSymlink = lstatSync(path.join(dir, 'link.txt')).isSymbolicLink();
+    const targetContent = readFileSync(path.join(dir, 'target.txt'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('symlink_path');
+    expect(linkStillSymlink).toBe(true);
+    expect(targetContent).toBe('old\n');
   });
 
   it('previews a hashline edit using operation grammar without writing to disk', async () => {
@@ -1958,6 +2070,29 @@ describe('Edit bridge tool', () => {
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('secret_detected');
+  });
+
+  it('returns size details when replacement content exceeds the mutation cap', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-oversize-details-'));
+    writeFileSync(path.join(dir, 'f.txt'), 'small\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-oversize-details', { path: 'f.txt' });
+    const res = await edit.execute('e-oversize-details', {
+      file_path: 'f.txt',
+      old_string: 'small',
+      new_string: 'x'.repeat(512 * 1024 + 1),
+    });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: false,
+      error: 'content_too_large',
+      size: 512 * 1024 + 1,
+      maxBytes: 512 * 1024,
+    });
   });
 
   it('rejects dangerous permission changes when editing agent settings files', async () => {
@@ -2325,6 +2460,10 @@ describe('Bash background execution', () => {
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.ok).toBe(true);
+    expect(res.details.sandboxed).toBe(true);
+    expect(new TaskRepository(db).findById(res.details.taskId)?.metadata).toMatchObject({
+      sandboxed: true,
+    });
     expect(wrap).toHaveBeenCalledWith('echo bg-original', expect.objectContaining({
       workspaceRoot: dir,
       extraAllowedDomains: ['example.test'],

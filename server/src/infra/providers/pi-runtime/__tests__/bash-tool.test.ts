@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import path from 'path';
 
 import { createBashBridgeTool, detectSandboxFsDenial } from '../bash-tool.js';
+import { runBash } from '../bash-runner.js';
+import { __resetSandboxCacheForTests } from '../sandbox.js';
 
 describe('detectSandboxFsDenial', () => {
   it('returns undefined when the command was not sandboxed', () => {
@@ -90,6 +92,46 @@ describe('Bash bridge tool module', () => {
     expect(result.details).toMatchObject({ ok: false, error: 'path_outside_workspace' });
   });
 
+  it('rejects a cwd that resolves to a file instead of a directory', async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    await writeFile(path.join(dir, 'file.txt'), 'not a directory\n');
+    const bash = createBashBridgeTool(dir) as any;
+
+    const result = await bash.execute('bash-cwd-file', { command: 'pwd', cwd: 'file.txt' });
+
+    await rm(dir, { recursive: true, force: true });
+    expect(result.details).toMatchObject({ ok: false, error: 'cwd_not_directory' });
+  });
+
+  it('blocks sensitive home file reads even when the sandbox is unavailable', async () => {
+    const workspace = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
+    const home = await mkdtemp(path.join(tmpdir(), 'zclaudia-home-'));
+    const previousHome = process.env.HOME;
+    const previousSandbox = process.env.ZCLAUDIA_SANDBOX;
+    process.env.HOME = home;
+    process.env.ZCLAUDIA_SANDBOX = 'off';
+    __resetSandboxCacheForTests();
+    await mkdir(path.join(home, '.ssh'));
+    await writeFile(path.join(home, '.ssh', 'id_rsa'), 'FAKE_PRIVATE_KEY_FOR_TEST\n');
+    const bash = createBashBridgeTool(workspace) as any;
+
+    const result = await bash.execute('bash-sensitive-home', { command: 'cat ~/.ssh/id_rsa' });
+
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousSandbox === undefined) delete process.env.ZCLAUDIA_SANDBOX;
+    else process.env.ZCLAUDIA_SANDBOX = previousSandbox;
+    __resetSandboxCacheForTests();
+    await rm(workspace, { recursive: true, force: true });
+    await rm(home, { recursive: true, force: true });
+    expect(result.details).toMatchObject({
+      ok: false,
+      error: 'bash_sensitive_path_blocked',
+      path: '~/.ssh/id_rsa',
+    });
+    expect(result.content[0].text).not.toContain('FAKE_PRIVATE_KEY_FOR_TEST');
+  });
+
   it('blocks pure listing commands and suggests LS', async () => {
     const dir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-module-'));
     await mkdir(path.join(dir, 'src'));
@@ -158,5 +200,30 @@ describe('Bash bridge tool module', () => {
       suggestedTool: 'Write',
     });
     expect(onDisk).toBe('export const value = 1;\n');
+  });
+
+  it('spools large foreground output to a secure log without retaining it all in memory', async () => {
+    const dataDir = await mkdtemp(path.join(tmpdir(), 'zclaudia-bash-data-'));
+    const previousDataDir = process.env.ZCLAUDIA_DATA_DIR;
+    process.env.ZCLAUDIA_DATA_DIR = dataDir;
+
+    const result = await runBash({
+      command: 'yes x | head -c 200000',
+      cwd: dataDir,
+      timeoutSec: 30,
+      maxBytes: 20_000,
+    });
+    const fullOutputPath = result.fullOutputPath as string;
+    const log = await readFile(fullOutputPath, 'utf8');
+    const logStat = await stat(fullOutputPath);
+
+    if (previousDataDir === undefined) delete process.env.ZCLAUDIA_DATA_DIR;
+    else process.env.ZCLAUDIA_DATA_DIR = previousDataDir;
+    await rm(dataDir, { recursive: true, force: true });
+    expect(result.truncated).toBe(true);
+    expect(result.fullOutput.length).toBeLessThanOrEqual(20_000);
+    expect(fullOutputPath.startsWith(path.join(dataDir, 'bash-logs'))).toBe(true);
+    expect((logStat.mode & 0o777)).toBe(0o600);
+    expect(log.length).toBe(200000);
   });
 });

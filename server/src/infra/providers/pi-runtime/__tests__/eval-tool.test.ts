@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { buildTools } from '../tool-bridge.js';
 import { __shutdownAllEvalKernelsForTests } from '../eval-kernel.js';
+import { __resetSandboxCacheForTests } from '../sandbox.js';
 
 let counter = 0;
 
@@ -91,5 +92,66 @@ describe('Eval tool', () => {
     const res = await tool.execute('e1', {});
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('missing_code');
+  });
+
+  it('rejects non-integer timeout values', async () => {
+    const { tool, dir } = makeEval();
+    const res = await tool.execute('e-invalid-timeout', { code: '1 + 1', timeout: 0.5 });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: false,
+      error: 'invalid_timeout',
+    });
+  });
+
+  it('blocks sensitive home file reads even when the sandbox is unavailable', async () => {
+    const { tool, dir } = makeEval();
+    const home = mkdtempSync(path.join(tmpdir(), 'zc-eval-home-'));
+    const previousHome = process.env.HOME;
+    const previousSandbox = process.env.ZCLAUDIA_SANDBOX;
+    process.env.HOME = home;
+    process.env.ZCLAUDIA_SANDBOX = 'off';
+    __resetSandboxCacheForTests();
+    mkdirSync(path.join(home, '.ssh'));
+    writeFileSync(path.join(home, '.ssh', 'id_rsa'), 'FAKE_EVAL_PRIVATE_KEY\n');
+
+    const res = await tool.execute('e-sensitive-home', {
+      code: 'require("fs").readFileSync("~/.ssh/id_rsa", "utf8")',
+    });
+
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    if (previousSandbox === undefined) delete process.env.ZCLAUDIA_SANDBOX;
+    else process.env.ZCLAUDIA_SANDBOX = previousSandbox;
+    __resetSandboxCacheForTests();
+    rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: false,
+      error: 'eval_sensitive_path_blocked',
+      path: '~/.ssh/id_rsa',
+    });
+    expect(res.content[0].text).not.toContain('FAKE_EVAL_PRIVATE_KEY');
+  });
+
+  it('caps large eval output and writes the full output to a secure log', async () => {
+    const { tool, dir } = makeEval();
+    const res = await tool.execute('e-large-output', {
+      code: 'console.log("x".repeat(200000)); "done"',
+    });
+    const fullOutputPath = res.details.fullOutputPath as string;
+    const fullOutput = readFileSync(fullOutputPath, 'utf8');
+    const fullOutputStat = statSync(fullOutputPath);
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      outputTruncated: true,
+    });
+    expect(res.content[0].text.length).toBeLessThan(90_000);
+    expect(fullOutputPath).toContain('zclaudia-eval-logs');
+    expect((fullOutputStat.mode & 0o777)).toBe(0o600);
+    expect(fullOutput).toContain('x'.repeat(1000));
+    expect(fullOutput).toContain('done');
   });
 });

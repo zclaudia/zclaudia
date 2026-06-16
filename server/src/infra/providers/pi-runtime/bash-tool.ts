@@ -1,18 +1,14 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
-import { randomUUID } from 'crypto';
-import { existsSync } from 'fs';
-import { writeFile } from 'fs/promises';
-import * as os from 'os';
-import * as path from 'path';
+import { existsSync, statSync } from 'fs';
 
 import { persistSessionSandboxDomain } from '../../../application/conversation/agent/permission-memory.js';
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import { CommandTaskExecutor, commandTaskLogPath } from '../../../domains/tasks/executors/command-executor.js';
 import type { PermissionCallback } from '../types.js';
-import { findBashFileBypass, findBashToolRoutingSuggestion, findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
-import { killProcessTree, runBash, type BashRunOptions, type BashRunResult } from './bash-runner.js';
+import { findBashFileBypass, findBashSensitivePathAccess, findBashToolRoutingSuggestion, findCriticalBashPattern, CRITICAL_BASH_APPROVAL_TOOL } from './bash-guards.js';
+import { killProcessTree, persistBashFullOutput, runBash, type BashRunOptions, type BashRunResult } from './bash-runner.js';
 import { extractBashOutputInsights, formatBashResultText } from './bash-output.js';
 import { registerInflightForegroundCommand } from './inflight-bash-registry.js';
 import * as sandbox from './sandbox.js';
@@ -44,10 +40,9 @@ export function detectSandboxFsDenial(
 
 async function persistFullOutputIfTruncated(result: Pick<BashRunResult, 'truncated' | 'fullOutput'>): Promise<string | undefined> {
   if (!result.truncated) return undefined;
-  const candidate = path.join(os.tmpdir(), `zclaudia-bash-${randomUUID()}.log`);
+  if ('fullOutputPath' in result && typeof result.fullOutputPath === 'string') return result.fullOutputPath;
   try {
-    await writeFile(candidate, result.fullOutput, 'utf8');
-    return candidate;
+    return persistBashFullOutput(result.fullOutput);
   } catch {
     return undefined;
   }
@@ -126,6 +121,23 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
       if (!existsSync(runCwd)) {
         return errorResult('cwd_not_found', `Working directory does not exist: ${toWorkspaceRelative(cwd, runCwd) || '.'}`);
       }
+      if (!statSync(runCwd).isDirectory()) {
+        return errorResult('cwd_not_directory', `Working directory is not a directory: ${toWorkspaceRelative(cwd, runCwd) || '.'}`, {
+          cwd: toWorkspaceRelative(cwd, runCwd) || '.',
+        });
+      }
+
+      const sensitivePath = findBashSensitivePathAccess(command);
+      if (sensitivePath) {
+        return errorResult(
+          'bash_sensitive_path_blocked',
+          `Bash command blocked: ${sensitivePath.reason}. Use dedicated tools for workspace files; sensitive home credentials cannot be read through Bash.`,
+          {
+            path: sensitivePath.path,
+            reason: sensitivePath.reason,
+          },
+        );
+      }
 
       if (args.run_in_background === true && options?.sandboxReadOnly === true) {
         return errorResult('background_not_allowed_plan_mode', 'Background commands are not available in plan mode (read-only).');
@@ -187,9 +199,11 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
         try {
           const started = await executor.start(task);
           service.startTask(task.id, { executorRef: started.executorRef });
+          const currentTask = repo.findById(task.id);
+          const sandboxed = currentTask?.metadata?.sandboxed === true;
           return textResult(
             `Started background task ${task.id}. Poll with TaskOutput({ task_id: "${task.id}" }); stop with Monitor({ action: "stop", task_id: "${task.id}" }).`,
-            { ok: true, background: true, taskId: task.id, pid: started.executorRef?.pid, logPath: commandTaskLogPath(task.id) },
+            { ok: true, background: true, taskId: task.id, pid: started.executorRef?.pid, logPath: commandTaskLogPath(task.id), sandboxed },
           );
         } catch (err) {
           try { service.failTask(task.id, { error: err instanceof Error ? err.message : String(err) }); } catch { /* best-effort */ }

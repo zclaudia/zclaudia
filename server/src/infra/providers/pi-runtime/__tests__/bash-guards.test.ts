@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { findBashFileBypass, findBashToolRoutingSuggestion, findCriticalBashPattern } from '../bash-guards.js';
+import * as bashGuards from '../bash-guards.js';
+import {
+  findBashFileBypass,
+  findBashToolRoutingSuggestion,
+  findCriticalBashPattern,
+} from '../bash-guards.js';
 
 describe('findCriticalBashPattern', () => {
   describe('matches critical commands', () => {
@@ -90,6 +95,40 @@ describe('findBashFileBypass', () => {
     expect(findBashFileBypass('pnpm test > /tmp/test.log')).toBeUndefined();
     expect(findBashFileBypass('rg "target" src')).toBeUndefined();
     expect(findBashFileBypass('echo x > dist/bundle.js')).toBeUndefined();
+  });
+});
+
+describe('findBashSensitivePathAccess', () => {
+  it('flags direct reads of sensitive home credential paths', () => {
+    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as undefined | ((command: string) => any);
+    expect(typeof findBashSensitivePathAccess).toBe('function');
+    expect(findBashSensitivePathAccess('cat ~/.ssh/id_rsa')).toMatchObject({
+      path: '~/.ssh/id_rsa',
+      reason: expect.stringContaining('sensitive'),
+    });
+    expect(findBashSensitivePathAccess('python3 -c "print(open(\\"~/.aws/credentials\\").read())"')).toMatchObject({
+      path: '~/.aws/credentials',
+    });
+  });
+
+  it('flags absolute paths under the current home directory', () => {
+    const previousHome = process.env.HOME;
+    process.env.HOME = '/tmp/zclaudia-test-home';
+    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as undefined | ((command: string) => any);
+
+    const result = findBashSensitivePathAccess?.('cat /tmp/zclaudia-test-home/.ssh/id_rsa');
+
+    if (previousHome === undefined) delete process.env.HOME;
+    else process.env.HOME = previousHome;
+    expect(result).toMatchObject({ path: '~/.ssh/id_rsa' });
+  });
+
+  it('does not flag allowed public ssh metadata or workspace paths', () => {
+    const findBashSensitivePathAccess = (bashGuards as any).findBashSensitivePathAccess as undefined | ((command: string) => any);
+    expect(typeof findBashSensitivePathAccess).toBe('function');
+    expect(findBashSensitivePathAccess('cat ~/.ssh/known_hosts')).toBeUndefined();
+    expect(findBashSensitivePathAccess('cat ~/.ssh/id_rsa.pub')).toBeUndefined();
+    expect(findBashSensitivePathAccess('cat src/app.ts')).toBeUndefined();
   });
 });
 

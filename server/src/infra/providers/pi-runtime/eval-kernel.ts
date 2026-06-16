@@ -8,7 +8,7 @@
  * the kernel (state lost) and the next cell starts a fresh one.
  */
 import { spawn, type ChildProcess } from 'child_process';
-import { writeFileSync } from 'fs';
+import { mkdirSync, writeFileSync } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
@@ -28,15 +28,51 @@ const IDLE_KERNEL_TTL_MS = 30 * 60 * 1000;
  */
 const KERNEL_SOURCE = [
   "'use strict';",
+  "const fs = require('fs');",
   "const vm = require('vm');",
   "const util = require('util');",
   "const readline = require('readline');",
   '',
+  'const MAX_OUTPUT_CHARS = 80000;',
   'const captured = [];',
+  'let capturedChars = 0;',
+  'let outputTruncated = false;',
+  'let fullOutputPath;',
+  'function appendFullOutput(text) {',
+  '  if (!fullOutputPath || !outputTruncated) return;',
+  '  try { fs.appendFileSync(fullOutputPath, text, "utf8"); } catch { }',
+  '}',
+  'function resetCapture(req) {',
+  '  captured.length = 0;',
+  '  capturedChars = 0;',
+  '  outputTruncated = false;',
+  '  fullOutputPath = typeof req.fullOutputPath === "string" ? req.fullOutputPath : undefined;',
+  '}',
+  'function appendCaptured(text) {',
+  '  const value = String(text);',
+  '  const separator = capturedChars > 0 ? "\\n" : "";',
+  '  const nextChars = capturedChars + value.length + separator.length;',
+  '  if (nextChars <= MAX_OUTPUT_CHARS) {',
+  '    captured.push(value);',
+  '    capturedChars = nextChars;',
+  '    return;',
+  '  }',
+  '  if (!outputTruncated && fullOutputPath) {',
+  '    try { fs.writeFileSync(fullOutputPath, captured.concat(value).join("\\n"), { encoding: "utf8", mode: 0o600 }); } catch { fullOutputPath = undefined; }',
+  '  } else {',
+  '    appendFullOutput(separator + value);',
+  '  }',
+  '  outputTruncated = true;',
+  '  capturedChars = nextChars;',
+  '  const joined = captured.concat(value).join("\\n");',
+  '  const tail = joined.slice(-MAX_OUTPUT_CHARS);',
+  '  captured.length = 0;',
+  '  captured.push(tail);',
+  '}',
   'const kernelConsole = {};',
   "for (const level of ['log', 'info', 'warn', 'error', 'debug', 'trace']) {",
   '  kernelConsole[level] = (...args) => {',
-  "    captured.push(args.map((a) => (typeof a === 'string' ? a : util.inspect(a, { depth: 4 }))).join(' '));",
+  "    appendCaptured(args.map((a) => (typeof a === 'string' ? a : util.inspect(a, { depth: 4 }))).join(' '));",
   '  };',
   '}',
   '',
@@ -64,7 +100,7 @@ const KERNEL_SOURCE = [
   '  queue = queue.then(async () => {',
   '    let req;',
   '    try { req = JSON.parse(line); } catch { return; }',
-  '    captured.length = 0;',
+  '    resetCapture(req);',
   '    let resp;',
   '    try {',
   '      let value;',
@@ -75,12 +111,11 @@ const KERNEL_SOURCE = [
   "        value = vm.runInContext(req.code, context, { filename: 'eval-cell' });",
   "        if (value && typeof value.then === 'function') value = await value;",
   '      }',
-  '      const parts = captured.slice();',
-  '      if (value !== undefined) parts.push(inspectValue(value));',
-  "      resp = { id: req.id, ok: true, output: parts.join('\\n') };",
+  '      if (value !== undefined) appendCaptured(inspectValue(value));',
+  "      resp = { id: req.id, ok: true, output: captured.join('\\n'), outputTruncated, fullOutputPath: outputTruncated ? fullOutputPath : undefined };",
   '    } catch (err) {',
   '      const stack = err && err.stack ? String(err.stack) : String(err);',
-  "      resp = { id: req.id, ok: false, output: captured.join('\\n'), error: stack.split('\\n').slice(0, 8).join('\\n') };",
+  "      resp = { id: req.id, ok: false, output: captured.join('\\n'), error: stack.split('\\n').slice(0, 8).join('\\n'), outputTruncated, fullOutputPath: outputTruncated ? fullOutputPath : undefined };",
   '    }',
   "    process.stdout.write(JSON.stringify(resp) + '\\n');",
   '  });',
@@ -95,6 +130,8 @@ export interface EvalExecResult {
   timedOut?: boolean;
   kernelRestarted?: boolean;
   sandboxed?: boolean;
+  outputTruncated?: boolean;
+  fullOutputPath?: string;
 }
 
 export interface EvalKernelOptions {
@@ -102,12 +139,18 @@ export interface EvalKernelOptions {
   readOnly?: boolean;
 }
 
+function evalLogPath(): string {
+  const dir = path.join(os.tmpdir(), 'zclaudia-eval-logs');
+  mkdirSync(dir, { recursive: true });
+  return path.join(dir, `${randomUUID()}.log`);
+}
+
 export class EvalKernel {
   private child: ChildProcess | undefined;
   private scriptPath: string | undefined;
   private sandboxed = false;
   private buffer = '';
-  private readonly pending = new Map<string, (result: { ok: boolean; output: string; error?: string }) => void>();
+  private readonly pending = new Map<string, (result: { ok: boolean; output: string; error?: string; outputTruncated?: boolean; fullOutputPath?: string }) => void>();
   lastUsedAt = Date.now();
 
   constructor(private readonly options: EvalKernelOptions) {}
@@ -125,7 +168,7 @@ export class EvalKernel {
       newlineIndex = this.buffer.indexOf('\n');
       if (!line.trim()) continue;
       try {
-        const msg = JSON.parse(line) as { id: string; ok: boolean; output: string; error?: string };
+        const msg = JSON.parse(line) as { id: string; ok: boolean; output: string; error?: string; outputTruncated?: boolean; fullOutputPath?: string };
         const resolve = this.pending.get(msg.id);
         if (resolve) {
           this.pending.delete(msg.id);
@@ -179,6 +222,7 @@ export class EvalKernel {
     const id = randomUUID();
     const timeoutMs = Math.min(Math.max(1000, opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS), MAX_TIMEOUT_MS);
     const child = this.child!;
+    const fullOutputPath = evalLogPath();
 
     return await new Promise<EvalExecResult>((resolve) => {
       let settled = false;
@@ -204,8 +248,14 @@ export class EvalKernel {
         finish({ ok: false, output: '', error: 'Eval kernel exited unexpectedly; it will restart on the next call.', kernelRestarted: true });
       };
       child.once('exit', onExit);
-      this.pending.set(id, (msg) => finish({ ok: msg.ok, output: msg.output, error: msg.error }));
-      child.stdin?.write(`${JSON.stringify({ id, code })}\n`);
+      this.pending.set(id, (msg) => finish({
+        ok: msg.ok,
+        output: msg.output,
+        error: msg.error,
+        ...(msg.outputTruncated ? { outputTruncated: true } : {}),
+        ...(msg.fullOutputPath ? { fullOutputPath: msg.fullOutputPath } : {}),
+      }));
+      child.stdin?.write(`${JSON.stringify({ id, code, fullOutputPath })}\n`);
     });
   }
 

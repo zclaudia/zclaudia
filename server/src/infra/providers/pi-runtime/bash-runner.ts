@@ -1,5 +1,8 @@
 import { spawn, type ChildProcess } from 'child_process';
-import { existsSync } from 'fs';
+import { randomUUID } from 'crypto';
+import { appendFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 
 export interface BashRunOptions {
   command: string;
@@ -41,6 +44,8 @@ export interface BashRunResult {
   durationMs: number;
   /** stderr captured separately (merged output unchanged), capped at 64KB. */
   stderrOutput: string;
+  /** Secure path containing full output when in-memory output was capped. */
+  fullOutputPath?: string;
   /** Present when the run was handed off at autoBackgroundMs; the child is still alive. */
   handoff?: BashHandoff;
 }
@@ -49,6 +54,20 @@ const DEFAULT_MAX_LINES = 2000;
 const DEFAULT_MAX_BYTES = 50 * 1024;
 const STDIO_GRACE_MS = 100;
 const STDERR_CAPTURE_LIMIT = 64 * 1024;
+
+function resolveDataDir(): string {
+  return process.env.ZCLAUDIA_DATA_DIR
+    ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
+    : path.join(os.homedir(), '.zclaudia');
+}
+
+export function persistBashFullOutput(content: string): string {
+  const dir = path.join(resolveDataDir(), 'bash-logs');
+  mkdirSync(dir, { recursive: true });
+  const filePath = path.join(dir, `${randomUUID()}.log`);
+  writeFileSync(filePath, content, { encoding: 'utf8', mode: 0o600 });
+  return filePath;
+}
 
 export function resolveShell(): { shell: string; args: string[] } {
   if (process.platform === 'win32') {
@@ -172,20 +191,32 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
     }
 
     let full = '';
+    let fullOutputPath: string | undefined;
     const stderrChunks: string[] = [];
     let stderrBytes = 0;
     let timedOut = false;
     let aborted = false;
 
-    const onData = (chunk: Buffer) => { full += chunk.toString('utf8'); onChunk?.(full); };
+    const appendOutput = (text: string) => {
+      if (fullOutputPath) {
+        appendFileSync(fullOutputPath, text, 'utf8');
+      } else if (Buffer.byteLength(full + text, 'utf8') > maxBytes) {
+        fullOutputPath = persistBashFullOutput(full + text);
+      }
+      full += text;
+      if (fullOutputPath) {
+        full = truncateTail(full, maxLines, maxBytes).display;
+      }
+      onChunk?.(full);
+    };
+    const onData = (chunk: Buffer) => { appendOutput(chunk.toString('utf8')); };
     const onStderrData = (chunk: Buffer) => {
       const text = chunk.toString('utf8');
       if (stderrBytes < STDERR_CAPTURE_LIMIT) {
         stderrChunks.push(text);
         stderrBytes += Buffer.byteLength(text, 'utf8');
       }
-      full += text;
-      onChunk?.(full);
+      appendOutput(text);
     };
     child.stdout?.on('data', onData);
     child.stderr?.on('data', onStderrData);
@@ -211,9 +242,10 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       opts.backgroundSignal?.removeEventListener('abort', performHandoff);
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
       resolve({
-        exitCode: null, output: display, fullOutput: full, truncated,
+        exitCode: null, output: display, fullOutput: full, truncated: truncated || Boolean(fullOutputPath),
         timedOut: false, aborted: false, durationMs: Date.now() - startedAt,
         stderrOutput: stderrChunks.join(''),
+        ...(fullOutputPath ? { fullOutputPath } : {}),
         handoff: {
           child,
           detach: () => {
@@ -236,7 +268,17 @@ export function runBash(opts: BashRunOptions): Promise<BashRunResult> {
       if (handedOff) return; // already resolved with a handoff; adopter owns the child
       finished = true;
       const { display, truncated } = truncateTail(full, maxLines, maxBytes);
-      resolve({ exitCode, output: display, fullOutput: full, truncated, timedOut, aborted, durationMs: Date.now() - startedAt, stderrOutput: stderrChunks.join('') });
+      resolve({
+        exitCode,
+        output: display,
+        fullOutput: full,
+        truncated: truncated || Boolean(fullOutputPath),
+        timedOut,
+        aborted,
+        durationMs: Date.now() - startedAt,
+        stderrOutput: stderrChunks.join(''),
+        ...(fullOutputPath ? { fullOutputPath } : {}),
+      });
     };
 
     waitForChild(child).then(finish).catch((err) => {

@@ -1,11 +1,23 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 
 import { getEvalKernel } from './eval-kernel.js';
+import { findBashSensitivePathAccess } from './bash-guards.js';
 import { errorResult, textResult, toolParams } from './tool-common.js';
 
 export interface EvalBridgeToolOptions {
   sessionId?: string;
   sandboxReadOnly?: boolean;
+}
+
+function parseEvalTimeout(value: unknown): { ok: true; timeoutMs?: number } | { ok: false; message: string; details: Record<string, unknown> } {
+  if (value === undefined) return { ok: true };
+  if (typeof value !== 'number' || !Number.isFinite(value) || !Number.isInteger(value)) {
+    return { ok: false, message: 'Eval timeout must be an integer number of seconds', details: { value } };
+  }
+  if (value < 1 || value > 600) {
+    return { ok: false, message: 'Eval timeout must be between 1 and 600 seconds', details: { value, min: 1, max: 600 } };
+  }
+  return { ok: true, timeoutMs: value * 1000 };
 }
 
 export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOptions): AgentTool<any> {
@@ -27,24 +39,41 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
       if (typeof args.code !== 'string' || !args.code.trim()) {
         return errorResult('missing_code', 'Eval requires code');
       }
+      const timeout = parseEvalTimeout(args.timeout);
+      if (!timeout.ok) {
+        return errorResult('invalid_timeout', timeout.message, timeout.details);
+      }
+      const sensitivePath = findBashSensitivePathAccess(args.code);
+      if (sensitivePath) {
+        return errorResult(
+          'eval_sensitive_path_blocked',
+          `Eval code blocked: ${sensitivePath.reason}. Sensitive home credentials cannot be read through Eval.`,
+          {
+            path: sensitivePath.path,
+            reason: sensitivePath.reason,
+          },
+        );
+      }
       const readOnly = options?.sandboxReadOnly === true;
       const kernelKey = `${options?.sessionId ?? `cwd:${cwd}`}:${readOnly ? 'ro' : 'rw'}`;
       const kernel = getEvalKernel(kernelKey, { workspaceRoot: cwd, readOnly });
-      const timeoutMs = typeof args.timeout === 'number' && Number.isFinite(args.timeout)
-        ? args.timeout * 1000
-        : undefined;
       const result = await kernel.exec(args.code, {
-        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
         reset: args.reset === true,
       });
       let text = result.output || '';
       if (result.error) text = text ? `${text}\n${result.error}` : result.error;
+      if (result.outputTruncated && result.fullOutputPath) {
+        text = `${text}\n... [eval output truncated; full output: ${result.fullOutputPath}]`;
+      }
       if (!text) text = '(no output)';
       return textResult(text, {
         ok: result.ok,
         ...(result.timedOut ? { timedOut: true } : {}),
         ...(result.kernelRestarted ? { kernelRestarted: true } : {}),
         ...(result.sandboxed !== undefined ? { sandboxed: result.sandboxed } : {}),
+        ...(result.outputTruncated ? { outputTruncated: true } : {}),
+        ...(result.fullOutputPath ? { fullOutputPath: result.fullOutputPath } : {}),
       });
     },
   } as unknown as AgentTool<any>;

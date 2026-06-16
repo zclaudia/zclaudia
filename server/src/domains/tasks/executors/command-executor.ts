@@ -71,6 +71,11 @@ export class CommandTaskExecutor implements TaskExecutor {
     if (!wrap.sandboxed && meta.sandboxRequired === true) {
       throw new Error('sandbox required for this command, but the sandbox is unavailable');
     }
+    try {
+      this.repo.update(task.id, { metadata: { sandboxed: wrap.sandboxed } });
+    } catch {
+      // Best-effort metadata for TaskOutput; failure should not block process start.
+    }
 
     const logPath = commandTaskLogPath(task.id);
     mkdirSync(path.dirname(logPath), { recursive: true });
