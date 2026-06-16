@@ -241,34 +241,52 @@ describe('decoupled mutation caps', () => {
 });
 
 describe('Edit whitespace-safe matching', () => {
-  it('edits a CRLF file with an LF old_string', async () => {
+  it('edits a CRLF file with a multi-line LF old_string', async () => {
     const dir = makeWorkspace();
     writeFileSync(path.join(dir, 'crlf.ts'), 'const a = 1;\r\nconst b = 2;\r\n');
     const tools = getTools(dir);
     await tools.Read.execute('r1', { path: 'crlf.ts' });
     const res = await tools.Edit.execute('e1', {
       file_path: 'crlf.ts',
-      old_string: 'const a = 1;',
-      new_string: 'const a = 42;',
+      old_string: 'const a = 1;\nconst b = 2;',     // LF; the file is CRLF -> exact fails -> whitespace
+      new_string: 'const a = 1;\nconst b = 42;',
     });
+    const after = readFileSync(path.join(dir, 'crlf.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({ ok: true, matchStrategy: 'whitespace' });
+    expect(after).toBe('const a = 1;\r\nconst b = 42;\r\n'); // CRLF preserved
   });
 
-  it('edits with wrong indentation, re-indents the replacement to the file indent', async () => {
+  it('edits a multi-line block with wrong indentation and re-indents the replacement', async () => {
     const dir = makeWorkspace();
-    writeFileSync(path.join(dir, 'f.ts'), 'function f() {\n    return 1;\n}\n');
+    writeFileSync(path.join(dir, 'f.ts'), 'function f() {\n    const a = 1;\n    const b = 2;\n}\n');
     const tools = getTools(dir);
     await tools.Read.execute('r1', { path: 'f.ts' });
     const res = await tools.Edit.execute('e1', {
       file_path: 'f.ts',
-      old_string: '  return 1;',
-      new_string: '  return 2;',
+      old_string: '  const a = 1;\n  const b = 2;',   // 2-space; file is 4-space -> exact fails -> whitespace
+      new_string: '  const a = 1;\n  const c = 3;',
     });
     const after = readFileSync(path.join(dir, 'f.ts'), 'utf8');
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({ ok: true, matchStrategy: 'whitespace' });
-    expect(after).toBe('function f() {\n    return 2;\n}\n');
+    expect(after).toBe('function f() {\n    const a = 1;\n    const c = 3;\n}\n'); // re-indented to 4 spaces
+  });
+
+  it('sub-line edits still work via exact match (whitespace matcher not consulted)', async () => {
+    const dir = makeWorkspace();
+    writeFileSync(path.join(dir, 'f.ts'), 'const x = getName();\n');
+    const tools = getTools(dir);
+    await tools.Read.execute('r1', { path: 'f.ts' });
+    const res = await tools.Edit.execute('e1', {
+      file_path: 'f.ts',
+      old_string: 'getName',
+      new_string: 'getFullName',
+    });
+    const after = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({ ok: true, matchStrategy: 'exact' });
+    expect(after).toBe('const x = getFullName();\n');
   });
 
   it('reports not_unique when the match is ambiguous', async () => {
@@ -285,7 +303,7 @@ describe('Edit whitespace-safe matching', () => {
     expect(res.details).toMatchObject({ ok: false, error: 'not_unique' });
   });
 
-  it('exact matches report matchStrategy exact (whitespace matcher not consulted)', async () => {
+  it('exact matches report matchStrategy exact', async () => {
     const dir = makeWorkspace();
     writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\n');
     const tools = getTools(dir);

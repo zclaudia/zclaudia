@@ -935,30 +935,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           });
         }
 
-        // Only accept an exact/quote match when every occurrence is at a clean
-        // LF line boundary (preceded by \n or start-of-file, followed by \n or
-        // end-of-file). This rejects mid-line substring matches (e.g. a 2-space
-        // search string matching inside a 4-space-indented line) and CRLF-file
-        // matches where the line ends with \r\n but the search string has LF-only
-        // endings — both are better handled by the whitespace-safe fallback.
-        function isAtLineBoundaries(content: string, needle: string): boolean {
-          if (!needle) return false;
-          let pos = 0;
-          let found = false;
-          for (;;) {
-            const i = content.indexOf(needle, pos);
-            if (i === -1) break;
-            found = true;
-            const startOk = i === 0 || content[i - 1] === '\n';
-            const endPos = i + needle.length;
-            const endOk = endPos >= content.length || content[endPos] === '\n';
-            if (!startOk || !endOk) return false;
-            pos = i + needle.length;
-          }
-          return found;
-        }
-        const rawActual = isHashlineEdit ? null : findActualString(original, oldString);
-        const actual = rawActual !== null && isAtLineBoundaries(original, rawActual) ? rawActual : null;
+        const actual = isHashlineEdit ? null : findActualString(original, oldString);
         if (isHashlineEdit) {
           // The snapshot (file as the model last saw it) disambiguates duplicate lines.
           const snapshot = options?.readFileState?.get(filePath)?.content;

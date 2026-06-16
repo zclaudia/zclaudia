@@ -778,7 +778,7 @@ describe('Write bridge tool', () => {
 
     const res = await write.execute('w-large-content', {
       file_path: 'large.txt',
-      content: 'x'.repeat(512 * 1024 + 1),
+      content: 'x'.repeat(2 * 1024 * 1024 + 1),
     });
     const exists = existsSync(path.join(dir, 'large.txt'));
 
@@ -786,7 +786,7 @@ describe('Write bridge tool', () => {
     expect(res.details).toMatchObject({
       ok: false,
       error: 'content_too_large',
-      maxBytes: 512 * 1024,
+      maxBytes: 2 * 1024 * 1024,
     });
     expect(exists).toBe(false);
   });
@@ -1734,8 +1734,8 @@ describe('Edit bridge tool', () => {
     const res = await edit.execute('e-final-cap', {
       file_path: 'f.txt',
       edits: [
-        { old_string: 'prefix', new_string: 'x'.repeat(300_000) },
-        { old_string: '\n', new_string: `${'y'.repeat(300_000)}\n` },
+        { old_string: 'prefix', new_string: 'x'.repeat(1_100_000) },
+        { old_string: '\n', new_string: `${'y'.repeat(1_100_000)}\n` },
       ],
     });
     const onDisk = readFileSync(path.join(dir, 'f.txt'), 'utf8');
@@ -1744,7 +1744,7 @@ describe('Edit bridge tool', () => {
     expect(res.details).toMatchObject({
       ok: false,
       error: 'content_too_large',
-      maxBytes: 512 * 1024,
+      maxBytes: 2 * 1024 * 1024,
     });
     expect(onDisk).toBe(original);
   });
@@ -2083,15 +2083,15 @@ describe('Edit bridge tool', () => {
     const res = await edit.execute('e-oversize-details', {
       file_path: 'f.txt',
       old_string: 'small',
-      new_string: 'x'.repeat(512 * 1024 + 1),
+      new_string: 'x'.repeat(2 * 1024 * 1024 + 1),
     });
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({
       ok: false,
       error: 'content_too_large',
-      size: 512 * 1024 + 1,
-      maxBytes: 512 * 1024,
+      size: 2 * 1024 * 1024 + 1,
+      maxBytes: 2 * 1024 * 1024,
     });
   });
 
