@@ -545,9 +545,15 @@ export function handleProviderEvent({
           if (outcome.outcome === 'compacted') {
             console.log(`[Compaction] auto session=${activeRun.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
           } else if (outcome.outcome === 'failed') {
-            console.warn(`[Compaction] auto FAILED session=${activeRun.sessionId} reason=${outcome.reason} breakerOpen=${outcome.breaker?.breakerOpen}`);
+            console.warn(`[Compaction] auto FAILED session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'} breakerOpen=${outcome.breaker?.breakerOpen}`);
           } else if (outcome.reason === 'circuit_open') {
             console.log(`[Compaction] auto skipped session=${activeRun.sessionId} (circuit open until ${outcome.breaker?.nextRetryAtMs})`);
+          } else {
+            // Skipped for a non-breaker reason (below_threshold / no_cut_point /
+            // cut_point_unmappable / no_messages / aborted). Log the reason + the
+            // estimated context size so an overflow post-mortem can tell "never
+            // crossed the threshold" apart from "couldn't find a cut point".
+            console.log(`[Compaction] auto skipped session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'}`);
           }
           const event = compactionEventFor(runId, activeRun.sessionId, outcome);
           if (event) sendRunEvent(event);

@@ -14,10 +14,19 @@ describe('isContextOverflowError', () => {
   it('matches HTTP 413 code', () => {
     expect(isContextOverflowError('Payload too large', '413')).toBe(true);
   });
+  it('matches openai-compat proxy "exceeded model token limit" phrasing', () => {
+    expect(
+      isContextOverflowError(
+        'LLM call failed: 400 Invalid request: Your request exceeded model token limit: 262144 (requested: 262492)',
+      ),
+    ).toBe(true);
+  });
   it('does NOT match unrelated errors', () => {
     expect(isContextOverflowError('rate limit exceeded')).toBe(false);
     expect(isContextOverflowError('connection reset')).toBe(false);
     expect(isContextOverflowError('invalid api key', '401')).toBe(false);
+    // a rate-limit on token throughput is not a context overflow
+    expect(isContextOverflowError('rate limit: token rate limit exceeded, retry later')).toBe(false);
   });
   it('is case-insensitive', () => {
     expect(isContextOverflowError('PROMPT IS TOO LONG')).toBe(true);

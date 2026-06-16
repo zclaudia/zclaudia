@@ -49,6 +49,24 @@ function applyModelEntryOverrides(
  * same-provider nor cross-provider registry lookup matched. Default window /
  * tokens are conservative; callers can still override via `models[*]`.
  */
+/**
+ * True for OpenAI-compatible endpoints that are NOT the canonical OpenAI API.
+ * Third-party proxies (LiteLLM, one-api, vLLM, self-hosted gateways, …) almost
+ * universally accept only the `system` role for the system prompt and reject
+ * OpenAI's `developer` role with `unknown variant 'developer'`. The canonical
+ * api.openai.com keeps developer-role support (pi-ai auto-detects it).
+ */
+function isThirdPartyOpenAiCompat(baseUrl: string | undefined): boolean {
+  if (!baseUrl) return false;
+  try {
+    return new URL(baseUrl).host.toLowerCase() !== 'api.openai.com';
+  } catch {
+    // A non-URL baseUrl should never reach here, but if it does treat it as a
+    // third-party endpoint — the safe (system-role) default.
+    return true;
+  }
+}
+
 function buildOpenAiCompatLiteral(
   modelId: string,
   providerType: string,
@@ -212,6 +230,24 @@ export function buildModel(
     // No registry match — fall back to a literal openai-compat shape. Works
     // for unregistered model ids served via OpenAI-compatible endpoints.
     model = buildOpenAiCompatLiteral(modelId, providerType, profile);
+  }
+
+  // Third-party openai-compatible proxies only support the `system` role for the
+  // system prompt. Because every openai-completions path above forces
+  // `reasoning: true`, pi-ai's compat auto-detection would emit the `developer`
+  // role for any proxy host it doesn't recognize (`useDeveloperRole =
+  // reasoning && supportsDeveloperRole`), which those proxies reject with
+  // `unknown variant 'developer'`. Pin supportsDeveloperRole=false for
+  // non-canonical openai endpoints unless the profile explicitly overrides it.
+  // Registry entries that hard-code the flag (e.g. moonshotai) and canonical
+  // api.openai.com are untouched; other registry compat fields are preserved.
+  if (
+    model.api === 'openai-completions'
+    && isThirdPartyOpenAiCompat(model.baseUrl)
+    && profile?.compat?.supportsDeveloperRole === undefined
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (model as any).compat = { ...((model as any).compat ?? {}), supportsDeveloperRole: false };
   }
 
   if (profile?.requestHeaders) {

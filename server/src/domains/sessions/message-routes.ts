@@ -8,6 +8,7 @@ import { findForegroundActiveRunIdForSession } from '../../utils/run-state.js';
 import { parsePersistedMessageMetadata } from '../../utils/persisted-message.js';
 import { SessionMessageRepository } from './message-repository.js';
 import { SessionCompactionRepository, type SessionCompaction } from './compaction-repository.js';
+import { applyMessagePageBudget } from './message-page-budget.js';
 import type { RunPhase } from '../../application/conversation/runtime/active-run-phase.js';
 /** Minimal shape — avoids depending on application/conversation types */
 type ActiveRunsMap = Map<string, { sessionId?: string; phase: RunPhase; sessionType?: string }>;
@@ -68,21 +69,7 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
         throw error;
       }
 
-      const MAX_RESPONSE_SIZE = 512 * 1024;
-      let cumSize = 0;
-      let keepCount = messages.length;
-
-      for (let i = 0; i < messages.length; i++) {
-        const rawSize = (messages[i].content?.length || 0) + (messages[i].metadata?.length || 0);
-        cumSize += rawSize;
-        if (i > 0 && cumSize > MAX_RESPONSE_SIZE) {
-          keepCount = i;
-          break;
-        }
-      }
-
-      const trimmed = messages.slice(0, keepCount);
-      const wasTrimmed = keepCount < messages.length;
+      const { trimmed, wasTrimmed } = applyMessagePageBudget(messages);
 
       if (!after && afterOffset == null && !aroundMessageId) {
         trimmed.reverse();

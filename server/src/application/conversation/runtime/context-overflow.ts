@@ -23,6 +23,10 @@ const OVERFLOW_SUBSTRINGS = [
   'too many tokens',
   'reduce the length of',
   'maximum context length',
+  // Some openai-compatible proxies phrase context overflow as "exceeded model
+  // token limit: <window> (requested: <n>)". Narrow enough to not catch
+  // throughput/rate "token rate limit" messages (those lack "model token limit").
+  'model token limit',
 ];
 
 const OVERFLOW_CODES = new Set(['context_length_exceeded', '413']);

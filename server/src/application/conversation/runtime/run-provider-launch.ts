@@ -16,6 +16,8 @@ import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
 import { persistMcpInstructionsDeltaForSession } from './mcp-instructions-delta.js';
 import { executePreparedDirectSkillInvocation, prepareDirectSkillInvocation } from '../../../infra/providers/pi-runtime/skills.js';
 import { setPhase } from './active-run-phase.js';
+import { maybeCompact } from '../compaction/compaction-service.js';
+import { compactionEventFor } from './compaction-events.js';
 
 interface LaunchProviderRunInput {
   activeRun: ActiveRun;
@@ -216,6 +218,40 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     model: agentProfile.model,
     cwd,
   }, `provider runner ${providerType}`);
+
+  // Pre-flight compaction. History is rebuilt from the DB inside adapter.run, so
+  // if the stored history already exceeds the CURRENT model's threshold — e.g.
+  // the session was switched from a large-window model to a smaller one, or
+  // reopened after growing under a bigger window — we must compact BEFORE the
+  // first request. The post-turn maybeCompact only runs at agent_end and can't
+  // preempt an overflow that the very first request would trigger. Non-fatal: on
+  // any failure the request still goes out and handleRunException's
+  // overflow-recovery retry remains the net.
+  if (providerConfig) {
+    try {
+      const preflight = await maybeCompact({
+        db: db as import('better-sqlite3').Database,
+        sessionId: message.sessionId,
+        agentProfile,
+        llmProfile: providerConfig,
+        source: 'preflight',
+        signal: activeRun.abortController?.signal,
+      });
+      if (preflight.outcome === 'compacted') {
+        console.log(`[Compaction] preflight session=${message.sessionId} id=${preflight.compactionId} tokens=${preflight.tokensBefore}`);
+        sendRunEvent({
+          type: 'delta',
+          runId,
+          sessionId: message.sessionId,
+          content: '⚠️ Context limit reached — compacted the conversation before starting…',
+        });
+        const event = compactionEventFor(runId, message.sessionId, preflight);
+        if (event) sendRunEvent(event);
+      }
+    } catch (err) {
+      console.warn(`[Compaction] preflight failed (non-fatal) session=${message.sessionId}:`, err instanceof Error ? err.message : err);
+    }
+  }
 
   const providerRunner = adapter.run(effectiveInput, runOptions, permissionCallback);
 

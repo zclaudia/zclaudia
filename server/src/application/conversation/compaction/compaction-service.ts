@@ -1,11 +1,15 @@
 import {
-  shouldCompact,
   estimateContextTokens,
   findCutPoint,
   generateSummary,
   DEFAULT_COMPACTION_SETTINGS,
   type AgentMessage,
 } from '@earendil-works/pi-agent-core';
+import {
+  compactionTriggerThreshold,
+  estimateContextTokensForThreshold,
+} from './context-estimate.js';
+import { summarizeChunked, summaryChunkBudget } from './chunked-summary.js';
 import type { Usage } from '@earendil-works/pi-ai';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
@@ -25,7 +29,7 @@ export interface CompactionContext {
   /** Optional usage from the most recent assistant turn (currently unused — reserved for future smarter triggering). */
   lastAssistantUsage?: Usage;
   customInstructions?: string;
-  source: 'auto' | 'manual' | 'overflow';
+  source: 'auto' | 'manual' | 'overflow' | 'preflight';
   signal?: AbortSignal;
   /** Injectable clock (ms since epoch). Defaults to Date.now(). */
   now?: number;
@@ -79,9 +83,19 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
   try {
     const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
     if (messages.length === 0) return skipped('no_messages');
-    const tokens = estimateContextTokens(messages).tokens;
     const window = resolveContextWindow(ctx.agentProfile, undefined, ctx.llmProfile).value;
-    if (!shouldCompact(tokens, window, DEFAULT_COMPACTION_SETTINGS)) {
+    // Threshold input is the real prompt-token count from the last response's
+    // usage (prompt only, bogus >window values rejected), not pi's totalTokens
+    // estimate; the trigger sits ~15% below the window so a turn's growth +
+    // estimation error can't overrun it. See context-estimate.ts.
+    const tokens = estimateContextTokensForThreshold(messages, window);
+    const threshold = compactionTriggerThreshold(window);
+    const willCompact = tokens > threshold;
+    // Diagnostic: one line per turn showing the proactive-compaction decision
+    // inputs. Lets us tell "estimate never crossed the threshold" apart from
+    // "threshold tripped but the cut/summary failed" when a session overflows.
+    console.log(`[Compaction] auto eval session=${ctx.sessionId} estimate=${tokens} window=${window} threshold=${threshold} willCompact=${willCompact}`);
+    if (!willCompact) {
       return skipped('below_threshold', tokens);
     }
     const result = await runCompaction(ctx, messages, dbIds, tokens);
@@ -193,25 +207,34 @@ async function runCompaction(
   // separate summarizer model is intentionally NOT introduced in this pass.
   const built = buildModel(ctx.llmProfile, ctx.agentProfile.model);
 
-  const result = await generateSummary(
-    toSummarize,
-    built.model,
-    DEFAULT_COMPACTION_SETTINGS.reserveTokens,
-    ctx.llmProfile.apiKey ?? '',
-    undefined,                          // headers
-    ctx.signal,
-    ctx.customInstructions,
-    undefined,                          // previousSummary — chained-compaction follow-up
-    ctx.agentProfile.thinkingLevel,
-  );
-  if (!result.ok) {
-    throw result.error instanceof Error ? result.error : new Error(String(result.error));
-  }
+  // Summarize in window-sized chunks so a to-summarize history LARGER than the
+  // model's own context window (e.g. after switching to a smaller-window model)
+  // can still be compacted — a single generateSummary call would itself overflow
+  // and fail the whole compaction. Each chunk's summary is chained into the next
+  // via previousSummary. A history that fits in one chunk issues exactly one
+  // call, unchanged from before.
+  const window = resolveContextWindow(ctx.agentProfile, undefined, ctx.llmProfile).value;
+  const chunkBudget = summaryChunkBudget(window, DEFAULT_COMPACTION_SETTINGS.reserveTokens);
+  const summary = await summarizeChunked({
+    messages: toSummarize,
+    chunkBudget,
+    generate: (chunk, previousSummary) => generateSummary(
+      chunk,
+      built.model,
+      DEFAULT_COMPACTION_SETTINGS.reserveTokens,
+      ctx.llmProfile.apiKey ?? '',
+      undefined,                          // headers
+      ctx.signal,
+      ctx.customInstructions,
+      previousSummary,
+      ctx.agentProfile.thinkingLevel,
+    ),
+  });
 
   const created = new SessionCompactionRepository(ctx.db).create({
     id: newId(),
     sessionId: ctx.sessionId,
-    summary: result.value,
+    summary,
     firstKeptMessageId: firstKeptDbId,
     tokensBefore: tokens,
     // File-op extraction is a follow-up — pi's extractFileOpsFromMessage lives
