@@ -94,6 +94,16 @@ describe('Eval tool', () => {
     expect(res.details.error).toBe('missing_code');
   });
 
+  it('requires database context for background execution', async () => {
+    const { tool, dir } = makeEval();
+    const res = await tool.execute('e-bg-no-db', { code: '1 + 1', run_in_background: true });
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: false,
+      error: 'missing_db_context',
+    });
+  });
+
   it('rejects non-integer timeout values', async () => {
     const { tool, dir } = makeEval();
     const res = await tool.execute('e-invalid-timeout', { code: '1 + 1', timeout: 0.5 });

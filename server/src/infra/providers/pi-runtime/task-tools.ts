@@ -1,77 +1,15 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type Database from 'better-sqlite3';
 import type { UnifiedPermissionPolicy } from '@zclaudia/shared/interaction/permissions';
-import type { TaskResult } from '@zclaudia/shared/core/task';
-import { closeSync, openSync, readSync, statSync } from 'fs';
 
 import { TaskRepository } from '../../../domains/tasks/repository.js';
 import { TaskService } from '../../../domains/tasks/task-service.js';
 import type { TaskExecutor } from '../../../domains/tasks/executors/types.js';
-import { CommandTaskExecutor, commandTaskLogPath, pidAlive } from '../../../domains/tasks/executors/command-executor.js';
 import { errorResult, jsonResult, textResult, toolParams, truncateText } from './tool-common.js';
-import { extractBashOutputInsights, formatBashResultText, type FormatBashResultInput } from './bash-output.js';
-import { toWorkspaceRelative } from './workspace-paths.js';
-
-function readLogWindow(filePath: string, offset: number, length: number): string {
-  const fd = openSync(filePath, 'r');
-  try {
-    const buf = Buffer.alloc(length);
-    const bytes = readSync(fd, buf, 0, length, offset);
-    return buf.subarray(0, bytes).toString('utf8');
-  } finally {
-    closeSync(fd);
-  }
-}
-
-export type TaskOutputWindowParams =
-  | { ok: true; outputOffset: number; tailLines?: number }
-  | { ok: false; code: 'invalid_output_offset' | 'invalid_tail_lines'; message: string; details: Record<string, unknown> };
-
-function parseIntegerParam(value: unknown, name: string, options: { min: number; max?: number }): { ok: true; value: number } | { ok: false; message: string } {
-  if (typeof value !== 'number' || !Number.isInteger(value) || !Number.isFinite(value)) {
-    return { ok: false, message: `${name} must be an integer` };
-  }
-  if (value < options.min) {
-    return { ok: false, message: `${name} must be >= ${options.min}` };
-  }
-  if (options.max !== undefined && value > options.max) {
-    return { ok: false, message: `${name} must be <= ${options.max}` };
-  }
-  return { ok: true, value };
-}
-
-export function parseTaskOutputWindowParams(args: Record<string, unknown>): TaskOutputWindowParams {
-  const offsetValue = args.output_offset;
-  const tailValue = args.tail_lines;
-  const outputOffset = offsetValue === undefined
-    ? 0
-    : parseIntegerParam(offsetValue, 'output_offset', { min: 0 });
-  if (typeof outputOffset !== 'number' && !outputOffset.ok) {
-    return {
-      ok: false,
-      code: 'invalid_output_offset',
-      message: outputOffset.message,
-      details: { value: offsetValue },
-    };
-  }
-  if (tailValue === undefined) {
-    return { ok: true, outputOffset: typeof outputOffset === 'number' ? outputOffset : outputOffset.value };
-  }
-  const tailLines = parseIntegerParam(tailValue, 'tail_lines', { min: 1, max: 2_000 });
-  if (!tailLines.ok) {
-    return {
-      ok: false,
-      code: 'invalid_tail_lines',
-      message: tailLines.message,
-      details: { value: tailValue, max: 2_000 },
-    };
-  }
-  return {
-    ok: true,
-    outputOffset: typeof outputOffset === 'number' ? outputOffset : outputOffset.value,
-    tailLines: tailLines.value,
-  };
-}
+import { CommandTaskRuntime } from './command-task-runtime.js';
+import { EvalTaskRuntime } from './eval-task-runtime.js';
+import { createTaskRuntimeRegistry, type TaskRuntimeRegistry } from './task-runtime.js';
+export { parseTaskOutputWindowParams } from './task-output-window.js';
 
 function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
   if (typeof args.description === 'string' && args.description.trim()) return args.description.trim();
@@ -79,33 +17,13 @@ function taskTitleFromArgs(args: Record<string, unknown>): string | undefined {
   return undefined;
 }
 
-function commandExitCode(result: TaskResult | undefined, status: string): number | null {
-  if (status === 'completed' && !result?.text?.includes('unknown')) return 0;
-  const exitCodeMatch = result?.error?.match(/exit code (\d+)/);
-  return exitCodeMatch ? Number(exitCodeMatch[1]) : null;
-}
+export type TaskRuntimeRegistryFactory = (repo: TaskRepository) => TaskRuntimeRegistry;
 
-function commandTaskCwd(taskMetadata: unknown): string {
-  if (!taskMetadata || typeof taskMetadata !== 'object') return '.';
-  const metadata = taskMetadata as Record<string, unknown>;
-  const cwd = typeof metadata.cwd === 'string' && metadata.cwd ? metadata.cwd : undefined;
-  const workspaceRoot = typeof metadata.workspaceRoot === 'string' && metadata.workspaceRoot ? metadata.workspaceRoot : undefined;
-  if (!cwd) return '.';
-  return workspaceRoot ? toWorkspaceRelative(workspaceRoot, cwd) || '.' : cwd;
-}
-
-function commandTaskStatus(status: string): FormatBashResultInput['status'] {
-  if (status === 'completed') return 'success';
-  if (status === 'failed') return 'failed';
-  if (status === 'running') return 'running';
-  if (status === 'queued') return 'queued';
-  if (status === 'stopped') return 'stopped';
-  return 'failed';
-}
-
-function commandTaskDurationMs(createdAt: number, updatedAt: number, status: string): number {
-  const terminal = status === 'completed' || status === 'failed' || status === 'stopped';
-  return Math.max(0, (terminal ? updatedAt : Date.now()) - createdAt);
+export function createDefaultTaskRuntimeRegistry(repo: TaskRepository): TaskRuntimeRegistry {
+  return createTaskRuntimeRegistry([
+    new CommandTaskRuntime(repo),
+    new EvalTaskRuntime(repo),
+  ]);
 }
 
 export function createAgentTool(
@@ -185,7 +103,7 @@ export function createAgentTool(
   } as unknown as AgentTool<any>;
 }
 
-export function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
+export function createTaskOutputTool(db?: Database.Database, runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry): AgentTool<any> {
   return {
     name: 'TaskOutput',
     label: 'TaskOutput',
@@ -213,80 +131,8 @@ export function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
       const task = repo.findById(taskId.trim());
       if (!task) return errorResult('task_not_found', `Task not found: ${taskId}`, { taskId });
 
-      if (task.type === 'command') {
-        let current = task;
-        const pid = task.executorRef?.pid;
-        if (task.status === 'running' && typeof pid === 'number' && !pidAlive(pid)) {
-          try {
-            current = new TaskService(repo).completeTask(task.id, { text: 'Process exited (exit code unknown; observed after restart)' });
-          } catch {
-            current = repo.findById(task.id) ?? task;
-          }
-        }
-        const logPath = commandTaskLogPath(task.id);
-        const CAP = 50 * 1024;
-        const windowParams = parseTaskOutputWindowParams(args);
-        if (!windowParams.ok) {
-          return errorResult(windowParams.code, windowParams.message, windowParams.details);
-        }
-        const requestedOffset = windowParams.outputOffset;
-        let output = '';
-        let size = 0;
-        try {
-          size = statSync(logPath).size;
-          const tailLines = windowParams.tailLines;
-          if (tailLines !== undefined) {
-            const start = Math.max(0, size - CAP);
-            output = readLogWindow(logPath, start, size - start);
-            const hadTrailingNewline = output.endsWith('\n');
-            const lines = output.split('\n');
-            if (lines.length && lines[lines.length - 1] === '') lines.pop();
-            output = lines.slice(-tailLines).join('\n') + (hadTrailingNewline ? '\n' : '');
-          } else {
-            const offset = Math.min(requestedOffset, size);
-            const len = Math.min(size - offset, CAP);
-            output = len > 0 ? readLogWindow(logPath, offset, len) : '';
-          }
-        } catch { /* no log yet - empty output */ }
-        const eof = args.tail_lines !== undefined || size <= requestedOffset + Buffer.byteLength(output, 'utf8');
-        const metadata = (current.metadata ?? {}) as Record<string, unknown>;
-        const command = typeof metadata.command === 'string' && metadata.command
-          ? metadata.command
-          : typeof current.executorRef?.command === 'string'
-            ? current.executorRef.command
-            : '<unknown>';
-        const exitCode = commandExitCode(current.result, current.status);
-        const truncated = args.tail_lines !== undefined
-          ? size > Buffer.byteLength(output, 'utf8')
-          : size - requestedOffset > Buffer.byteLength(output, 'utf8');
-        const insights = extractBashOutputInsights(output);
-        const text = formatBashResultText({
-          command,
-          cwd: commandTaskCwd(current.metadata),
-          output,
-          fullOutput: output,
-          exitCode,
-          durationMs: commandTaskDurationMs(current.createdAt, current.updatedAt, current.status),
-          truncated,
-          timedOut: false,
-          sandboxed: metadata.sandboxed === true,
-          status: commandTaskStatus(current.status),
-          ...(truncated ? { fullOutputPath: logPath } : {}),
-        }, insights);
-        return textResult(text, {
-          ok: true,
-          taskId: current.id,
-          status: current.status,
-          ...(exitCode !== null ? { exitCode } : {}),
-          nextOffset: size,
-          eof,
-          logPath,
-          logSize: size,
-          rawOutput: output,
-          ...(insights.diagnostics.length ? { diagnostics: insights.diagnostics } : {}),
-          ...(insights.failedTests.length ? { failedTests: insights.failedTests } : {}),
-        });
-      }
+      const runtime = runtimeRegistryFactory(repo).get(task.type);
+      if (runtime?.readOutput) return runtime.readOutput(task, args);
 
       const includeEvents = args.include_events !== false;
       const events = includeEvents ? repo.listEvents(task.id) : [];
@@ -300,7 +146,7 @@ export function createTaskOutputTool(db?: Database.Database): AgentTool<any> {
   } as unknown as AgentTool<any>;
 }
 
-export function createMonitorTool(sessionId?: string, runId?: string, db?: Database.Database): AgentTool<any> {
+export function createMonitorTool(sessionId?: string, runId?: string, db?: Database.Database, runtimeRegistryFactory: TaskRuntimeRegistryFactory = createDefaultTaskRuntimeRegistry): AgentTool<any> {
   return {
     name: 'Monitor',
     label: 'Monitor',
@@ -356,9 +202,9 @@ export function createMonitorTool(sessionId?: string, runId?: string, db?: Datab
       }
       if (action === 'stop') {
         try {
-          if (task.type === 'command') {
-            const executor = new CommandTaskExecutor(repo);
-            const update = await executor.stop(task.id, typeof args.reason === 'string' ? args.reason : undefined);
+          const runtime = runtimeRegistryFactory(repo).get(task.type);
+          if (runtime?.stop) {
+            const update = await runtime.stop(task, typeof args.reason === 'string' ? args.reason : undefined);
             return jsonResult({ ok: true, taskId: task.id, status: update.status });
           }
           const stopped = service.stopTask(task.id, {

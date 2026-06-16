@@ -1,4 +1,5 @@
-export type TaskType = 'agent' | 'command' | 'monitor' | 'external';
+export type BuiltinTaskType = 'agent' | 'command' | 'eval' | 'monitor' | 'external';
+export type TaskType = BuiltinTaskType | (string & {});
 
 export type TaskStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'stopped';
 

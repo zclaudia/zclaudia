@@ -1,11 +1,17 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
+import type Database from 'better-sqlite3';
 
+import { TaskRepository } from '../../../domains/tasks/repository.js';
+import { TaskService } from '../../../domains/tasks/task-service.js';
 import { getEvalKernel } from './eval-kernel.js';
+import { EvalTaskRuntime } from './eval-task-runtime.js';
 import { findBashSensitivePathAccess } from './bash-guards.js';
 import { errorResult, textResult, toolParams } from './tool-common.js';
 
 export interface EvalBridgeToolOptions {
   sessionId?: string;
+  runId?: string;
+  db?: Database.Database;
   sandboxReadOnly?: boolean;
 }
 
@@ -31,6 +37,7 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
         code: { type: 'string', description: 'JavaScript code to evaluate' },
         timeout: { type: 'number', description: 'Per-cell timeout in seconds (default 30, max 600). On timeout the kernel restarts and state is lost.' },
         reset: { type: 'boolean', default: false, description: 'Discard kernel state before running' },
+        run_in_background: { type: 'boolean', default: false, description: 'Run this code as an isolated one-shot background task. Does not use or mutate the persistent Eval kernel.' },
       },
       required: ['code'],
     } as any,
@@ -53,6 +60,40 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
             reason: sensitivePath.reason,
           },
         );
+      }
+      if (args.run_in_background === true) {
+        if (!options?.db) return errorResult('missing_db_context', 'Eval background execution requires database context');
+        const repo = new TaskRepository(options.db);
+        const service = new TaskService(repo);
+        const task = service.createTask({
+          type: 'eval',
+          title: 'Eval background task',
+          parentSessionId: options.sessionId,
+          parentRunId: options.runId,
+          parentToolUseId: typeof toolCallId === 'string' ? toolCallId : undefined,
+          metadata: {
+            code: args.code,
+            workspaceRoot: cwd,
+            readOnly: options.sandboxReadOnly === true,
+            ...(timeout.timeoutMs !== undefined ? { timeoutMs: timeout.timeoutMs } : {}),
+          },
+        });
+        try {
+          const runtime = new EvalTaskRuntime(repo);
+          const runningTask = service.startTask(task.id);
+          const started = await runtime.start(runningTask);
+          const running = repo.update(task.id, { executorRef: started.executorRef });
+          return textResult(`Started Eval background task ${running.id}`, {
+            ok: true,
+            taskId: running.id,
+            status: running.status,
+            type: 'eval',
+          });
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          service.failTask(task.id, { error: message });
+          return errorResult('eval_background_start_failed', message, { taskId: task.id });
+        }
       }
       const readOnly = options?.sandboxReadOnly === true;
       const kernelKey = `${options?.sessionId ?? `cwd:${cwd}`}:${readOnly ? 'ro' : 'rw'}`;

@@ -27,7 +27,7 @@ import { createAstEditTool, createAstGrepTool } from './ast-bridge-tools.js';
 import { createEvalBridgeTool } from './eval-tool.js';
 import { createEnterPlanModeTool, createExitPlanModeTool } from './mode-tools.js';
 import { createEnterWorktreeTool, createExitWorktreeTool } from './worktree-tools.js';
-import { createAgentTool, createMonitorTool, createTaskOutputTool } from './task-tools.js';
+import { createAgentTool, createMonitorTool, createTaskOutputTool, type TaskRuntimeRegistryFactory } from './task-tools.js';
 import { createBashBridgeTool } from './bash-tool.js';
 import { createMemoryTool } from './memory-tool.js';
 export { ALL_TOOL_NAMES, type ToolName };
@@ -88,8 +88,8 @@ const TOOL_FACTORIES: Record<ToolName, (cwd: string, options?: ToolBridgeOptions
   ToolSearch: (_cwd, options) => createToolSearchTool(options?.db),
   ListMcpResources: (_cwd, options) => createListMcpResourcesTool(options?.db),
   ReadMcpResource: (_cwd, options) => createReadMcpResourceTool(options?.db),
-  TaskOutput: (_cwd, options) => createTaskOutputTool(options?.db),
-  Monitor: (_cwd, options) => createMonitorTool(options?.sessionId, options?.runId, options?.db),
+  TaskOutput: (_cwd, options) => createTaskOutputTool(options?.db, options?.taskRuntimeRegistryFactory),
+  Monitor: (_cwd, options) => createMonitorTool(options?.sessionId, options?.runId, options?.db, options?.taskRuntimeRegistryFactory),
   Agent: (cwd, options) => createAgentTool(
     cwd,
     options?.sessionId,
@@ -156,6 +156,8 @@ export interface ToolBridgeOptions {
   noopGuard?: NoopEditGuard;
   /** Per-project memory directory; absent = Memory tool disabled (e.g. sessions without a project, subagent tasks). */
   memoryDir?: string;
+  /** Optional extension point for TaskOutput/Monitor runtimes. */
+  taskRuntimeRegistryFactory?: TaskRuntimeRegistryFactory;
 }
 
 /**

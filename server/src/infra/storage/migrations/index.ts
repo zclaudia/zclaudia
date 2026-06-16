@@ -17,6 +17,7 @@ import { migration as m_014_mcp_headers_helper } from './014_mcp_headers_helper.
 import { migration as m_015_llm_profile_cache_retention } from './015_llm_profile_cache_retention.js';
 import { migration as m_016_user_hooks } from './016_user_hooks.js';
 import { migration as m_017_compaction_overflow_source } from './017_compaction_overflow_source.js';
+import { migration as m_018_eval_task_type } from './018_eval_task_type.js';
 
 export type { Migration };
 
@@ -38,6 +39,7 @@ export const migrations: Migration[] = [
   m_015_llm_profile_cache_retention,
   m_016_user_hooks,
   m_017_compaction_overflow_source,
+  m_018_eval_task_type,
 ];
 
 /**
