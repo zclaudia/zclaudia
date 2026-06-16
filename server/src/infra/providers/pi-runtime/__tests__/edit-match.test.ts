@@ -84,4 +84,8 @@ describe('findWhitespaceMatch', () => {
     const res = findWhitespaceMatch('abc\n', 'xyz', 'q');
     expect(res).toMatchObject({ ok: false, reason: 'not_found' });
   });
+
+  it('returns not_found for an empty search (no anchor)', () => {
+    expect(findWhitespaceMatch('a\nb\n', '', 'INS')).toMatchObject({ ok: false, reason: 'not_found' });
+  });
 });

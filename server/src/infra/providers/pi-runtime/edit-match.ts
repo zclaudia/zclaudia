@@ -86,9 +86,11 @@ export function findWhitespaceMatch(
 ): WhitespaceMatchResult {
   const nf = fileContent.replace(/\r\n/g, '\n');
   const fileLines = nf.split('\n');
+  // Self-protect: an empty search has no anchor and must never match (a caller
+  // that passes "" would otherwise get a zero-width/ambiguous "match").
+  if (search === '') return { ok: false, reason: 'not_found' };
   const searchLines = search.replace(/\r\n/g, '\n').split('\n');
   const L = searchLines.length;
-  if (L === 0) return { ok: false, reason: 'not_found' };
 
   // Map each normalized file-line index to its start offset in the ORIGINAL
   // content. Only \r\n was collapsed, so the \r belongs to the separator, not the
