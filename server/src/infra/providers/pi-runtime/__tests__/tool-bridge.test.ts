@@ -2114,7 +2114,21 @@ describe('Edit bridge tool', () => {
     expect(res.details.error).toBe('unsafe_settings_change');
   });
 
-  it('requires a full read before editing', async () => {
+  it('requires the file to have been read before editing', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    const res = await edit.execute('e-unread', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 3;' });
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details.error).toBe('file_not_read');
+  });
+
+  // Option B: a fast-path ranged read captures the whole file (only the displayed
+  // window is partial), so a targeted Edit is allowed without a redundant full re-read.
+  it('allows editing after a ranged read (full content captured on the fast path)', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-'));
     writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
     const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
@@ -2125,7 +2139,7 @@ describe('Edit bridge tool', () => {
     const res = await edit.execute('e-partial', { file_path: 'f.ts', old_string: 'const a = 1;', new_string: 'const a = 3;' });
 
     rmSync(dir, { recursive: true, force: true });
-    expect(res.details.error).toBe('partial_read');
+    expect(res.details.ok).toBe(true);
   });
 
   it('preserves CRLF line endings when editing a CRLF file', async () => {
