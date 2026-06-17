@@ -21,36 +21,60 @@ export interface ConnectedClient {
   authenticated: boolean; // Whether the client has been authenticated
 }
 
-// Track active runs and their permission callbacks
-export interface ActiveRun {
+export interface PendingPermissionRequest {
+  toolName: string;
+  detail: string;
+  matchedRule?: string;
+  timeoutSeconds: number;
+  sessionId?: string;
+  requiresCredential?: boolean;
+  credentialHint?: string;
+  questions?: AskUserQuestionItem[];
+}
+
+export interface PendingPermission {
+  resolve: (decision: PermissionDecision) => void;
+  timeout: NodeJS.Timeout | null;
+  originalToolInput?: unknown;
+  // Original request info for state heartbeat reconstruction
+  originalRequest?: PendingPermissionRequest;
+}
+
+export interface RunIdentityState {
   runId: string;
+  sessionId: string;
+  projectId: string;
+  sessionType: 'regular' | 'background' | 'agent';  // Session type for this run
+}
+
+export interface RunConnectionState {
   clientId: string;
   client: ConnectedClient;      // Direct reference (works for both real WS and virtual gateway clients)
+}
+
+export interface RunProviderState {
   abortController?: AbortController;
   providerType?: string;         // Provider type for this run
   providerSessionId?: string;    // Provider session ID (for abort support)
   providerCwd?: string;          // Provider cwd (for abort support)
-  pendingPermissions: Map<string, {
-    resolve: (decision: PermissionDecision) => void;
-    timeout: NodeJS.Timeout | null;
-    originalToolInput?: unknown;
-    // Original request info for state heartbeat reconstruction
-    originalRequest?: {
-      toolName: string;
-      detail: string;
-      matchedRule?: string;
-      timeoutSeconds: number;
-      sessionId?: string;
-      requiresCredential?: boolean;
-      credentialHint?: string;
-      questions?: AskUserQuestionItem[];
-    };
-  }>;
-  // Streaming state for message persistence (allows cancelRun to save partial content)
+}
+
+export interface RunPermissionState {
+  pendingPermissions: Map<string, PendingPermission>;
+  /** Session-scoped remembered permission decisions, hydrated into each run from DB.
+   *  Key: toolName for non-bash, `Bash:<normalized-command>` for bash commands/subcommands. */
+  rememberedDecisions: Map<string, 'allow' | 'deny'>;
+  /** Project-scoped allowlist for paths outside workspace that the user explicitly remembered. */
+  allowedOutsideWorkspaceRoots: Set<string>;
+}
+
+export interface RunPersistenceState {
   db: ReturnType<typeof initDatabase>;
-  sessionId: string;
-  projectId: string;
   assistantMessageId: string;
+}
+
+export interface RunMessagingState {
+  // Streaming state for message persistence (allows cancelRun to save partial content)
   fullContent: string;
   collectedToolCalls: (ToolCall & { toolUseId: string })[];
   contentBlocks: ContentBlock[];
@@ -61,6 +85,10 @@ export interface ActiveRun {
    */
   thinkingBlocks: ThinkingBlock[];
   saveInterval?: NodeJS.Timeout;
+  eventSeq: number; // Monotonically increasing event sequence number (starts at 0, first event gets seq=1)
+}
+
+export interface RunLifecycleState {
   /**
    * Lifecycle phase. Hub-and-spoke state machine driven by `setPhase` /
    * `recomputePhase` (see active-run-phase.ts). Replaces the previous
@@ -70,17 +98,17 @@ export interface ActiveRun {
   phase: RunPhase;
   /** Observable phase changes; consumed by waitForIdle and future hooks. */
   phaseEmitter: PhaseEmitterType;
-  sessionType: 'regular' | 'background' | 'agent';  // Session type for this run
-  workspaceRoot: string;
-  /** Session-scoped remembered permission decisions, hydrated into each run from DB.
-   *  Key: toolName for non-bash, `Bash:<normalized-command>` for bash commands/subcommands. */
-  rememberedDecisions: Map<string, 'allow' | 'deny'>;
-  /** Project-scoped allowlist for paths outside workspace that the user explicitly remembered. */
-  allowedOutsideWorkspaceRoots: Set<string>;
   /** True when AI called EnterPlanMode during a non-plan-mode run (not user-initiated). */
   aiInitiatedPlanMode?: boolean;
   /** Original mode before AI-initiated plan mode, used to restore after ExitPlanMode. */
   originalMode?: string;
+}
+
+export interface RunWorkspaceState {
+  workspaceRoot: string;
+}
+
+export interface RunHealthState {
   // Stuck/loop detection
   startedAt: number;
   lastActivityAt: number;
@@ -91,7 +119,9 @@ export interface ActiveRun {
    *  the follow-up assistant turn triggered by task completion is consumed. */
   pendingBackgroundTasks: number;
   latestSystemInfo?: SystemInfo; // Used for heartbeat reconciliation on late-joining clients
-  eventSeq: number; // Monotonically increasing event sequence number (starts at 0, first event gets seq=1)
+}
+
+export interface RunProfileState {
   /** PCP effective profile negotiated at run start */
   effectiveProfile?: PCPEffectiveProfile;
   /**
@@ -107,15 +137,24 @@ export interface ActiveRun {
    * `generateSummary` calls. Populated alongside `agentProfile` in bootstrap.
    */
   llmProfile?: LlmProfileConfig;
+}
+
+export interface RunExtensionState {
   /** Session-scoped MCP/plugin tools progressively loaded during this run. */
   externalToolState?: ExternalToolRuntimeState;
   /** Session-scoped skills progressively loaded as active context. */
   skillState?: SkillRuntimeState;
+}
+
+export interface RunNotificationState {
   /**
    * Broadcast a message to ALL connected clients (not just the run's originating client).
    * Set up in run-bootstrap.ts. Falls back to run.client.ws if not wired (e.g. supervision).
    */
   broadcast?: (message: ServerMessage) => void;
+}
+
+export interface RunSteeringState {
   /**
    * Steer handle exposed by the provider adapter (registered via RunOptions.onAgentReady).
    * Present only when the underlying agent supports mid-run steering. Cleared on cancel.
@@ -127,6 +166,24 @@ export interface ActiveRun {
    */
   pendingSteers: AgentMessage[];
 }
+
+// Track active runs and their permission callbacks.
+// Keep this as a composition of smaller run facets so consumers can move toward
+// narrow dependencies instead of accepting the whole runtime state bag.
+export interface ActiveRun
+  extends RunIdentityState,
+    RunConnectionState,
+    RunProviderState,
+    RunPermissionState,
+    RunPersistenceState,
+    RunMessagingState,
+    RunLifecycleState,
+    RunWorkspaceState,
+    RunHealthState,
+    RunProfileState,
+    RunExtensionState,
+    RunNotificationState,
+    RunSteeringState {}
 
 // Message sender interface for abstraction
 export interface MessageSender {

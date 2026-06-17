@@ -1,4 +1,4 @@
-import type { ClaudeMessage } from '../../../infra/providers/types.js';
+import type { ProviderRuntimeEvent } from '../../../infra/providers/types.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
@@ -22,7 +22,7 @@ interface ConsumeProviderStreamInput {
   notificationService: NotificationSender;
   notificationsService?: NotificationService;
   persistSessionWorkingDirectory: (nextWorkingDirectory: string | null | undefined) => void;
-  providerRunner: AsyncIterable<ClaudeMessage>;
+  providerRunner: AsyncIterable<ProviderRuntimeEvent>;
   providerType: string;
   runId: string;
   sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;

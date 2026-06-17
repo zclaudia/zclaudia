@@ -2,7 +2,7 @@ import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
-import type { ClaudeMessage, PermissionCallback, ProviderAdapter, RunOptions } from '../types.js';
+import type { PermissionCallback, ProviderAdapter, ProviderRuntimeEvent, RunOptions } from '../types.js';
 import {
   AsyncQueue,
   buildModel,
@@ -75,7 +75,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     input: string,
     options: RunOptions,
     onPermission?: PermissionCallback,
-  ): AsyncGenerator<ClaudeMessage, void, void> {
+  ): AsyncGenerator<ProviderRuntimeEvent, void, void> {
     const sessionId = options.sessionId || `zclaudia-${Date.now()}`;
     // ctx.model surfaces in init.systemInfo (the UI's "Model:" badge) and in the
     // captured context snapshot. Resolution mirrors buildModel: the agent

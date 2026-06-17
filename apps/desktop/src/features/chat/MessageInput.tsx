@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, ChangeEvent, useCallback, useMemo } from 'react';
-import { Paperclip, X, Send, File as FileIcon, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowUp, Paperclip, X, Square, File as FileIcon, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { Icon } from '../../components/ui/Icon';
 import { getFileIcon } from '../../config/icons';
 import type { SlashCommand, FileEntry } from '@zclaudia/shared';
@@ -1007,21 +1007,22 @@ export function MessageInput({
             {/* Send/Cancel button */}
             {isLoading && onCancel ? (
               <button
+                data-testid="cancel-button"
                 onClick={onCancel}
-                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-full transition-colors"
+                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 rounded-full transition-colors"
                 title="Cancel (Esc)"
               >
-                <X size={20} strokeWidth={2} />
+                <Square size={14} fill="currentColor" strokeWidth={0} />
               </button>
             ) : (
               <button
                 onClick={handleSend}
                 disabled={disabled || (!value.trim() && attachments.length === 0)}
-                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-muted/60 text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
+                className="h-10 w-10 flex-shrink-0 flex items-center justify-center bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed rounded-full transition-colors"
                 title="Send message"
                 data-testid="send-button"
               >
-                <Send size={20} strokeWidth={1.75} />
+                <ArrowUp size={21} strokeWidth={2.25} />
               </button>
             )}
           </div>
@@ -1140,22 +1141,22 @@ export function MessageInput({
             <button
               data-testid="cancel-button"
               onClick={onCancel}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-destructive text-destructive-foreground hover:bg-destructive/90`}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-foreground text-background hover:bg-foreground/90`}
               title="Cancel (Esc)"
             >
-              <X size={18} strokeWidth={2} />
+              <Square size={12} fill="currentColor" strokeWidth={0} />
             </button>
           ) : (
             <button
               data-testid="send-button"
               onClick={handleSend}
               disabled={disabled || (!value.trim() && attachments.length === 0)}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-muted/60 text-foreground hover:bg-muted disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed`}
+              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed`}
               title={advancedMode
                 ? `Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`
                 : 'Send message (Enter)'}
             >
-              <Send size={18} strokeWidth={1.75} />
+              <ArrowUp size={18} strokeWidth={2.25} />
             </button>
           )}
         </div>

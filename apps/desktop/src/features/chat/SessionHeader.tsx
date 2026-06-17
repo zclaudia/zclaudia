@@ -71,12 +71,12 @@ export function SessionHeader({
     activeServerId ? s.connections[activeServerId]?.connectionQuality : undefined,
   );
   const { agent } = useAgentForSession(currentSession?.id);
+  const modelValue = systemInfo?.model || agent?.model || null;
   // Show "Agent Name (model)" once the agent resolves; fall back to a generic
   // placeholder during the brief first-render window before the store hydrates.
   const agentLabel = agent
-    ? `${agent.name} (${agent.model})`
+    ? `${agent.name}${modelValue ? ` (${modelValue})` : ''}`
     : DEFAULT_AGENT_LABEL;
-  const modelValue = systemInfo?.model || agent?.model || null;
   const pathValue = systemInfo?.cwd || currentSession?.workingDirectory || null;
 
   // Right-panel toggle — a persistent affordance on desktop (like Cursor's panel toggle).
@@ -102,9 +102,9 @@ export function SessionHeader({
 
   return (
     <div
-      className="flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad"
-      data-tauri-drag-region
+      className="relative flex min-h-[48px] items-center gap-2.5 px-3 py-0 sm:min-h-[36px] sm:px-3.5 sm:py-0 bg-background safe-top-pad"
     >
+      <div className="absolute inset-x-0 top-0 hidden h-2 sm:block" data-tauri-drag-region />
       {/* Mobile: hamburger menu */}
       {isMobile && onOpenSidebar && (
         <button
@@ -129,7 +129,7 @@ export function SessionHeader({
       )}
       {/* Session name — click to rename (disabled for background sessions) */}
       {currentSession.type === 'background' ? (
-        <div className="flex flex-1 min-w-0 items-center self-stretch">
+        <div className="flex min-w-0 max-w-[520px] items-center self-stretch">
           <span className="flex min-w-0 items-center truncate text-[13px] font-semibold leading-none text-foreground">
             {currentSession.name || 'Untitled Session'}
           </span>
@@ -145,19 +145,20 @@ export function SessionHeader({
             if (e.key === 'Escape') onRenameCancel();
           }}
           onBlur={onRenameConfirm}
-          className="flex-1 min-w-0 px-2 py-0 text-[13px] font-semibold leading-none bg-muted/60 border-0 rounded-lg shadow-apple-sm focus:ring-1 focus:ring-primary/50 focus:outline-none text-foreground"
+          className="w-full min-w-0 max-w-[min(56vw,880px)] px-2 py-0 text-[13px] font-semibold leading-none bg-muted/60 border-0 rounded-lg shadow-apple-sm focus:ring-1 focus:ring-primary/50 focus:outline-none text-foreground"
         />
       ) : (
-        <div className="flex flex-1 min-w-0 items-center self-stretch">
+        <div className="flex min-w-0 max-w-[520px] items-center self-stretch">
           <button
             onClick={() => onRenameStart(currentSession.name || '')}
-            className="flex h-full w-full min-w-0 items-center truncate text-left text-[13px] font-semibold leading-none text-foreground hover:text-primary transition-colors"
+            className="flex h-full min-w-0 max-w-full items-center truncate text-left text-[13px] font-semibold leading-none text-foreground hover:text-primary transition-colors"
             title="Click to rename"
           >
             {currentSession.name || 'Untitled Session'}
           </button>
         </div>
       )}
+      <div className="hidden min-w-6 flex-1 self-stretch sm:block" data-tauri-drag-region />
       {/* Session info chip — agent/model + context%, opens a details popover */}
       {currentSession.type !== 'background' && (
         <div className="relative hidden shrink-0 sm:block">

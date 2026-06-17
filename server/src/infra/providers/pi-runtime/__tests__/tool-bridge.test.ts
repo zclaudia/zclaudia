@@ -13,18 +13,6 @@ import { CommandTaskExecutor, pidAlive } from '../../../../domains/tasks/executo
 import { mcpClientManager } from '../../../../utils/mcp-client-manager.js';
 import * as sandbox from '../sandbox.js';
 
-const { activateConditionalSkillsForToolNamesMock } = vi.hoisted(() => ({
-  activateConditionalSkillsForToolNamesMock: vi.fn(),
-}));
-
-vi.mock('../../../../application/plugins/skill-tools.js', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../../application/plugins/skill-tools.js')>();
-  return {
-    ...actual,
-    activateConditionalSkillsForToolNames: activateConditionalSkillsForToolNamesMock,
-  };
-});
-
 describe('buildTools', () => {
   const tempDirs: string[] = [];
 
@@ -32,18 +20,46 @@ describe('buildTools', () => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
-    activateConditionalSkillsForToolNamesMock.mockReset();
     return Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })));
   });
 
-  it('activates hook-triggered skills after matching tool execution', async () => {
+  it('notifies the tool execution observer after successful tool execution', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-hook-tool-'));
     tempDirs.push(root);
-    const bash = buildTools(root, { enabled: ['Bash'] })[0] as any;
+    const afterToolExecute = vi.fn();
+    const bash = buildTools(root, {
+      enabled: ['Bash'],
+      toolExecutionObserver: { afterToolExecute },
+    })[0] as any;
 
     await bash.execute('bash-1', { command: 'printf ok' });
 
-    expect(activateConditionalSkillsForToolNamesMock).toHaveBeenCalledWith(['Bash']);
+    expect(afterToolExecute).toHaveBeenCalledWith({
+      toolName: 'Bash',
+      cwd: root,
+      params: { command: 'printf ok' },
+      touchedPaths: [],
+    });
+  });
+
+  it('includes touched paths in tool execution observer events', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-hook-path-'));
+    tempDirs.push(root);
+    await writeFile(path.join(root, 'sample.ts'), 'const value = 1;\n');
+    const afterToolExecute = vi.fn();
+    const read = buildTools(root, {
+      enabled: ['Read'],
+      toolExecutionObserver: { afterToolExecute },
+    })[0] as any;
+
+    await read.execute('read-1', { path: 'sample.ts' });
+
+    expect(afterToolExecute).toHaveBeenCalledWith({
+      toolName: 'Read',
+      cwd: root,
+      params: { path: 'sample.ts' },
+      touchedPaths: ['sample.ts'],
+    });
   });
 
   it('returns core coding tools and first-batch agent tools by default', () => {

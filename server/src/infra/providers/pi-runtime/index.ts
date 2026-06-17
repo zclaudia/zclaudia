@@ -1,4 +1,11 @@
-export { buildTools, ALL_TOOL_NAMES, type ToolName, type ToolBridgeOptions } from './tool-bridge.js';
+export {
+  buildTools,
+  ALL_TOOL_NAMES,
+  type ToolName,
+  type ToolBridgeOptions,
+  type ToolExecutionEvent,
+  type ToolExecutionObserver,
+} from './tool-bridge.js';
 export { runPreToolUseHooks, runPostToolUseHooks, type HookInvocation, type PreHookOutcome } from './user-hooks.js';
 export { withStreamRetry, type RetryNotification } from './retry-stream.js';
 export { AsyncQueue } from './async-queue.js';

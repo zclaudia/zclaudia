@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { ChevronDown, ChevronRight, Folder, FolderOpen, Loader2 } from 'lucide-react';
 import type { FileEntry } from '@zclaudia/shared';
 import * as api from '../../services/api';
+import { iconForFile } from './fileIcons';
 
 interface FileTreeProps {
   projectRoot: string;
@@ -14,7 +16,7 @@ type FlagMap = Record<string, boolean>;
 type ErrorMap = Record<string, string | null>;
 
 function entryIndent(depth: number) {
-  return { paddingLeft: `${0.5 + depth * 0.875}rem` };
+  return { paddingLeft: `${0.625 + depth * 0.875}rem` };
 }
 
 function parentPath(path: string) {
@@ -83,8 +85,9 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
           </div>
         )}
         {loading && !entries.length && (
-          <div className="px-2 py-1 text-xs text-muted-foreground" style={entryIndent(depth)}>
-            Loading...
+          <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground" style={entryIndent(depth)}>
+            <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+            <span>Loading...</span>
           </div>
         )}
         {entries.map((entry) => {
@@ -93,25 +96,33 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
           const autoExpand = isDirectory && shouldAutoExpand(selectedPath, entry.path);
           const isExpanded = expandedPaths[entry.path] ?? autoExpand;
           const showChildren = isDirectory && isExpanded;
+          const EntryIcon = isDirectory ? (showChildren ? FolderOpen : Folder) : iconForFile(entry.path);
 
           return (
             <div key={entry.path}>
               <button
                 type="button"
                 onClick={() => isDirectory ? toggleDirectory(entry.path) : onOpenFile(entry.path)}
-                className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-xs font-mono min-w-0 ${
+                className={`group w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-mono min-w-0 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
                   isSelected
-                    ? 'bg-muted/60 text-primary'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    ? 'bg-primary/10 text-primary shadow-[inset_2px_0_0_hsl(var(--primary))]'
+                    : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
                 }`}
                 style={entryIndent(depth)}
                 title={entry.path}
+                aria-current={isSelected ? 'page' : undefined}
               >
-                <span className="w-3 flex-shrink-0 text-[10px] opacity-70">
-                  {isDirectory ? (showChildren ? 'v' : '>') : ''}
+                <span className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground/80 group-hover:text-foreground">
+                  {isDirectory ? (
+                    showChildren
+                      ? <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                      : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : null}
                 </span>
-                <span className="w-3 flex-shrink-0 text-[10px] opacity-80">
-                  {isDirectory ? 'D' : 'F'}
+                <span className={`flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center ${
+                  isDirectory ? 'text-amber-500/90 dark:text-amber-400/90' : 'text-muted-foreground group-hover:text-foreground'
+                }`}>
+                  <EntryIcon className="h-3.5 w-3.5" aria-hidden="true" />
                 </span>
                 <span className="truncate">{entry.name}</span>
               </button>
@@ -124,9 +135,11 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
   };
 
   return (
-    <div className="h-full overflow-auto border-r border-border bg-card/40" data-testid="file-tree">
-      <div className="px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground border-b border-border">
-        Files
+    <div className="h-full overflow-auto border-r border-border bg-card/50" data-testid="file-tree">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-3 py-2 backdrop-blur">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          Files
+        </span>
       </div>
       <div className="py-1">
         {renderEntries('', 0)}

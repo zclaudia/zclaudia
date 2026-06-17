@@ -64,6 +64,10 @@ zclaudia/
 resource, stream, and notification envelopes before sending them through
 `../zclaudia-gateway/`.
 
+Additional architecture notes:
+
+- [Runtime Event Model](docs/runtime-events.md)
+
 ## License
 
 MIT

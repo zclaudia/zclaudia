@@ -1,13 +1,24 @@
-import { useState, useEffect, useMemo, type CSSProperties } from 'react';
+import { createElement, useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { Highlight, themes as prismThemes, type PrismTheme, type Token } from 'prism-react-renderer';
 import { List, useListRef, type RowComponentProps, type ListImperativeAPI } from 'react-window';
+import {
+  Check,
+  Copy,
+  ExternalLink,
+  FileText,
+  Maximize2,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Search,
+} from 'lucide-react';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import * as api from '../../services/api';
 import { FileSearchInput } from './FileSearchInput';
 import { FileTree } from './FileTree';
 import { MarkdownFileContent } from './MarkdownFileContent';
+import { iconForFile } from './fileIcons';
 import { isDesktopTauri } from '../../utils/platform';
 import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../utils/popoutWindow';
 import { useProjectStore } from '../../stores/projectStore';
@@ -221,51 +232,40 @@ export function FileViewerActions() {
   };
 
   return (
-    <>
+    <div className="flex items-center gap-1">
       <button
         onClick={() => setSearchOpen(!searchOpen)}
-        className={`p-1 rounded-md hover:bg-secondary flex-shrink-0 ${
+        className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
           searchOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-        }`}
+        } hover:bg-secondary`}
         title="Search files (Cmd+P)"
+        aria-label="Search files"
       >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <Search className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
       {content && (
         <button
           onClick={handleCopy}
-          className={`p-1 rounded-md flex-shrink-0 ${
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
             copied ? 'text-green-500' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
           }`}
           title={copied ? 'Copied!' : 'Copy file content'}
+          aria-label={copied ? 'Copied file content' : 'Copy file content'}
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {copied ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-            )}
-          </svg>
+          {copied ? <Check className="w-3.5 h-3.5" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
         </button>
       )}
       {filePath && !isMobile && (
         <button
           onClick={handleExpand}
-          className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground flex-shrink-0"
           title={isDesktopTauri() ? 'Open in new window' : 'Fullscreen'}
+          aria-label={isDesktopTauri() ? 'Open in new window' : 'Fullscreen'}
         >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {isDesktopTauri() ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-            )}
-          </svg>
+          {isDesktopTauri() ? <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" /> : <Maximize2 className="w-3.5 h-3.5" aria-hidden="true" />}
         </button>
       )}
-    </>
+    </div>
   );
 }
 
@@ -317,6 +317,10 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const lang = filePath ? detectLanguage(filePath) : 'text';
   const codeTheme = isDarkTheme(resolvedTheme) ? prismThemes.oneDark : prismThemes.oneLight;
   const isMarkdown = lang === 'markdown';
+  const headerIcon = createElement(filePath ? iconForFile(filePath) : FileText, {
+    className: `w-3.5 h-3.5 flex-shrink-0 ${filePath ? 'text-muted-foreground' : 'text-muted-foreground/70'}`,
+    'aria-hidden': true,
+  });
   const highlightStart = targetLine ?? null;
   const highlightEnd = targetEndLine ?? targetLine ?? null;
   const showFileTree = isMobile ? !filePath : showTree;
@@ -347,28 +351,27 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* File path indicator */}
-      <div className="flex items-center gap-1.5 px-3 py-1 border-b border-border flex-shrink-0 min-w-0">
-        <svg className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-        <span className="text-xs font-mono text-muted-foreground truncate" title={filePath || ''}>
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
+        {headerIcon}
+        <span className={`text-xs font-mono truncate ${filePath ? 'text-foreground' : 'text-muted-foreground'}`} title={filePath || ''}>
           {filePath || 'No file selected'}
         </span>
+        {filePath && (
+          <span className="hidden sm:inline text-[11px] text-muted-foreground truncate">
+            {projectRoot}
+          </span>
+        )}
         {!isMobile && (
           <button
             type="button"
             onClick={toggleTree}
-            className={`ml-auto p-1 rounded-md flex-shrink-0 ${
+            className={`ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 transition-colors ${
               showFileTree ? 'text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
             }`}
             title={showFileTree ? 'Hide file tree' : 'Show file tree'}
             aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <rect x="3" y="5" width="18" height="14" rx="2" strokeWidth={2} />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5v14" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showFileTree ? 'M6.5 12h-2' : 'M4.5 12h2'} />
-            </svg>
+            {showFileTree ? <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" /> : <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />}
           </button>
         )}
       </div>
@@ -423,9 +426,18 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
             )
           )}
           {!filePath && !loading && !searchOpen && (
-            <div className="flex flex-col items-center justify-center h-full text-muted-foreground text-sm gap-2">
-              <span>Click a <span className="font-mono text-primary">@file</span> reference to view</span>
-              <span className="text-xs">or browse the file tree</span>
+            <div className="flex h-full items-center justify-center px-6 text-center">
+              <div className="flex max-w-sm flex-col items-center gap-3 text-muted-foreground">
+                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-muted/30 text-muted-foreground">
+                  <FileText className="h-6 w-6" aria-hidden="true" />
+                </div>
+                <div className="space-y-1">
+                  <div className="text-sm font-medium text-foreground">Select a file to preview</div>
+                  <div className="text-xs leading-5">
+                    Click a <span className="font-mono text-primary">@file</span> reference, browse the file tree, or press <span className="font-mono text-foreground">Cmd P</span> to search.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

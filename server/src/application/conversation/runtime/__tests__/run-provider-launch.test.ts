@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
 
 const buildRunContextMock = vi.fn();
 const negotiateProfileMock = vi.fn();
@@ -7,6 +8,7 @@ const pluginEventsEmitMock = vi.fn(async () => {});
 const mcpListStatusesMock = vi.fn();
 const prepareDirectSkillInvocationMock = vi.fn();
 const executePreparedDirectSkillInvocationMock = vi.fn();
+const maybeCompactMock = vi.fn(async () => ({ outcome: 'skipped', compacted: false, reason: 'below_threshold' }));
 
 vi.mock('../run-context.js', () => ({
   buildRunContext: buildRunContextMock,
@@ -37,6 +39,10 @@ vi.mock('../../../../infra/providers/pi-runtime/skills.js', () => ({
   executePreparedDirectSkillInvocation: executePreparedDirectSkillInvocationMock,
 }));
 
+vi.mock('../../compaction/compaction-service.js', () => ({
+  maybeCompact: maybeCompactMock,
+}));
+
 async function* providerStream() {
   yield {
     type: 'result',
@@ -63,6 +69,7 @@ describe('ws/run-provider-launch', () => {
     mcpListStatusesMock.mockReturnValue([]);
     prepareDirectSkillInvocationMock.mockResolvedValue({ matched: false });
     executePreparedDirectSkillInvocationMock.mockReset();
+    maybeCompactMock.mockResolvedValue({ outcome: 'skipped', compacted: false, reason: 'below_threshold' });
   });
 
   it('emits run_started, background status, negotiates profile, and starts periodic save', async () => {
@@ -84,6 +91,11 @@ describe('ws/run-provider-launch', () => {
     } as any;
     const sendRunEventMock = vi.fn();
     const broadcastSessionCatalogUpdateMock = vi.fn();
+    const listeners = new RunDomainEventListenerRegistry();
+    const runStartedListener = vi.fn();
+    listeners.on('run.started', runStartedListener);
+    const { registerPluginDomainEventListener } = await import('../plugin-domain-event-listener.js');
+    const unregisterPluginDomainEventListener = registerPluginDomainEventListener(listeners);
 
     const result = await launchProviderRun({
       activeRun,
@@ -135,6 +147,7 @@ describe('ws/run-provider-launch', () => {
       sessionType: 'background',
       trace: trace as any,
       userMessageId: 'user-1',
+      listeners,
     });
 
     expect(negotiateProfileMock).toHaveBeenCalled();
@@ -157,6 +170,20 @@ describe('ws/run-provider-launch', () => {
       sessionId: 'session-1',
       llmProfileId: 'provider-1',
       providerType: 'claude',
+    }));
+    expect(runStartedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'run.started',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      payload: expect.objectContaining({
+        clientRequestId: 'req-1',
+        assistantMessageId: 'assistant-1',
+        userMessageId: 'user-1',
+        sessionType: 'background',
+        input: 'hello',
+        llmProfileId: 'provider-1',
+        providerType: 'claude',
+      }),
     }));
     expect(sendRunEventMock).toHaveBeenCalledWith({
       type: 'background_task_update',
@@ -188,6 +215,7 @@ describe('ws/run-provider-launch', () => {
     expect(activeRun.providerCwd).toBe('/tmp/project');
     expect(trace.setMeta).toHaveBeenCalledWith({ provider: 'claude', cwd: '/tmp/project' });
     expect(result.providerRunner).toBeTruthy();
+    unregisterPluginDomainEventListener();
 
     // onAgentReady mutates activeRun.steerHandle; onSteerConsumed clears
     // pendingSteers — verify both wirings work end-to-end through the closure.
@@ -201,6 +229,101 @@ describe('ws/run-provider-launch', () => {
 
     vi.advanceTimersByTime(5000);
     expect(upsertAssistantMessageMock).toHaveBeenCalledWith(activeRun);
+
+    clearInterval(activeRun.saveInterval);
+  });
+
+  it('emits preflight compaction as a domain event before provider run starts', async () => {
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const activeRun = {
+      sessionId: 'session-1',
+      assistantMessageId: 'assistant-1',
+      pendingSteers: [],
+      eventSeq: 0,
+    } as any;
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+    const sendRunEventMock = vi.fn();
+    const listeners = new RunDomainEventListenerRegistry();
+    const compactionCompletedListener = vi.fn();
+    listeners.on('compaction.completed', compactionCompletedListener);
+    maybeCompactMock.mockResolvedValueOnce({
+      outcome: 'compacted',
+      compacted: true,
+      compactionId: 'compaction-1',
+      tokensBefore: 1234,
+    });
+
+    await launchProviderRun({
+      activeRun,
+      adapter,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Test Agent',
+        model: 'sonnet',
+        systemPrompt: 'agent system prompt',
+        enabledTools: [],
+      } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: {} as any,
+      enabledTools: [],
+      forcedPlanBySession: false,
+      images: [],
+      message: {
+        type: 'run_start',
+        sessionId: 'session-1',
+        clientRequestId: 'req-1',
+        input: 'hello',
+      },
+      modeValue: 'default',
+      permissionCallback: vi.fn(),
+      processedInput: 'processed hello',
+      providerConfig: { id: 'provider-1', providerType: 'claude', baseUrl: '/usr/bin/claude' } as any,
+      llmProfileId: 'provider-1',
+      providerType: 'claude',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+        llm_profile_id: 'provider-1',
+        system_prompt: null,
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+      listeners,
+    });
+
+    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'compaction_completed',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      compactionId: 'compaction-1',
+      tokensBefore: 1234,
+    }));
+    expect(compactionCompletedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'compaction.completed',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      payload: {
+        compactionId: 'compaction-1',
+        tokensBefore: 1234,
+      },
+    }));
+    expect(adapter.run).toHaveBeenCalled();
 
     clearInterval(activeRun.saveInterval);
   });

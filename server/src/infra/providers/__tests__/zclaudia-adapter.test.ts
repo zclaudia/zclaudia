@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
 import { __testables, resolvePlanModeTools, PiAgentProviderAdapter } from '../pi-agent/adapter.js';
-import type { RunOptions, ClaudeMessage, SteerHandle } from '../types.js';
+import type { RunOptions, ProviderRuntimeEvent, SteerHandle } from '../types.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
@@ -451,13 +451,13 @@ describe('translateEvent', () => {
   });
 });
 
-async function collect(adapter: PiAgentProviderAdapter, input: string, options: Partial<RunOptions>): Promise<ClaudeMessage[]> {
+async function collect(adapter: PiAgentProviderAdapter, input: string, options: Partial<RunOptions>): Promise<ProviderRuntimeEvent[]> {
   const opts: RunOptions = {
     cwd: '/tmp',
     sessionId: 'sess-test',
     ...options,
   } as RunOptions;
-  const out: ClaudeMessage[] = [];
+  const out: ProviderRuntimeEvent[] = [];
   for await (const m of adapter.run(input, opts, async () => ({ behavior: 'allow' }))) {
     out.push(m);
   }
@@ -897,7 +897,7 @@ describe('PiAgentProviderAdapter.run — thinking', () => {
     scriptQueue.length = 0;
   });
 
-  it('translates thinking_delta into ClaudeMessage.thinking_delta', async () => {
+  it('translates thinking_delta into ProviderRuntimeEvent.thinking_delta', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: 'message_update', message: { role: 'assistant', content: [] }, assistantMessageEvent: { type: 'thinking_delta', contentIndex: 0, delta: 'reasoning step' } },
@@ -1631,7 +1631,7 @@ describe('stream retry wiring', () => {
     expect(callOpts).not.toHaveProperty('cacheRetention');
   });
 
-  it('e2e: retry_scheduled ClaudeMessage is yielded by adapter when streamFn gets a 429', async () => {
+  it('e2e: retry_scheduled ProviderRuntimeEvent is yielded by adapter when streamFn gets a 429', async () => {
     // The MockAgent never calls constructorOpts.streamFn itself — it fires
     // AgentEvents directly. To observe retry_scheduled in the adapter's yielded
     // output we must keep the adapter's AsyncQueue open until the retry timer fires.

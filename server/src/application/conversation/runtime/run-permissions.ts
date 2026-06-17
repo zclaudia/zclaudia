@@ -51,6 +51,11 @@ import type { PermissionBridge } from '../agent/permission-bridge.js';
 import type { PermissionEscalationContext } from '../../../domains/workflows/ports/step-executor.js';
 import type { PermissionWorkflowResolver } from '../../../domains/workflows/index.js';
 import { buildAppSelectionClickUrl, formatSessionBackendContext } from '../../../infra/push/notification-context.js';
+import { createRunDomainEvent, type RunDomainEventType, type RunDomainEventPayloadMap } from './run-domain-events.js';
+import {
+  runDomainEventListeners,
+  type RunDomainEventListenerRegistry,
+} from './run-domain-event-listeners.js';
 
 interface SessionContext {
   project_id: string;
@@ -198,6 +203,7 @@ export interface CreatePermissionCallbackInput {
   /** Permission bridge for workflow-based permission handling */
   permissionBridge: PermissionBridge;
   permissionWorkflowResolver: PermissionWorkflowResolver;
+  listeners?: RunDomainEventListenerRegistry;
 }
 
 export function createPermissionCallback(input: CreatePermissionCallbackInput) {
@@ -210,6 +216,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
     message,
     modeValue,
     notificationService,
+    listeners,
     permissionBridge,
     permissionWorkflowResolver,
     providerType,
@@ -223,6 +230,22 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
 
   return async (request: PermissionRequest) => {
     return new Promise<PermissionDecision>((resolve) => {
+      const autoResolve = (decision: PermissionDecision, reason?: string) => {
+        emitPermissionDomainEvent({
+          activeRun,
+          listeners,
+          payload: {
+            requestId: request.requestId,
+            behavior: decision.behavior,
+            ...(reason ? { reason } : {}),
+          },
+          runId,
+          sessionId: message.sessionId,
+          type: 'permission.autoResolved',
+        });
+        resolve(decision);
+      };
+
       if (forcedPlanBySession && modeValue === 'plan') {
         const planReadOnlyTools = new Set([
           'read',
@@ -254,7 +277,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             runId,
           } as AgentPermissionInterceptedMessage);
           writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'deny', false);
-          resolve({ behavior: 'deny', message: reason });
+          autoResolve({ behavior: 'deny', message: reason }, reason);
           return;
         }
       }
@@ -277,7 +300,10 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           runId,
         } as AgentPermissionInterceptedMessage);
         writePermissionLog(db, message.sessionId, request.toolName, request.detail, remembered, true);
-        resolve({ behavior: remembered, message: remembered === 'deny' ? 'Denied (remembered)' : undefined });
+        autoResolve(
+          { behavior: remembered, message: remembered === 'deny' ? 'Denied (remembered)' : undefined },
+          `Remembered decision (${remembered}) for "${rememberKey}"`,
+        );
         return;
       }
 
@@ -306,7 +332,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           runId,
         } as AgentPermissionInterceptedMessage);
         writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'allow', true);
-        resolve({ behavior: 'allow', updatedInput: request.toolInput });
+        autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, 'Auto-approved for remembered outside-workspace directory');
         return;
       }
 
@@ -324,7 +350,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           mcpTrust: mcpTrustDecision,
         } as AgentPermissionInterceptedMessage);
         writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'allow', false, mcpTrustDecision);
-        resolve({ behavior: 'allow', updatedInput: request.toolInput });
+        autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, mcpTrustDecision.reason);
         return;
       }
       if (mcpTrustDecision?.policyDecision === 'deny') {
@@ -338,7 +364,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           mcpTrust: mcpTrustDecision,
         } as AgentPermissionInterceptedMessage);
         writePermissionLog(db, message.sessionId, request.toolName, request.detail, 'deny', false, mcpTrustDecision);
-        resolve({ behavior: 'deny', message: mcpTrustDecision.reason });
+        autoResolve({ behavior: 'deny', message: mcpTrustDecision.reason }, mcpTrustDecision.reason);
         return;
       }
 
@@ -387,7 +413,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             sessionId: message.sessionId,
             runId,
           } as AgentPermissionInterceptedMessage);
-          resolve({ behavior: 'allow', updatedInput: request.toolInput });
+          autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, 'Auto-approved by category policy');
           return;
         }
         if (decision === 'deny') {
@@ -399,7 +425,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             sessionId: message.sessionId,
             runId,
           } as AgentPermissionInterceptedMessage);
-          resolve({ behavior: 'deny', message: 'Denied by policy' });
+          autoResolve({ behavior: 'deny', message: 'Denied by policy' }, 'Blocked by category policy');
           return;
         }
       }
@@ -444,7 +470,7 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
             sessionId: message.sessionId,
             runId,
           } as AgentPermissionInterceptedMessage);
-          resolve({ behavior: 'allow', updatedInput: request.toolInput });
+          autoResolve({ behavior: 'allow', updatedInput: request.toolInput }, 'Internal interaction tool handles its own user flow');
           return;
         }
 
@@ -533,6 +559,17 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           },
         });
         recomputePhase(activeRun, computeBlockers(activeRun));
+        emitPermissionDomainEvent({
+          activeRun,
+          listeners,
+          payload: {
+            requestId: request.requestId,
+            toolName: request.toolName,
+          },
+          runId,
+          sessionId: message.sessionId,
+          type: 'permission.requested',
+        });
 
         db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
           .run('waiting', Date.now(), activeRun.sessionId);
@@ -568,6 +605,17 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
               questions: askUserQuestions,
             });
             sendRunEvent(askUserInteraction);
+            emitPermissionDomainEvent({
+              activeRun,
+              listeners,
+              payload: {
+                interactionId: request.requestId,
+                title: askUserInteraction.title,
+              },
+              runId,
+              sessionId: message.sessionId,
+              type: 'interaction.promptRequested',
+            });
             const firstQuestion = askUserQuestions[0] as { question?: string } | undefined;
             void notificationService.notify({
               type: 'interaction_prompt',
@@ -614,4 +662,24 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
       continueWithUserFlow();
     });
   };
+}
+
+function emitPermissionDomainEvent<TType extends RunDomainEventType>(input: {
+  activeRun: ActiveRun;
+  listeners?: RunDomainEventListenerRegistry;
+  payload: RunDomainEventPayloadMap[TType];
+  runId: string;
+  sessionId: string;
+  type: TType;
+}): void {
+  const event = createRunDomainEvent({
+    type: input.type,
+    runId: input.runId,
+    sessionId: input.sessionId,
+    providerType: input.activeRun.providerType,
+    seq: (input.activeRun.eventSeq ?? 0) + 1,
+    source: 'runtime',
+    payload: input.payload,
+  });
+  (input.listeners ?? runDomainEventListeners).emit(event);
 }

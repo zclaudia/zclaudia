@@ -1,6 +1,6 @@
-import { pluginEvents } from '../../../infra/events/index.js';
 import { negotiateProfile } from '../../../infra/providers/pcp-negotiator.js';
-import type { ClaudeMessage, ProviderAdapter } from '../../../infra/providers/types.js';
+import type { ProviderAdapter, ProviderRuntimeEvent } from '../../../infra/providers/types.js';
+import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { ResolvedImage } from './resolve-image-attachments.js';
 import { buildRunContext } from './run-context.js';
 import { upsertAssistantMessage } from './run-lifecycle.js';
@@ -17,7 +17,17 @@ import { persistMcpInstructionsDeltaForSession } from './mcp-instructions-delta.
 import { executePreparedDirectSkillInvocation, prepareDirectSkillInvocation } from '../../../infra/providers/pi-runtime/skills.js';
 import { setPhase } from './active-run-phase.js';
 import { maybeCompact } from '../compaction/compaction-service.js';
-import { compactionEventFor } from './compaction-events.js';
+import { compactionDomainEventFor } from './compaction-events.js';
+import { createSkillActivationObserver } from './skill-activation-observer.js';
+import { createRunDomainEvent, type RunDomainEvent } from './run-domain-events.js';
+import {
+  runDomainEventListeners,
+  type RunDomainEventListenerRegistry,
+} from './run-domain-event-listeners.js';
+import { projectRunDomainEventToWireMessages } from './wire-projector.js';
+import { registerPluginDomainEventListener } from './plugin-domain-event-listener.js';
+
+registerPluginDomainEventListener();
 
 interface LaunchProviderRunInput {
   activeRun: ActiveRun;
@@ -41,6 +51,7 @@ interface LaunchProviderRunInput {
   agentTaskExecutor?: TaskExecutor;
   sdkSessionId?: string;
   sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
+  listeners?: RunDomainEventListenerRegistry;
   serverPort: number | null;
   session: RunSessionRecord;
   sessionType: 'regular' | 'background' | 'agent';
@@ -50,7 +61,7 @@ interface LaunchProviderRunInput {
 }
 
 export async function launchProviderRun(input: LaunchProviderRunInput): Promise<{
-  providerRunner: AsyncIterable<ClaudeMessage>;
+  providerRunner: AsyncIterable<ProviderRuntimeEvent>;
 }> {
   const {
     activeRun,
@@ -74,6 +85,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     agentTaskExecutor,
     sdkSessionId,
     sendRunEvent,
+    listeners,
     serverPort,
     session,
     sessionType,
@@ -98,27 +110,20 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     }, 'PCP profile negotiated');
   }
 
-  sendRunEvent({
-    type: 'run_started',
+  dispatchRunStartedDomainEvent({
+    activeRun,
+    input: message.input,
+    listeners,
+    llmProfileId,
+    providerType: providerConfig?.providerType,
     runId,
+    sendRunEvent,
     sessionId: message.sessionId,
     clientRequestId: message.clientRequestId,
     userMessageId,
-    assistantMessageId: activeRun.assistantMessageId,
     sessionType,
-    effectiveProfile: activeRun.effectiveProfile,
   });
   broadcastSessionCatalogUpdate();
-
-  pluginEvents.emit('run.started', {
-    runId,
-    sessionId: message.sessionId,
-    input: message.input,
-    llmProfileId,
-    providerType: providerConfig?.providerType,
-  }).catch((err: unknown) => {
-    console.warn('[PluginEvents] Event emission failed:', err instanceof Error ? err.message : err);
-  });
 
   if (sessionType === 'background') {
     sendRunEvent({
@@ -197,6 +202,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   runOptions.skillState = activeRun.skillState;
   runOptions.images = images.length > 0 ? images : undefined;
   runOptions.userHooks = userHooks && userHooks.length > 0 ? userHooks : undefined;
+  runOptions.toolExecutionObserver = createSkillActivationObserver();
 
   // Wire mid-run steering callbacks. The closure captures `activeRun` directly
   // (not via activeRuns map) so registration is robust even if the run is
@@ -245,8 +251,18 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
           sessionId: message.sessionId,
           content: '⚠️ Context limit reached — compacted the conversation before starting…',
         });
-        const event = compactionEventFor(runId, message.sessionId, preflight);
-        if (event) sendRunEvent(event);
+        const event = compactionDomainEventFor({
+          outcome: preflight,
+          providerType: activeRun.providerType,
+          runId,
+          seq: (activeRun.eventSeq ?? 0) + 1,
+          sessionId: message.sessionId,
+        });
+        if (event) emitRunLaunchDomainEvent({
+          event,
+          listeners,
+          sendRunEvent,
+        });
       }
     } catch (err) {
       console.warn(`[Compaction] preflight failed (non-fatal) session=${message.sessionId}:`, err instanceof Error ? err.message : err);
@@ -270,13 +286,71 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   return { providerRunner };
 }
 
+function dispatchRunStartedDomainEvent(input: {
+  activeRun: ActiveRun;
+  clientRequestId?: string;
+  input: string;
+  listeners?: RunDomainEventListenerRegistry;
+  llmProfileId: string | null;
+  providerType?: string;
+  runId: string;
+  sendRunEvent: (event: ServerMessage) => void;
+  sessionId: string;
+  sessionType: 'regular' | 'background' | 'agent';
+  userMessageId?: string;
+}): void {
+  const event = createRunDomainEvent({
+    type: 'run.started',
+    runId: input.runId,
+    sessionId: input.sessionId,
+    providerType: input.activeRun.providerType,
+    seq: (input.activeRun.eventSeq ?? 0) + 1,
+    source: 'runtime',
+    payload: {
+      clientRequestId: input.clientRequestId,
+      assistantMessageId: input.activeRun.assistantMessageId,
+      userMessageId: input.userMessageId,
+      sessionType: input.sessionType,
+      effectiveProfile: input.activeRun.effectiveProfile,
+      input: input.input,
+      llmProfileId: input.llmProfileId,
+      providerType: input.providerType,
+    },
+  });
+
+  emitRunLaunchDomainEvent({
+    event,
+    listeners: input.listeners,
+    sendRunEvent: input.sendRunEvent,
+  });
+}
+
+function emitRunLaunchDomainEvent(input: {
+  event: RunDomainEvent;
+  listeners?: RunDomainEventListenerRegistry;
+  sendRunEvent: (event: ServerMessage) => void;
+}): void {
+  for (const wireEvent of projectRunDomainEventToWireMessages(input.event)) {
+    input.sendRunEvent(stripProjectedSeq(wireEvent));
+  }
+  (input.listeners ?? runDomainEventListeners).emit(input.event);
+}
+
+function stripProjectedSeq(event: ServerMessage): ServerMessage {
+  const eventForSend = { ...event };
+  if ('seq' in eventForSend) {
+    delete (eventForSend as { seq?: number }).seq;
+  }
+  return eventForSend;
+}
+
 function completeRunLocally(input: {
   activeRun: ActiveRun;
   content: string;
   message: RunStartMessage;
   runId: string;
   sendRunEvent: (event: import('@zclaudia/shared/wire/messages').ServerMessage) => void;
-}): { providerRunner: AsyncIterable<ClaudeMessage> } {
+}): { providerRunner: AsyncIterable<ProviderRuntimeEvent> } {
   const { activeRun, content, message, runId, sendRunEvent } = input;
   activeRun.fullContent = content;
   activeRun.contentBlocks.push({ type: 'text', content });
@@ -297,6 +371,6 @@ function completeRunLocally(input: {
 }
 
 // eslint-disable-next-line require-yield -- intentional: an empty async iterable that yields nothing
-async function* emptyProviderStream(): AsyncIterable<ClaudeMessage> {
+async function* emptyProviderStream(): AsyncIterable<ProviderRuntimeEvent> {
   return;
 }

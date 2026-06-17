@@ -15,6 +15,11 @@ import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import type { PermissionBridge } from '../agent/permission-bridge.js';
 import { recomputePhase, computeBlockers } from '../runtime/active-run-phase.js';
+import { createRunDomainEvent, type RunDomainEventType, type RunDomainEventPayloadMap } from '../runtime/run-domain-events.js';
+import {
+  runDomainEventListeners,
+  type RunDomainEventListenerRegistry,
+} from '../runtime/run-domain-event-listeners.js';
 
 function broadcastPermissionResolved(
   run: ActiveRun,
@@ -44,6 +49,7 @@ export function handlePermissionDecision(
   connectedClients: Map<string, ConnectedClient>,
   permissionBridge?: PermissionBridge,
   cancelWorkflowRun?: (runId: string) => void,
+  listeners?: RunDomainEventListenerRegistry,
 ): void {
   console.log(`[Permission] Received decision for ${message.requestId}: ${message.allow ? 'allow' : 'deny'}`);
   console.log(`[Permission] Active runs: ${activeRuns.size}`);
@@ -84,6 +90,15 @@ export function handlePermissionDecision(
           console.error(`[Permission] Failed to decrypt credential for ${message.requestId}:`, err);
           pending.resolve({ behavior: 'deny', message: 'Failed to decrypt credential' });
           broadcastPermissionResolved(run, message.requestId, 'deny');
+          emitInteractionDomainEvent({
+            listeners,
+            payload: {
+              requestId: message.requestId,
+              behavior: 'deny',
+            },
+            run,
+            type: 'permission.resolved',
+          });
           return;
         }
       }
@@ -155,6 +170,15 @@ export function handlePermissionDecision(
 
       // Broadcast resolution to all clients (so other devices close their modals)
       broadcastPermissionResolved(run, message.requestId, message.allow ? 'allow' : 'deny');
+      emitInteractionDomainEvent({
+        listeners,
+        payload: {
+          requestId: message.requestId,
+          behavior: message.allow ? 'allow' : 'deny',
+        },
+        run,
+        type: 'permission.resolved',
+      });
 
       console.log(`[Permission] ${message.requestId}: ${message.allow ? 'allowed' : 'denied'} - resolved!`);
       return;
@@ -178,6 +202,7 @@ export function handlePromptAnswer(
   },
   activeRuns: Map<string, ActiveRun>,
   connectedClients: Map<string, ConnectedClient>,
+  listeners?: RunDomainEventListenerRegistry,
 ): void {
   console.log(`[PromptRequest] Received answer for ${message.requestId}`);
 
@@ -206,6 +231,17 @@ export function handlePromptAnswer(
 
       // Emit unified interaction_resolved event
       broadcastRunMessage(run, resolvedEvent as ServerMessage);
+      emitInteractionDomainEvent({
+        listeners,
+        payload: {
+          interactionId: message.requestId,
+          resolution: {
+            formattedAnswer: message.formattedAnswer,
+          },
+        },
+        run,
+        type: 'interaction.resolved',
+      });
 
       console.log(`[PromptRequest] ${message.requestId}: answered - resolved!`);
       return;
@@ -221,4 +257,22 @@ export function handlePromptAnswer(
     } as import('@zclaudia/shared/interaction/forms').InteractionResolvedMessage);
     break;
   }
+}
+
+function emitInteractionDomainEvent<TType extends RunDomainEventType>(input: {
+  listeners?: RunDomainEventListenerRegistry;
+  payload: RunDomainEventPayloadMap[TType];
+  run: ActiveRun;
+  type: TType;
+}): void {
+  const event = createRunDomainEvent({
+    type: input.type,
+    runId: input.run.runId,
+    sessionId: input.run.sessionId,
+    providerType: input.run.providerType,
+    seq: (input.run.eventSeq ?? 0) + 1,
+    source: 'runtime',
+    payload: input.payload,
+  });
+  (input.listeners ?? runDomainEventListeners).emit(event);
 }

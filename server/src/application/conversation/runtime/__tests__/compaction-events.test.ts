@@ -1,22 +1,69 @@
 import { describe, it, expect } from 'vitest';
-import { compactionEventFor } from '../compaction-events.js';
+import { compactionDomainEventFor } from '../compaction-events.js';
 
-describe('compactionEventFor', () => {
-  it('maps compacted → compaction_completed', () => {
-    const e = compactionEventFor('r1', 's1', { outcome: 'compacted', compacted: true, compactionId: 'c1', tokensBefore: 100 });
-    expect(e).toEqual({ type: 'compaction_completed', runId: 'r1', sessionId: 's1', compactionId: 'c1', tokensBefore: 100 });
-  });
-  it('maps failed → compaction_failed with breaker fields', () => {
-    const e = compactionEventFor('r1', 's1', {
-      outcome: 'failed', compacted: false, reason: 'error: x',
-      breaker: { consecutiveFailures: 3, breakerOpen: true, nextRetryAtMs: 999 },
+describe('compactionDomainEventFor', () => {
+  it('maps compacted outcome to compaction.completed domain event', () => {
+    const event = compactionDomainEventFor({
+      outcome: { outcome: 'compacted', compacted: true, compactionId: 'c1', tokensBefore: 100 },
+      providerType: 'zclaudia',
+      runId: 'r1',
+      seq: 7,
+      sessionId: 's1',
     });
-    expect(e).toEqual({ type: 'compaction_failed', runId: 'r1', sessionId: 's1', reason: 'error: x', breakerOpen: true, nextRetryAtMs: 999 });
+
+    expect(event).toEqual(expect.objectContaining({
+      type: 'compaction.completed',
+      runId: 'r1',
+      sessionId: 's1',
+      providerType: 'zclaudia',
+      seq: 7,
+      source: 'runtime',
+      payload: {
+        compactionId: 'c1',
+        tokensBefore: 100,
+      },
+    }));
   });
-  it('maps skipped → null (no wire event)', () => {
-    expect(compactionEventFor('r1', 's1', { outcome: 'skipped', compacted: false, reason: 'circuit_open' })).toBeNull();
+
+  it('maps failed outcome to compaction.failed domain event with breaker fields', () => {
+    const event = compactionDomainEventFor({
+      outcome: {
+        outcome: 'failed',
+        compacted: false,
+        reason: 'error: x',
+        breaker: { consecutiveFailures: 3, breakerOpen: true, nextRetryAtMs: 999 },
+      },
+      runId: 'r1',
+      seq: 8,
+      sessionId: 's1',
+    });
+
+    expect(event).toEqual(expect.objectContaining({
+      type: 'compaction.failed',
+      runId: 'r1',
+      sessionId: 's1',
+      seq: 8,
+      source: 'runtime',
+      payload: {
+        reason: 'error: x',
+        breakerOpen: true,
+        nextRetryAtMs: 999,
+      },
+    }));
   });
-  it('maps aborted → null', () => {
-    expect(compactionEventFor('r1', 's1', { outcome: 'aborted', compacted: false, reason: 'aborted: x' })).toBeNull();
+
+  it('maps skipped and aborted outcomes to null', () => {
+    expect(compactionDomainEventFor({
+      outcome: { outcome: 'skipped', compacted: false, reason: 'circuit_open' },
+      runId: 'r1',
+      seq: 1,
+      sessionId: 's1',
+    })).toBeNull();
+    expect(compactionDomainEventFor({
+      outcome: { outcome: 'aborted', compacted: false, reason: 'aborted: x' },
+      runId: 'r1',
+      seq: 1,
+      sessionId: 's1',
+    })).toBeNull();
   });
 });

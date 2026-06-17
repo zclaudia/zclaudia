@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPermissionCallback } from '../run-permissions.js';
 import { PhaseEmitter } from '../active-run-phase.js';
+import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
 
 async function shortRace<T>(promise: Promise<T>): Promise<T | 'pending'> {
   return Promise.race([
@@ -168,7 +169,11 @@ describe('createPermissionCallback workflow routing', () => {
 
   it('auto-approves readonly MCP tools when trusted by server policy', async () => {
     evaluateMcpToolTrustPolicyMock.mockReturnValue('approve');
-    const callback = createPermissionCallback(createInput() as any);
+    const listeners = new RunDomainEventListenerRegistry();
+    const autoResolvedListener = vi.fn();
+    listeners.on('permission.autoResolved', autoResolvedListener);
+    const input = { ...createInput(), listeners };
+    const callback = createPermissionCallback(input as any);
 
     const decision = await shortRace(callback({
       requestId: 'mcp-approve-1',
@@ -179,6 +184,16 @@ describe('createPermissionCallback workflow routing', () => {
     }));
 
     expect(decision).toEqual({ behavior: 'allow', updatedInput: { id: '1' } });
+    expect(autoResolvedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'permission.autoResolved',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      payload: {
+        requestId: 'mcp-approve-1',
+        behavior: 'allow',
+        reason: 'Auto-approved by MCP trust policy',
+      },
+    }));
     expect(evaluateMcpToolTrustPolicyMock).toHaveBeenCalledWith(
       expect.objectContaining({ declaredReadOnly: true, riskLevel: 'medium' }),
       expect.objectContaining({ trustLevel: 'trusted-readonly' }),
@@ -243,6 +258,10 @@ describe('createPermissionCallback workflow routing', () => {
 
   it('triggers the resolved permission workflow and marks the request as workflow mode', async () => {
     const input = createInput() as any;
+    const listeners = new RunDomainEventListenerRegistry();
+    const requestedListener = vi.fn();
+    listeners.on('permission.requested', requestedListener);
+    input.listeners = listeners;
     const callback = createPermissionCallback(input);
 
     void callback({
@@ -267,6 +286,15 @@ describe('createPermissionCallback workflow routing', () => {
         workflowMode: true,
       }),
     );
+    expect(requestedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'permission.requested',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      payload: {
+        requestId: 'req-1',
+        toolName: 'Bash',
+      },
+    }));
     await Promise.resolve();
     expect(input.permissionBridge.setWorkflowRunId).toHaveBeenCalledWith('req-1', 'wf-run-1');
   });
@@ -305,6 +333,10 @@ describe('createPermissionCallback workflow routing', () => {
       responseMode: 'prompt_answer',
     });
     const input = createInput() as any;
+    const listeners = new RunDomainEventListenerRegistry();
+    const promptRequestedListener = vi.fn();
+    listeners.on('interaction.promptRequested', promptRequestedListener);
+    input.listeners = listeners;
     const callback = createPermissionCallback(input);
     permissionEvaluatorEvaluateMock.mockReturnValue('approve');
 
@@ -329,6 +361,15 @@ describe('createPermissionCallback workflow routing', () => {
       type: 'interaction_prompt',
       interactionId: 'question-1',
       responseMode: 'prompt_answer',
+    }));
+    expect(promptRequestedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'interaction.promptRequested',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      payload: {
+        interactionId: 'question-1',
+        title: 'Question',
+      },
     }));
   });
 });

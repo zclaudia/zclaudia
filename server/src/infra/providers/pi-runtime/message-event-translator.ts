@@ -1,6 +1,6 @@
 import type { Usage } from '@earendil-works/pi-ai';
 import type { AgentEvent } from '@earendil-works/pi-agent-core';
-import type { ClaudeMessage } from '../types.js';
+import type { ProviderRuntimeEvent } from '../types.js';
 import { zeroUsage } from './usage-extractor.js';
 
 export interface TranslateContext {
@@ -14,7 +14,7 @@ export function translateEvent(
   event: AgentEvent,
   _ctx: TranslateContext,
   usage?: Usage,
-): ClaudeMessage | undefined {
+): ProviderRuntimeEvent | undefined {
   try {
     switch (event.type) {
       // agent_start is intentionally not translated; adapter.run emits `init`

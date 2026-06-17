@@ -50,6 +50,170 @@ describe('ws/run-events', () => {
     vi.useFakeTimers();
   });
 
+  it('routes canonical assistant_delta provider events through the domain event path', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      runId: 'run-1',
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      thinkingBlocks: [],
+      eventSeq: 0,
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: { type: 'assistant_delta', content: 'hello' } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map(),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(activeRun.fullContent).toBe('hello');
+    expect(activeRun.contentBlocks).toEqual([{ type: 'text', content: 'hello' }]);
+    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'delta',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      content: 'hello',
+    }));
+  });
+
+  it('routes canonical tool_started provider events through the domain event path', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      runId: 'run-1',
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      thinkingBlocks: [],
+      eventSeq: 0,
+    } as any;
+    const toolUseIdToName = new Map<string, string>();
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: {
+        type: 'tool_started',
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        toolInput: { file_path: '/repo/src/app.ts' },
+      } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName,
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(toolUseIdToName.get('tool-1')).toBe('Read');
+    expect(activeRun.collectedToolCalls[0]).toMatchObject({
+      toolUseId: 'tool-1',
+      name: 'Read',
+      input: { file_path: '/repo/src/app.ts' },
+    });
+    expect(activeRun.contentBlocks).toEqual([{ type: 'tool_use', toolUseId: 'tool-1' }]);
+    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tool_use',
+      runId: 'run-1',
+      toolUseId: 'tool-1',
+      toolName: 'Read',
+    }));
+  });
+
+  it('routes canonical tool_finished provider events through the domain event path', async () => {
+    const sendRunEventMock = vi.fn();
+    const activeRun = {
+      runId: 'run-1',
+      sessionId: 'session-1',
+      providerType: 'zclaudia',
+      collectedToolCalls: [{ toolUseId: 'tool-1', name: 'Read', input: {} }],
+      contentBlocks: [],
+      fullContent: '',
+      pendingPermissions: new Map(),
+      recentToolCalls: [],
+      thinkingBlocks: [],
+      eventSeq: 0,
+    } as any;
+
+    const { handleProviderEvent } = await import('../run-events.js');
+
+    handleProviderEvent({
+      activeRun,
+      activeRuns: new Map(),
+      broadcastHeartbeat: vi.fn(),
+      client: { ws: {} as any } as any,
+      db: {} as any,
+      input: 'hello',
+      modeValue: 'default',
+      msg: {
+        type: 'tool_finished',
+        toolUseId: 'tool-1',
+        toolName: 'Read',
+        toolResult: 'contents',
+        isToolError: false,
+      } as any,
+      notificationService: {} as any,
+      persistSessionWorkingDirectory: vi.fn(),
+      providerType: 'zclaudia',
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      sessionId: 'session-1',
+      sessionType: 'regular',
+      state: {},
+      toolUseIdToName: new Map([['tool-1', 'Read']]),
+      providerRegistry: mockProviderRegistry as any,
+    });
+
+    expect(activeRun.collectedToolCalls[0]).toMatchObject({
+      output: 'contents',
+      isError: false,
+    });
+    expect(sendRunEventMock).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'tool_result',
+      runId: 'run-1',
+      toolUseId: 'tool-1',
+      toolName: 'Read',
+      result: 'contents',
+    }));
+  });
+
   it('persists system info and emits session_created on init', async () => {
     const runSqlMock = vi.fn();
     const sendRunEventMock = vi.fn();

@@ -10,7 +10,7 @@
 
 import { newId } from '../../../utils/uuid.js';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
-import type { ClaudeMessage } from '../../../infra/providers/types.js';
+import type { ProviderRuntimeEvent } from '../../../infra/providers/types.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
@@ -25,6 +25,12 @@ import {
   loadProjectAllowedOutsideWorkspaceRoots,
 } from '../agent/permission-evaluator.js';
 import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
+import { createRunDomainEvent, type RunDomainEvent } from './run-domain-events.js';
+import {
+  runDomainEventListeners,
+  type RunDomainEventListenerRegistry,
+} from './run-domain-event-listeners.js';
+import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
 
 export interface BackgroundFollowUpContext {
   activeRuns: Map<string, ActiveRun>;
@@ -40,6 +46,7 @@ export interface BackgroundFollowUpContext {
   notificationsService?: NotificationService;
   initialPendingTasks: number;
   workspaceRoot: string;
+  listeners?: RunDomainEventListenerRegistry;
 }
 
 /**
@@ -47,7 +54,7 @@ export interface BackgroundFollowUpContext {
  * after the main run has ended. Does not block the caller.
  */
 export function spawnBackgroundFollowUpConsumer(
-  iterator: AsyncIterator<ClaudeMessage>,
+  iterator: AsyncIterator<ProviderRuntimeEvent>,
   ctx: BackgroundFollowUpContext,
 ): void {
   consumeBackgroundStream(iterator, ctx).catch(err => {
@@ -56,7 +63,7 @@ export function spawnBackgroundFollowUpConsumer(
 }
 
 async function consumeBackgroundStream(
-  iterator: AsyncIterator<ClaudeMessage>,
+  iterator: AsyncIterator<ProviderRuntimeEvent>,
   ctx: BackgroundFollowUpContext,
 ): Promise<void> {
   let pendingTasks = ctx.initialPendingTasks;
@@ -226,6 +233,7 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
   };
 
   ctx.activeRuns.set(runId, activeRun);
+  attachRunPhaseDomainEventEmitter(activeRun, ctx.listeners);
 
   sendRunEvent({
     type: 'run_started',
@@ -234,6 +242,7 @@ function createFollowUpRun(ctx: BackgroundFollowUpContext): {
     clientRequestId: `bg-followup:${runId}`,
     assistantMessageId,
   });
+  emitBackgroundFollowUpDomainEvent(ctx, activeRun, 'backgroundFollowup.started');
 
   return { activeRun, sendRunEvent };
 }
@@ -262,6 +271,27 @@ function finalizeFollowUpRun(run: ActiveRun, ctx: BackgroundFollowUpContext): vo
     notificationSender: ctx.notificationService,
     notificationsService: ctx.notificationsService,
   });
+  emitBackgroundFollowUpDomainEvent(ctx, run, 'backgroundFollowup.finished');
 
   console.log(`[BackgroundFollowUp] Follow-up run ${run.runId} finalized`);
+}
+
+function emitBackgroundFollowUpDomainEvent(
+  ctx: BackgroundFollowUpContext,
+  run: ActiveRun,
+  type: 'backgroundFollowup.started' | 'backgroundFollowup.finished',
+): RunDomainEvent<typeof type> {
+  const event = createRunDomainEvent({
+    type,
+    runId: run.runId,
+    sessionId: run.sessionId,
+    providerType: run.providerType,
+    seq: (run.eventSeq ?? 0) + 1,
+    source: 'runtime',
+    payload: {
+      followupRunId: run.runId,
+    },
+  });
+  (ctx.listeners ?? runDomainEventListeners).emit(event);
+  return event;
 }

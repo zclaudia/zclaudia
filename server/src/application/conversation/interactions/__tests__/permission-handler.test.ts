@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { handlePermissionDecision } from '../permission-handler.js';
+import { handlePermissionDecision, handlePromptAnswer } from '../permission-handler.js';
 import type { ActiveRun, ConnectedClient } from '../../transport/types.js';
 import { PhaseEmitter } from '../../runtime/active-run-phase.js';
+import { RunDomainEventListenerRegistry } from '../../runtime/run-domain-event-listeners.js';
 
 vi.mock('../../../../utils/crypto.js', () => ({
   decryptCredential: vi.fn(() => {
@@ -95,12 +96,15 @@ describe('permission-handler', () => {
   });
 
   it('broadcasts permission_resolved when credential decrypt fails', () => {
+    const listeners = new RunDomainEventListenerRegistry();
+    const permissionResolvedListener = vi.fn();
+    listeners.on('permission.resolved', permissionResolvedListener);
     handlePermissionDecision({
       type: 'permission_decision',
       requestId: 'req-1',
       allow: true,
       encryptedCredential: 'bad',
-    }, activeRuns, connectedClients);
+    }, activeRuns, connectedClients, undefined, undefined, listeners);
 
     expect(resolve).toHaveBeenCalledWith({
       behavior: 'deny',
@@ -126,5 +130,50 @@ describe('permission-handler', () => {
         decision: 'deny',
       }),
     ]));
+    expect(permissionResolvedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'permission.resolved',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      payload: {
+        requestId: 'req-1',
+        behavior: 'deny',
+      },
+    }));
+  });
+
+  it('emits interaction.resolved when a prompt answer resolves AskUserQuestion', () => {
+    const listeners = new RunDomainEventListenerRegistry();
+    const interactionResolvedListener = vi.fn();
+    listeners.on('interaction.resolved', interactionResolvedListener);
+    run.pendingPermissions.set('question-1', {
+      resolve,
+      timeout: null,
+      originalToolInput: {},
+      originalRequest: {
+        toolName: 'AskUserQuestion',
+        detail: 'Continue?',
+        timeoutSeconds: 0,
+      },
+    });
+
+    handlePromptAnswer({
+      type: 'prompt_answer',
+      requestId: 'question-1',
+      formattedAnswer: 'Yes',
+    }, activeRuns, connectedClients, listeners);
+
+    expect(resolve).toHaveBeenCalledWith({
+      behavior: 'allow',
+      message: 'Yes',
+    });
+    expect(interactionResolvedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'interaction.resolved',
+      runId: 'run-1',
+      sessionId: 'session-1',
+      payload: {
+        interactionId: 'question-1',
+        resolution: { formattedAnswer: 'Yes' },
+      },
+    }));
   });
 });

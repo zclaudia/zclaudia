@@ -16,6 +16,7 @@ interface AgentProfileMetaState {
   loaded: boolean;
   loading: boolean;
   loadAll: () => Promise<void>;
+  setAll: (profiles: AgentProfileConfig[]) => void;
   getById: (id: string) => AgentProfileConfig | undefined;
   invalidate: (id?: string) => void;
 }
@@ -30,15 +31,20 @@ export const useAgentProfileMetaStore = create<AgentProfileMetaState>((set, get)
     set({ loading: true });
     try {
       const all = await listAgentProfiles();
-      const byId: Record<string, AgentProfileConfig> = {};
-      for (const a of all) byId[a.id] = a;
-      set({ profiles: byId, loaded: true, loading: false });
+      get().setAll(all);
+      set({ loading: false });
     } catch (err) {
       console.error('[agentProfileMetaStore] loadAll failed:', err);
       // Mark as "loaded" even on failure to avoid an infinite refetch loop —
       // consumers can call invalidate() to retry.
       set({ loaded: true, loading: false });
     }
+  },
+
+  setAll(profiles) {
+    const byId: Record<string, AgentProfileConfig> = {};
+    for (const a of profiles) byId[a.id] = a;
+    set({ profiles: byId, loaded: true });
   },
 
   getById(id) {

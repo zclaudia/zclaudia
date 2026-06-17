@@ -28,6 +28,7 @@ import {
 import { useServerStore } from '../../stores/serverStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
+import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
 import * as api from '../../services/api';
 import { useAndroidBack } from '../../hooks/useAndroidBack';
 import { isMobileBackendUsable } from '../../services/mobileConnectionState';
@@ -165,6 +166,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
         api.listLlmProfiles(),
       ]);
       setAgents(agentData);
+      useAgentProfileMetaStore.getState().setAll(agentData);
       setLlmProfiles(llmData);
       try {
         setSkillCatalog(await api.getWorkspaceSkills());

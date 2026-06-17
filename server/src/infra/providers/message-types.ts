@@ -56,19 +56,43 @@ export interface SystemInfo {
   agents?: string[];
 }
 
-export interface ClaudeMessage {
+export const PROVIDER_RUNTIME_EVENT_TYPES = [
+  'init',
+  'assistant_delta',
+  'tool_started',
+  'tool_finished',
+  'provider_turn_finished',
+  'provider_error',
+  'task_notification',
+  'tool_activity',
+  'mode_transition',
+  'thinking_delta',
+  'retry_scheduled',
+] as const;
+
+export type ProviderRuntimeEventType = typeof PROVIDER_RUNTIME_EVENT_TYPES[number];
+
+type LegacyProviderRuntimeEventType =
+  | 'assistant'
+  | 'result'
+  | 'tool_use'
+  | 'tool_result'
+  | 'error';
+
+export interface ProviderRuntimeEvent {
   type:
     | 'init'
-    | 'assistant'
-    | 'result'
-    | 'tool_use'
-    | 'tool_result'
-    | 'error'
+    | 'assistant_delta'
+    | 'tool_started'
+    | 'tool_finished'
+    | 'provider_turn_finished'
+    | 'provider_error'
     | 'task_notification'
     | 'tool_activity'
     | 'mode_transition'
     | 'thinking_delta'
-    | 'retry_scheduled';
+    | 'retry_scheduled'
+    | LegacyProviderRuntimeEventType;
   /** Populated when type === 'retry_scheduled'. */
   retryInfo?: {
     attempt: number;
@@ -125,4 +149,23 @@ export interface ClaudeMessage {
   thinkingSignature?: string;
   /** Whether the thinking block was redacted by safety filters. */
   thinkingRedacted?: boolean;
+}
+
+export interface ProviderAssistantDeltaEvent extends ProviderRuntimeEvent {
+  type: 'assistant_delta' | 'assistant';
+  content: string;
+}
+
+export interface ProviderToolStartedEvent extends ProviderRuntimeEvent {
+  type: 'tool_started' | 'tool_use';
+  toolUseId?: string;
+  toolName?: string;
+  toolInput?: unknown;
+}
+
+export interface ProviderTurnFinishedEvent extends ProviderRuntimeEvent {
+  type: 'provider_turn_finished' | 'result';
+  content?: string;
+  usage?: Usage;
+  isComplete?: boolean;
 }

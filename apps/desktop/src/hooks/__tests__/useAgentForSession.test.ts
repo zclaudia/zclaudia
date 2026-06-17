@@ -27,6 +27,8 @@ const agentProfile: AgentProfileConfig = {
   id: 'ap1',
   name: 'Coder',
   llmProfileId: 'lp1',
+  model: 'claude-sonnet-4-6',
+  systemPrompt: '',
   enabledTools: ['read'],
   isDefault: true,
   createdAt: 0,
@@ -123,6 +125,25 @@ describe('useAgentForSession', () => {
     await waitFor(() => {
       expect(result.current.agent?.id).toBe('ap1');
       expect(result.current.llm?.id).toBe('lp1');
+    });
+  });
+
+  it('reflects agent profile metadata replacement for existing sessions', async () => {
+    useAgentProfileMetaStore.setState({
+      profiles: { ap1: agentProfile },
+      loaded: true,
+      loading: false,
+    } as any);
+
+    const { result } = renderHook(() => useAgentForSession('sess-1'));
+    expect(result.current.agent?.model).toBe('claude-sonnet-4-6');
+
+    useAgentProfileMetaStore.getState().setAll([
+      { ...agentProfile, model: 'kimi-k2.7-code', updatedAt: 1 },
+    ]);
+
+    await waitFor(() => {
+      expect(result.current.agent?.model).toBe('kimi-k2.7-code');
     });
   });
 });

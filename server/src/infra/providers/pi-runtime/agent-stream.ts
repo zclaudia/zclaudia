@@ -1,6 +1,6 @@
 import { streamSimple } from '@earendil-works/pi-ai';
 import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type StreamFn } from '@earendil-works/pi-agent-core';
-import type { ClaudeMessage, RunOptions } from '../types.js';
+import type { ProviderRuntimeEvent, RunOptions } from '../types.js';
 import { CodexOAuthError } from '../../../domains/llm-profiles/codex-oauth-errors.js';
 import type { AgentHooksOutput } from './agent-hooks.js';
 import { AsyncQueue } from './async-queue.js';
@@ -24,7 +24,7 @@ export async function* runPiAgentStream(input: {
   tools: AgentTool<any>[];
   hooks: AgentHooksOutput;
   effectiveSystemPrompt: string;
-}): AsyncGenerator<ClaudeMessage, void, void> {
+}): AsyncGenerator<ProviderRuntimeEvent, void, void> {
   const {
     userInput,
     options,
@@ -40,7 +40,7 @@ export async function* runPiAgentStream(input: {
 
   // Queue is created before agentOpts so the onRetry callback can push
   // retry_scheduled messages without a forward reference to the queue.
-  const queue = new AsyncQueue<ClaudeMessage>();
+  const queue = new AsyncQueue<ProviderRuntimeEvent>();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const agentOpts: any = {
@@ -82,7 +82,7 @@ export async function* runPiAgentStream(input: {
       queue.push({
         type: 'retry_scheduled',
         retryInfo: info,
-      } as ClaudeMessage);
+      } as ProviderRuntimeEvent);
     },
   });
 
@@ -172,7 +172,7 @@ export async function* runPiAgentStream(input: {
   agent.prompt(promptInput, promptImages)
     .then(() => { queue.close(); })
     .catch(err => {
-      const errorMsg: ClaudeMessage = {
+      const errorMsg: ProviderRuntimeEvent = {
         type: 'error',
         error: err instanceof Error ? err.message : String(err),
         isComplete: true,

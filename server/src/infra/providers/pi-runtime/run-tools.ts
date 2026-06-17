@@ -51,6 +51,7 @@ export function buildPiRunToolBundle(input: {
     sandboxReadOnly: isPlanMode,
     sandboxAllowedDomains,
     memoryDir: options.memoryDir,
+    toolExecutionObserver: options.toolExecutionObserver,
   });
   if (options.externalToolState) {
     for (const ref of options.externalToolState.loadedExternalTools) {

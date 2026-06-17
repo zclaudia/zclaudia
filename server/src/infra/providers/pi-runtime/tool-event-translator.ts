@@ -1,5 +1,5 @@
 import type { AgentEvent } from '@earendil-works/pi-agent-core';
-import type { ClaudeMessage } from '../message-types.js';
+import type { ProviderRuntimeEvent } from '../message-types.js';
 
 export interface TranslateToolContext {
   sessionId: string;
@@ -45,16 +45,16 @@ function extractPartialText(partialResult: unknown): string {
 }
 
 /**
- * Translate pi tool-related AgentEvents into ZClaudia ClaudeMessage(s).
+ * Translate pi tool-related AgentEvents into ZClaudia ProviderRuntimeEvent(s).
  * Returns:
  *  - undefined — event ignored
- *  - ClaudeMessage — one event to push
- *  - ClaudeMessage[] — multiple to push (e.g. assistant with N toolCalls)
+ *  - ProviderRuntimeEvent — one event to push
+ *  - ProviderRuntimeEvent[] — multiple to push (e.g. assistant with N toolCalls)
  */
 export function translateToolEvent(
   event: AgentEvent,
   _ctx: TranslateToolContext,
-): ClaudeMessage | ClaudeMessage[] | undefined {
+): ProviderRuntimeEvent | ProviderRuntimeEvent[] | undefined {
   try {
     switch (event.type) {
       case 'message_end': {

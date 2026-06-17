@@ -6,9 +6,9 @@ import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/ag
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import type Database from 'better-sqlite3';
 import type { ProviderEventNormalizer } from './provider-normalizer.js';
-import type { ClaudeMessage, PermissionCallback } from './message-types.js';
+import type { PermissionCallback, ProviderRuntimeEvent } from './message-types.js';
 import type { TaskExecutor } from '../../domains/tasks/executors/types.js';
-import type { ExternalToolRuntimeState, SkillRuntimeState } from './pi-runtime/index.js';
+import type { ExternalToolRuntimeState, SkillRuntimeState, ToolExecutionObserver } from './pi-runtime/index.js';
 
 /** Handle exposed to the application after pi Agent construction, for mid-run steering. */
 export interface SteerHandle {
@@ -17,7 +17,12 @@ export interface SteerHandle {
 }
 
 // Re-export core provider message types (shared across all providers)
-export type { ClaudeMessage, SystemInfo, PermissionDecision, PermissionCallback } from './message-types.js';
+export type {
+  PermissionCallback,
+  PermissionDecision,
+  ProviderRuntimeEvent,
+  SystemInfo,
+} from './message-types.js';
 
 /** Options for starting a zclaudia agent runtime run. */
 export interface RunOptions {
@@ -58,6 +63,8 @@ export interface RunOptions {
   userHooks?: import('@zclaudia/shared/interaction/user-hooks').UserHookDefinition[];
   /** Per-project memory directory (absent = memory feature disabled for this run). */
   memoryDir?: string;
+  /** Application policy hook invoked by pi-runtime after a built-in tool succeeds. */
+  toolExecutionObserver?: ToolExecutionObserver;
 }
 
 /** Agent runtime adapter interface. */
@@ -78,7 +85,7 @@ export interface ProviderAdapter {
     input: string,
     options: RunOptions,
     onPermission: PermissionCallback,
-  ): AsyncGenerator<ClaudeMessage, void, void>;
+  ): AsyncGenerator<ProviderRuntimeEvent, void, void>;
 
   /** Abort an active session */
   abort?(sessionId: string, cwd: string): Promise<void>;

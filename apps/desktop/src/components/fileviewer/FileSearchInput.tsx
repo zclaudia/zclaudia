@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { Search } from 'lucide-react';
 import * as api from '../../services/api';
 import type { FileEntry } from '@zclaudia/shared';
+import { iconForFile } from './fileIcons';
 
 interface FileSearchInputProps {
   projectRoot: string;
@@ -27,7 +29,6 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     if (!query.trim()) {
-      setResults([]);
       return;
     }
 
@@ -58,6 +59,21 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
     onSelect(entry.path);
   }, [onSelect]);
 
+  const handleQueryChange = (value: string) => {
+    setQuery(value);
+    if (!value.trim()) {
+      setResults([]);
+      setSelectedIndex(0);
+    }
+  };
+
+  const renderFileName = (path: string) => {
+    const parts = path.split('/');
+    const name = parts.pop() ?? path;
+    const directory = parts.join('/');
+    return { directory, name };
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -75,20 +91,28 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
   };
 
   return (
-    <div className="border-b border-border flex-shrink-0">
-      <div className="flex items-center gap-2 px-3 py-1.5">
-        <svg className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+    <div className="border-b border-border bg-background/95 flex-shrink-0">
+      <div className="flex items-center gap-2 px-3 py-2">
+        <Search className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" aria-hidden="true" />
         <input
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => handleQueryChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Search files by name..."
           className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
         />
+        {!query && (
+          <kbd className="hidden sm:inline-flex h-5 items-center rounded border border-border bg-muted/40 px-1.5 text-[10px] font-medium text-muted-foreground">
+            Cmd P
+          </kbd>
+        )}
+        {query && !loading && results.length > 0 && (
+          <span className="text-[11px] text-muted-foreground">
+            {results.length}
+          </span>
+        )}
         {loading && (
           <span className="text-xs text-muted-foreground">...</span>
         )}
@@ -97,25 +121,34 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
       {/* Results */}
       {results.length > 0 && (
         <div className="max-h-[200px] overflow-y-auto">
-          {results.map((entry, idx) => (
-            <button
-              key={entry.path}
-              onClick={() => handleSelect(entry)}
-              className={`w-full text-left px-3 py-1.5 text-sm font-mono flex items-center gap-2 ${
-                idx === selectedIndex
-                  ? 'bg-muted/60 text-primary'
-                  : 'text-foreground hover:bg-secondary'
-              }`}
-            >
-              <span className="truncate">{entry.path}</span>
-            </button>
-          ))}
+          {results.map((entry, idx) => {
+            const EntryIcon = iconForFile(entry.path);
+            const { directory, name } = renderFileName(entry.path);
+            return (
+              <button
+                key={entry.path}
+                onClick={() => handleSelect(entry)}
+                className={`w-full text-left px-3 py-1.5 text-sm font-mono flex items-center gap-2 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
+                  idx === selectedIndex
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-foreground hover:bg-secondary/80'
+                }`}
+              >
+                <EntryIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span className="sr-only">{entry.path}</span>
+                <span className="min-w-0 flex-1 truncate" aria-hidden="true">
+                  <span>{directory ? `${directory}/` : ''}</span>
+                  <span className="font-semibold">{name}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
 
       {query && !loading && results.length === 0 && (
-        <div className="px-3 py-2 text-xs text-muted-foreground">
-          No files found
+        <div className="px-3 py-3 text-xs text-muted-foreground">
+          No files found for <span className="font-mono text-foreground">{query}</span>
         </div>
       )}
     </div>

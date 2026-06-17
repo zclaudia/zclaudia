@@ -23,6 +23,7 @@ import type { initDatabase } from '../../../infra/storage/db.js';
 import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
 import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
+import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -253,6 +254,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     skillState: buildSkillRuntimeState(agentProfile),
   };
   activeRuns.set(runId, activeRun);
+  attachRunPhaseDomainEventEmitter(activeRun);
 
   db.prepare('UPDATE sessions SET last_run_status = ?, updated_at = ? WHERE id = ?')
     .run('running', Date.now(), message.sessionId);

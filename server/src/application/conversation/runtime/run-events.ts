@@ -1,24 +1,23 @@
-import { sendMessage } from '../transport/broadcast.js';
 import type { ActiveRun } from '../transport/types.js';
-import { maybeCompact } from '../compaction/compaction-service.js';
-import { cleanupPendingPermissions, findProcessPidsByTaskCommand, upsertAssistantMessage } from './run-lifecycle.js';
-import {
-  buildStatusOutput,
-  formatProviderErrorMessage,
-  SYSTEM_INFO_COMMANDS,
-} from '../../../utils/server-utils.js';
-import { normalizeFromToolUse } from '../interactions/interaction-normalizer.js';
-import { trackAndAutoComplete, finalizeSession, clearSession } from '../interactions/todo-state-tracker.js';
-import { pluginEvents } from '../../../infra/events/index.js';
-import { generateToolSignature } from '../../../loop-detection.js';
+import { formatProviderErrorMessage } from '../../../utils/server-utils.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
-import type { ClaudeMessage, SystemInfo } from '../../../infra/providers/types.js';
+import type { ProviderRuntimeEvent, SystemInfo } from '../../../infra/providers/types.js';
 import type { NotificationSender } from '../../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../../domains/notification-feed/index.js';
-import { postRunCompletedNotification, postRunFailedNotification } from './run-terminal-notifications.js';
-import { setPhase, recomputePhase, isTerminalPhase, computeBlockers } from './active-run-phase.js';
-import { compactionEventFor } from './compaction-events.js';
+import { isTerminalPhase } from './active-run-phase.js';
 import { isContextOverflowError, ContextOverflowError } from './context-overflow.js';
+import { dispatchProviderRuntimeEventToDomain } from './run-domain-dispatcher.js';
+import { completeProviderTurn, failProviderTurn } from './run-terminal-coordinator.js';
+import {
+  handleTaskNotification,
+  trackBackgroundTaskFromToolResult,
+} from './background-task-coordinator.js';
+import { handleToolUseInteraction } from './interaction-coordinator.js';
+import { handleProviderInit } from './provider-session-coordinator.js';
+import { handleModeTransition } from './mode-transition-coordinator.js';
+import { registerPluginDomainEventListener } from './plugin-domain-event-listener.js';
+
+registerPluginDomainEventListener();
 
 export interface ProviderEventState {
   sdkSessionId?: string;
@@ -43,69 +42,9 @@ interface HandleProviderEventParams {
   sessionType: ActiveRun['sessionType'];
   state: ProviderEventState;
   toolUseIdToName: Map<string, string>;
-  msg: ClaudeMessage;
+  msg: ProviderRuntimeEvent;
   broadcastHeartbeat: () => void;
   providerRegistry: ProviderRegistryPort;
-}
-
-function markBackgroundTaskStarted(activeRun: ActiveRun, state: ProviderEventState, key?: string): void {
-  if (!key) {
-    activeRun.pendingBackgroundTasks = (activeRun.pendingBackgroundTasks || 0) + 1;
-    recomputePhase(activeRun, computeBlockers(activeRun));
-    return;
-  }
-  state.backgroundTaskKeys ??= new Set();
-  if (state.backgroundTaskKeys.has(key)) return;
-  state.backgroundTaskKeys.add(key);
-  activeRun.pendingBackgroundTasks = (activeRun.pendingBackgroundTasks || 0) + 1;
-  recomputePhase(activeRun, computeBlockers(activeRun));
-}
-
-function markBackgroundTaskFinished(activeRun: ActiveRun, state: ProviderEventState, key?: string): void {
-  if (key && state.backgroundTaskKeys?.has(key)) {
-    state.backgroundTaskKeys.delete(key);
-    activeRun.pendingBackgroundTasks = Math.max(0, (activeRun.pendingBackgroundTasks || 0) - 1);
-    recomputePhase(activeRun, computeBlockers(activeRun));
-    return;
-  }
-  activeRun.pendingBackgroundTasks = Math.max(0, (activeRun.pendingBackgroundTasks || 0) - 1);
-  recomputePhase(activeRun, computeBlockers(activeRun));
-}
-
-function getTaskNotificationKey(msg: ClaudeMessage): string | undefined {
-  if (msg.taskId) return `task:${msg.taskId}`;
-  if (msg.taskToolUseId) return `tool:${msg.taskToolUseId}`;
-  return undefined;
-}
-
-function extractText(value: unknown): string {
-  if (typeof value === 'string') return value;
-  if (value == null) return '';
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function getToolResultBackgroundTaskKey(
-  toolName: string,
-  toolUseId: string | undefined,
-  result: unknown,
-): string | undefined {
-  const text = extractText(result);
-  if (!text) return undefined;
-
-  const bashMatch = text.match(/Command running in background with ID:\s*([A-Za-z0-9_-]+)/i);
-  if (bashMatch?.[1]) return `task:${bashMatch[1]}`;
-
-  const monitorMatch = text.match(/Monitor started\s*\(task\s+([A-Za-z0-9_-]+)/i);
-  if (monitorMatch?.[1]) return `task:${monitorMatch[1]}`;
-
-  if (/Command running in background/i.test(text) || /Monitor started/i.test(text)) {
-    return toolUseId ? `tool:${toolUseId}` : `tool-result:${toolName}:${text.slice(0, 80)}`;
-  }
-  return undefined;
 }
 
 export function handleProviderEvent({
@@ -131,201 +70,92 @@ export function handleProviderEvent({
 }: HandleProviderEventParams): void {
   switch (msg.type) {
     case 'init':
-      if (msg.systemInfo) {
-        state.systemInfo = msg.systemInfo;
-        activeRun.latestSystemInfo = msg.systemInfo;
-        persistSessionWorkingDirectory(msg.systemInfo.cwd);
-        sendRunEvent({
-          type: 'system_info',
-          runId,
-          systemInfo: {
-            model: msg.systemInfo.model,
-            contextWindow: msg.systemInfo.contextWindow,
-            contextWindowSource: msg.systemInfo.contextWindowSource,
-            contextWindowMatchedProvider: msg.systemInfo.contextWindowMatchedProvider,
-            claudeCodeVersion: msg.systemInfo.claudeCodeVersion,
-            cwd: msg.systemInfo.cwd,
-            permissionMode: msg.systemInfo.permissionMode,
-            apiKeySource: msg.systemInfo.apiKeySource,
-            tools: msg.systemInfo.tools,
-            mcpServers: msg.systemInfo.mcpServers,
-            slashCommands: msg.systemInfo.slashCommands,
-            agents: msg.systemInfo.agents,
-          },
-        });
-      }
-
-      if (msg.sessionId && msg.sessionId !== state.sdkSessionId) {
-        state.sdkSessionId = msg.sessionId;
-        db.prepare(`
-          UPDATE sessions SET sdk_session_id = ?, updated_at = ? WHERE id = ?
-        `).run(state.sdkSessionId, Date.now(), sessionId);
-
-        activeRun.providerSessionId = state.sdkSessionId;
-
-        sendRunEvent({
-          type: 'session_created',
-          sessionId,
-          sdkSessionId: msg.sessionId,
-        });
-      }
+      handleProviderInit({
+        activeRun,
+        db,
+        msg,
+        persistSessionWorkingDirectory,
+        runId,
+        sendRunEvent,
+        sessionId,
+        state,
+      });
       break;
 
-    case 'assistant': {
+    case 'assistant':
+    case 'assistant_delta': {
       if (!msg.content) break;
-
-      activeRun.fullContent += msg.content;
-      const lastBlock = activeRun.contentBlocks[activeRun.contentBlocks.length - 1];
-      if (lastBlock && lastBlock.type === 'text') {
-        lastBlock.content += msg.content;
-      } else {
-        activeRun.contentBlocks.push({ type: 'text', content: msg.content });
-      }
-      sendRunEvent({
-        type: 'delta',
+      dispatchProviderRuntimeEventToDomain({
+        activeRun,
+        providerEvent: msg,
+        providerType,
         runId,
-        sessionId: activeRun.sessionId,
-        content: msg.content,
+        sendRunEvent,
       });
       break;
     }
 
-    case 'tool_use': {
+    case 'tool_use':
+    case 'tool_started': {
       if (msg.toolUseId && msg.toolName) {
         toolUseIdToName.set(msg.toolUseId, msg.toolName);
       }
 
-      if (msg.toolName) {
-        const inputRecord = msg.toolInput as Record<string, unknown> | undefined;
-        const toolSignature = generateToolSignature(msg.toolName, inputRecord, activeRun.providerType);
-        activeRun.recentToolCalls.push(toolSignature);
-        if (activeRun.recentToolCalls.length > 20) {
-          activeRun.recentToolCalls.shift();
-        }
-      }
-
-      activeRun.collectedToolCalls.push({
-        toolUseId: msg.toolUseId || '',
-        name: msg.toolName || '',
-        input: msg.toolInput,
-        effect: msg.toolEffect,
-      });
-      activeRun.contentBlocks.push({ type: 'tool_use', toolUseId: msg.toolUseId || '' });
-      sendRunEvent({
-        type: 'tool_use',
-        runId,
-        sessionId: activeRun.sessionId,
-        toolUseId: msg.toolUseId || '',
-        toolName: msg.toolName || '',
-        toolInput: msg.toolInput,
-        semantic: msg.toolSemantic,
-        effect: msg.toolEffect,
-      });
-      pluginEvents.emit('run.toolCall', {
-        runId,
-        sessionId: activeRun.sessionId,
-        toolName: msg.toolName,
-        toolUseId: msg.toolUseId,
-        toolInput: msg.toolInput,
-      }).catch((err: unknown) => {
-        console.warn('[PluginEvents] Event emission failed:', err instanceof Error ? err.message : err);
-      });
-
-      const todoInteraction = normalizeFromToolUse({
-        sessionId: activeRun.sessionId,
-        runId,
+      dispatchProviderRuntimeEventToDomain({
+        activeRun,
+        providerEvent: msg,
         providerType,
-        toolUseId: msg.toolUseId || '',
-        toolName: msg.toolName || '',
-        toolInput: msg.toolInput,
-        interactionKind: msg.toolInteractionKind,
+        runId,
+        sendRunEvent,
       });
-      if (todoInteraction) {
-        // Auto-complete items in previous todo lists that disappeared from the new list
-        for (const update of trackAndAutoComplete(sessionId, todoInteraction.interactionId, todoInteraction.todos)) {
-          sendRunEvent({
-            type: 'interaction_todo_update',
-            interactionId: update.interactionId,
-            sessionId: activeRun.sessionId,
-            runId,
-            provider: providerType,
-            source: 'tool_call',
-            createdAt: Date.now(),
-            todos: update.todos,
-          });
-        }
-        sendRunEvent(todoInteraction);
-      }
+
+      handleToolUseInteraction({
+        activeRun,
+        msg,
+        providerType,
+        runId,
+        sendRunEvent,
+        sessionId,
+      });
       break;
     }
 
-    case 'tool_result': {
-      const toolName = msg.toolUseId ? toolUseIdToName.get(msg.toolUseId) || '' : '';
-      const collected = activeRun.collectedToolCalls.find(tc => tc.toolUseId === msg.toolUseId);
-      if (collected) {
-        collected.output = msg.toolResult;
-        collected.isError = msg.isToolError || false;
-        if (msg.toolEffect) collected.effect = msg.toolEffect;
-      }
-
-      sendRunEvent({
-        type: 'tool_result',
+    case 'tool_result':
+    case 'tool_finished': {
+      const toolName = msg.toolName || (msg.toolUseId ? toolUseIdToName.get(msg.toolUseId) || '' : '');
+      const dispatchMsg = toolName && toolName !== msg.toolName
+        ? { ...msg, toolName }
+        : msg;
+      dispatchProviderRuntimeEventToDomain({
+        activeRun,
+        providerEvent: dispatchMsg as ProviderRuntimeEvent,
+        providerType,
         runId,
-        sessionId: activeRun.sessionId,
-        toolUseId: msg.toolUseId || '',
-        toolName,
-        result: msg.toolResult,
-        isError: msg.isToolError,
-        effect: msg.toolEffect,
+        sendRunEvent,
       });
-      pluginEvents.emit('run.toolResult', {
-        runId,
-        sessionId: activeRun.sessionId,
+
+      trackBackgroundTaskFromToolResult({
+        activeRun,
+        state,
         toolName,
         toolUseId: msg.toolUseId,
         result: msg.toolResult,
         isError: msg.isToolError,
-      }).catch((err: unknown) => {
-        console.warn('[PluginEvents] Event emission failed:', err instanceof Error ? err.message : err);
       });
-
-      const backgroundTaskKey = getToolResultBackgroundTaskKey(toolName, msg.toolUseId, msg.toolResult);
-      if (!msg.isToolError && backgroundTaskKey) {
-        markBackgroundTaskStarted(activeRun, state, backgroundTaskKey);
-      }
 
       break;
     }
 
     case 'mode_transition': {
-      // Provider SDKs translate their own plan-mode tool calls (Claude's
-      // EnterPlanMode / ExitPlanMode, Codex's normalized equivalents, Cursor's
-      // switchMode, …) into this normalized event. The runtime stays
-      // provider-agnostic — no tool-name or providerType branches here.
-      const transition = msg.modeTransition;
-      if (!transition) break;
-
-      const targetMode = transition.mode;
-      sendRunEvent({
-        type: 'mode_change',
+      handleModeTransition({
+        activeRun,
+        modeValue,
+        msg,
+        providerRegistry,
+        providerType,
         runId,
-        sessionId: activeRun.sessionId,
-        mode: targetMode,
+        sendRunEvent,
       });
-
-      if (transition.reason === 'enter') {
-        if (modeValue !== 'plan') {
-          activeRun.aiInitiatedPlanMode = true;
-          activeRun.originalMode = activeRun.originalMode ?? modeValue;
-          console.log(`[Permission] AI entered plan mode during ${modeValue} run (provider=${activeRun.providerType})`);
-        }
-      } else if (transition.reason === 'exit') {
-        activeRun.aiInitiatedPlanMode = false;
-      }
-
-      // Let the provider sync any session-level mode state (permission gating).
-      const adapter = activeRun.providerType ? providerRegistry.get(activeRun.providerType) : undefined;
-      adapter?.setSessionMode?.(activeRun.sessionId, targetMode);
       break;
     }
 
@@ -339,39 +169,25 @@ export function handleProviderEvent({
           .reverse()
           .find(tc => tc.name === 'Agent' && !tc.output)?.toolUseId;
       if (targetToolUseId && msg.content) {
-        sendRunEvent({
-          type: 'tool_activity',
+        dispatchProviderRuntimeEventToDomain({
+          activeRun,
+          providerEvent: { ...msg, toolUseId: targetToolUseId },
+          providerType,
           runId,
-          sessionId: activeRun.sessionId,
-          toolUseId: targetToolUseId,
-          content: msg.content,
+          sendRunEvent,
         });
       }
       break;
     }
 
     case 'thinking_delta': {
-      if (!activeRun.thinkingBlocks) activeRun.thinkingBlocks = [];
-
-      if (msg.thinkingContent) {
-        let current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
-        if (!current) {
-          current = { text: '' };
-          activeRun.thinkingBlocks.push(current);
-        }
-        current.text += msg.thinkingContent;
-      }
-
-      if (msg.thinkingSignature) {
-        const current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
-        if (current) current.signature = msg.thinkingSignature;
-      }
-
-      if (msg.thinkingRedacted !== undefined) {
-        const current = activeRun.thinkingBlocks[activeRun.thinkingBlocks.length - 1];
-        if (current) current.redacted = msg.thinkingRedacted;
-      }
-
+      dispatchProviderRuntimeEventToDomain({
+        activeRun,
+        providerEvent: msg,
+        providerType,
+        runId,
+        sendRunEvent,
+      });
       // No wire-level streaming for thinking content yet — the desktop UI
       // currently receives thinking blocks via the final assistant message
       // metadata persisted in upsertAssistantMessage. A future task can add
@@ -380,212 +196,33 @@ export function handleProviderEvent({
     }
 
     case 'result': {
-      if (msg.content && !activeRun.fullContent) {
-        activeRun.fullContent = msg.content;
-        activeRun.contentBlocks.push({ type: 'text', content: msg.content });
-        sendRunEvent({
-          type: 'delta',
-          runId,
-          sessionId: activeRun.sessionId,
-          content: msg.content,
-        });
-      }
-
-      const inputTrimmed = input.trim().toLowerCase();
-      if (!activeRun.fullContent && SYSTEM_INFO_COMMANDS.includes(inputTrimmed) && state.systemInfo) {
-        const statusOutput = buildStatusOutput(state.systemInfo);
-        if (statusOutput) {
-          activeRun.fullContent = statusOutput;
-          sendRunEvent({
-            type: 'delta',
-            runId,
-            sessionId: activeRun.sessionId,
-            content: statusOutput,
-          });
-        }
-      }
-
-      // Providers may declare a fallback message in their policy for the
-      // case where a tool-driven turn ends without any final assistant text
-      // (the policy is the source of truth — no provider-type literal here).
-      if (
-        !activeRun.fullContent &&
-        activeRun.collectedToolCalls.length > 0 &&
-        activeRun.providerType
-      ) {
-        const fallback = providerRegistry.getPolicy(activeRun.providerType)?.emptyResultFallback;
-        if (fallback) {
-          activeRun.fullContent = fallback;
-          activeRun.contentBlocks.push({ type: 'text', content: fallback });
-          sendRunEvent({
-            type: 'delta',
-            runId,
-            sessionId: activeRun.sessionId,
-            content: fallback,
-          });
-        }
-      }
-
-      const lastBlock = activeRun.contentBlocks[activeRun.contentBlocks.length - 1];
-      const endsWithThinking = lastBlock?.type === 'text' &&
-        lastBlock.content.trimEnd().endsWith('</think>');
-      if (endsWithThinking) {
-        console.warn(`[Truncation] Run ${runId} ended with a thinking block as last output. Possible provider truncation.`);
-        const warning = '\n\n⚠️ *The model appeared to stop mid-thought without producing a response. This may be caused by output token limits or provider compatibility issues. Try sending "continue" or starting a new session.*';
-        activeRun.fullContent += warning;
-        activeRun.contentBlocks.push({ type: 'text', content: warning });
-        sendRunEvent({
-          type: 'delta',
-          runId,
-          sessionId: activeRun.sessionId,
-          content: warning,
-        });
-      }
-
-      upsertAssistantMessage(activeRun, {
-        usage: msg.usage,
-        indexMetadata: true,
+      completeProviderTurn({
+        activeRun,
+        broadcastHeartbeat,
+        db,
+        input,
+        msg,
+        notificationService,
+        notificationsService,
+        providerRegistry,
+        providerType,
+        runId,
+        sendRunEvent,
+        sessionId,
+        sessionType,
+        state,
       });
-
-      // Auto-complete all remaining pending/in_progress todo items on run completion
-      for (const update of finalizeSession(sessionId)) {
-        sendRunEvent({
-          type: 'interaction_todo_update',
-          interactionId: update.interactionId,
-          sessionId: activeRun.sessionId,
-          runId,
-          provider: providerType,
-          source: 'tool_call',
-          createdAt: Date.now(),
-          todos: update.todos,
-        });
-      }
-
-      // Auto-compaction: if the active run knows its agent + llm profiles and
-      // the assistant turn reported usage, ask the compaction service whether
-      // we should summarize history. The check is cheap (pi shouldCompact +
-      // estimateContextTokens) so it's safe to always run. The summarization
-      // step (LLM call) only happens when the threshold is exceeded.
-      //
-      // Critical ordering: `compaction_completed` MUST precede `run_completed`
-      // on the wire so the client can swap session history before showing the
-      // "ready" state. We achieve that by deferring the run_completed emission
-      // until the compaction promise settles. `activeRun.phase` is still
-      // set to a terminal state synchronously below so the
-      // consume-provider-stream loop terminates.
-      const shouldRunCompaction = !isTerminalPhase(activeRun.phase)
-        && Boolean(msg.usage)
-        && Boolean(activeRun.agentProfile)
-        && Boolean(activeRun.llmProfile);
-
-      // Track whether the side-effects below (heartbeat / pluginEvents /
-      // notification) should fire. `isTerminalPhase(activeRun.phase)` is the
-      // canonical "was this run already terminated" flag — we capture it once
-      // before any pre-emit bookkeeping so the deferred-compaction path still
-      // runs the side-effects exactly once.
-      const wasAlreadyCompleted = isTerminalPhase(activeRun.phase);
-      const emitRunCompleted = () => {
-        if (wasAlreadyCompleted) {
-          if (msg.usage) {
-            sendRunEvent({
-              type: 'run_completed',
-              runId,
-              sessionId: activeRun.sessionId,
-              usage: msg.usage,
-            });
-          }
-          return;
-        }
-        sendRunEvent({
-          type: 'run_completed',
-          runId,
-          sessionId: activeRun.sessionId,
-          usage: msg.usage,
-        });
-        setPhase(activeRun, 'completed');
-        pluginEvents.emit('run.completed', {
-          runId,
-          sessionId: activeRun.sessionId,
-          usage: msg.usage,
-        }).catch((err: unknown) => {
-          console.warn('[PluginEvents] Event emission failed:', err instanceof Error ? err.message : err);
-        });
-        broadcastHeartbeat();
-        postRunCompletedNotification({
-          db,
-          sessionId,
-          notificationSender: notificationService,
-          notificationsService,
-        });
-      };
-
-      const emitBackgroundUpdate = () => {
-        if (sessionType === 'background') {
-          sendRunEvent({
-            type: 'background_task_update',
-            sessionId,
-            status: 'completed',
-          } as import('@zclaudia/shared/wire/messages').BackgroundTaskUpdateMessage);
-        }
-      };
-
-      if (shouldRunCompaction) {
-        // Mark completed synchronously so consume-provider-stream stops looping.
-        // Wire-level run_completed is deferred until after compaction resolves.
-        setPhase(activeRun, 'completed');
-        maybeCompact({
-          db,
-          sessionId: activeRun.sessionId,
-          agentProfile: activeRun.agentProfile!,
-          llmProfile: activeRun.llmProfile!,
-          lastAssistantUsage: msg.usage,
-          source: 'auto',
-          signal: activeRun.abortController?.signal,
-        }).then((outcome) => {
-          if (outcome.outcome === 'compacted') {
-            console.log(`[Compaction] auto session=${activeRun.sessionId} id=${outcome.compactionId} tokens=${outcome.tokensBefore}`);
-          } else if (outcome.outcome === 'failed') {
-            console.warn(`[Compaction] auto FAILED session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'} breakerOpen=${outcome.breaker?.breakerOpen}`);
-          } else if (outcome.reason === 'circuit_open') {
-            console.log(`[Compaction] auto skipped session=${activeRun.sessionId} (circuit open until ${outcome.breaker?.nextRetryAtMs})`);
-          } else {
-            // Skipped for a non-breaker reason (below_threshold / no_cut_point /
-            // cut_point_unmappable / no_messages / aborted). Log the reason + the
-            // estimated context size so an overflow post-mortem can tell "never
-            // crossed the threshold" apart from "couldn't find a cut point".
-            console.log(`[Compaction] auto skipped session=${activeRun.sessionId} reason=${outcome.reason} tokens=${outcome.tokensBefore ?? 'n/a'}`);
-          }
-          const event = compactionEventFor(runId, activeRun.sessionId, outcome);
-          if (event) sendRunEvent(event);
-        }).catch((err: unknown) => {
-          // maybeCompact no longer lets exceptions escape; this is a defensive net.
-          console.warn('[Compaction] auto-trigger unexpected error:', err instanceof Error ? err.message : err);
-        }).finally(() => {
-          // `completed` is already true; the inner branch of emitRunCompleted
-          // will only send run_completed if msg.usage is present (which it is
-          // here, otherwise shouldRunCompaction would be false).
-          emitRunCompleted();
-          emitBackgroundUpdate();
-        });
-      } else {
-        emitRunCompleted();
-        emitBackgroundUpdate();
-      }
       break;
     }
 
     case 'retry_scheduled': {
-      if (msg.retryInfo) {
-        sendRunEvent({
-          type: 'run_retrying',
-          runId,
-          sessionId: activeRun.sessionId,
-          attempt: msg.retryInfo.attempt,
-          maxAttempts: msg.retryInfo.maxAttempts,
-          delayMs: msg.retryInfo.delayMs,
-          ...(msg.retryInfo.status !== undefined ? { status: msg.retryInfo.status } : {}),
-        });
-      }
+      dispatchProviderRuntimeEventToDomain({
+        activeRun,
+        providerEvent: msg,
+        providerType,
+        runId,
+        sendRunEvent,
+      });
       break;
     }
 
@@ -607,111 +244,32 @@ export function handleProviderEvent({
       const errorMessage = formatProviderErrorMessage(rawProviderError, activeRun.providerType, authHint);
       console.error(`[Provider Error] runId=${runId} provider=${activeRun.providerType}: ${rawProviderError}`);
 
-      if (!isTerminalPhase(activeRun.phase)) {
-        try {
-          upsertAssistantMessage(activeRun, { indexMetadata: true });
-        } catch (saveErr) {
-          console.error(`[Error Save] Failed for run ${runId}:`, saveErr);
-        }
-        sendRunEvent({
-          type: 'run_failed',
-          runId,
-          sessionId: activeRun.sessionId,
-          error: errorMessage,
-          ...(msg.errorCode ? { errorCode: msg.errorCode } : {}),
-        });
-        setPhase(activeRun, 'failed');
-        pluginEvents.emit('run.error', {
-          runId,
-          sessionId: activeRun.sessionId,
-          error: errorMessage,
-        }).catch((err: unknown) => {
-          console.warn('[PluginEvents] Event emission failed:', err instanceof Error ? err.message : err);
-        });
-        broadcastHeartbeat();
-        postRunFailedNotification({
-          db,
-          sessionId,
-          error: errorMessage,
-          notificationSender: notificationService,
-          notificationsService,
-        });
-      }
-
-      clearSession(sessionId);
-      cleanupPendingPermissions(activeRun, errorMessage);
-      activeRuns.delete(runId);
+      failProviderTurn({
+        activeRun,
+        activeRuns,
+        broadcastHeartbeat,
+        cleanupReason: errorMessage,
+        db,
+        errorCode: msg.errorCode,
+        errorMessage,
+        notificationService,
+        notificationsService,
+        runId,
+        sendRunEvent,
+        sessionId,
+      });
       break;
     }
 
     case 'task_notification': {
-      // Track in-flight background tasks so the stream stays open for follow-up turns.
-      const taskKey = getTaskNotificationKey(msg);
-      if (msg.taskStatus === 'started') {
-        markBackgroundTaskStarted(activeRun, state, taskKey);
-      } else if (
-        msg.taskStatus === 'completed' ||
-        msg.taskStatus === 'failed' ||
-        msg.taskStatus === 'stopped'
-      ) {
-        markBackgroundTaskFinished(activeRun, state, taskKey);
-      }
-
-      const adapter = activeRun.providerType ? providerRegistry.get(activeRun.providerType) : undefined;
-      const buildTaskNotificationEvent = () => {
-        const cliPid = activeRun.providerSessionId
-          ? adapter?.getCliPid?.(activeRun.providerSessionId)
-          : undefined;
-        const taskProcInfo = msg.taskId ? adapter?.getTaskProcessInfo?.(msg.taskId) : undefined;
-        return {
-          cliPid,
-          taskProcInfo,
-          event: {
-            type: 'task_notification',
-            runId,
-            sessionId: activeRun.sessionId,
-            taskId: msg.taskId,
-            status: msg.taskStatus,
-            message: msg.taskMessage,
-            cliPid,
-            taskCommand: taskProcInfo?.command,
-            taskRootPid: taskProcInfo?.rootPid,
-          } as import('@zclaudia/shared/wire/messages').TaskNotificationMessage,
-        };
-      };
-
-      const { cliPid, taskProcInfo, event } = buildTaskNotificationEvent();
-      sendRunEvent(event);
-
-      if (msg.taskId && msg.taskStatus === 'started' && !taskProcInfo?.rootPid) {
-        const timer = setTimeout(async () => {
-          try {
-            const refreshed = buildTaskNotificationEvent();
-            let resolvedRootPid = refreshed.taskProcInfo?.rootPid;
-
-            if (!resolvedRootPid && refreshed.event.taskCommand) {
-              const matchedPids = await findProcessPidsByTaskCommand(
-                refreshed.event.taskCommand,
-                [refreshed.event.cliPid, refreshed.event.taskRootPid].filter((pid): pid is number => typeof pid === 'number'),
-              );
-              resolvedRootPid = matchedPids[0];
-            }
-
-            if (resolvedRootPid && resolvedRootPid !== taskProcInfo?.rootPid) {
-              sendRunEvent({
-                ...refreshed.event,
-                taskRootPid: resolvedRootPid,
-              });
-            }
-          } catch (error) {
-            console.warn(
-              `[Task Notification] Failed to backfill PID for taskId=${msg.taskId}:`,
-              error instanceof Error ? error.message : error
-            );
-          }
-        }, 1800);
-        timer.unref();
-      }
+      handleTaskNotification({
+        activeRun,
+        msg,
+        providerRegistry,
+        runId,
+        sendRunEvent,
+        state,
+      });
       break;
     }
   }
