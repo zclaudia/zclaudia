@@ -12,14 +12,14 @@ import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useComposerStore } from '../../stores/composerStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useSessionToolsStore, type SessionTool } from '../../stores/sessionToolsStore';
 import { activatePanel, usePanelIsActive } from '../../utils/openPanel';
 import * as api from '../../services/api';
 import type { UnifiedPermissionPolicy, SlashCommand, Session, Project } from '@zclaudia/shared';
 import type { ProviderCapabilities } from '@zclaudia/shared/core/runtime-capabilities';
-import type { SessionDraft } from '../../stores/chatStore';
+import type { SessionDraft } from '../../stores/composerStore';
 
 interface ChatInputAreaProps {
   sessionId: string;
@@ -206,8 +206,8 @@ export function ChatInputArea({
   // gates the fallback sources after consumption so the user's in-progress
   // edits stay put (otherwise initialValue would revert to the draft and
   // overwrite them on the next MessageInput effect).
-  const pendingPrefill = useChatStore((s) => s.pendingPrefills[sessionId]);
-  const clearPendingPrefill = useChatStore((s) => s.clearPendingPrefill);
+  const pendingPrefill = useComposerStore((s) => s.pendingPrefills[sessionId]);
+  const clearPendingPrefill = useComposerStore((s) => s.clearPendingPrefill);
   const [prefillConsumed, setPrefillConsumed] = useState(false);
 
   useEffect(() => {

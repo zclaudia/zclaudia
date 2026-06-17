@@ -8,11 +8,11 @@ vi.mock('../../../hooks/useMediaQuery', () => ({
   useIsMobile: () => false,
 }));
 
-// Mock chatStore
+// Mock composerStore
 const mockSetDraft = vi.fn();
 const mockClearDraft = vi.fn();
-vi.mock('../../../stores/chatStore', () => ({
-  useChatStore: (selector: any) => {
+vi.mock('../../../stores/composerStore', () => ({
+  useComposerStore: (selector: any) => {
     const state = {
       setDraft: mockSetDraft,
       clearDraft: mockClearDraft,
@@ -532,11 +532,14 @@ describe('MessageInput', () => {
       expect(textarea.style.height).toBe('24px');
     });
 
-    it('keeps desktop advanced mode bottom-aligned so taller composer grows upward', () => {
+    it('uses a stacked desktop advanced composer so controls do not indent the text area', () => {
       render(<MessageInput {...defaultProps} advancedMode />);
       const box = screen.getByTestId('composer-box');
-      expect(box.className).toContain('items-end');
+      expect(box.className).toContain('flex-col');
       expect(box.className).not.toContain('items-center');
+      expect(box.querySelector('[data-testid="message-input"]')).not.toBeNull();
+      expect(box.querySelector('[data-testid="attach-button"]')).not.toBeNull();
+      expect(box.querySelector('[data-testid="send-button"]')).not.toBeNull();
     });
 
     it('keeps collapsed desktop composer center-aligned even once content exceeds a single line', () => {

@@ -33,7 +33,6 @@ describe('chatStore', () => {
       sessionUsage: {},
       permissionOverrides: {},
       worktreeOverrides: {},
-      drafts: {},
     });
   });
 
@@ -584,34 +583,6 @@ describe('chatStore', () => {
     });
   });
 
-  // ── Drafts ──────────────────────────────────────────
-
-  describe('drafts', () => {
-    it('sets and gets draft', () => {
-      useChatStore.getState().setDraft('sess-1', { content: 'draft text', attachments: [] });
-      expect(useChatStore.getState().drafts['sess-1']).toEqual({ content: 'draft text', attachments: [] });
-    });
-
-    it('clears draft when content and attachments are empty', () => {
-      useChatStore.getState().setDraft('sess-1', { content: 'text', attachments: [] });
-      useChatStore.getState().setDraft('sess-1', { content: '', attachments: [] });
-      expect(useChatStore.getState().drafts['sess-1']).toBeUndefined();
-    });
-
-    it('keeps attachment-only draft', () => {
-      useChatStore.getState().setDraft('sess-1', {
-        content: '',
-        attachments: [{ id: 'att-1', type: 'image', name: 'a.png', data: 'data:image/png;base64,aaa', mimeType: 'image/png' }],
-      });
-      expect(useChatStore.getState().drafts['sess-1']?.attachments).toHaveLength(1);
-    });
-
-    it('clearDraft removes draft', () => {
-      useChatStore.getState().setDraft('sess-1', { content: 'text', attachments: [] });
-      useChatStore.getState().clearDraft('sess-1');
-      expect(useChatStore.getState().drafts['sess-1']).toBeUndefined();
-    });
-  });
 
   // ── Getters ─────────────────────────────────────────
 

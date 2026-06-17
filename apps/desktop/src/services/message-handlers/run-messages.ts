@@ -1,6 +1,7 @@
 import type { ServerMessage } from '@zclaudia/shared';
 import type { MessageDispatchContext } from './types';
 import { useChatStore } from '../../stores/chatStore';
+import { useComposerStore } from '../../stores/composerStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { usePermissionStore } from '../../stores/permissionStore';
 import { usePromptRequestStore } from '../../stores/promptRequestStore';
@@ -172,7 +173,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         // Steer cancel path: server returns un-consumed steer drafts joined as restoreDraft
         // so the input box reflows the steer text the user can edit + resend as a new run.
         if (msg.restoreDraft && serverId === activeServerId) {
-          useChatStore.getState().setPendingPrefill(failedSession, msg.restoreDraft);
+          useComposerStore.getState().setPendingPrefill(failedSession, msg.restoreDraft);
         }
         void eagerSyncCurrentSession(serverId);
         void recoverCurrentSessionTail(serverId, failedSession);

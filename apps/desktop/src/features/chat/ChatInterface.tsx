@@ -10,7 +10,8 @@ import { SessionHeader } from './SessionHeader';
 import { BackgroundTaskPanel } from '../../components/BackgroundTaskPanel';
 import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
 import { TaskCardStrip } from '../supervision/components/TaskCardStrip';
-import { useChatStore, type SessionDraft } from '../../stores/chatStore';
+import { useChatStore } from '../../stores/chatStore';
+import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -123,7 +124,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   // Reset per-session ephemeral state when switching sessions
   useEffect(() => {
     resetSendState();
-    setInitialDraft(useChatStore.getState().drafts[sessionId]);
+    setInitialDraft(useComposerStore.getState().drafts[sessionId]);
     resetPaginationRefs();
     setIsRenamingSession(false);
     setRenameValue('');

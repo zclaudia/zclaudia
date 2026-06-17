@@ -11,6 +11,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { handleServerMessage } from '../../services/messageHandler';
 import { useServerStore } from '../../stores/serverStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useComposerStore } from '../../stores/composerStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSessionsStore } from '../../stores/sessionsStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
@@ -69,8 +70,8 @@ describe('useBackendFacade run_event forwarding', () => {
       sessionUsage: {},
       permissionOverrides: {},
       worktreeOverrides: {},
-      drafts: {},
     } as any);
+    useComposerStore.setState({ drafts: {}, pendingPrefills: {} });
     useSessionRunStateStore.setState({ records: {} });
     useProjectStore.setState({
       projects: [],

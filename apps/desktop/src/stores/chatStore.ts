@@ -63,19 +63,6 @@ export interface CompactionNotice {
   receivedAt: number;
 }
 
-export interface DraftAttachment {
-  id: string;
-  type: 'image' | 'file';
-  name: string;
-  data: string;
-  mimeType: string;
-}
-
-export interface SessionDraft {
-  content: string;
-  attachments: DraftAttachment[];
-}
-
 interface ChatState {
   // Messages grouped by session ID
   messages: Record<string, MessageWithToolCalls[]>;
@@ -137,12 +124,6 @@ interface ChatState {
   permissionOverrides: Record<string, Partial<UnifiedPermissionPolicy> | null>;
   // Worktree override per session (user-selected working directory, empty = use project root)
   worktreeOverrides: Record<string, string>;
-  // Input drafts per session (preserved across session switches)
-  drafts: Record<string, SessionDraft>;
-  // Pending one-shot prefill into the chat input (e.g. "Execute plan" button).
-  // Consumed by ChatInputArea on next render and immediately cleared.
-  // `ts` distinguishes successive prefills with identical content.
-  pendingPrefills: Record<string, { content: string; ts: number }>;
 
   // Actions — Messages
   setMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
@@ -201,14 +182,6 @@ interface ChatState {
   getWorktreeOverride: (sessionId: string) => string;
   clearWorktreeOverride: (sessionId: string) => void;
 
-  // Draft actions
-  setDraft: (sessionId: string, draft: SessionDraft) => void;
-  clearDraft: (sessionId: string) => void;
-
-  // One-shot input prefill (e.g. fired by the plan "Execute plan" button).
-  setPendingPrefill: (sessionId: string, content: string) => void;
-  clearPendingPrefill: (sessionId: string) => void;
-
   // Getters
   getPagination: (sessionId: string) => PaginationInfo | undefined;
   isSessionLoading: (sessionId: string) => boolean;
@@ -249,8 +222,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sessionUsage: {},
   permissionOverrides: {},
   worktreeOverrides: {},
-  drafts: {},
-  pendingPrefills: {},
 
   setMessages: (sessionId, messages, pagination) =>
     set((state) => ({
@@ -750,39 +721,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const { [sessionId]: _, ...rest } = state.worktreeOverrides;
       return { worktreeOverrides: rest };
-    }),
-
-  // Draft actions
-  setDraft: (sessionId, draft) =>
-    set((state) => {
-      const hasContent = draft.content.trim().length > 0;
-      const hasAttachments = draft.attachments.length > 0;
-      if (!hasContent && !hasAttachments) {
-        const { [sessionId]: _, ...rest } = state.drafts;
-        return { drafts: rest };
-      }
-      return { drafts: { ...state.drafts, [sessionId]: draft } };
-    }),
-
-  clearDraft: (sessionId) =>
-    set((state) => {
-      const { [sessionId]: _, ...rest } = state.drafts;
-      return { drafts: rest };
-    }),
-
-  setPendingPrefill: (sessionId, content) =>
-    set((state) => ({
-      pendingPrefills: {
-        ...state.pendingPrefills,
-        [sessionId]: { content, ts: Date.now() },
-      },
-    })),
-
-  clearPendingPrefill: (sessionId) =>
-    set((state) => {
-      if (!state.pendingPrefills[sessionId]) return state;
-      const { [sessionId]: _, ...rest } = state.pendingPrefills;
-      return { pendingPrefills: rest };
     }),
 
   getPagination: (sessionId) => get().pagination[sessionId],

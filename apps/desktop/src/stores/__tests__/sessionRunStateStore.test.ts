@@ -38,7 +38,6 @@ function resetStores() {
     sessionUsage: {},
     permissionOverrides: {},
     worktreeOverrides: {},
-    drafts: {},
   } as any);
   useProjectStore.setState({
     projects: [],

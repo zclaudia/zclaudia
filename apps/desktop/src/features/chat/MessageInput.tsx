@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent, ChangeEvent, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import type { KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
 import { ArrowUp, Paperclip, X, Square, File as FileIcon, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { Icon } from '../../components/ui/Icon';
 import { getFileIcon } from '../../config/icons';
 import type { SlashCommand, FileEntry } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
-import { useChatStore, type SessionDraft } from '../../stores/chatStore';
+import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
 import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
 import { downscaleImageFile } from '../attachments/downscale-image';
 
@@ -123,8 +124,8 @@ export function MessageInput({
     return window.visualViewport?.height ?? window.innerHeight;
   }, []);
   const isMobile = useIsMobile();
-  const setDraft = useChatStore((s) => s.setDraft);
-  const clearDraft = useChatStore((s) => s.clearDraft);
+  const setDraft = useComposerStore((s) => s.setDraft);
+  const clearDraft = useComposerStore((s) => s.clearDraft);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -1028,68 +1029,125 @@ export function MessageInput({
           </div>
         </div>
       ) : (
-        /* Desktop: single-row layout — all controls inside the bordered box */
-        <div
-          data-testid="composer-box"
-          className={`flex gap-2 rounded-2xl border border-border bg-input px-2.5 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md ${advancedMode ? 'items-end py-2' : 'items-center min-h-12'}`}
-        >
-          {/* Attachment button */}
-          <button
-            data-testid="attach-button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={disabled}
-            className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed`}
-            title="Add attachment (images, files)"
+        advancedMode ? (
+          /* Desktop advanced: textarea owns the top area; actions live in a separate bottom bar. */
+          <div
+            data-testid="composer-box"
+            className="flex flex-col rounded-2xl border border-border bg-input px-4 pt-3 pb-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
           >
-            <Plus size={18} strokeWidth={1.75} />
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,.pdf,.txt,.md,.json,.csv"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
+            <textarea
+              data-testid="message-input"
+              ref={textareaRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
+              onCompositionStart={() => {
+                if (compositionTimeoutRef.current) {
+                  clearTimeout(compositionTimeoutRef.current);
+                  compositionTimeoutRef.current = null;
+                }
+                setIsComposing(true);
+              }}
+              onCompositionEnd={() => {
+                compositionTimeoutRef.current = setTimeout(() => {
+                  setIsComposing(false);
+                  compositionTimeoutRef.current = null;
+                }, 50);
+              }}
+              disabled={disabled}
+              placeholder={placeholder}
+              spellCheck={false}
+              autoCorrect="off"
+              autoCapitalize="off"
+              autoComplete="off"
+              rows={1}
+              className="w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 pr-2 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                fontSize: 'var(--chat-font-input, 0.875rem)',
+                minHeight: `${expandedInputHeight}px`,
+                maxHeight: `${expandedInputMaxHeight}px`,
+              }}
+            />
 
-          {/* Text input */}
-          <div className={`flex-1 relative ${advancedMode ? 'self-end' : ''}`}>
-            {advancedMode ? (
-              <textarea
-                data-testid="message-input"
-                ref={textareaRef}
-                value={value}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                onCompositionStart={() => {
-                  if (compositionTimeoutRef.current) {
-                    clearTimeout(compositionTimeoutRef.current);
-                    compositionTimeoutRef.current = null;
-                  }
-                  setIsComposing(true);
-                }}
-                onCompositionEnd={() => {
-                  compositionTimeoutRef.current = setTimeout(() => {
-                    setIsComposing(false);
-                    compositionTimeoutRef.current = null;
-                  }, 50);
-                }}
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                data-testid="attach-button"
+                onClick={() => fileInputRef.current?.click()}
                 disabled={disabled}
-                placeholder={placeholder}
-                spellCheck={false}
-                autoCorrect="off"
-                autoCapitalize="off"
-                autoComplete="off"
-                rows={1}
-                className="w-full resize-none overflow-auto bg-transparent border-0 px-0 py-2 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  fontSize: 'var(--chat-font-input, 0.875rem)',
-                  minHeight: `${expandedInputHeight}px`,
-                  maxHeight: `${expandedInputMaxHeight}px`,
-                }}
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Add attachment (images, files)"
+              >
+                <Plus size={18} strokeWidth={1.75} />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept="image/*,.pdf,.txt,.md,.json,.csv"
+                onChange={handleFileSelect}
+                className="hidden"
               />
-            ) : (
+              <div className="flex-1" />
+              {onToggleAdvanced && (
+                <button
+                  data-testid="advanced-toggle"
+                  onClick={onToggleAdvanced}
+                  className="flex h-6 w-6 flex-shrink-0 items-center justify-center text-primary transition-colors"
+                  title="Normal input"
+                >
+                  <ChevronDown size={14} strokeWidth={2} />
+                </button>
+              )}
+              {isLoading && onCancel ? (
+                <button
+                  data-testid="cancel-button"
+                  onClick={onCancel}
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
+                  title="Cancel (Esc)"
+                >
+                  <Square size={12} fill="currentColor" strokeWidth={0} />
+                </button>
+              ) : (
+                <button
+                  data-testid="send-button"
+                  onClick={handleSend}
+                  disabled={disabled || (!value.trim() && attachments.length === 0)}
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+                  title={`Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`}
+                >
+                  <ArrowUp size={18} strokeWidth={2.25} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* Desktop collapsed: single-row layout — all controls inside the bordered box */
+          <div
+            data-testid="composer-box"
+            className="flex min-h-12 items-center gap-2 rounded-2xl border border-border bg-input px-2.5 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
+          >
+            {/* Attachment button */}
+            <button
+              data-testid="attach-button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={disabled}
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Add attachment (images, files)"
+            >
+              <Plus size={18} strokeWidth={1.75} />
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept="image/*,.pdf,.txt,.md,.json,.csv"
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+
+            {/* Text input */}
+            <div className="flex-1 relative">
               <textarea
                 data-testid="message-input"
                 ref={textareaRef}
@@ -1120,46 +1178,44 @@ export function MessageInput({
                 className="block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
               />
+            </div>
+
+            {/* Multiline toggle (only when onToggleAdvanced is provided) — kept
+                visually light: small bare icon, no hover box, sits close to Send. */}
+            {onToggleAdvanced && (
+              <button
+                data-testid="advanced-toggle"
+                onClick={onToggleAdvanced}
+                className="flex h-6 w-6 flex-shrink-0 items-center justify-center -mr-1 text-muted-foreground/50 transition-colors hover:text-foreground"
+                title="Advanced input (Enter to newline)"
+              >
+                <ChevronUp size={14} strokeWidth={2} />
+              </button>
+            )}
+
+            {/* Send/Cancel button */}
+            {isLoading && onCancel ? (
+              <button
+                data-testid="cancel-button"
+                onClick={onCancel}
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90"
+                title="Cancel (Esc)"
+              >
+                <Square size={12} fill="currentColor" strokeWidth={0} />
+              </button>
+            ) : (
+              <button
+                data-testid="send-button"
+                onClick={handleSend}
+                disabled={disabled || (!value.trim() && attachments.length === 0)}
+                className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed"
+                title="Send message (Enter)"
+              >
+                <ArrowUp size={18} strokeWidth={2.25} />
+              </button>
             )}
           </div>
-
-          {/* Multiline toggle (only when onToggleAdvanced is provided) — kept
-              visually light: small bare icon, no hover box, sits close to Send. */}
-          {onToggleAdvanced && (
-            <button
-              data-testid="advanced-toggle"
-              onClick={onToggleAdvanced}
-              className={`flex h-6 w-6 flex-shrink-0 items-center justify-center -mr-1 transition-colors ${advancedMode ? 'self-end' : ''} ${advancedMode ? 'text-primary' : 'text-muted-foreground/50 hover:text-foreground'}`}
-              title={advancedMode ? 'Normal input' : 'Advanced input (Enter to newline)'}
-            >
-              {advancedMode ? <ChevronDown size={14} strokeWidth={2} /> : <ChevronUp size={14} strokeWidth={2} />}
-            </button>
-          )}
-
-          {/* Send/Cancel button */}
-          {isLoading && onCancel ? (
-            <button
-              data-testid="cancel-button"
-              onClick={onCancel}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-foreground text-background hover:bg-foreground/90`}
-              title="Cancel (Esc)"
-            >
-              <Square size={12} fill="currentColor" strokeWidth={0} />
-            </button>
-          ) : (
-            <button
-              data-testid="send-button"
-              onClick={handleSend}
-              disabled={disabled || (!value.trim() && attachments.length === 0)}
-              className={`flex h-8 w-8 flex-shrink-0 items-center justify-center ${advancedMode ? 'self-end' : ''} rounded-full bg-foreground text-background hover:bg-foreground/90 disabled:bg-muted disabled:text-muted-foreground disabled:cursor-not-allowed`}
-              title={advancedMode
-                ? `Send message (${isMac ? 'Cmd' : 'Ctrl'}+Enter)`
-                : 'Send message (Enter)'}
-            >
-              <ArrowUp size={18} strokeWidth={2.25} />
-            </button>
-          )}
-        </div>
+        )
       )}
     </div>
   );

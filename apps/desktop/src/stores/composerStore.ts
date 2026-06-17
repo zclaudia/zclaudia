@@ -27,7 +27,7 @@ interface ComposerState {
   clearPendingPrefill: (sessionId: string) => void;
 }
 
-// Consumers (MessageInput, ChatInputArea) are migrated off chatStore in a later task.
+// Owns transient chat-input state (per-session drafts + one-shot prefills).
 export const useComposerStore = create<ComposerState>((set) => ({
   drafts: {},
   pendingPrefills: {},

@@ -9,11 +9,11 @@ vi.mock('../../hooks/useMediaQuery', () => ({
   useIsMobile: () => mockIsMobile,
 }));
 
-// Mock chatStore
+// Mock composerStore
 const mockSetDraft = vi.fn();
 const mockClearDraft = vi.fn();
-vi.mock('../../stores/chatStore', () => ({
-  useChatStore: (selector: any) => {
+vi.mock('../../stores/composerStore', () => ({
+  useComposerStore: (selector: any) => {
     const state = {
       setDraft: mockSetDraft,
       clearDraft: mockClearDraft,

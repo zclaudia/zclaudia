@@ -11,6 +11,7 @@ import { useFileViewerStore } from '../../../stores/fileViewerStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useRecoveryStore } from '../../../stores/recoveryStore';
 import { useAgentProfileMetaStore } from '../../../stores/agentProfileMetaStore';
+import { useComposerStore } from '../../../stores/composerStore';
 
 // Prevent useAgentForSession's loadAll() from hitting the real API
 vi.mock('../../../services/api/agent-profiles', () => ({
@@ -364,7 +365,6 @@ function setDefaultStores(overrides?: {
     runContentBlocks: {},
     toolCallsHistory: {},
     sessionUsage: {},
-    drafts: {},
     addMessage: vi.fn(),
     setMessages: vi.fn(),
     prependMessages: vi.fn(),
@@ -471,6 +471,7 @@ function setDefaultStores(overrides?: {
     close: vi.fn(),
     ...overrides?.fileViewerStore,
   } as any);
+  useComposerStore.setState({ drafts: {}, pendingPrefills: {} });
 }
 
 describe('ChatInterface', () => {
@@ -490,6 +491,7 @@ describe('ChatInterface', () => {
     vi.restoreAllMocks();
     // Reset real stores that may be seeded per-test
     useAgentProfileMetaStore.setState({ profiles: {}, loaded: false, loading: false } as any);
+    useComposerStore.setState({ drafts: {}, pendingPrefills: {} });
   });
 
   // ─── Basic Rendering ─────────────────────────────────────────────────
@@ -1395,15 +1397,17 @@ describe('ChatInterface', () => {
   it('restores session draft attachments into MessageInput', () => {
     setDefaultStores({
       chatStore: {
-        drafts: {
-          'sess-1': {
-            content: '',
-            attachments: [
-              { id: 'att-1', type: 'image', name: 'draft.png', data: 'data:image/png;base64,aaa', mimeType: 'image/png' },
-            ],
-          },
-        },
         pagination: { 'sess-1': { total: 0, hasMore: false } },
+      },
+    });
+    useComposerStore.setState({
+      drafts: {
+        'sess-1': {
+          content: '',
+          attachments: [
+            { id: 'att-1', type: 'image', name: 'draft.png', data: 'data:image/png;base64,aaa', mimeType: 'image/png' },
+          ],
+        },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);
