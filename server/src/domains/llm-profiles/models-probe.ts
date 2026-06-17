@@ -38,7 +38,7 @@ export async function probeModel(
     // Pass the per-model entry (if declared) so any contextWindow / maxTokens
     // / displayName overrides flow into the built model. For max_tokens=1
     // ping this is mostly cosmetic but keeps the build path consistent with
-    // the runtime call site (zclaudia-adapter).
+    // the runtime call site (PiAgentProviderAdapter).
     const modelEntry = profile.models?.find((m) => m.modelId === modelId);
     const built = buildModel(profile, modelId, modelEntry);
     // Resolve api key explicitly: completeSimple's `apiKey` option takes

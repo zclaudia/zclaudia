@@ -2,7 +2,7 @@ import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import type { ProviderDefinition } from './definitions.js';
 import type { ProviderAdapter } from './types.js';
-import { ZClaudiaAdapter } from './zclaudia-adapter.js';
+import { PiAgentProviderAdapter } from './pi-agent/adapter.js';
 
 /** Port interface — conversation domain depends on this, not on the concrete registry. */
 export interface ProviderRegistryPort {
@@ -17,7 +17,7 @@ class ProviderRegistry implements ProviderRegistryPort {
   private defaultType = 'zclaudia';
 
   constructor() {
-    this.register(new ZClaudiaAdapter());
+    this.register(new PiAgentProviderAdapter());
   }
 
   register(adapter: ProviderAdapter): void {

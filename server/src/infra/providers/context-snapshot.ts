@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 /**
  * Per-session context-composition snapshots backing the /context command.
  *
- * Captured by ZClaudiaAdapter on every run (after the system prompt and tool
+ * Captured by PiAgentProviderAdapter on every run (after the system prompt and tool
  * set are assembled), with real usage backfilled at run end. In-memory only —
  * a server restart simply means "no data until the next run", same as the
  * deferred-diagnostics store.

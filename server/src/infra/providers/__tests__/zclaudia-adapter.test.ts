@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import Database from 'better-sqlite3';
 import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
-import { __testables, resolvePlanModeTools, ZClaudiaAdapter } from '../zclaudia-adapter.js';
+import { __testables, resolvePlanModeTools, PiAgentProviderAdapter } from '../pi-agent/adapter.js';
 import type { RunOptions, ClaudeMessage, SteerHandle } from '../types.js';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
@@ -451,7 +451,7 @@ describe('translateEvent', () => {
   });
 });
 
-async function collect(adapter: ZClaudiaAdapter, input: string, options: Partial<RunOptions>): Promise<ClaudeMessage[]> {
+async function collect(adapter: PiAgentProviderAdapter, input: string, options: Partial<RunOptions>): Promise<ClaudeMessage[]> {
   const opts: RunOptions = {
     cwd: '/tmp',
     sessionId: 'sess-test',
@@ -464,7 +464,7 @@ async function collect(adapter: ZClaudiaAdapter, input: string, options: Partial
   return out;
 }
 
-describe('ZClaudiaAdapter.run', () => {
+describe('PiAgentProviderAdapter.run', () => {
   beforeEach(() => {
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
@@ -479,7 +479,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hello', {});
 
     expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'assistant', 'assistant', 'result']);
@@ -498,7 +498,7 @@ describe('ZClaudiaAdapter.run', () => {
       ] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
     const last = out[out.length - 1];
@@ -516,7 +516,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'follow up', { db, claudiaSessionId: 'sess-test' });
 
     expect(mockAgentInstances.length).toBe(1);
@@ -528,7 +528,7 @@ describe('ZClaudiaAdapter.run', () => {
 
   it('config error (getModel throws): yields init then error(isComplete) and stops', async () => {
     process.env.PI_MODEL = 'invalid-model';
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
     delete process.env.PI_MODEL;
 
@@ -543,7 +543,7 @@ describe('ZClaudiaAdapter.run', () => {
     delete process.env.PI_MODEL;
     process.env.OPENAI_MODEL = 'invalid-model'; // mock getModel throws → buildModel throws
     try {
-      const adapter = new ZClaudiaAdapter();
+      const adapter = new PiAgentProviderAdapter();
       const out = await collect(adapter, 'hi', {});
       expect(out.map(m => m.type)).toEqual(['init', 'error']);
       // The badge must reflect the model that actually failed, not claude-sonnet-4-6.
@@ -559,7 +559,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_start' },
     ], { rejectWith: new Error('Anthropic 429') });
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
     expect(out[0].type).toBe('init');
@@ -580,7 +580,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', { db: brokenDb, claudiaSessionId: 'sess-test' });
 
     const errors = out.filter(m => m.type === 'error');
@@ -604,7 +604,7 @@ describe('ZClaudiaAdapter.run', () => {
       ] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
     expect(out.map(m => m.type)).toEqual(['init', 'error']);
@@ -622,7 +622,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
     expect(out.map(m => m.type)).toEqual(['init', 'assistant', 'result']);
@@ -634,7 +634,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', { mode: 'plan' });
 
     const init = out.find(m => m.type === 'init');
@@ -647,7 +647,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
     const init = out.find(m => m.type === 'init');
@@ -660,7 +660,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       agentProfile: {
         model: 'claude-sonnet-4-6',
@@ -687,7 +687,7 @@ describe('ZClaudiaAdapter.run', () => {
     const prevEnv = process.env.PI_MODEL;
     delete process.env.PI_MODEL;
     try {
-      const adapter = new ZClaudiaAdapter();
+      const adapter = new PiAgentProviderAdapter();
       const out = await collect(adapter, 'hi', {
         agentProfile: {
           model: 'kimi-k2.6',
@@ -713,7 +713,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       agentProfile: {
         model: 'claude-sonnet-4-6',
@@ -738,7 +738,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       agentProfile: {
         // The mocked pi-ai getModel returns contextWindow=200_000 for any
@@ -761,7 +761,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       mode: 'plan',
       enabledTools: [
@@ -830,7 +830,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       enabledTools: ['read', 'write', 'bash'] as ToolName[],
     });
@@ -845,7 +845,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       mode: 'plan',
       enabledTools: ['read', 'write'] as ToolName[],  // agent only allows read + write
@@ -862,7 +862,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       mode: 'plan',
       systemPrompt: 'You are a coding assistant.',
@@ -880,7 +880,7 @@ describe('ZClaudiaAdapter.run', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       systemPrompt: 'You are a coding assistant.',
     });
@@ -891,7 +891,7 @@ describe('ZClaudiaAdapter.run', () => {
   });
 });
 
-describe('ZClaudiaAdapter.run — thinking', () => {
+describe('PiAgentProviderAdapter.run — thinking', () => {
   beforeEach(() => {
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
@@ -904,7 +904,7 @@ describe('ZClaudiaAdapter.run — thinking', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
     const thinkings = out.filter(m => m.type === 'thinking_delta');
@@ -925,7 +925,7 @@ describe('ZClaudiaAdapter.run — thinking', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {});
 
     const thinkings = out.filter(m => m.type === 'thinking_delta');
@@ -935,7 +935,7 @@ describe('ZClaudiaAdapter.run — thinking', () => {
   });
 });
 
-describe('ZClaudiaAdapter.run — tool loop integration', () => {
+describe('PiAgentProviderAdapter.run — tool loop integration', () => {
   beforeEach(() => {
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
@@ -958,7 +958,7 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'read /x', {});
 
     const types = out.map(m => m.type);
@@ -976,7 +976,7 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { cwd: '/tmp' });
 
     expect(mockAgentInstances.length).toBe(1);
@@ -992,7 +992,7 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       cwd: '/tmp/project',
       claudiaSessionId: 'session-1',
@@ -1021,7 +1021,7 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const out = await collect(adapter, 'hi', {
       cwd: '/tmp/project',
       enabledTools: ['Read'],
@@ -1074,7 +1074,7 @@ describe('ZClaudiaAdapter.run — tool loop integration', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {});
 
     expect(mockAgentInstances.length).toBe(1);
@@ -1110,7 +1110,7 @@ describe('buildModel — modelOverride', () => {
   });
 });
 
-describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => {
+describe('PiAgentProviderAdapter.run — agent profile fields wired into Agent', () => {
   const originalEnv = { ...process.env };
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -1125,7 +1125,7 @@ describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => 
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { thinkingLevel: 'medium' as ThinkingLevel });
 
     expect(mockAgentInstances[0].initialState.thinkingLevel).toBe('medium');
@@ -1137,7 +1137,7 @@ describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => 
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { enabledTools: ['read', 'bash'] as ToolName[] });
 
     expect((mockAgentInstances[0].initialState as any).tools).toBeDefined();
@@ -1156,7 +1156,7 @@ describe('ZClaudiaAdapter.run — agent profile fields wired into Agent', () => 
       id: 'a1', name: 'coder', llmProfileId: 'lp1', model: 'kimi-k2.6',
       systemPrompt: '', enabledTools: ['read'], createdAt: 0, updatedAt: 0,
     };
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', { agentProfile });
 
     expect(mockAgentInstances[0].initialState.model.id).toBe('kimi-k2.6');
@@ -1384,7 +1384,7 @@ describe('buildModel — profile overrides', () => {
   });
 });
 
-describe('ZClaudiaAdapter.run — steering wiring', () => {
+describe('PiAgentProviderAdapter.run — steering wiring', () => {
   const originalEnv = { ...process.env };
   beforeEach(() => {
     process.env = { ...originalEnv };
@@ -1398,7 +1398,7 @@ describe('ZClaudiaAdapter.run — steering wiring', () => {
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },
     ]);
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {});
     expect(mockAgentInstances[0].constructorOpts.steeringMode).toBe('all');
   });
@@ -1408,7 +1408,7 @@ describe('ZClaudiaAdapter.run — steering wiring', () => {
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },
     ]);
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const handles: SteerHandle[] = [];
     await collect(adapter, 'hi', { onAgentReady: (h) => handles.push(h) });
     expect(handles).toHaveLength(1);
@@ -1420,7 +1420,7 @@ describe('ZClaudiaAdapter.run — steering wiring', () => {
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },
     ]);
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     let handle: SteerHandle | undefined;
     await collect(adapter, 'hi', { onAgentReady: (h) => { handle = h; } });
     const msg: AgentMessage = { role: 'user', content: [{ type: 'text', text: 'also fix typo' }] } as AgentMessage;
@@ -1434,14 +1434,14 @@ describe('ZClaudiaAdapter.run — steering wiring', () => {
       { type: 'turn_start' },
       { type: 'agent_end', messages: [] },
     ]);
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const consumedCalls: number[] = [];
     await collect(adapter, 'hi', { onSteerConsumed: () => consumedCalls.push(Date.now()) });
     expect(consumedCalls).toHaveLength(1);
   });
 
   it('declares session.steer capability', () => {
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     const cap = adapter.manifest.capabilities.find((c) => c.id === 'session.steer');
     expect(cap).toBeDefined();
     expect(cap?.supported).toBe(true);
@@ -1463,7 +1463,7 @@ describe('prompt cache wiring', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
         id: 'lp1', name: 'p1', providerType: 'anthropic',
@@ -1489,7 +1489,7 @@ describe('prompt cache wiring', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
         id: 'lp2', name: 'p2', providerType: 'anthropic',
@@ -1515,7 +1515,7 @@ describe('prompt cache wiring', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       claudiaSessionId: 'sess-cache-1',
     });
@@ -1529,7 +1529,7 @@ describe('prompt cache wiring', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
         id: 'lp3', name: 'p3', providerType: 'anthropic',
@@ -1569,7 +1569,7 @@ describe('stream retry wiring', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
         id: 'lp-no-cache', name: 'p', providerType: 'anthropic',
@@ -1586,7 +1586,7 @@ describe('stream retry wiring', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
         id: 'lp-cache', name: 'p', providerType: 'anthropic',
@@ -1612,7 +1612,7 @@ describe('stream retry wiring', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hi', {
       llmProfileConfig: {
         id: 'lp-no-cache2', name: 'p', providerType: 'anthropic',
@@ -1677,7 +1677,7 @@ describe('stream retry wiring', () => {
       { waitForPromise: gate },
     );
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
 
     const collectPromise = collect(adapter, 'hi', {
       onAgentReady: () => {
@@ -1730,7 +1730,7 @@ describe('vision gating', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'what is this', {
       images: [{ name: 'a.png', mimeType: 'image/png', data: 'QQ==' }],
     });
@@ -1753,7 +1753,7 @@ describe('vision gating', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'what is this', {
       images: [{ name: 'a.png', mimeType: 'image/png', data: 'QQ==' }],
     });
@@ -1769,7 +1769,7 @@ describe('vision gating', () => {
       { type: 'agent_end', messages: [] },
     ]);
 
-    const adapter = new ZClaudiaAdapter();
+    const adapter = new PiAgentProviderAdapter();
     await collect(adapter, 'hello', {});
 
     const call = mockAgentInstances[0].promptCalls[0];

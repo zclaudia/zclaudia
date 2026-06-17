@@ -32,7 +32,7 @@ describe('mcp-bridge-launch', () => {
     existsSyncMock.mockImplementation((filePath) => filePath.endsWith('/application/plugins/mcp-bridge.js'));
 
     const { resolveMcpBridgeLaunchConfig } = await import('../mcp-bridge-launch.js');
-    const result = resolveMcpBridgeLaunchConfig('file:///tmp/providers/zclaudia-adapter.js');
+    const result = resolveMcpBridgeLaunchConfig('file:///tmp/providers/pi-agent/adapter.js');
 
     expect(result.command).toBe(process.execPath);
     expect(result.args).toEqual(['/dist/application/plugins/mcp-bridge.js']);
@@ -55,7 +55,7 @@ describe('mcp-bridge-launch', () => {
     existsSyncMock.mockImplementation((filePath) => filePath.endsWith('/application/plugins/mcp-bridge.ts'));
 
     const { resolveMcpBridgeLaunchConfig } = await import('../mcp-bridge-launch.js');
-    const result = resolveMcpBridgeLaunchConfig('file:///tmp/providers/zclaudia-adapter.js');
+    const result = resolveMcpBridgeLaunchConfig('file:///tmp/providers/pi-agent/adapter.js');
 
     expect(result.command).toBe(process.execPath);
     expect(result.args).toEqual(['--import', 'tsx/esm', '/tmp/application/plugins/mcp-bridge.ts']);
