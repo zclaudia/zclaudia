@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import type { UnifiedPermissionPolicy, ClientMessage, MessageAttachment, MessageInput as MessageInputData } from '@zclaudia/shared';
 import type { Attachment } from '../../features/chat/MessageInput';
-import type { MessageWithToolCalls } from '../../stores/chatStore';
+import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useToastStore } from '../../stores/toastStore';

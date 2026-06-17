@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useChatStore, type MessageWithToolCalls } from '../chatStore';
+import { useChatStore } from '../chatStore';
+import { useChatMessageStore, type MessageWithToolCalls } from '../chatMessageStore';
 import { useSessionConfigStore } from '../sessionConfigStore';
 import type { UsageInfo } from '@zclaudia/shared/core/message';
 
@@ -19,8 +20,6 @@ const makeMsg = (id: string, role: 'user' | 'assistant' = 'user', content = 'hel
 describe('chatStore', () => {
   beforeEach(() => {
     useChatStore.setState({
-      messages: {},
-      pagination: {},
       activeRuns: {},
       backgroundRunIds: new Set(),
       runHealth: {},
@@ -29,155 +28,16 @@ describe('chatStore', () => {
       toolCallsHistory: {},
       runContentBlocks: {},
     });
+    useChatMessageStore.setState({
+      messages: {},
+      pagination: {},
+    });
     useSessionConfigStore.setState({
       systemInfoBySession: {},
       modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
       compactionNotice: {},
-    });
-  });
-
-  // ── Messages ────────────────────────────────────────
-
-  describe('setMessages', () => {
-    it('sets messages for a session', () => {
-      const msgs = [makeMsg('m1'), makeMsg('m2')];
-      useChatStore.getState().setMessages('sess-1', msgs);
-      expect(useChatStore.getState().messages['sess-1']).toEqual(msgs);
-    });
-
-    it('sets pagination when provided', () => {
-      useChatStore.getState().setMessages('sess-1', [], { total: 10, hasMore: true });
-      const p = useChatStore.getState().pagination['sess-1'];
-      expect(p.total).toBe(10);
-      expect(p.hasMore).toBe(true);
-      expect(p.isLoadingMore).toBe(false);
-    });
-  });
-
-  describe('prependMessages', () => {
-    it('prepends messages to existing', () => {
-      useChatStore.getState().setMessages('sess-1', [makeMsg('m2')]);
-      useChatStore.getState().prependMessages('sess-1', [makeMsg('m1')]);
-      const msgs = useChatStore.getState().messages['sess-1'];
-      expect(msgs).toHaveLength(2);
-      expect(msgs[0].id).toBe('m1');
-      expect(msgs[1].id).toBe('m2');
-    });
-  });
-
-  describe('appendMessages', () => {
-    it('appends messages to existing', () => {
-      useChatStore.getState().setMessages('sess-1', [makeMsg('m1')]);
-      useChatStore.getState().appendMessages('sess-1', [makeMsg('m2')]);
-      const msgs = useChatStore.getState().messages['sess-1'];
-      expect(msgs).toHaveLength(2);
-      expect(msgs[1].id).toBe('m2');
-    });
-
-    it('deduplicates by message ID', () => {
-      useChatStore.getState().setMessages('sess-1', [makeMsg('m1')]);
-      useChatStore.getState().appendMessages('sess-1', [makeMsg('m1'), makeMsg('m2')]);
-      expect(useChatStore.getState().messages['sess-1']).toHaveLength(2);
-    });
-
-    it('returns state unchanged when all messages are duplicates', () => {
-      useChatStore.getState().setMessages('sess-1', [makeMsg('m1')]);
-      const before = useChatStore.getState().messages;
-      useChatStore.getState().appendMessages('sess-1', [makeMsg('m1')]);
-      expect(useChatStore.getState().messages).toBe(before);
-    });
-
-    it('updates pagination maxOffset', () => {
-      useChatStore.getState().setMessages('sess-1', [makeMsg('m1')], { total: 1, hasMore: false, maxOffset: 5 });
-      useChatStore.getState().appendMessages('sess-1', [makeMsg('m2')], { total: 2, hasMore: false, maxOffset: 10 });
-      expect(useChatStore.getState().pagination['sess-1'].maxOffset).toBe(10);
-    });
-  });
-
-  describe('addMessage', () => {
-    it('adds message to session', () => {
-      useChatStore.getState().addMessage('sess-1', makeMsg('m1'));
-      expect(useChatStore.getState().messages['sess-1']).toHaveLength(1);
-    });
-
-    it('deduplicates by id', () => {
-      useChatStore.getState().addMessage('sess-1', makeMsg('m1'));
-      useChatStore.getState().addMessage('sess-1', makeMsg('m1'));
-      expect(useChatStore.getState().messages['sess-1']).toHaveLength(1);
-    });
-
-    it('deduplicates by clientMessageId', () => {
-      const msg1 = { ...makeMsg('m1'), clientMessageId: 'client-1' };
-      const msg2 = { ...makeMsg('m2'), clientMessageId: 'client-1' };
-      useChatStore.getState().addMessage('sess-1', msg1);
-      useChatStore.getState().addMessage('sess-1', msg2);
-      expect(useChatStore.getState().messages['sess-1']).toHaveLength(1);
-    });
-
-    it('updates pagination total and newestTimestamp', () => {
-      const msg = makeMsg('m1');
-      useChatStore.getState().addMessage('sess-1', msg);
-      const p = useChatStore.getState().pagination['sess-1'];
-      expect(p.total).toBe(1);
-      expect(p.newestTimestamp).toBe(msg.createdAt);
-    });
-  });
-
-  describe('updateMessageIdByClientMessageId', () => {
-    it('updates message id by clientMessageId', () => {
-      const msg = { ...makeMsg('temp-id'), clientMessageId: 'client-1' };
-      useChatStore.getState().addMessage('sess-1', msg);
-      useChatStore.getState().updateMessageIdByClientMessageId('sess-1', 'client-1', 'server-id');
-      expect(useChatStore.getState().messages['sess-1'][0].id).toBe('server-id');
-    });
-
-    it('does nothing when clientMessageId not found', () => {
-      useChatStore.getState().addMessage('sess-1', makeMsg('m1'));
-      const before = useChatStore.getState().messages;
-      useChatStore.getState().updateMessageIdByClientMessageId('sess-1', 'nonexistent', 'new-id');
-      expect(useChatStore.getState().messages).toBe(before);
-    });
-  });
-
-  describe('appendToLastMessage', () => {
-    it('appends content to last assistant message', () => {
-      useChatStore.getState().setMessages('sess-1', [
-        makeMsg('m1', 'user'),
-        makeMsg('m2', 'assistant', 'Hello'),
-      ]);
-      useChatStore.getState().appendToLastMessage('sess-1', ' World');
-      expect(useChatStore.getState().messages['sess-1'][1].content).toBe('Hello World');
-    });
-
-    it('does nothing with empty messages', () => {
-      const before = useChatStore.getState().messages;
-      useChatStore.getState().appendToLastMessage('sess-1', 'text');
-      expect(useChatStore.getState().messages).toBe(before);
-    });
-
-    it('does nothing when no assistant message', () => {
-      useChatStore.getState().setMessages('sess-1', [makeMsg('m1', 'user')]);
-      const before = useChatStore.getState().messages;
-      useChatStore.getState().appendToLastMessage('sess-1', 'text');
-      expect(useChatStore.getState().messages).toBe(before);
-    });
-  });
-
-  describe('clearMessages', () => {
-    it('clears messages and pagination for session', () => {
-      useChatStore.getState().setMessages('sess-1', [makeMsg('m1')], { total: 1, hasMore: false });
-      useChatStore.getState().clearMessages('sess-1');
-      expect(useChatStore.getState().messages['sess-1']).toEqual([]);
-      expect(useChatStore.getState().pagination['sess-1'].total).toBe(0);
-    });
-  });
-
-  describe('setLoadingMore', () => {
-    it('sets loading state', () => {
-      useChatStore.getState().setLoadingMore('sess-1', true);
-      expect(useChatStore.getState().pagination['sess-1'].isLoadingMore).toBe(true);
     });
   });
 
@@ -312,7 +172,7 @@ describe('chatStore', () => {
 
   describe('finalizeRunToMessage', () => {
     it('finalizes tool calls and content blocks onto assistant message', () => {
-      useChatStore.getState().setMessages('sess-1', [
+      useChatMessageStore.getState().setMessages('sess-1', [
         makeMsg('m1', 'user'),
         makeMsg('m2', 'assistant', 'response'),
       ]);
@@ -321,34 +181,34 @@ describe('chatStore', () => {
       useChatStore.getState().appendTextBlock('run-1', 'text');
       useChatStore.getState().finalizeRunToMessage('run-1');
 
-      const msg = useChatStore.getState().messages['sess-1'][1];
+      const msg = useChatMessageStore.getState().messages['sess-1'][1];
       expect(msg.toolCalls).toHaveLength(1);
       expect(msg.contentBlocks).toHaveLength(1);
     });
 
     it('does nothing when no active run', () => {
-      const before = useChatStore.getState().messages;
+      const before = useChatMessageStore.getState().messages;
       useChatStore.getState().finalizeRunToMessage('nonexistent');
-      expect(useChatStore.getState().messages).toBe(before);
+      expect(useChatMessageStore.getState().messages).toBe(before);
     });
 
     it('does nothing when no messages', () => {
       useChatStore.getState().startRun('run-1', 'sess-1');
-      const before = useChatStore.getState().messages;
+      const before = useChatMessageStore.getState().messages;
       useChatStore.getState().finalizeRunToMessage('run-1');
-      expect(useChatStore.getState().messages).toBe(before);
+      expect(useChatMessageStore.getState().messages).toBe(before);
     });
 
     it('preserves existing tool calls when more complete', () => {
       const existingTC = [{ id: 'tc-1', toolName: 'Read', toolInput: {}, status: 'completed' as const, result: 'data' }];
-      useChatStore.getState().setMessages('sess-1', [
+      useChatMessageStore.getState().setMessages('sess-1', [
         { ...makeMsg('m2', 'assistant', 'response'), toolCalls: existingTC },
       ]);
       useChatStore.getState().startRun('run-1', 'sess-1');
       // Run has no tool calls (empty)
       useChatStore.getState().finalizeRunToMessage('run-1');
 
-      const msg = useChatStore.getState().messages['sess-1'][0];
+      const msg = useChatMessageStore.getState().messages['sess-1'][0];
       expect(msg.toolCalls).toEqual(existingTC);
     });
   });
@@ -558,12 +418,6 @@ describe('chatStore', () => {
   // ── Getters ─────────────────────────────────────────
 
   describe('getters', () => {
-    it('getPagination returns pagination info', () => {
-      useChatStore.getState().setMessages('sess-1', [], { total: 5, hasMore: true });
-      const p = useChatStore.getState().getPagination('sess-1');
-      expect(p?.total).toBe(5);
-    });
-
     it('isSessionLoading returns true for active foreground run', () => {
       useChatStore.getState().startRun('run-1', 'sess-1');
       expect(useChatStore.getState().isSessionLoading('sess-1')).toBe(true);

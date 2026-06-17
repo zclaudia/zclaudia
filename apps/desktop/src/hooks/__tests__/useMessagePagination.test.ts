@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useMessagePagination } from '../chat/useMessagePagination';
 import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useFilePushStore } from '../../stores/filePushStore';
@@ -17,14 +18,16 @@ describe('useMessagePagination', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useChatStore.setState({
-      messages: {},
-      pagination: {},
       activeRuns: {},
       backgroundRunIds: new Set(),
       runHealth: {},
       activeToolCalls: {},
       toolCallsHistory: {},
       runContentBlocks: {},
+    });
+    useChatMessageStore.setState({
+      messages: {},
+      pagination: {},
     });
     useSessionConfigStore.setState({
       systemInfoBySession: {},
@@ -82,7 +85,7 @@ describe('useMessagePagination', () => {
       expect(result.current.initialLoadDone).toBe(true);
     });
 
-    expect(useChatStore.getState().messages['session-1']).toHaveLength(1);
+    expect(useChatMessageStore.getState().messages['session-1']).toHaveLength(1);
   });
 
   it('does not refetch in a loop after initial messages are stored', async () => {
@@ -136,13 +139,13 @@ describe('useMessagePagination', () => {
     });
 
     expect(result.current.loadError).toContain('Backend is offline');
-    expect(useChatStore.getState().messages['session-1']).toEqual([]);
+    expect(useChatMessageStore.getState().messages['session-1']).toEqual([]);
   });
 
   it('preserves cached messages when the initial fetch fails offline', async () => {
     vi.mocked(api.getSessionMessages).mockRejectedValue(new Error('BACKEND_OFFLINE'));
-    useChatStore.setState({
-      ...useChatStore.getState(),
+    useChatMessageStore.setState({
+      ...useChatMessageStore.getState(),
       messages: {
         'session-1': [
           {
@@ -159,7 +162,7 @@ describe('useMessagePagination', () => {
           total: 1,
           hasMore: false,
           maxOffset: 1,
-        },
+        } as any,
       },
     });
 
@@ -176,7 +179,7 @@ describe('useMessagePagination', () => {
     });
 
     expect(result.current.loadError).toContain('Backend is offline');
-    expect(useChatStore.getState().messages['session-1']).toEqual([
+    expect(useChatMessageStore.getState().messages['session-1']).toEqual([
       expect.objectContaining({ id: 'cached-1', content: 'cached message' }),
     ]);
   });

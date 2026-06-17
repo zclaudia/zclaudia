@@ -80,8 +80,8 @@ vi.mock('../../stores/gatewayStore', () => ({
   },
 }));
 
-vi.mock('../../stores/chatStore', () => ({
-  useChatStore: {
+vi.mock('../../stores/chatMessageStore', () => ({
+  useChatMessageStore: {
     getState: vi.fn(() => chatState),
   },
 }));

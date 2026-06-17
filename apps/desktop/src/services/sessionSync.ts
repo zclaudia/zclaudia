@@ -10,7 +10,7 @@ import { useSessionsStore, type RemoteSession } from '../stores/sessionsStore';
 import { useServerStore } from '../stores/serverStore';
 
 import { resolveGatewayBackendUrl, getGatewayAuthHeaders } from './gatewayProxy';
-import { useChatStore } from '../stores/chatStore';
+import { useChatMessageStore } from '../stores/chatMessageStore';
 import { useProjectStore } from '../stores/projectStore';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useSessionRunStateStore } from '../stores/sessionRunStateStore';
@@ -40,7 +40,7 @@ async function fillMessageGapForSession(
   if (!currentSessionId || session.id !== currentSessionId) return;
   if (!session.lastMessageOffset) return;
 
-  const pagination = useChatStore.getState().pagination[currentSessionId];
+  const pagination = useChatMessageStore.getState().pagination[currentSessionId];
   const localMaxOffset = afterOffsetOverride ?? pagination?.maxOffset ?? 0;
 
   // If server's max offset is ahead of what we have, fetch missing messages.
@@ -56,7 +56,7 @@ async function fillMessageGapForSession(
       limit: 100,
     });
     if (result.messages.length > 0) {
-      useChatStore.getState().appendMessages(currentSessionId, result.messages, result.pagination);
+      useChatMessageStore.getState().appendMessages(currentSessionId, result.messages, result.pagination);
       console.log(`[SessionSync] Filled ${result.messages.length} missing messages`);
     }
   } catch (error) {
@@ -334,7 +334,7 @@ export async function eagerSyncCurrentSession(_backendId: string): Promise<void>
   const currentSessionId = useSelectionStore.getState().selectedSessionId;
   if (!currentSessionId) return;
 
-  const pagination = useChatStore.getState().pagination[currentSessionId];
+  const pagination = useChatMessageStore.getState().pagination[currentSessionId];
   if (!pagination?.maxOffset) return;
 
   try {
@@ -343,7 +343,7 @@ export async function eagerSyncCurrentSession(_backendId: string): Promise<void>
       limit: 100,
     });
     if (result.messages.length > 0) {
-      useChatStore.getState().appendMessages(currentSessionId, result.messages, result.pagination);
+      useChatMessageStore.getState().appendMessages(currentSessionId, result.messages, result.pagination);
       console.log(`[SessionSync] Eager sync filled ${result.messages.length} messages for session ${currentSessionId}`);
     }
   } catch (error) {
@@ -382,7 +382,7 @@ export async function recoverCurrentSessionTail(targetServerId: string, sessionI
   const run = async () => {
     try {
       const result = await api.getSessionMessages(targetSessionId, { limit: 100 });
-      useChatStore.getState().mergeMessages(targetSessionId, result.messages, result.pagination);
+      useChatMessageStore.getState().mergeMessages(targetSessionId, result.messages, result.pagination);
       console.log(`[SessionSync] Recovered tail snapshot for session ${targetSessionId}: ${result.messages.length} messages`);
     } catch (error) {
       console.error('[SessionSync] Failed to recover current session tail:', error);

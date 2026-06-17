@@ -4,7 +4,7 @@ import { useSessionRoute } from '../useSessionRoute';
 import { useFacadeStore } from '../../../stores/facadeStore';
 import { useOwnershipStore } from '../../../stores/ownershipStore';
 import { useServerStore } from '../../../stores/serverStore';
-import { useChatStore } from '../../../stores/chatStore';
+import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useRecoveryStore } from '../../../stores/recoveryStore';
 
 describe('useSessionRoute', () => {
@@ -43,7 +43,7 @@ describe('useSessionRoute', () => {
       localServerPort: null,
       controlPlaneMode: 'gateway-direct',
     } as any);
-    useChatStore.setState({
+    useChatMessageStore.setState({
       messages: {},
       pagination: { 'session-1': { maxOffset: 0 } },
     } as any);

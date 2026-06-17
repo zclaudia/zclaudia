@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useChatStore } from '../../../stores/chatStore';
+import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 import { useSessionOverridesStore } from '../../../stores/sessionOverridesStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
@@ -268,7 +269,7 @@ vi.mock('../../../hooks/chat/useMessagePagination', () => ({
       };
       paginationHookState.set(sessionId, stable);
     }
-    const sessionPagination = useChatStore.getState().pagination[sessionId];
+    const sessionPagination = useChatMessageStore.getState().pagination[sessionId];
     return {
       ...stable,
       initialLoadDone: Boolean(sessionPagination),
@@ -337,6 +338,7 @@ async function blurAsync(target: Element) {
 function setDefaultStores(overrides?: {
   projectStore?: Record<string, any>;
   chatStore?: Record<string, any>;
+  chatMessageStore?: Record<string, any>;
   sessionConfigStore?: Record<string, any>;
   sessionOverridesStore?: Record<string, any>;
   terminalStore?: Record<string, any>;
@@ -358,22 +360,25 @@ function setDefaultStores(overrides?: {
     ...overrides?.projectStore,
   } as any);
   useChatStore.setState({
-    messages: {},
-    pagination: {},
     activeRuns: {},
     backgroundRunIds: new Set(),
     runHealth: {},
     activeToolCalls: {},
     runContentBlocks: {},
     toolCallsHistory: {},
+    startRun: vi.fn(),
+    ...overrides?.chatStore,
+  } as any);
+  useChatMessageStore.setState({
+    messages: {},
+    pagination: {},
     addMessage: vi.fn(),
     setMessages: vi.fn(),
     prependMessages: vi.fn(),
     appendMessages: vi.fn(),
     clearMessages: vi.fn(),
     setLoadingMore: vi.fn(),
-    startRun: vi.fn(),
-    ...overrides?.chatStore,
+    ...overrides?.chatMessageStore,
   } as any);
   useSessionConfigStore.setState({
     modeBySession: {},
@@ -762,7 +767,7 @@ describe('ChatInterface', () => {
 
   it('hides initial loading placeholder after messages load', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
     });
@@ -778,7 +783,7 @@ describe('ChatInterface', () => {
       { id: 'msg-2', sessionId: 'sess-1', role: 'assistant', content: 'Hi there', createdAt: 2 },
     ];
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: { 'sess-1': msgs },
         pagination: { 'sess-1': { total: 2, hasMore: false } },
       },
@@ -799,7 +804,7 @@ describe('ChatInterface', () => {
 
   it('sends message via WebSocket on send button click', async () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -845,7 +850,7 @@ describe('ChatInterface', () => {
 
   it('does not send empty messages', async () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -859,7 +864,7 @@ describe('ChatInterface', () => {
 
   it("includes mode='plan' in run_start message when mode is plan", async () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -881,7 +886,7 @@ describe('ChatInterface', () => {
 
   it('omits mode when no per-session mode is set (server picks default)', async () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -1362,7 +1367,7 @@ describe('ChatInterface', () => {
 
   it('shows default placeholder when connected and not loading', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -1374,7 +1379,7 @@ describe('ChatInterface', () => {
 
   it("shows plan mode placeholder when mode='plan'", () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -1389,7 +1394,7 @@ describe('ChatInterface', () => {
 
   it('does not show plan mode placeholder when only runtimeMode is plan', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -1409,6 +1414,8 @@ describe('ChatInterface', () => {
       chatStore: {
         activeRuns: { 'run-1': 'sess-1' },
         backgroundRunIds: new Set(),
+      },
+      chatMessageStore: {
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
     });
@@ -1419,7 +1426,7 @@ describe('ChatInterface', () => {
 
   it('restores session draft attachments into MessageInput', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
     });
@@ -1442,7 +1449,7 @@ describe('ChatInterface', () => {
 
   it('shows "Load older messages" button when hasMore is true', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: { 'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'hi', createdAt: 1000 }] },
         pagination: { 'sess-1': { total: 100, hasMore: true, isLoadingMore: false, oldestTimestamp: 1000 } },
       },
@@ -1455,7 +1462,7 @@ describe('ChatInterface', () => {
 
   it('shows "Loading older messages..." when isLoadingMore is true', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: { 'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'hi', createdAt: 1000 }] },
         pagination: { 'sess-1': { total: 100, hasMore: true, isLoadingMore: true, oldestTimestamp: 1000 } },
       },
@@ -1466,7 +1473,7 @@ describe('ChatInterface', () => {
 
   it('does not show load more when hasMore is false', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         pagination: { 'sess-1': { total: 5, hasMore: false } },
       },
     });
@@ -1604,7 +1611,7 @@ describe('ChatInterface', () => {
 
   it('shows messages for the correct session', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {
           'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'Hello from 1', createdAt: 1 }],
           'sess-2': [{ id: 'm2', sessionId: 'sess-2', role: 'user', content: 'Hello from 2', createdAt: 2 }],
@@ -1627,7 +1634,7 @@ describe('ChatInterface', () => {
       projectStore: {
         sessions: [{ id: 'sess-1', projectId: 'proj-1', name: 'Test', workingDirectory: '/test/worktree' }],
       },
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -1675,7 +1682,7 @@ describe('ChatInterface', () => {
         advancedInput: true,
         poppedOutSessions: new Map(),
       },
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -1689,7 +1696,7 @@ describe('ChatInterface', () => {
 
   it('includes permissionOverride in run_start message', async () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
       },
@@ -1713,7 +1720,7 @@ describe('ChatInterface', () => {
 
   it('shows scroll to bottom button when scrolled up', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: { 'sess-1': [{ id: 'm1', sessionId: 'sess-1', role: 'user', content: 'test', createdAt: 1 }] },
         pagination: { 'sess-1': { total: 1, hasMore: false } },
       },
@@ -1769,7 +1776,7 @@ describe('ChatInterface', () => {
 
   it('shows resend button when last message is from user', () => {
     setDefaultStores({
-      chatStore: {
+      chatMessageStore: {
         messages: { 'sess-1': [
           { id: 'm1', sessionId: 'sess-1', role: 'assistant', content: 'Hi', createdAt: 1 },
           { id: 'm2', sessionId: 'sess-1', role: 'user', content: 'Hello', createdAt: 2 },

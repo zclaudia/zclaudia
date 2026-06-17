@@ -1,16 +1,19 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatStore } from './chatStore';
+import { useChatMessageStore } from './chatMessageStore';
 import type { Message } from '@zclaudia/shared';
 
 describe('chatStore', () => {
   beforeEach(() => {
     // Reset store state before each test
     useChatStore.setState({
-      messages: {},
-      pagination: {},
       activeRuns: {},
       activeToolCalls: {},
       toolCallsHistory: {},
+    });
+    useChatMessageStore.setState({
+      messages: {},
+      pagination: {},
     });
   });
 
@@ -21,124 +24,6 @@ describe('chatStore', () => {
     content: 'Test message',
     createdAt: Date.now(),
     ...overrides,
-  });
-
-  describe('setMessages', () => {
-    it('sets messages for a session', () => {
-      const messages = [createMessage()];
-      useChatStore.getState().setMessages('session-1', messages);
-
-      expect(useChatStore.getState().messages['session-1']).toEqual(messages);
-    });
-
-    it('replaces existing messages', () => {
-      const oldMessages = [createMessage({ id: 'old' })];
-      const newMessages = [createMessage({ id: 'new' })];
-
-      useChatStore.getState().setMessages('session-1', oldMessages);
-      useChatStore.getState().setMessages('session-1', newMessages);
-
-      expect(useChatStore.getState().messages['session-1']).toEqual(newMessages);
-    });
-
-    it('does not affect other sessions', () => {
-      const messages1 = [createMessage({ id: '1', sessionId: 'session-1' })];
-      const messages2 = [createMessage({ id: '2', sessionId: 'session-2' })];
-
-      useChatStore.getState().setMessages('session-1', messages1);
-      useChatStore.getState().setMessages('session-2', messages2);
-
-      expect(useChatStore.getState().messages['session-1']).toEqual(messages1);
-      expect(useChatStore.getState().messages['session-2']).toEqual(messages2);
-    });
-  });
-
-  describe('addMessage', () => {
-    it('adds a message to an empty session', () => {
-      const message = createMessage();
-      useChatStore.getState().addMessage('session-1', message);
-
-      expect(useChatStore.getState().messages['session-1']).toEqual([message]);
-    });
-
-    it('appends message to existing messages', () => {
-      const message1 = createMessage({ id: '1' });
-      const message2 = createMessage({ id: '2' });
-
-      useChatStore.getState().addMessage('session-1', message1);
-      useChatStore.getState().addMessage('session-1', message2);
-
-      expect(useChatStore.getState().messages['session-1']).toEqual([
-        message1,
-        message2,
-      ]);
-    });
-  });
-
-  describe('appendToLastMessage', () => {
-    it('appends content to the last assistant message', () => {
-      const message = createMessage({ role: 'assistant', content: 'Hello' });
-      useChatStore.getState().addMessage('session-1', message);
-      useChatStore.getState().appendToLastMessage('session-1', ' World');
-
-      expect(useChatStore.getState().messages['session-1'][0].content).toBe(
-        'Hello World'
-      );
-    });
-
-    it('does not append to user message', () => {
-      const message = createMessage({ role: 'user', content: 'Hello' });
-      useChatStore.getState().addMessage('session-1', message);
-      useChatStore.getState().appendToLastMessage('session-1', ' World');
-
-      expect(useChatStore.getState().messages['session-1'][0].content).toBe(
-        'Hello'
-      );
-    });
-
-    it('does nothing for empty session', () => {
-      useChatStore.getState().appendToLastMessage('session-1', 'content');
-      expect(useChatStore.getState().messages['session-1']).toBeUndefined();
-    });
-
-    it('does not modify previous messages', () => {
-      const message1 = createMessage({ id: '1', role: 'user', content: 'User' });
-      const message2 = createMessage({
-        id: '2',
-        role: 'assistant',
-        content: 'AI',
-      });
-
-      useChatStore.getState().addMessage('session-1', message1);
-      useChatStore.getState().addMessage('session-1', message2);
-      useChatStore.getState().appendToLastMessage('session-1', ' Response');
-
-      expect(useChatStore.getState().messages['session-1'][0].content).toBe(
-        'User'
-      );
-      expect(useChatStore.getState().messages['session-1'][1].content).toBe(
-        'AI Response'
-      );
-    });
-  });
-
-  describe('clearMessages', () => {
-    it('clears messages for a session', () => {
-      const message = createMessage();
-      useChatStore.getState().addMessage('session-1', message);
-      useChatStore.getState().clearMessages('session-1');
-
-      expect(useChatStore.getState().messages['session-1']).toEqual([]);
-    });
-
-    it('does not affect other sessions', () => {
-      useChatStore.getState().addMessage('session-1', createMessage());
-      useChatStore.getState().addMessage('session-2', createMessage());
-      useChatStore.getState().clearMessages('session-1');
-
-      expect(useChatStore.getState().messages['session-1']).toEqual([]);
-      expect(useChatStore.getState().messages['session-2']).toHaveLength(1);
-    });
   });
 
   describe('run lifecycle', () => {
@@ -193,62 +78,6 @@ describe('chatStore', () => {
       useChatStore.getState().endRun('run-1');
       expect(useChatStore.getState().isSessionLoading('session-1')).toBe(false);
       expect(useChatStore.getState().isSessionLoading('session-2')).toBe(true);
-    });
-  });
-
-  describe('pagination', () => {
-    it('sets pagination with setMessages', () => {
-      const messages = [createMessage()];
-      const pagination = { total: 100, hasMore: true, oldestTimestamp: 1000, newestTimestamp: 2000 };
-
-      useChatStore.getState().setMessages('session-1', messages, pagination);
-
-      const storedPagination = useChatStore.getState().pagination['session-1'];
-      expect(storedPagination?.total).toBe(100);
-      expect(storedPagination?.hasMore).toBe(true);
-      expect(storedPagination?.isLoadingMore).toBe(false);
-    });
-
-    it('prepends messages with prependMessages', () => {
-      const existingMessage = createMessage({ id: 'new', createdAt: 2000 });
-      const olderMessage = createMessage({ id: 'old', createdAt: 1000 });
-
-      useChatStore.getState().setMessages('session-1', [existingMessage]);
-      useChatStore.getState().prependMessages('session-1', [olderMessage], { total: 2, hasMore: false });
-
-      const messages = useChatStore.getState().messages['session-1'];
-      expect(messages).toHaveLength(2);
-      expect(messages[0].id).toBe('old');
-      expect(messages[1].id).toBe('new');
-    });
-
-    it('setLoadingMore updates isLoadingMore', () => {
-      useChatStore.getState().setLoadingMore('session-1', true);
-      expect(useChatStore.getState().pagination['session-1']?.isLoadingMore).toBe(true);
-
-      useChatStore.getState().setLoadingMore('session-1', false);
-      expect(useChatStore.getState().pagination['session-1']?.isLoadingMore).toBe(false);
-    });
-
-    it('clearMessages resets pagination', () => {
-      useChatStore.getState().setMessages('session-1', [createMessage()], { total: 10, hasMore: true });
-      useChatStore.getState().clearMessages('session-1');
-
-      const pagination = useChatStore.getState().pagination['session-1'];
-      expect(pagination?.total).toBe(0);
-      expect(pagination?.hasMore).toBe(false);
-    });
-
-    it('addMessage updates pagination newestTimestamp', () => {
-      const timestamp = Date.now();
-      const message = createMessage({ createdAt: timestamp });
-
-      useChatStore.getState().setMessages('session-1', [], { total: 0, hasMore: false });
-      useChatStore.getState().addMessage('session-1', message);
-
-      const pagination = useChatStore.getState().pagination['session-1'];
-      expect(pagination?.total).toBe(1);
-      expect(pagination?.newestTimestamp).toBe(timestamp);
     });
   });
 
@@ -365,7 +194,7 @@ describe('chatStore', () => {
     it('finalizeRunToMessage attaches tool calls and content blocks to last assistant message', () => {
       // Set up an assistant message
       const message = createMessage({ id: 'msg-1', role: 'assistant', content: 'Response' });
-      useChatStore.getState().addMessage('session-1', message);
+      useChatMessageStore.getState().addMessage('session-1', message);
 
       // Add tool calls
       useChatStore.getState().addToolCall(RUN_ID, 'tc-1', 'Read', { file_path: '/a.ts' });
@@ -378,7 +207,7 @@ describe('chatStore', () => {
       // Finalize (takes runId, looks up sessionId from activeRuns)
       useChatStore.getState().finalizeRunToMessage(RUN_ID);
 
-      const messages = useChatStore.getState().messages['session-1'];
+      const messages = useChatMessageStore.getState().messages['session-1'];
       expect(messages[0].toolCalls).toHaveLength(1);
       expect(messages[0].toolCalls![0].toolName).toBe('Read');
       expect(messages[0].toolCalls![0].status).toBe('completed');
@@ -387,7 +216,7 @@ describe('chatStore', () => {
 
     it('finalizeRunToMessage does nothing if last message is not assistant', () => {
       const message = createMessage({ id: 'msg-1', role: 'user', content: 'User msg' });
-      useChatStore.getState().addMessage('session-1', message);
+      useChatMessageStore.getState().addMessage('session-1', message);
       useChatStore.getState().addToolCall(RUN_ID, 'tc-1', 'Read', {});
 
       useChatStore.getState().finalizeRunToMessage(RUN_ID);
@@ -397,16 +226,16 @@ describe('chatStore', () => {
     });
 
     it('keeps appending and finalizing against the most recent assistant message even after system messages', () => {
-      useChatStore.getState().addMessage('session-1', createMessage({ id: 'assistant-1', role: 'assistant', content: 'Hello' }));
-      useChatStore.getState().addMessage('session-1', createMessage({ id: 'system-1', role: 'system', content: 'Task started' }));
+      useChatMessageStore.getState().addMessage('session-1', createMessage({ id: 'assistant-1', role: 'assistant', content: 'Hello' }));
+      useChatMessageStore.getState().addMessage('session-1', createMessage({ id: 'system-1', role: 'system', content: 'Task started' }));
 
-      useChatStore.getState().appendToLastMessage('session-1', ' world');
+      useChatMessageStore.getState().appendToLastMessage('session-1', ' world');
       useChatStore.getState().addToolCall(RUN_ID, 'tc-1', 'Read', {});
       useChatStore.getState().updateToolCallResult(RUN_ID, 'tc-1', 'ok');
       useChatStore.getState().appendTextBlock(RUN_ID, 'stream text');
       useChatStore.getState().finalizeRunToMessage(RUN_ID);
 
-      const messages = useChatStore.getState().messages['session-1'];
+      const messages = useChatMessageStore.getState().messages['session-1'];
       expect(messages[0].content).toBe('Hello world');
       expect(messages[0].toolCalls).toHaveLength(1);
       expect(messages[0].contentBlocks).toEqual([{ type: 'text', content: 'stream text' }]);
@@ -420,12 +249,12 @@ describe('chatStore', () => {
         { id: 'tc-1', toolName: 'Read', toolInput: {}, status: 'completed' as const, result: 'data' },
         { id: 'tc-2', toolName: 'Write', toolInput: {}, status: 'completed' as const, result: 'ok' },
       ];
-      useChatStore.getState().addMessage('session-1', { ...message, toolCalls: existingToolCalls });
+      useChatMessageStore.getState().addMessage('session-1', { ...message, toolCalls: existingToolCalls });
 
       // Run has no tool calls tracked (mid-stream join scenario)
       useChatStore.getState().finalizeRunToMessage(RUN_ID);
 
-      const messages = useChatStore.getState().messages['session-1'];
+      const messages = useChatMessageStore.getState().messages['session-1'];
       // Should keep the existing 2 tool calls, not overwrite with empty
       expect(messages[0].toolCalls).toHaveLength(2);
     });

@@ -1,13 +1,13 @@
 import type { ServerMessage } from '@zclaudia/shared';
 import type { MessageHandlerContext } from './types';
-import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useFilePushStore } from '../../stores/filePushStore';
 import { downloadPushedFile } from '../fileDownload';
 
 export function handleFilePushMessage(msg: ServerMessage, ctx: MessageHandlerContext): boolean {
   if (msg.type !== 'file_push') return false;
 
-  useChatStore.getState().addMessage(msg.sessionId, {
+  useChatMessageStore.getState().addMessage(msg.sessionId, {
     id: msg.messageId || `file-push-${msg.fileId}`,
     sessionId: msg.sessionId,
     role: 'system',

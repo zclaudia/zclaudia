@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { useChatStore, type MessageWithToolCalls } from '../../stores/chatStore';
+import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/chatMessageStore';
 import { useFilePushStore } from '../../stores/filePushStore';
 import { useUIStore } from '../../stores/uiStore';
 import * as api from '../../services/api';
@@ -43,12 +44,12 @@ export function useMessagePagination({
   isConnected,
   isMobile,
 }: UseMessagePaginationParams) {
-  const pagination = useChatStore((s) => s.pagination);
-  const setMessages = useChatStore((s) => s.setMessages);
-  const prependMessages = useChatStore((s) => s.prependMessages);
-  const appendMessages = useChatStore((s) => s.appendMessages);
-  const setLoadingMore = useChatStore((s) => s.setLoadingMore);
-  const sessionMessages = useChatStore((s) => s.messages[sessionId]);
+  const pagination = useChatMessageStore((s) => s.pagination);
+  const setMessages = useChatMessageStore((s) => s.setMessages);
+  const prependMessages = useChatMessageStore((s) => s.prependMessages);
+  const appendMessages = useChatMessageStore((s) => s.appendMessages);
+  const setLoadingMore = useChatMessageStore((s) => s.setLoadingMore);
+  const sessionMessages = useChatMessageStore((s) => s.messages[sessionId]);
 
   const forceScrollToBottomSessionId = useUIStore((s) => s.forceScrollToBottomSessionId);
   const consumeForceScrollToBottom = useUIStore((s) => s.consumeForceScrollToBottom);
@@ -207,7 +208,7 @@ export function useMessagePagination({
           : `Failed to load messages: ${errMsg}`;
         setLoadError(friendlyMsg);
         // Preserve previously loaded messages so offline session re-open still shows cached history.
-        const existingMessages = useChatStore.getState().messages[sessionId];
+        const existingMessages = useChatMessageStore.getState().messages[sessionId];
         if (!existingMessages || existingMessages.length === 0) {
           setMessages(sessionId, [], { total: 0, hasMore: false });
         }

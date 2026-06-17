@@ -1,4 +1,5 @@
 import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 
 /**
  * Coalesce streaming `delta` events into one chatStore commit per animation
@@ -30,8 +31,9 @@ function flushAll(): void {
   const snapshot = Array.from(pendingByRun.entries());
   pendingByRun.clear();
   const chat = useChatStore.getState();
+  const messageStore = useChatMessageStore.getState();
   for (const [runId, { sessionId, content }] of snapshot) {
-    chat.appendToLastMessage(sessionId, content);
+    messageStore.appendToLastMessage(sessionId, content);
     chat.appendTextBlock(runId, content);
   }
 }
@@ -73,7 +75,8 @@ export function flushDeltaForRun(runId: string): void {
   if (!pending) return;
   pendingByRun.delete(runId);
   const chat = useChatStore.getState();
-  chat.appendToLastMessage(pending.sessionId, pending.content);
+  const messageStore = useChatMessageStore.getState();
+  messageStore.appendToLastMessage(pending.sessionId, pending.content);
   chat.appendTextBlock(runId, pending.content);
 }
 

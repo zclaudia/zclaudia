@@ -6,7 +6,8 @@ import {
   isTurnEmpty,
   type TurnStat,
 } from '../useSessionChanges';
-import type { MessageWithToolCalls, ToolCallState } from '../../../stores/chatStore';
+import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
+import type { ToolCallState } from '../../../stores/chatStore';
 
 const PROJECT_ROOT = '/repo';
 

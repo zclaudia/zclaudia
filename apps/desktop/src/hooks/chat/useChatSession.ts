@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useSessionOverridesStore } from '../../stores/sessionOverridesStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -7,7 +8,8 @@ import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useProviderCapabilities } from './useProviderCapabilities';
-import type { MessageWithToolCalls, ToolCallState } from '../../stores/chatStore';
+import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
+import type { ToolCallState } from '../../stores/chatStore';
 import type { ContentBlock } from '@zclaudia/shared';
 
 const EMPTY_MESSAGES: MessageWithToolCalls[] = [];
@@ -21,7 +23,7 @@ interface UseChatSessionParams {
 
 export function useChatSession({ sessionId, isConnected }: UseChatSessionParams) {
   // ── Session-scoped store selectors ──
-  const sessionMessages = useChatStore((s) => s.messages[sessionId] || EMPTY_MESSAGES);
+  const sessionMessages = useChatMessageStore((s) => s.messages[sessionId] || EMPTY_MESSAGES);
   const sessionRunId = useChatStore((s) => s.getSessionRunId(sessionId));
   const isSessionRunning = useChatStore((s) => {
     return Object.values(s.activeRuns).some((sid) => sid === sessionId);
@@ -59,8 +61,8 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
   const currentSystemInfo = useSessionConfigStore((s) => s.systemInfoBySession[sessionId] || null);
 
   // Store actions
-  const addMessage = useChatStore((s) => s.addMessage);
-  const clearMessages = useChatStore((s) => s.clearMessages);
+  const addMessage = useChatMessageStore((s) => s.addMessage);
+  const clearMessages = useChatMessageStore((s) => s.clearMessages);
   const setMode = useSessionConfigStore((s) => s.setMode);
   const selectedMode = useSessionConfigStore((s) => s.modeBySession[sessionId] ?? '');
   const runtimeMode = useSessionConfigStore((s) => s.runtimeModes[sessionId] || '');

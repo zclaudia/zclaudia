@@ -22,6 +22,24 @@ const mockChatStore = {
   clearRunRetryStatus: vi.fn(),
 };
 
+// Message state/actions live in chatMessageStore. Share the same vi.fn
+// references as mockChatStore so existing `mockChatStore.<action>` assertions
+// keep working regardless of which store the handler routes through.
+const mockChatMessageStore = {
+  messages: {} as Record<string, any>,
+  pagination: {} as Record<string, any>,
+  appendToLastMessage: mockChatStore.appendToLastMessage,
+  updateMessageIdByClientMessageId: mockChatStore.updateMessageIdByClientMessageId,
+  addMessage: mockChatStore.addMessage,
+  setMessages: vi.fn(),
+  prependMessages: vi.fn(),
+  appendMessages: vi.fn(),
+  mergeMessages: vi.fn(),
+  clearMessages: vi.fn(),
+  setLoadingMore: vi.fn(),
+  getPagination: vi.fn(),
+};
+
 const mockSessionConfigStore = {
   compactionNotice: {} as Record<string, any>,
   clearSystemInfo: vi.fn(),
@@ -122,6 +140,9 @@ const mockGetProjectsForBackend = vi.fn();
 
 vi.mock('../../stores/chatStore', () => ({
   useChatStore: { getState: () => mockChatStore },
+}));
+vi.mock('../../stores/chatMessageStore', () => ({
+  useChatMessageStore: { getState: () => mockChatMessageStore },
 }));
 vi.mock('../../stores/sessionConfigStore', () => ({
   useSessionConfigStore: { getState: () => mockSessionConfigStore },

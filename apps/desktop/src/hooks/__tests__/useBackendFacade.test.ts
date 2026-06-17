@@ -11,6 +11,7 @@ import { useToastStore } from '../../stores/toastStore';
 import { handleServerMessage } from '../../services/messageHandler';
 import { useServerStore } from '../../stores/serverStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { useProjectStore } from '../../stores/projectStore';
@@ -57,14 +58,16 @@ describe('useBackendFacade run_event forwarding', () => {
       snapshotVersion: 1,
     });
     useChatStore.setState({
-      messages: {},
-      pagination: {},
       activeRuns: {},
       backgroundRunIds: new Set(),
       runHealth: {},
       activeToolCalls: {},
       toolCallsHistory: {},
       runContentBlocks: {},
+    } as any);
+    useChatMessageStore.setState({
+      messages: {},
+      pagination: {},
     } as any);
     useSessionConfigStore.setState({
       systemInfoBySession: {},

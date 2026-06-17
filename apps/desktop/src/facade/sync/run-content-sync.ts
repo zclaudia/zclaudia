@@ -1,6 +1,6 @@
 import type { BackendFacadeEvent } from '@zclaudia/shared';
 import type { SessionMessage } from '@zclaudia/protocol/zclaudia';
-import { useChatStore, type MessageWithToolCalls } from '../../stores/chatStore';
+import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/chatMessageStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
 import { useToastStore } from '../../stores/toastStore';
@@ -32,7 +32,7 @@ export function syncContentPatch(event: Extract<BackendFacadeEvent, { type: 'con
       ? msg.content
       : JSON.stringify(msg.content),
   }));
-  useChatStore.getState().appendMessages(sessionId, restoredMessages, { maxOffset: latestOffset });
+  useChatMessageStore.getState().appendMessages(sessionId, restoredMessages, { maxOffset: latestOffset });
   useRecoveryStore.getState().noteActiveSessionMessage();
 }
 

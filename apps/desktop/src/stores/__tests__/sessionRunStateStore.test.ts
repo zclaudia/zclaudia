@@ -25,8 +25,6 @@ const baseRemoteSession: RemoteSession = {
 function resetStores() {
   useSessionRunStateStore.setState({ records: {} });
   useChatStore.setState({
-    messages: {},
-    pagination: {},
     activeRuns: {},
     backgroundRunIds: new Set(),
     runHealth: {},

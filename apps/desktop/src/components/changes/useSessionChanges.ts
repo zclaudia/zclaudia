@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { useChatStore, type MessageWithToolCalls, type ToolCallState } from '../../stores/chatStore';
+import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/chatMessageStore';
+import type { ToolCallState } from '../../stores/chatStore';
 import { extractMessageText } from '../../utils/messageContent';
 
 type LegacyWriteToolKind = 'edit' | 'write' | 'multiEdit' | 'notebook';
@@ -758,7 +759,7 @@ export function useChangesData(
    *  options-list hook (which is gated behind the dropdown being open). */
   effectiveSinceOption: UserMessageOption | null;
 } {
-  const messages = useChatStore((s) => (sessionId ? s.messages[sessionId] : undefined));
+  const messages = useChatMessageStore((s) => (sessionId ? s.messages[sessionId] : undefined));
   return useMemo(() => {
     const msgs = messages ?? [];
     let latestUserMessageId: string | null = null;
@@ -810,7 +811,7 @@ export function useUserMessageOptions(
   sessionId: string | null | undefined,
   enabled: boolean,
 ): UserMessageOption[] {
-  const messages = useChatStore((s) =>
+  const messages = useChatMessageStore((s) =>
     enabled && sessionId ? s.messages[sessionId] : undefined,
   );
   return useMemo(() => {

@@ -1,6 +1,7 @@
 import type { ServerMessage } from '@zclaudia/shared';
 import type { MessageDispatchContext } from './types';
 import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { useInteractionStore } from '../../stores/interactionStore';
@@ -79,9 +80,9 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (serverId === activeServerId) {
         useSessionConfigStore.getState().clearSystemInfo(targetSessionId);
       }
-      if (userMsgId && clientReqId) chat.updateMessageIdByClientMessageId(targetSessionId, clientReqId, userMsgId);
+      if (userMsgId && clientReqId) useChatMessageStore.getState().updateMessageIdByClientMessageId(targetSessionId, clientReqId, userMsgId);
       if (msg.assistantMessageId || !alreadyTrackingRun) {
-        chat.addMessage(targetSessionId, {
+        useChatMessageStore.getState().addMessage(targetSessionId, {
           id: assistantMsgId,
           sessionId: targetSessionId,
           role: 'assistant',
@@ -161,7 +162,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
               icon: 'error',
             });
           }
-          useChatStore.getState().appendToLastMessage(failedSession, `\n\n**Error:** ${msg.error}`);
+          useChatMessageStore.getState().appendToLastMessage(failedSession, `\n\n**Error:** ${msg.error}`);
         }
         useChatStore.getState().finalizeRunToMessage(msg.runId);
         useSessionRunStateStore.getState().markRunEnded({
@@ -216,7 +217,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       // Stable id derived from runId + timestamp so any later history sync
       // (e.g. recoverCurrentSessionTail after cancel) deduplicates correctly.
       const stableId = `steer-${msg.runId}-${msg.timestamp}`;
-      useChatStore.getState().addMessage(appendedSession, {
+      useChatMessageStore.getState().addMessage(appendedSession, {
         id: stableId,
         clientMessageId: stableId,
         sessionId: appendedSession,
@@ -319,7 +320,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       useSessionConfigStore.getState().clearCompactionNotice(sessionId);
       void getSessionCompaction(sessionId, compactionId)
         .then((c) => {
-          useChatStore.getState().addMessage(sessionId, {
+          useChatMessageStore.getState().addMessage(sessionId, {
             id: c.id,
             sessionId: c.sessionId,
             role: 'system',

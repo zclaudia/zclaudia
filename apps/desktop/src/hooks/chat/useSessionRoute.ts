@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useServerStore } from '../../stores/serverStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { getControlPlaneMode, resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
 import { getMobileBackendViewState, isMobileBackendUsable } from '../../services/mobileConnectionState';
@@ -44,7 +44,7 @@ export function useSessionRoute(
   const facadeConnectionState = useFacadeStore((s) => s.connectionState);
   const reconnectGeneration = useFacadeStore((s) => s.reconnectGeneration);
   const activeServerId = useServerStore((s) => s.activeServerId);
-  const maxOffset = useChatStore((s) =>
+  const maxOffset = useChatMessageStore((s) =>
     sessionId ? s.pagination[sessionId]?.maxOffset ?? 0 : 0
   );
   const localSessionProjectId = useProjectStore((s) =>
