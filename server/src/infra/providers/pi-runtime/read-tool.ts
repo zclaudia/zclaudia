@@ -258,10 +258,107 @@ function renderHashlineWindow(
   };
 }
 
+interface LineRange { start: number; end: number }
+
+// Parses a multi-range selector like "5-16,960-973" into sorted, merged ranges.
+// Accepts `a-b` (inclusive), `a+n` (n lines from a), and bare `a` (single line),
+// all 1-based. Overlapping or contiguous ranges are merged so no line is shown
+// twice. Returns an error result on any malformed token.
+function parseRanges(value: unknown): { ok: true; ranges: LineRange[] } | { ok: false; code: string; message: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { ok: false, code: 'invalid_ranges', message: 'ranges must be a non-empty string like "5-16,960-973"' };
+  }
+  const tokens = value.split(',').map(t => t.trim()).filter(Boolean);
+  if (tokens.length === 0) {
+    return { ok: false, code: 'invalid_ranges', message: 'ranges must list at least one range' };
+  }
+  const parsed: LineRange[] = [];
+  for (const token of tokens) {
+    let m: RegExpMatchArray | null;
+    if ((m = token.match(/^(\d+)-(\d+)$/))) {
+      const start = Number(m[1]);
+      const end = Number(m[2]);
+      if (start < 1 || end < start) {
+        return { ok: false, code: 'invalid_ranges', message: `invalid range "${token}" (expected 1-based start <= end)` };
+      }
+      parsed.push({ start, end });
+    } else if ((m = token.match(/^(\d+)\+(\d+)$/))) {
+      const start = Number(m[1]);
+      const count = Number(m[2]);
+      if (start < 1 || count < 1) {
+        return { ok: false, code: 'invalid_ranges', message: `invalid range "${token}" (expected 1-based start and positive count)` };
+      }
+      parsed.push({ start, end: start + count - 1 });
+    } else if ((m = token.match(/^(\d+)$/))) {
+      const start = Number(m[1]);
+      if (start < 1) {
+        return { ok: false, code: 'invalid_ranges', message: `invalid line "${token}" (lines are 1-based)` };
+      }
+      parsed.push({ start, end: start });
+    } else {
+      return { ok: false, code: 'invalid_ranges', message: `unrecognized range "${token}" (use a-b, a+n, or a)` };
+    }
+  }
+  parsed.sort((a, b) => a.start - b.start);
+  const merged: LineRange[] = [];
+  for (const range of parsed) {
+    const last = merged[merged.length - 1];
+    if (last && range.start <= last.end + 1) last.end = Math.max(last.end, range.end);
+    else merged.push({ ...range });
+  }
+  return { ok: true, ranges: merged };
+}
+
+// Renders several line ranges in one view: each block keeps its real line
+// numbers, and non-contiguous blocks are separated by a gap marker so the
+// elision is explicit. Reuses the column-clip + token-cap backstops.
+function renderMultiRangeWindow(
+  lines: string[],
+  ranges: LineRange[],
+  totalLines: number,
+  relPath: string,
+): { text: string; returnedLines: number; columnTruncated: boolean; shownRanges: LineRange[] } {
+  // Clamp to the file's bounds and drop ranges that start past EOF.
+  const clamped: LineRange[] = [];
+  for (const range of ranges) {
+    if (range.start > totalLines) continue;
+    clamped.push({ start: range.start, end: Math.min(range.end, totalLines) });
+  }
+  const out: string[] = [];
+  let columnTruncated = false;
+  let returnedLines = 0;
+  let prevEnd = 0;
+  for (const range of clamped) {
+    const gapFrom = prevEnd + 1;
+    const gapTo = range.start - 1;
+    if (prevEnd > 0 && gapTo >= gapFrom) {
+      const skipped = gapTo - gapFrom + 1;
+      out.push(`  ⋮ (${skipped} line${skipped === 1 ? '' : 's'} ${gapFrom}-${gapTo} not shown)`);
+    }
+    for (let line = range.start; line <= range.end; line++) {
+      const clipped = truncateDisplayLine(lines[line - 1], READ_MAX_LINE_COLUMNS);
+      if (clipped.truncated) columnTruncated = true;
+      out.push(`${line}|${clipped.text}`);
+      returnedLines += 1;
+    }
+    prevEnd = range.end;
+  }
+  const { lines: capped } = capLinesByTokens(out, MAX_READ_OUTPUT_TOKENS);
+  const rangeDesc = clamped.map(r => (r.start === r.end ? `${r.start}` : `${r.start}-${r.end}`)).join(', ');
+  const footer = `\n\n[Multi-range view of ${relPath} — ${totalLines} total lines, showing ${returnedLines} across ranges ${rangeDesc || '(none in range)'}. Read other ranges with ranges=, or omit ranges for a structural summary.]`;
+  return { text: capped.join('\n') + footer, returnedLines, columnTruncated, shownRanges: clamped };
+}
+
 export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): AgentTool<any> {
   // Successful reads per workspace-relative path this session, keyed off the
   // result's details.path so every read modality shares one counter.
   const readCounts = new Map<string, number>();
+
+  // Last emitted text/notebook read per resolved path, so an identical re-read
+  // (same mtime+size+request) returns a short stub instead of re-sending content
+  // already in context. Keyed by absolute path; hashline reads are excluded so
+  // the model always gets fresh anchors.
+  const lastEmitted = new Map<string, { mtimeMs: number; size: number; signature: string; totalLines: number }>();
 
   function noteRepeatRead(key: string): string | undefined {
     const count = (readCounts.get(key) ?? 0) + 1;
@@ -273,7 +370,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
   return {
     name: 'Read',
     label: 'Read',
-    description: 'Read a file. Text files return up to 2000 lines per call (default reads from the start); the output footer reports the total line count and whether more lines remain, so prefer one large read over many small ones and only paginate with offset when a file exceeds 2000 lines. Images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call).',
+    description: 'Read a file. Text files return up to 2000 lines per call (default reads from the start); the output footer reports the total line count and whether more lines remain, so prefer one large read over many small ones and only paginate with offset when a file exceeds 2000 lines. To pull back several scattered sections at once, pass ranges (e.g. "5-16,960-973"). Images return vision blocks (oversized ones are downscaled automatically); .ipynb notebooks render as cells with outputs; PDFs extract text per page (use pages, e.g. "1-5", max 20 pages per call).',
     parameters: {
       type: 'object',
       properties: {
@@ -281,6 +378,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         file_path: { type: 'string' },
         offset: { type: 'number', default: 1 },
         limit: { type: 'number', default: 2000 },
+        ranges: { type: 'string', description: 'For text files: read several line ranges in one call, e.g. "5-16,960-973" (also accepts a+n and bare a). Overrides offset/limit.' },
         pages: { type: 'string', description: 'For PDFs: page range like "1-5" or "2,7" (max 20 pages per call)' },
         hashline: { type: 'boolean', description: 'For text files: return content-addressed line hashes for precise edits' },
         full: { type: 'boolean', description: 'Read the entire file verbatim instead of a structural summary' },
@@ -311,6 +409,30 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         if (!fileStat.isFile()) {
           return errorResult('not_a_file', `Path is not a file: ${requestedPath}`, { path: String(requestedPath) });
         }
+        // Everything that changes the rendered text output goes into the dedup
+        // signature; a re-read with the same signature against an unchanged file
+        // (same mtime+size) is served from a stub. hashline is excluded below.
+        const readSignature = JSON.stringify({
+          o: args.offset ?? null,
+          l: args.limit ?? null,
+          r: typeof args.ranges === 'string' ? args.ranges : null,
+          h: args.hashline === true,
+          f: args.full === true,
+        });
+        const maybeDedup = (relPath: string): ReturnType<typeof textResult> | undefined => {
+          if (args.hashline === true) return undefined;
+          const prior = lastEmitted.get(filePath);
+          if (prior && prior.mtimeMs === fileStat.mtimeMs && prior.size === fileStat.size && prior.signature === readSignature) {
+            return textResult(
+              `[File ${relPath} is unchanged since your last read (same mtime and size, ${prior.totalLines} line${prior.totalLines === 1 ? '' : 's'}) — its contents are already in the context above and are not being re-sent. Pass full:true, or a different offset/limit/ranges, to force a fresh copy.]`,
+              { ok: true, path: relPath, deduped: true, totalLines: prior.totalLines, size: fileStat.size },
+            );
+          }
+          return undefined;
+        };
+        const recordEmitted = (totalLines: number): void => {
+          lastEmitted.set(filePath, { mtimeMs: fileStat.mtimeMs, size: fileStat.size, signature: readSignature, totalLines });
+        };
         const fileExt = path.extname(filePath).toLowerCase();
         const imageMime = IMAGE_MIME_BY_EXT[fileExt];
         if (imageMime) {
@@ -364,9 +486,11 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
               path: toWorkspaceRelative(cwd, filePath), size: fileStat.size, maxBytes: MAX_NOTEBOOK_BYTES,
             });
           }
+          const relPath = toWorkspaceRelative(cwd, filePath);
+          const notebookDedup = maybeDedup(relPath);
+          if (notebookDedup) return notebookDedup;
           const buffer = await readFile(filePath);
           const rendered = renderNotebook(decodeTextBuffer(buffer).content);
-          const relPath = toWorkspaceRelative(cwd, filePath);
           const lines = rendered.split('\n');
           const totalLines = lines.length;
           const windowArgs = parseReadWindow(args);
@@ -374,6 +498,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const { offset, limit } = windowArgs;
           const selected = lines.slice(offset - 1, offset - 1 + limit);
           const view = renderTextWindow(selected, offset, totalLines);
+          recordEmitted(totalLines);
           return textResult(view.text, {
             ok: true, path: relPath, format: 'notebook', offset, limit, totalLines,
             returnedLines: view.returnedLines, size: fileStat.size,
@@ -397,6 +522,21 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         if (!windowArgs.ok) return errorResult(windowArgs.code, windowArgs.message, { path: relPath });
         const { offset, limit } = windowArgs;
 
+        const dedupHit = maybeDedup(relPath);
+        if (dedupHit) return dedupHit;
+
+        let multiRanges: LineRange[] | undefined;
+        if (args.ranges !== undefined) {
+          const parsedRanges = parseRanges(args.ranges);
+          if (!parsedRanges.ok) return errorResult(parsedRanges.code, parsedRanges.message, { path: relPath });
+          if (fileStat.size > READ_FAST_PATH_BYTES) {
+            return errorResult('ranges_unsupported_large',
+              `ranges only support files up to ${READ_FAST_PATH_BYTES} bytes; use offset/limit for larger files: ${requestedPath}`,
+              { path: relPath, size: fileStat.size });
+          }
+          multiRanges = parsedRanges.ranges;
+        }
+
         // Fast path: small files are read whole, which keeps full BOM/UTF-16
         // decoding, hashline anchors, and full-content tracking for write guards.
         if (fileStat.size <= READ_FAST_PATH_BYTES) {
@@ -411,6 +551,32 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const lines = text.split(/\r?\n/);
           if (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
           const totalLines = lines.length;
+          if (multiRanges) {
+            const view = renderMultiRangeWindow(lines, multiRanges, totalLines, relPath);
+            // We hold the whole file, so record full content: edits stay safe even
+            // though only the requested ranges were shown.
+            await options?.readFileState?.recordRead(filePath, {
+              content: text,
+              offset: 1,
+              limit: totalLines,
+              totalLines,
+              returnedLines: view.returnedLines,
+              isPartialView: true,
+              hasFullContent: true,
+              timestamp: fileStat.mtimeMs,
+            });
+            recordEmitted(totalLines);
+            return textResult(view.text, {
+              ok: true,
+              path: relPath,
+              format: 'ranges',
+              ranges: view.shownRanges.map(r => [r.start, r.end]),
+              totalLines,
+              returnedLines: view.returnedLines,
+              size: fileStat.size,
+              ...(view.columnTruncated ? { columnTruncated: READ_MAX_LINE_COLUMNS } : {}),
+            });
+          }
           try {
             const userGaveWindow = args.offset !== undefined || args.limit !== undefined;
             const summaryEligible = !userGaveWindow
@@ -436,6 +602,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
                     hasFullContent: true,
                     timestamp: fileStat.mtimeMs,
                   });
+                  recordEmitted(totalLines);
                   return textResult(skeleton.text, {
                     ok: true,
                     path: relPath,
@@ -467,6 +634,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
             hasFullContent: true,
             timestamp: fileStat.mtimeMs,
           });
+          recordEmitted(totalLines);
           return textResult(
             isHashline ? hashlineView!.text : view.text,
             {
@@ -511,6 +679,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           hasFullContent: false,
           timestamp: fileStat.mtimeMs,
         });
+        recordEmitted(window.totalLines);
         return textResult(view.text, {
           ok: true,
           path: relPath,
@@ -528,8 +697,8 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         });
       }
       })();
-      const details = (result as { details?: { ok?: boolean; path?: unknown } }).details;
-      if (details && details.ok !== false && typeof details.path === 'string') {
+      const details = (result as { details?: { ok?: boolean; path?: unknown; deduped?: boolean } }).details;
+      if (details && details.ok !== false && details.deduped !== true && typeof details.path === 'string') {
         const notice = noteRepeatRead(details.path);
         if (notice) return appendTextNotice(result, notice);
       }

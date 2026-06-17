@@ -84,6 +84,25 @@ export async function writeTextFileAtomic(filePath: string, content: string, met
   }
 }
 
+// Files written with a `#!` shebang are almost always meant to be run directly.
+// Add execute bits (best-effort) so the model doesn't have to follow up with a
+// separate chmod. Returns true only when the mode actually changed; any failure
+// (read-only mount, Windows ACL) is swallowed — making the file executable is a
+// convenience, not a contract.
+export async function maybeMarkExecutableForShebang(filePath: string, content: string): Promise<boolean> {
+  if (!content.startsWith('#!')) return false;
+  try {
+    const fileStat = await stat(filePath);
+    const current = fileStat.mode & 0o7777;
+    const desired = current | 0o111;
+    if (desired === current) return false;
+    await chmod(filePath, desired);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function truncateToolResultContent(content: string, limit = TOOL_RESULT_CONTENT_LIMIT): { content: string; truncated: boolean } {
   if (content.length <= limit) return { content, truncated: false };
   return {

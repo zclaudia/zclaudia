@@ -71,12 +71,37 @@ function leadingWhitespace(line: string): string {
   return m ? m[0] : '';
 }
 
+function indentKind(ws: string): 'tab' | 'space' {
+  return ws.includes('\t') ? 'tab' : 'space';
+}
+
+/**
+ * Shift every non-blank line of `text` by `delta` indent characters. Positive
+ * delta prepends `indentChar`; negative delta strips up to that many leading
+ * whitespace chars. Blank lines are left untouched.
+ */
+function shiftIndent(text: string, delta: number, indentChar: string): string {
+  if (delta === 0) return text;
+  return text
+    .split('\n')
+    .map(line => {
+      if (line.trim() === '') return line;
+      if (delta > 0) return indentChar.repeat(delta) + line;
+      const cur = leadingWhitespace(line).length;
+      return line.slice(Math.min(-delta, cur));
+    })
+    .join('\n');
+}
+
 /**
  * Whitespace-safe fallback matcher. Runs only after exact + quote matching fail.
  * Tolerates line-ending and trailing-whitespace differences (Pass 1) and a
- * uniform indentation shift, re-indenting `replacement` to match (Pass 2). All
- * comparison is pure string-prefix work — no tab-width arithmetic — so mixed
- * indentation falls through to `not_found`, never a mis-indented edit. Returns a
+ * uniform indentation delta, re-indenting `replacement` to match (Pass 2). Pass 2
+ * requires every non-blank line to share the SAME char-delta between file and
+ * search indentation and the SAME indent kind (no tab<->space arithmetic), so a
+ * mismatched delta or mixed indentation falls through to `not_found`, never a
+ * mis-indented edit. Unlike a common-prefix shift, the per-line delta re-indents
+ * whole blocks even when the first line is not the least-indented one. Returns a
  * match only when exactly one location matches; otherwise `ambiguous`/`not_found`.
  */
 export function findWhitespaceMatch(
@@ -107,10 +132,7 @@ export function findWhitespaceMatch(
   }
 
   const trimEnd = (s: string): string => s.replace(/\s+$/, '');
-  const firstNonBlank = searchLines.find(l => l.trim() !== '');
-  const si = firstNonBlank !== undefined ? leadingWhitespace(firstNonBlank) : '';
-  const pass2Eligible =
-    firstNonBlank !== undefined && searchLines.every(l => l.trim() === '' || l.startsWith(si));
+  const fnbIdx = searchLines.findIndex(l => l.trim() !== '');
 
   const matches: WhitespaceMatch[] = [];
   for (let i = 0; i + L <= fileLines.length; i++) {
@@ -123,27 +145,33 @@ export function findWhitespaceMatch(
     }
     if (pass1) {
       adjusted = replacement;
-    } else if (pass2Eligible) {
-      // Pass 2: uniform indentation shift si -> fi.
-      // Reject when si and fi use different whitespace kinds (tabs vs spaces).
-      const fi = leadingWhitespace(fileLines[i]);
-      const siKind = si.includes('\t') ? 'tab' : 'space';
-      const fiKind = fi.includes('\t') ? 'tab' : 'space';
-      if (si.length > 0 && fi.length > 0 && siKind !== fiKind) continue;
-      let pass2 = true;
+    } else if (fnbIdx !== -1) {
+      // Pass 2: uniform indentation delta. Every non-blank line must carry the
+      // same char-delta between file and search leading whitespace, using the
+      // same indent kind; blank lines must line up. Trimmed content must match
+      // exactly. A differing delta or a tab-vs-space kind clash fails the whole
+      // window so we never emit a mis-indented edit.
+      let delta: number | null = null;
+      let ok = true;
       for (let j = 0; j < L; j++) {
-        const sl = searchLines[j];
-        if (sl.trim() === '') {
-          if (fileLines[i + j].trim() !== '') { pass2 = false; break; }
-          continue;
-        }
-        if (trimEnd(fileLines[i + j]) !== trimEnd(fi + sl.slice(si.length))) { pass2 = false; break; }
+        const sLine = searchLines[j];
+        const fLine = fileLines[i + j];
+        const sBlank = sLine.trim() === '';
+        const fBlank = fLine.trim() === '';
+        if (sBlank || fBlank) { if (sBlank !== fBlank) { ok = false; break; } continue; }
+        if (sLine.trim() !== fLine.trim()) { ok = false; break; }
+        const sWS = leadingWhitespace(sLine);
+        const fWS = leadingWhitespace(fLine);
+        if (sWS.length > 0 && fWS.length > 0 && indentKind(sWS) !== indentKind(fWS)) { ok = false; break; }
+        const d = fWS.length - sWS.length;
+        if (delta === null) delta = d;
+        else if (d !== delta) { ok = false; break; }
       }
-      if (pass2) {
-        adjusted = replacement
-          .split('\n')
-          .map(line => (line.trim() === '' ? line : line.startsWith(si) ? fi + line.slice(si.length) : line))
-          .join('\n');
+      if (ok && delta !== null) {
+        const fileIndentChar = leadingWhitespace(fileLines[i + fnbIdx])[0]
+          ?? leadingWhitespace(searchLines[fnbIdx])[0]
+          ?? ' ';
+        adjusted = shiftIndent(replacement, delta, fileIndentChar);
       }
     }
 

@@ -834,7 +834,7 @@ describe('Write bridge tool', () => {
     expect(outsideChanged).toBe(false);
   });
 
-  it('rejects writing directly to a symlink path without replacing the symlink', async () => {
+  it('writes through an in-workspace symlink to its target without replacing the link', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-write-symlink-'));
     writeFileSync(path.join(dir, 'target.txt'), 'old\n');
     symlinkSync(path.join(dir, 'target.txt'), path.join(dir, 'link.txt'));
@@ -848,9 +848,9 @@ describe('Write bridge tool', () => {
     const targetContent = readFileSync(path.join(dir, 'target.txt'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
-    expect(res.details.error).toBe('symlink_path');
+    expect(res.details.ok).toBe(true);
     expect(linkStillSymlink).toBe(true);
-    expect(targetContent).toBe('old\n');
+    expect(targetContent).toBe('new\n');
   });
 
   it('rejects writing obvious private key material', async () => {
@@ -1528,17 +1528,19 @@ describe('Edit bridge tool', () => {
     expect(a).toBe('const a = 1;\n');
   });
 
-  it('preflights patch add symlink failures before writing earlier updates', async () => {
+  it('preflights workspace-escaping symlink failures before writing earlier updates', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-patch-symlink-'));
+    const outside = mkdtempSync(path.join(tmpdir(), 'zc-edit-patch-outside-'));
     writeFileSync(path.join(dir, 'a.ts'), 'const a = 1;\n');
-    writeFileSync(path.join(dir, 'target.ts'), 'target\n');
-    symlinkSync(path.join(dir, 'target.ts'), path.join(dir, 'link.ts'));
+    writeFileSync(path.join(outside, 'target.ts'), 'target\n');
+    // A symlink whose target escapes the workspace must still be refused — that's
+    // what protects the earlier a.ts update from landing.
+    symlinkSync(path.join(outside, 'target.ts'), path.join(dir, 'link.ts'));
     const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
     const read = tools.find((t: any) => t.name === 'Read') as any;
     const edit = tools.find((t: any) => t.name === 'Edit') as any;
 
     await read.execute('r-patch-symlink-a', { path: 'a.ts' });
-    await read.execute('r-patch-symlink-link', { path: 'link.ts' });
     const res = await edit.execute('e-apply-patch-symlink', {
       patch: [
         '*** Begin Patch',
@@ -1553,13 +1555,14 @@ describe('Edit bridge tool', () => {
     });
     const a = readFileSync(path.join(dir, 'a.ts'), 'utf8');
     const linkStillSymlink = lstatSync(path.join(dir, 'link.ts')).isSymbolicLink();
-    const target = readFileSync(path.join(dir, 'target.ts'), 'utf8');
+    const target = readFileSync(path.join(outside, 'target.ts'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
     expect(res.details).toMatchObject({ ok: false, error: 'patch_partial_failure' });
     expect(res.details.perFileResults).toEqual([
       expect.objectContaining({ path: 'a.ts', ok: true, preview: true }),
-      expect.objectContaining({ path: 'link.ts', ok: false, error: 'symlink_path' }),
+      expect.objectContaining({ path: 'link.ts', ok: false, error: expect.stringMatching(/symlink_escape|path_outside_workspace/) }),
     ]);
     expect(a).toBe('const a = 1;\n');
     expect(linkStillSymlink).toBe(true);
@@ -1835,7 +1838,7 @@ describe('Edit bridge tool', () => {
     expect(onDisk).toBe('const a = 1;\nconst b = 3;\n');
   });
 
-  it('rejects editing directly through a symlink path without replacing it', async () => {
+  it('edits through an in-workspace symlink to its target without replacing it', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-symlink-'));
     writeFileSync(path.join(dir, 'target.txt'), 'old\n');
     symlinkSync(path.join(dir, 'target.txt'), path.join(dir, 'link.txt'));
@@ -1853,9 +1856,9 @@ describe('Edit bridge tool', () => {
     const targetContent = readFileSync(path.join(dir, 'target.txt'), 'utf8');
 
     rmSync(dir, { recursive: true, force: true });
-    expect(res.details.error).toBe('symlink_path');
+    expect(res.details.ok).toBe(true);
     expect(linkStillSymlink).toBe(true);
-    expect(targetContent).toBe('old\n');
+    expect(targetContent).toBe('new\n');
   });
 
   it('previews a hashline edit using operation grammar without writing to disk', async () => {

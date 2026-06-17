@@ -80,6 +80,77 @@ describe('Read bridge tool module', () => {
     expect(result.content[0].text).toContain('300|line300');
   });
 
+  it('reads several line ranges in one call with a gap marker between them', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-ranges-'));
+    const lines = Array.from({ length: 20 }, (_, i) => `line${i + 1}`);
+    await writeFile(path.join(root, 'sample.ts'), lines.join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-ranges', { path: 'sample.ts', ranges: '2-3,10-11' });
+
+    expect(result.details).toMatchObject({ ok: true, format: 'ranges', totalLines: 20, returnedLines: 4 });
+    expect(result.details.ranges).toEqual([[2, 3], [10, 11]]);
+    const text = result.content[0].text;
+    expect(text).toContain('2|line2');
+    expect(text).toContain('3|line3');
+    expect(text).toContain('10|line10');
+    expect(text).not.toContain('5|line5');
+    expect(text).toMatch(/⋮ .*4-9 not shown/);
+  });
+
+  it('keeps a ranges read editable by capturing full content', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-ranges-edit-'));
+    const lines = Array.from({ length: 20 }, (_, i) => `line${i + 1}`);
+    const file = path.join(root, 'sample.ts');
+    await writeFile(file, lines.join('\n'));
+    const state = createReadFileStateStore();
+    const read = createReadBridgeTool(root, { readFileState: state }) as any;
+
+    await read.execute('read-ranges', { path: 'sample.ts', ranges: '2-3' });
+
+    expect(state.assertEditable(file, lines.join('\n'))).toEqual({ ok: true });
+  });
+
+  it('rejects a malformed ranges selector', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-ranges-bad-'));
+    await writeFile(path.join(root, 'sample.ts'), 'a\nb\nc\n');
+    const read = createReadBridgeTool(root) as any;
+
+    const result = await read.execute('read-ranges', { path: 'sample.ts', ranges: '3-1' });
+
+    expect(result.details).toMatchObject({ ok: false, error: 'invalid_ranges' });
+  });
+
+  it('returns a dedup stub when the same file is re-read unchanged', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-dedup-'));
+    await writeFile(path.join(root, 'sample.ts'), ['one', 'two', 'three'].join('\n'));
+    const read = createReadBridgeTool(root) as any;
+
+    const first = await read.execute('read-1', { path: 'sample.ts' });
+    const second = await read.execute('read-2', { path: 'sample.ts' });
+
+    expect(first.details.deduped).toBeUndefined();
+    expect(second.details).toMatchObject({ ok: true, deduped: true });
+    expect(second.content[0].text).toContain('unchanged since your last read');
+    // A different window is not a dedup hit.
+    const windowed = await read.execute('read-3', { path: 'sample.ts', offset: 2, limit: 1 });
+    expect(windowed.details.deduped).toBeUndefined();
+  });
+
+  it('does not dedup after the file content changes', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-dedup-change-'));
+    const file = path.join(root, 'sample.ts');
+    await writeFile(file, 'one\ntwo\n');
+    const read = createReadBridgeTool(root) as any;
+
+    await read.execute('read-1', { path: 'sample.ts' });
+    await writeFile(file, 'one\ntwo\nthree\nfour\n'); // size changes → never a stale stub
+    const second = await read.execute('read-2', { path: 'sample.ts' });
+
+    expect(second.details.deduped).toBeUndefined();
+    expect(second.content[0].text).toContain('4|four');
+  });
+
   it('can return hashline anchors for content-addressed edits', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-hash-module-'));
     await writeFile(path.join(root, 'sample.ts'), 'const a = 1;\nconst b = 2;\n');
@@ -227,11 +298,17 @@ describe('Read bridge tool module', () => {
 
   it('nudges the model after repeated reads of the same file in a session', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'zclaudia-read-repeat-'));
-    await writeFile(path.join(root, 'sample.ts'), 'const a = 1;\n');
+    const file = path.join(root, 'sample.ts');
     const read = createReadBridgeTool(root) as any;
 
+    // The content changes between reads so each re-read bypasses the dedup stub
+    // (which would otherwise short-circuit an identical re-read) and the
+    // repeat-read counter advances.
+    await writeFile(file, 'const a = 1;\n');
     const first = await read.execute('r1', { path: 'sample.ts' });
+    await writeFile(file, 'const a = 22;\n');
     const second = await read.execute('r2', { path: 'sample.ts' });
+    await writeFile(file, 'const a = 333;\n');
     const third = await read.execute('r3', { path: 'sample.ts' });
 
     expect(first.content[0].text).not.toContain('read #');

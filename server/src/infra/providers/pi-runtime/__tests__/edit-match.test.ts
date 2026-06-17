@@ -68,6 +68,27 @@ describe('findWhitespaceMatch', () => {
     expect(res.match.adjustedNewString).toBe('    const a = 1;\n    const c = 3;');
   });
 
+  it('re-indents a block whose first line is not the least-indented (per-line delta, Pass 2)', () => {
+    // 'foo();' (deeper) precedes 'bar();' (shallower); a common-prefix shift
+    // would bail because not every line starts with the first line's indent.
+    const file = 'def f():\n        foo();\n      bar();\n';
+    const search = '      foo();\n    bar();';
+    const replacement = '      foo2();\n    bar();';
+    const res = findWhitespaceMatch(file, search, replacement);
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect(file.slice(res.match.start, res.match.end)).toBe('        foo();\n      bar();');
+    expect(res.match.adjustedNewString).toBe('        foo2();\n      bar();');
+  });
+
+  it('rejects a block with an inconsistent indentation delta', () => {
+    // foo shifts by +2 but bar by +4 — not a uniform shift, so no safe re-indent.
+    const file = 'x:\n    foo();\n        bar();\n';
+    const search = '  foo();\n    bar();';
+    const res = findWhitespaceMatch(file, search, 'q');
+    expect(res).toMatchObject({ ok: false, reason: 'not_found' });
+  });
+
   it('returns ambiguous when the normalized block matches more than one location', () => {
     const file = 'x = 1;\ny = 2;\nx = 1;\n';
     const res = findWhitespaceMatch(file, 'x = 1; ', 'x = 9;');
