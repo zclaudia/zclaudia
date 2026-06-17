@@ -31,8 +31,6 @@ describe('chatStore', () => {
       modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
-      permissionOverrides: {},
-      worktreeOverrides: {},
     });
   });
 
@@ -552,37 +550,6 @@ describe('chatStore', () => {
       expect(usage.latestCacheWriteTokens).toBe(0);
     });
   });
-
-  // ── Permission overrides ────────────────────────────
-
-  describe('permission overrides', () => {
-    it('sets and gets permission policy', () => {
-      useChatStore.getState().setPermissionOverride('sess-1', { autoApprove: true } as any);
-      expect(useChatStore.getState().getPermissionOverride('sess-1')).toEqual({ autoApprove: true });
-    });
-
-    it('clears permission override when null', () => {
-      useChatStore.getState().setPermissionOverride('sess-1', { autoApprove: true } as any);
-      useChatStore.getState().setPermissionOverride('sess-1', null);
-      expect(useChatStore.getState().getPermissionOverride('sess-1')).toBeNull();
-    });
-  });
-
-  // ── Worktree overrides ──────────────────────────────
-
-  describe('worktree overrides', () => {
-    it('sets and gets worktree path', () => {
-      useChatStore.getState().setWorktreeOverride('sess-1', '/worktree/path');
-      expect(useChatStore.getState().getWorktreeOverride('sess-1')).toBe('/worktree/path');
-    });
-
-    it('clears worktree override', () => {
-      useChatStore.getState().setWorktreeOverride('sess-1', '/path');
-      useChatStore.getState().clearWorktreeOverride('sess-1');
-      expect(useChatStore.getState().getWorktreeOverride('sess-1')).toBe('');
-    });
-  });
-
 
   // ── Getters ─────────────────────────────────────────
 

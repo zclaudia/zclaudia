@@ -68,8 +68,6 @@ describe('useBackendFacade run_event forwarding', () => {
       modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
-      permissionOverrides: {},
-      worktreeOverrides: {},
     } as any);
     useComposerStore.setState({ drafts: {}, pendingPrefills: {} });
     useSessionRunStateStore.setState({ records: {} });

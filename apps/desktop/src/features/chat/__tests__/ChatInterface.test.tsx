@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useChatStore } from '../../../stores/chatStore';
+import { useSessionOverridesStore } from '../../../stores/sessionOverridesStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { useBottomPanelStore } from '../../../stores/bottomPanelStore';
 import { useUIStore } from '../../../stores/uiStore';
@@ -335,6 +336,7 @@ async function blurAsync(target: Element) {
 function setDefaultStores(overrides?: {
   projectStore?: Record<string, any>;
   chatStore?: Record<string, any>;
+  sessionOverridesStore?: Record<string, any>;
   terminalStore?: Record<string, any>;
   uiStore?: Record<string, any>;
   permissionStore?: Record<string, any>;
@@ -374,10 +376,18 @@ function setDefaultStores(overrides?: {
     setMode: vi.fn(),
     getMode: vi.fn(() => ''),
     getSystemInfo: vi.fn(() => null),
-    getPermissionOverride: vi.fn(() => null),
-    setPermissionOverride: vi.fn(),
     startRun: vi.fn(),
     ...overrides?.chatStore,
+  } as any);
+  useSessionOverridesStore.setState({
+    permissionOverrides: {},
+    worktreeOverrides: {},
+    setPermissionOverride: vi.fn(),
+    getPermissionOverride: vi.fn(() => null),
+    setWorktreeOverride: vi.fn(),
+    getWorktreeOverride: vi.fn(() => ''),
+    clearWorktreeOverride: vi.fn(),
+    ...overrides?.sessionOverridesStore,
   } as any);
   useTerminalStore.setState({
     drawerOpen: {},
@@ -1669,7 +1679,9 @@ describe('ChatInterface', () => {
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
-        getPermissionOverride: vi.fn(() => 'auto-approve'),
+      },
+      sessionOverridesStore: {
+        permissionOverrides: { 'sess-1': 'auto-approve' },
       },
     });
     const { container } = render(<ChatInterface sessionId="sess-1" />);

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Message, SystemInfo, UsageInfo, ContentBlock, RunHealthStatus, UnifiedPermissionPolicy, ToolEffect, ToolSemantic, ContextWindowSource } from '@zclaudia/shared';
+import type { Message, SystemInfo, UsageInfo, ContentBlock, RunHealthStatus, ToolEffect, ToolSemantic, ContextWindowSource } from '@zclaudia/shared';
 
 export interface PaginationInfo {
   total: number;
@@ -120,11 +120,6 @@ interface ChatState {
     latestCacheReadTokens?: number;
     latestCacheWriteTokens?: number;
   }>;
-  // Permission policy override per session (user-selected policy, null = use project default)
-  permissionOverrides: Record<string, Partial<UnifiedPermissionPolicy> | null>;
-  // Worktree override per session (user-selected working directory, empty = use project root)
-  worktreeOverrides: Record<string, string>;
-
   // Actions — Messages
   setMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
   prependMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
@@ -173,15 +168,6 @@ interface ChatState {
   addSessionUsage: (sessionId: string, usage: UsageInfo) => void;
   clearSessionUsage: (sessionId: string) => void;
 
-  // Permission override (per session)
-  setPermissionOverride: (sessionId: string, policy: Partial<UnifiedPermissionPolicy> | null) => void;
-  getPermissionOverride: (sessionId: string) => Partial<UnifiedPermissionPolicy> | null;
-
-  // Worktree override (per session)
-  setWorktreeOverride: (sessionId: string, path: string) => void;
-  getWorktreeOverride: (sessionId: string) => string;
-  clearWorktreeOverride: (sessionId: string) => void;
-
   // Getters
   getPagination: (sessionId: string) => PaginationInfo | undefined;
   isSessionLoading: (sessionId: string) => boolean;
@@ -220,8 +206,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
   modeBySession: {},
   runtimeModes: {},
   sessionUsage: {},
-  permissionOverrides: {},
-  worktreeOverrides: {},
 
   setMessages: (sessionId, messages, pagination) =>
     set((state) => ({
@@ -695,32 +679,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => {
       const { [sessionId]: _, ...rest } = state.sessionUsage;
       return { sessionUsage: rest };
-    }),
-
-  // Permission override (per session)
-  setPermissionOverride: (sessionId, policy) =>
-    set((state) => {
-      if (!policy) {
-        // Clear override by removing the key
-        const { [sessionId]: _, ...rest } = state.permissionOverrides;
-        return { permissionOverrides: rest };
-      }
-      return {
-        permissionOverrides: { ...state.permissionOverrides, [sessionId]: policy },
-      };
-    }),
-  getPermissionOverride: (sessionId) => get().permissionOverrides[sessionId] || null,
-
-  // Worktree override (per session)
-  setWorktreeOverride: (sessionId, path) =>
-    set((state) => ({
-      worktreeOverrides: { ...state.worktreeOverrides, [sessionId]: path },
-    })),
-  getWorktreeOverride: (sessionId) => get().worktreeOverrides[sessionId] || '',
-  clearWorktreeOverride: (sessionId) =>
-    set((state) => {
-      const { [sessionId]: _, ...rest } = state.worktreeOverrides;
-      return { worktreeOverrides: rest };
     }),
 
   getPagination: (sessionId) => get().pagination[sessionId],

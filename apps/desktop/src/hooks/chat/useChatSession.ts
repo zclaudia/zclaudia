@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useChatStore } from '../../stores/chatStore';
+import { useSessionOverridesStore } from '../../stores/sessionOverridesStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -62,8 +63,8 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
   const setMode = useChatStore((s) => s.setMode);
   const selectedMode = useChatStore((s) => s.modeBySession[sessionId] ?? '');
   const runtimeMode = useChatStore((s) => s.runtimeModes[sessionId] || '');
-  const permissionOverride = useChatStore((s) => s.getPermissionOverride(sessionId));
-  const setPermissionOverride = useChatStore((s) => s.setPermissionOverride);
+  const permissionOverride = useSessionOverridesStore((s) => s.permissionOverrides[sessionId] ?? null);
+  const setPermissionOverride = useSessionOverridesStore((s) => s.setPermissionOverride);
 
   // ── Derived values ──
   const useStreamingSegmented = isLoading && sessionContentBlocks.length > 1 && sessionToolCallHistory.length > 0;

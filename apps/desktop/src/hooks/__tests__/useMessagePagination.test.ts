@@ -28,8 +28,6 @@ describe('useMessagePagination', () => {
       modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
-      permissionOverrides: {},
-      worktreeOverrides: {},
     });
     useUIStore.setState({
       forceScrollToBottomSessionId: null,
