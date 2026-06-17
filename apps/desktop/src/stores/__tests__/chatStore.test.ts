@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatStore, type MessageWithToolCalls } from '../chatStore';
+import { useSessionConfigStore } from '../sessionConfigStore';
 import type { UsageInfo } from '@zclaudia/shared/core/message';
 
 const u = (input: number, output: number): UsageInfo => ({
@@ -27,10 +28,13 @@ describe('chatStore', () => {
       activeToolCalls: {},
       toolCallsHistory: {},
       runContentBlocks: {},
+    });
+    useSessionConfigStore.setState({
       systemInfoBySession: {},
       modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
+      compactionNotice: {},
     });
   });
 
@@ -354,18 +358,18 @@ describe('chatStore', () => {
   describe('system info', () => {
     it('sets and gets system info', () => {
       const info = { model: 'claude-4', cwd: '/home' };
-      useChatStore.getState().setSystemInfo('sess-1', info);
-      expect(useChatStore.getState().getSystemInfo('sess-1')).toEqual(info);
+      useSessionConfigStore.getState().setSystemInfo('sess-1', info);
+      expect(useSessionConfigStore.getState().getSystemInfo('sess-1')).toEqual(info);
     });
 
     it('clears system info', () => {
-      useChatStore.getState().setSystemInfo('sess-1', { model: 'test' });
-      useChatStore.getState().clearSystemInfo('sess-1');
-      expect(useChatStore.getState().getSystemInfo('sess-1')).toBeNull();
+      useSessionConfigStore.getState().setSystemInfo('sess-1', { model: 'test' });
+      useSessionConfigStore.getState().clearSystemInfo('sess-1');
+      expect(useSessionConfigStore.getState().getSystemInfo('sess-1')).toBeNull();
     });
 
     it('returns null for unknown session', () => {
-      expect(useChatStore.getState().getSystemInfo('unknown')).toBeNull();
+      expect(useSessionConfigStore.getState().getSystemInfo('unknown')).toBeNull();
     });
   });
 
@@ -373,28 +377,28 @@ describe('chatStore', () => {
 
   describe('mode', () => {
     it('setMode + getMode round-trip', () => {
-      useChatStore.getState().setMode('s1', 'plan');
-      expect(useChatStore.getState().getMode('s1')).toBe('plan');
-      useChatStore.getState().setMode('s1', 'default');
-      expect(useChatStore.getState().getMode('s1')).toBe('default');
+      useSessionConfigStore.getState().setMode('s1', 'plan');
+      expect(useSessionConfigStore.getState().getMode('s1')).toBe('plan');
+      useSessionConfigStore.getState().setMode('s1', 'default');
+      expect(useSessionConfigStore.getState().getMode('s1')).toBe('default');
     });
 
     it('getMode defaults to empty string for unknown session', () => {
-      expect(useChatStore.getState().getMode('unknown')).toBe('');
+      expect(useSessionConfigStore.getState().getMode('unknown')).toBe('');
     });
 
     it('tracks runtime mode separately and clears it when a run ends', () => {
-      useChatStore.getState().setMode('sess-1', 'default');
-      useChatStore.getState().setRuntimeMode('sess-1', 'plan');
+      useSessionConfigStore.getState().setMode('sess-1', 'default');
+      useSessionConfigStore.getState().setRuntimeMode('sess-1', 'plan');
       useChatStore.getState().startRun('run-1', 'sess-1');
 
-      expect(useChatStore.getState().getMode('sess-1')).toBe('default');
-      expect(useChatStore.getState().getRuntimeMode('sess-1')).toBe('plan');
+      expect(useSessionConfigStore.getState().getMode('sess-1')).toBe('default');
+      expect(useSessionConfigStore.getState().getRuntimeMode('sess-1')).toBe('plan');
 
       useChatStore.getState().endRun('run-1');
 
-      expect(useChatStore.getState().getMode('sess-1')).toBe('default');
-      expect(useChatStore.getState().getRuntimeMode('sess-1')).toBe('');
+      expect(useSessionConfigStore.getState().getMode('sess-1')).toBe('default');
+      expect(useSessionConfigStore.getState().getRuntimeMode('sess-1')).toBe('');
     });
   });
 
@@ -402,61 +406,61 @@ describe('chatStore', () => {
 
   describe('system info contextWindow', () => {
     it('setSystemInfo copies contextWindow into the session usage record (no prior usage)', () => {
-      useChatStore.getState().setSystemInfo('s2', {
+      useSessionConfigStore.getState().setSystemInfo('s2', {
         model: 'kimi-k2.6',
         contextWindow: 128_000,
       });
-      const usage = useChatStore.getState().sessionUsage['s2'];
+      const usage = useSessionConfigStore.getState().sessionUsage['s2'];
       expect(usage.contextWindow).toBe(128_000);
       expect(usage.inputTokens).toBe(0);
       expect(usage.outputTokens).toBe(0);
     });
 
     it('setSystemInfo updates existing usage record with contextWindow', () => {
-      useChatStore.getState().addSessionUsage('s3', u(100, 50));
-      useChatStore.getState().setSystemInfo('s3', { contextWindow: 64_000 });
-      const usage = useChatStore.getState().sessionUsage['s3'];
+      useSessionConfigStore.getState().addSessionUsage('s3', u(100, 50));
+      useSessionConfigStore.getState().setSystemInfo('s3', { contextWindow: 64_000 });
+      const usage = useSessionConfigStore.getState().sessionUsage['s3'];
       expect(usage.contextWindow).toBe(64_000);
       expect(usage.inputTokens).toBe(100);
       expect(usage.outputTokens).toBe(50);
     });
 
     it('setSystemInfo without contextWindow leaves usage untouched', () => {
-      useChatStore.getState().addSessionUsage('s4', u(20, 10));
-      useChatStore.getState().setSystemInfo('s4', { model: 'foo' });
-      const usage = useChatStore.getState().sessionUsage['s4'];
+      useSessionConfigStore.getState().addSessionUsage('s4', u(20, 10));
+      useSessionConfigStore.getState().setSystemInfo('s4', { model: 'foo' });
+      const usage = useSessionConfigStore.getState().sessionUsage['s4'];
       expect(usage.contextWindow).toBeUndefined();
     });
 
     // F2: contextWindowSource is wired alongside contextWindow so the UI can
     // explain provenance and warn on the fallback path.
     it('setSystemInfo copies contextWindowSource into usage (fresh record)', () => {
-      useChatStore.getState().setSystemInfo('s5', {
+      useSessionConfigStore.getState().setSystemInfo('s5', {
         contextWindow: 200_000,
         contextWindowSource: 'profile_entry',
       });
-      const usage = useChatStore.getState().sessionUsage['s5'];
+      const usage = useSessionConfigStore.getState().sessionUsage['s5'];
       expect(usage.contextWindow).toBe(200_000);
       expect(usage.contextWindowSource).toBe('profile_entry');
     });
 
     it('setSystemInfo updates contextWindowSource on existing usage record', () => {
-      useChatStore.getState().addSessionUsage('s6', u(1, 2));
-      useChatStore.getState().setSystemInfo('s6', {
+      useSessionConfigStore.getState().addSessionUsage('s6', u(1, 2));
+      useSessionConfigStore.getState().setSystemInfo('s6', {
         contextWindow: 64_000,
         contextWindowSource: 'fallback',
       });
-      const usage = useChatStore.getState().sessionUsage['s6'];
+      const usage = useSessionConfigStore.getState().sessionUsage['s6'];
       expect(usage.contextWindowSource).toBe('fallback');
     });
 
     it('addSessionUsage preserves contextWindowSource set earlier by setSystemInfo', () => {
-      useChatStore.getState().setSystemInfo('s7', {
+      useSessionConfigStore.getState().setSystemInfo('s7', {
         contextWindow: 128_000,
         contextWindowSource: 'pi_ai_registry',
       });
-      useChatStore.getState().addSessionUsage('s7', u(50, 25));
-      const usage = useChatStore.getState().sessionUsage['s7'];
+      useSessionConfigStore.getState().addSessionUsage('s7', u(50, 25));
+      const usage = useSessionConfigStore.getState().sessionUsage['s7'];
       expect(usage.contextWindowSource).toBe('pi_ai_registry');
       expect(usage.contextWindow).toBe(128_000);
       expect(usage.inputTokens).toBe(50);
@@ -466,24 +470,24 @@ describe('chatStore', () => {
     // show "from registry (deepseek)" — it must round-trip from system_info
     // wire through usage and survive subsequent addSessionUsage calls.
     it('setSystemInfo copies contextWindowMatchedProvider into usage (fresh record)', () => {
-      useChatStore.getState().setSystemInfo('s8', {
+      useSessionConfigStore.getState().setSystemInfo('s8', {
         contextWindow: 131_072,
         contextWindowSource: 'pi_ai_registry',
         contextWindowMatchedProvider: 'deepseek',
       });
-      const usage = useChatStore.getState().sessionUsage['s8'];
+      const usage = useSessionConfigStore.getState().sessionUsage['s8'];
       expect(usage.contextWindowSource).toBe('pi_ai_registry');
       expect(usage.contextWindowMatchedProvider).toBe('deepseek');
     });
 
     it('addSessionUsage preserves contextWindowMatchedProvider set earlier by setSystemInfo', () => {
-      useChatStore.getState().setSystemInfo('s9', {
+      useSessionConfigStore.getState().setSystemInfo('s9', {
         contextWindow: 131_072,
         contextWindowSource: 'pi_ai_registry',
         contextWindowMatchedProvider: 'deepseek',
       });
-      useChatStore.getState().addSessionUsage('s9', u(10, 5));
-      const usage = useChatStore.getState().sessionUsage['s9'];
+      useSessionConfigStore.getState().addSessionUsage('s9', u(10, 5));
+      const usage = useSessionConfigStore.getState().sessionUsage['s9'];
       expect(usage.contextWindowMatchedProvider).toBe('deepseek');
       expect(usage.contextWindowSource).toBe('pi_ai_registry');
       expect(usage.contextWindow).toBe(131_072);
@@ -491,11 +495,11 @@ describe('chatStore', () => {
     });
 
     it('setSystemInfo leaves contextWindowMatchedProvider undefined when wire omits it', () => {
-      useChatStore.getState().setSystemInfo('s10', {
+      useSessionConfigStore.getState().setSystemInfo('s10', {
         contextWindow: 200_000,
         contextWindowSource: 'profile_entry',
       });
-      const usage = useChatStore.getState().sessionUsage['s10'];
+      const usage = useSessionConfigStore.getState().sessionUsage['s10'];
       expect(usage.contextWindowMatchedProvider).toBeUndefined();
     });
   });
@@ -504,10 +508,10 @@ describe('chatStore', () => {
 
   describe('addSessionUsage', () => {
     it('accumulates usage', () => {
-      useChatStore.getState().addSessionUsage('sess-1', u(100, 50));
-      useChatStore.getState().addSessionUsage('sess-1', u(200, 100));
+      useSessionConfigStore.getState().addSessionUsage('sess-1', u(100, 50));
+      useSessionConfigStore.getState().addSessionUsage('sess-1', u(200, 100));
 
-      const usage = useChatStore.getState().sessionUsage['sess-1'];
+      const usage = useSessionConfigStore.getState().sessionUsage['sess-1'];
       expect(usage.inputTokens).toBe(300);
       expect(usage.outputTokens).toBe(150);
       expect(usage.contextWindow).toBeUndefined();
@@ -516,13 +520,13 @@ describe('chatStore', () => {
     });
 
     it('clears usage for the reset session only', () => {
-      useChatStore.getState().addSessionUsage('sess-1', u(100, 50));
-      useChatStore.getState().addSessionUsage('sess-2', u(200, 100));
+      useSessionConfigStore.getState().addSessionUsage('sess-1', u(100, 50));
+      useSessionConfigStore.getState().addSessionUsage('sess-2', u(200, 100));
 
-      useChatStore.getState().clearSessionUsage('sess-1');
+      useSessionConfigStore.getState().clearSessionUsage('sess-1');
 
-      expect(useChatStore.getState().sessionUsage['sess-1']).toBeUndefined();
-      expect(useChatStore.getState().sessionUsage['sess-2']).toEqual({
+      expect(useSessionConfigStore.getState().sessionUsage['sess-1']).toBeUndefined();
+      expect(useSessionConfigStore.getState().sessionUsage['sess-2']).toEqual({
         inputTokens: 200,
         outputTokens: 100,
         cacheReadTokens: 0,
@@ -540,10 +544,10 @@ describe('chatStore', () => {
     });
 
     it('accumulates cache tokens and tracks latest snapshot', () => {
-      useChatStore.getState().addSessionUsage('sess-1', uc(100, 50, 1000, 200));
-      useChatStore.getState().addSessionUsage('sess-1', uc(10, 5, 2000, 0));
+      useSessionConfigStore.getState().addSessionUsage('sess-1', uc(100, 50, 1000, 200));
+      useSessionConfigStore.getState().addSessionUsage('sess-1', uc(10, 5, 2000, 0));
 
-      const usage = useChatStore.getState().sessionUsage['sess-1'];
+      const usage = useSessionConfigStore.getState().sessionUsage['sess-1'];
       expect(usage.cacheReadTokens).toBe(3000);
       expect(usage.cacheWriteTokens).toBe(200);
       expect(usage.latestCacheReadTokens).toBe(2000);

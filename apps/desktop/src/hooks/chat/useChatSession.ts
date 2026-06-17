@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useSessionOverridesStore } from '../../stores/sessionOverridesStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
@@ -54,15 +55,15 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     if (!runId) return EMPTY_TOOL_CALLS;
     return s.toolCallsHistory[runId] || EMPTY_TOOL_CALLS;
   });
-  const currentUsage = useChatStore((s) => s.sessionUsage[sessionId] || null);
-  const currentSystemInfo = useChatStore((s) => s.systemInfoBySession[sessionId] || null);
+  const currentUsage = useSessionConfigStore((s) => s.sessionUsage[sessionId] || null);
+  const currentSystemInfo = useSessionConfigStore((s) => s.systemInfoBySession[sessionId] || null);
 
   // Store actions
   const addMessage = useChatStore((s) => s.addMessage);
   const clearMessages = useChatStore((s) => s.clearMessages);
-  const setMode = useChatStore((s) => s.setMode);
-  const selectedMode = useChatStore((s) => s.modeBySession[sessionId] ?? '');
-  const runtimeMode = useChatStore((s) => s.runtimeModes[sessionId] || '');
+  const setMode = useSessionConfigStore((s) => s.setMode);
+  const selectedMode = useSessionConfigStore((s) => s.modeBySession[sessionId] ?? '');
+  const runtimeMode = useSessionConfigStore((s) => s.runtimeModes[sessionId] || '');
   const permissionOverride = useSessionOverridesStore((s) => s.permissionOverrides[sessionId] ?? null);
   const setPermissionOverride = useSessionOverridesStore((s) => s.setPermissionOverride);
 

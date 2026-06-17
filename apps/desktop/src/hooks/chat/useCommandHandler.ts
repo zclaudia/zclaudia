@@ -3,6 +3,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { activatePanel } from '../../utils/openPanel';
 import * as api from '../../services/api';
 import type { CommandExecuteResponse, SlashCommand, Session, Project, MessageRole, MessageMetadata } from '@zclaudia/shared';
@@ -234,7 +235,7 @@ export function useCommandHandler({
   const handleResetProviderSession = useCallback(async () => {
     try {
       await api.resetSessionSdkSession(sessionId);
-      useChatStore.getState().clearSessionUsage(sessionId);
+      useSessionConfigStore.getState().clearSessionUsage(sessionId);
       // Clear any stale frontend run state so the session is no longer stuck in loading
       const staleRunId = useChatStore.getState().getSessionRunId(sessionId);
       if (staleRunId) {
@@ -389,7 +390,7 @@ export function useCommandHandler({
     if (command === '/new-cli-session' || command === '/reset-cli-session') {
       try {
         await api.resetSessionSdkSession(sessionId);
-        useChatStore.getState().clearSessionUsage(sessionId);
+        useSessionConfigStore.getState().clearSessionUsage(sessionId);
         addMessage(sessionId, {
           id: crypto.randomUUID(),
           sessionId,

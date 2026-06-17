@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useMessagePagination } from '../chat/useMessagePagination';
 import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useFilePushStore } from '../../stores/filePushStore';
 
@@ -24,10 +25,13 @@ describe('useMessagePagination', () => {
       activeToolCalls: {},
       toolCallsHistory: {},
       runContentBlocks: {},
+    });
+    useSessionConfigStore.setState({
       systemInfoBySession: {},
       modeBySession: {},
       runtimeModes: {},
       sessionUsage: {},
+      compactionNotice: {},
     });
     useUIStore.setState({
       forceScrollToBottomSessionId: null,

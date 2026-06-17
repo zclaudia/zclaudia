@@ -1,6 +1,7 @@
 import type { ServerMessage } from '@zclaudia/shared';
 import type { MessageDispatchContext } from './types';
 import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { usePermissionStore } from '../../stores/permissionStore';
@@ -76,7 +77,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         health: 'healthy',
       });
       if (serverId === activeServerId) {
-        chat.clearSystemInfo(targetSessionId);
+        useSessionConfigStore.getState().clearSystemInfo(targetSessionId);
       }
       if (userMsgId && clientReqId) chat.updateMessageIdByClientMessageId(targetSessionId, clientReqId, userMsgId);
       if (msg.assistantMessageId || !alreadyTrackingRun) {
@@ -118,7 +119,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         useInteractionStore.getState().clearSession(completedSession);
         useChatStore.getState().finalizeRunToMessage(msg.runId);
         if (msg.usage) {
-          useChatStore.getState().addSessionUsage(completedSession, msg.usage);
+          useSessionConfigStore.getState().addSessionUsage(completedSession, msg.usage);
         }
         useSessionRunStateStore.getState().markRunEnded({
           backendId,
@@ -267,11 +268,11 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'mode_change':
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      useChatStore.getState().setRuntimeMode(msg.sessionId, msg.mode);
+      useSessionConfigStore.getState().setRuntimeMode(msg.sessionId, msg.mode);
       // Pass the mode string through directly so the UI selector stays
       // consistent with the backend's actual mode (e.g. AI-entered plan mode
       // mid-run). Selector values match the same vocabulary.
-      useChatStore.getState().setMode(msg.sessionId, msg.mode);
+      useSessionConfigStore.getState().setMode(msg.sessionId, msg.mode);
       return true;
 
     case 'system_info':
@@ -279,7 +280,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (serverId === activeServerId) {
         const sessionId = useChatStore.getState().activeRuns[msg.runId];
         if (sessionId) {
-          useChatStore.getState().setSystemInfo(sessionId, msg.systemInfo);
+          useSessionConfigStore.getState().setSystemInfo(sessionId, msg.systemInfo);
         } else {
           console.warn(`[${logTag}] system_info for untracked run ${msg.runId}`);
         }
@@ -293,7 +294,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         return true;
       }
       console.warn(`[${logTag}] compaction_failed session=${sessionId} reason=${msg.reason} breakerOpen=${msg.breakerOpen}`);
-      useChatStore.getState().setCompactionNotice(sessionId, {
+      useSessionConfigStore.getState().setCompactionNotice(sessionId, {
         sessionId,
         reason: msg.reason,
         breakerOpen: msg.breakerOpen,
@@ -315,7 +316,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
         console.warn(`[${logTag}] compaction_completed missing sessionId/compactionId, ignoring`);
         return true;
       }
-      useChatStore.getState().clearCompactionNotice(sessionId);
+      useSessionConfigStore.getState().clearCompactionNotice(sessionId);
       void getSessionCompaction(sessionId, compactionId)
         .then((c) => {
           useChatStore.getState().addMessage(sessionId, {

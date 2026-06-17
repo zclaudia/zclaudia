@@ -6,7 +6,7 @@ import { useProjectStore } from '../../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../../stores/llmProfileMetaStore';
 import { useAgentProfileMetaStore } from '../../../stores/agentProfileMetaStore';
 import { useServerStore } from '../../../stores/serverStore';
-import { useChatStore } from '../../../stores/chatStore';
+import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 
 vi.mock('../../../services/api', () => ({
   getProviderCommands: vi.fn(),
@@ -56,7 +56,7 @@ describe('useProviderCapabilities', () => {
       setProviderCapabilities: useProjectStore.getState().setProviderCapabilities,
     } as any);
 
-    useChatStore.setState({
+    useSessionConfigStore.setState({
       getMode: vi.fn(() => ''),
       setMode: vi.fn(),
     } as any);
@@ -102,7 +102,7 @@ describe('useProviderCapabilities', () => {
       expect.objectContaining({ defaultModeId: 'plan' })
     );
     // Capabilities arrive for an unset session → setMode seeded from defaultModeId.
-    expect((useChatStore.getState() as any).setMode).toHaveBeenCalledWith('sess-1', 'plan');
+    expect((useSessionConfigStore.getState() as any).setMode).toHaveBeenCalledWith('sess-1', 'plan');
   });
 
   it('loads provider-specific metadata when session resolves to agent → llm-profile', async () => {

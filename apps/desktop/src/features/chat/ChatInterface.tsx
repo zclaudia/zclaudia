@@ -10,7 +10,7 @@ import { SessionHeader } from './SessionHeader';
 import { BackgroundTaskPanel } from '../../components/BackgroundTaskPanel';
 import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
 import { TaskCardStrip } from '../supervision/components/TaskCardStrip';
-import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useTerminalStore } from '../../stores/terminalStore';
@@ -112,7 +112,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   const chatActionsValue = useMemo<ChatActionsContextValue>(() => ({
     handleSendMessage,
-    setMode: useChatStore.getState().setMode,
+    setMode: useSessionConfigStore.getState().setMode,
   }), [handleSendMessage]);
 
   // UI state

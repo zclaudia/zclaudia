@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useChatStore } from '../../../stores/chatStore';
+import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 import { useSessionOverridesStore } from '../../../stores/sessionOverridesStore';
 import { useTerminalStore } from '../../../stores/terminalStore';
 import { useBottomPanelStore } from '../../../stores/bottomPanelStore';
@@ -336,6 +337,7 @@ async function blurAsync(target: Element) {
 function setDefaultStores(overrides?: {
   projectStore?: Record<string, any>;
   chatStore?: Record<string, any>;
+  sessionConfigStore?: Record<string, any>;
   sessionOverridesStore?: Record<string, any>;
   terminalStore?: Record<string, any>;
   uiStore?: Record<string, any>;
@@ -360,24 +362,29 @@ function setDefaultStores(overrides?: {
     pagination: {},
     activeRuns: {},
     backgroundRunIds: new Set(),
-    modeBySession: {},
-    runtimeModes: {},
     runHealth: {},
     activeToolCalls: {},
     runContentBlocks: {},
     toolCallsHistory: {},
-    sessionUsage: {},
     addMessage: vi.fn(),
     setMessages: vi.fn(),
     prependMessages: vi.fn(),
     appendMessages: vi.fn(),
     clearMessages: vi.fn(),
     setLoadingMore: vi.fn(),
+    startRun: vi.fn(),
+    ...overrides?.chatStore,
+  } as any);
+  useSessionConfigStore.setState({
+    modeBySession: {},
+    runtimeModes: {},
+    sessionUsage: {},
+    compactionNotice: {},
+    systemInfoBySession: {},
     setMode: vi.fn(),
     getMode: vi.fn(() => ''),
     getSystemInfo: vi.fn(() => null),
-    startRun: vi.fn(),
-    ...overrides?.chatStore,
+    ...overrides?.sessionConfigStore,
   } as any);
   useSessionOverridesStore.setState({
     permissionOverrides: {},
@@ -855,6 +862,8 @@ describe('ChatInterface', () => {
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
+      },
+      sessionConfigStore: {
         modeBySession: { 'sess-1': 'plan' },
       },
     });
@@ -1271,7 +1280,7 @@ describe('ChatInterface', () => {
 
   it("shows mode selector value='plan' when modeBySession is set", () => {
     setDefaultStores({
-      chatStore: {
+      sessionConfigStore: {
         modeBySession: { 'sess-1': 'plan' },
       },
     });
@@ -1368,6 +1377,8 @@ describe('ChatInterface', () => {
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
+      },
+      sessionConfigStore: {
         modeBySession: { 'sess-1': 'plan' },
       },
     });
@@ -1381,6 +1392,8 @@ describe('ChatInterface', () => {
       chatStore: {
         messages: {},
         pagination: { 'sess-1': { total: 0, hasMore: false } },
+      },
+      sessionConfigStore: {
         modeBySession: {},
         runtimeModes: { 'sess-1': 'plan' },
       },
@@ -1517,7 +1530,7 @@ describe('ChatInterface', () => {
 
   it('passes session usage to TokenUsageDisplay', () => {
     setDefaultStores({
-      chatStore: {
+      sessionConfigStore: {
         sessionUsage: {
           'sess-1': {
             inputTokens: 100,

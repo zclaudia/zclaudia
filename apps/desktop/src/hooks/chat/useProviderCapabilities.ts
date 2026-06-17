@@ -2,7 +2,7 @@ import { useEffect, useMemo } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useServerStore } from '../../stores/serverStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import * as api from '../../services/api';
 import type { ProviderCapabilities, SlashCommand } from '@zclaudia/shared';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../../utils/controlPlane';
@@ -97,7 +97,7 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
   // the first capabilities entry. Only fires once per session-with-unset-mode.
   useEffect(() => {
     if (!capabilities) return;
-    const chat = useChatStore.getState();
+    const chat = useSessionConfigStore.getState();
     if (chat.getMode(sessionId)) return;
     const next = capabilities.defaultModeId || capabilities.modes?.[0]?.id;
     if (next) chat.setMode(sessionId, next);

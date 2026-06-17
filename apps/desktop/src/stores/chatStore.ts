@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import type { Message, SystemInfo, UsageInfo, ContentBlock, RunHealthStatus, ToolEffect, ToolSemantic, ContextWindowSource } from '@zclaudia/shared';
+import type { Message, ContentBlock, RunHealthStatus, ToolEffect, ToolSemantic } from '@zclaudia/shared';
+import { useSessionConfigStore } from './sessionConfigStore';
 
 export interface PaginationInfo {
   total: number;
@@ -55,14 +56,6 @@ export interface RunRetryStatus {
   receivedAt: number;
 }
 
-export interface CompactionNotice {
-  sessionId: string;
-  reason: string;
-  breakerOpen: boolean;
-  nextRetryAtMs?: number;
-  receivedAt: number;
-}
-
 interface ChatState {
   // Messages grouped by session ID
   messages: Record<string, MessageWithToolCalls[]>;
@@ -76,50 +69,12 @@ interface ChatState {
   runHealth: Record<string, RunHealth>;
   // Retry status while LLM call is in backoff: runId → RunRetryStatus
   runRetryStatus: Record<string, RunRetryStatus>;
-  // Per-session compaction failure notice (cleared on success or dismiss)
-  compactionNotice: Record<string, CompactionNotice>;
   // Active tool calls per run: runId → { toolUseId → ToolCallState }
   activeToolCalls: Record<string, Record<string, ToolCallState>>;
   // Tool calls history per run: runId → ToolCallState[] (preserves order)
   toolCallsHistory: Record<string, ToolCallState[]>;
   // Content blocks per run: runId → ContentBlock[] (text/tool_use interleaved sequence)
   runContentBlocks: Record<string, ContentBlock[]>;
-  // Provider system info from runtime init message, keyed by session ID
-  systemInfoBySession: Record<string, SystemInfo>;
-  // User-selected mode per session (e.g. 'default' | 'plan'). The selector
-  // is driven by `ProviderCapabilities.modes`; adding new modes only needs
-  // a capabilities entry. Stored as a string so the wire `run_start.mode`
-  // and `mode_change` events can pass through directly.
-  modeBySession: Record<string, string>;
-  // Runtime mode per session (provider-driven transient state, e.g. AI-entered plan mode).
-  // Mirrors backend `mode_change` events; same vocabulary as modeBySession.
-  runtimeModes: Record<string, string>;
-  // Token usage per session (accumulated + latest run snapshot)
-  sessionUsage: Record<string, {
-    inputTokens: number;
-    outputTokens: number;
-    cacheReadTokens: number;
-    cacheWriteTokens: number;
-    contextWindow?: number;
-    /**
-     * Which layer in the resolution chain supplied `contextWindow`. Surfaced
-     * by TokenUsageDisplay so users can tell when we're guessing (fallback)
-     * vs reading from their LLM profile / pi-ai registry.
-     */
-    contextWindowSource?: ContextWindowSource;
-    /**
-     * When `contextWindowSource === 'pi_ai_registry'`, the pi-ai provider id
-     * whose registry entry matched. Lets TokenUsageDisplay show
-     * "from registry (deepseek)" on cross-provider sweeps so users can tell
-     * which provider's spec we adopted. `undefined` on same-provider hits
-     * where the annotation would be redundant.
-     */
-    contextWindowMatchedProvider?: string;
-    latestInputTokens?: number;
-    latestOutputTokens?: number;
-    latestCacheReadTokens?: number;
-    latestCacheWriteTokens?: number;
-  }>;
   // Actions — Messages
   setMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
   prependMessages: (sessionId: string, messages: MessageWithToolCalls[], pagination?: Partial<Omit<PaginationInfo, 'isLoadingMore'>>) => void;
@@ -137,8 +92,6 @@ interface ChatState {
   updateRunHealth: (runId: string, health: RunHealth) => void;
   updateRunRetryStatus: (runId: string, status: RunRetryStatus) => void;
   clearRunRetryStatus: (runId: string) => void;
-  setCompactionNotice: (sessionId: string, notice: CompactionNotice) => void;
-  clearCompactionNotice: (sessionId: string) => void;
 
   // Actions — Tool calls (per run)
   addToolCall: (runId: string, toolUseId: string, toolName: string, toolInput: unknown, semantic?: ToolSemantic, effect?: ToolEffect) => void;
@@ -151,22 +104,6 @@ interface ChatState {
 
   // Finalize run data onto the assistant message (single atomic update)
   finalizeRunToMessage: (runId: string) => void;
-
-  // System info actions
-  setSystemInfo: (sessionId: string, info: SystemInfo) => void;
-  clearSystemInfo: (sessionId: string) => void;
-  getSystemInfo: (sessionId: string) => SystemInfo | null;
-
-  // Mode actions (per session)
-  setMode: (sessionId: string, mode: string) => void;
-  getMode: (sessionId: string) => string;
-  setRuntimeMode: (sessionId: string, mode: string) => void;
-  getRuntimeMode: (sessionId: string) => string;
-  clearRuntimeMode: (sessionId: string) => void;
-
-  // Usage tracking
-  addSessionUsage: (sessionId: string, usage: UsageInfo) => void;
-  clearSessionUsage: (sessionId: string) => void;
 
   // Getters
   getPagination: (sessionId: string) => PaginationInfo | undefined;
@@ -198,14 +135,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
   backgroundRunIds: new Set<string>(),
   runHealth: {},
   runRetryStatus: {},
-  compactionNotice: {},
   activeToolCalls: {},
   toolCallsHistory: {},
   runContentBlocks: {},
-  systemInfoBySession: {},
-  modeBySession: {},
-  runtimeModes: {},
-  sessionUsage: {},
 
   setMessages: (sessionId, messages, pagination) =>
     set((state) => ({
@@ -394,17 +326,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }));
   },
 
-  endRun: (runId) =>
+  endRun: (runId) => {
+    const sessionId = useChatStore.getState().activeRuns[runId];
     set((state) => {
-      const sessionId = state.activeRuns[runId];
       const { [runId]: _removedRun, ...remainingRuns } = state.activeRuns;
       const { [runId]: _removedTC, ...remainingTC } = state.activeToolCalls;
       const { [runId]: _removedHist, ...remainingHist } = state.toolCallsHistory;
       const { [runId]: _removedCB, ...remainingCB } = state.runContentBlocks;
       const { [runId]: _removedHealth, ...remainingHealth } = state.runHealth;
       const { [runId]: _removedRetry, ...remainingRetry } = state.runRetryStatus;
-      const runtimeModes = { ...state.runtimeModes };
-      if (sessionId) delete runtimeModes[sessionId];
       const newBackgroundRunIds = new Set(state.backgroundRunIds);
       newBackgroundRunIds.delete(runId);
       return {
@@ -415,9 +345,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         runContentBlocks: remainingCB,
         runHealth: remainingHealth,
         runRetryStatus: remainingRetry,
-        runtimeModes,
       };
-    }),
+    });
+    if (sessionId) useSessionConfigStore.getState().clearRuntimeMode(sessionId);
+  },
 
   updateRunHealth: (runId, health) =>
     set((state) => {
@@ -440,15 +371,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       if (!state.runRetryStatus[runId]) return state;
       const { [runId]: _removed, ...rest } = state.runRetryStatus;
       return { runRetryStatus: rest };
-    }),
-
-  setCompactionNotice: (sessionId, notice) =>
-    set((state) => ({ compactionNotice: { ...state.compactionNotice, [sessionId]: notice } })),
-
-  clearCompactionNotice: (sessionId) =>
-    set((state) => {
-      const { [sessionId]: _removed, ...rest } = state.compactionNotice;
-      return { compactionNotice: rest };
     }),
 
   // ── Tool call actions (per run) ────────────────────────────────
@@ -595,90 +517,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return {
         messages: { ...state.messages, [sessionId]: updatedMessages },
       };
-    }),
-
-  // System info actions
-  setSystemInfo: (sessionId, info) =>
-    set((state) => {
-      const usageNext = { ...state.sessionUsage };
-      if (typeof info.contextWindow === 'number' && info.contextWindow > 0) {
-        const existing = usageNext[sessionId];
-        if (existing) {
-          usageNext[sessionId] = {
-            ...existing,
-            contextWindow: info.contextWindow,
-            contextWindowSource: info.contextWindowSource,
-            contextWindowMatchedProvider: info.contextWindowMatchedProvider,
-          };
-        } else {
-          usageNext[sessionId] = {
-            inputTokens: 0,
-            outputTokens: 0,
-            cacheReadTokens: 0,
-            cacheWriteTokens: 0,
-            contextWindow: info.contextWindow,
-            contextWindowSource: info.contextWindowSource,
-            contextWindowMatchedProvider: info.contextWindowMatchedProvider,
-          };
-        }
-      }
-      return {
-        systemInfoBySession: { ...state.systemInfoBySession, [sessionId]: info },
-        sessionUsage: usageNext,
-      };
-    }),
-  clearSystemInfo: (sessionId) =>
-    set((state) => {
-      const { [sessionId]: _, ...rest } = state.systemInfoBySession;
-      return { systemInfoBySession: rest };
-    }),
-  getSystemInfo: (sessionId) => get().systemInfoBySession[sessionId] || null,
-
-  // Mode actions (per session). Default getMode returns '' so ModeSelector
-  // can fall back to capabilities.defaultModeId when no override is set.
-  setMode: (sessionId, mode) =>
-    set((state) => ({
-      modeBySession: { ...state.modeBySession, [sessionId]: mode },
-    })),
-  getMode: (sessionId) => get().modeBySession[sessionId] ?? '',
-  setRuntimeMode: (sessionId, mode) =>
-    set((state) => ({
-      runtimeModes: { ...state.runtimeModes, [sessionId]: mode },
-    })),
-  getRuntimeMode: (sessionId) => get().runtimeModes[sessionId] || '',
-  clearRuntimeMode: (sessionId) =>
-    set((state) => {
-      const { [sessionId]: _removedMode, ...remainingRuntimeModes } = state.runtimeModes;
-      return { runtimeModes: remainingRuntimeModes };
-    }),
-
-  // Usage tracking
-  addSessionUsage: (sessionId, usage) =>
-    set((state) => {
-      const existing = state.sessionUsage[sessionId] || { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 };
-      return {
-        sessionUsage: {
-          ...state.sessionUsage,
-          [sessionId]: {
-            inputTokens: existing.inputTokens + usage.input,
-            outputTokens: existing.outputTokens + usage.output,
-            cacheReadTokens: (existing.cacheReadTokens ?? 0) + (usage.cacheRead ?? 0),
-            cacheWriteTokens: (existing.cacheWriteTokens ?? 0) + (usage.cacheWrite ?? 0),
-            contextWindow: existing.contextWindow,
-            contextWindowSource: existing.contextWindowSource,
-            contextWindowMatchedProvider: existing.contextWindowMatchedProvider,
-            latestInputTokens: usage.input,
-            latestOutputTokens: usage.output,
-            latestCacheReadTokens: usage.cacheRead ?? 0,
-            latestCacheWriteTokens: usage.cacheWrite ?? 0,
-          },
-        },
-      };
-    }),
-  clearSessionUsage: (sessionId) =>
-    set((state) => {
-      const { [sessionId]: _, ...rest } = state.sessionUsage;
-      return { sessionUsage: rest };
     }),
 
   getPagination: (sessionId) => get().pagination[sessionId],

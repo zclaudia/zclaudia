@@ -6,31 +6,34 @@ const mockChatStore = {
   activeRuns: {} as Record<string, string>,
   runHealth: {} as Record<string, any>,
   runRetryStatus: {} as Record<string, any>,
-  compactionNotice: {} as Record<string, any>,
   appendToLastMessage: vi.fn(),
   appendTextBlock: vi.fn(),
   startRun: vi.fn(),
-  clearSystemInfo: vi.fn(),
   updateMessageIdByClientMessageId: vi.fn(),
   addMessage: vi.fn(),
   finalizeRunToMessage: vi.fn(),
-  addSessionUsage: vi.fn(),
   endRun: vi.fn(),
   addToolCall: vi.fn(),
   addToolUseBlock: vi.fn(),
   updateToolCallResult: vi.fn(),
   updateToolCallActivity: vi.fn(),
-  setMode: vi.fn(),
-  setRuntimeMode: vi.fn(),
-  setSystemInfo: vi.fn(),
   updateRunHealth: vi.fn(),
   updateRunRetryStatus: vi.fn(),
   clearRunRetryStatus: vi.fn(),
+};
+
+const mockSessionConfigStore = {
+  compactionNotice: {} as Record<string, any>,
+  clearSystemInfo: vi.fn(),
+  addSessionUsage: vi.fn(),
+  setMode: vi.fn(),
+  setRuntimeMode: vi.fn(),
+  setSystemInfo: vi.fn(),
   setCompactionNotice: vi.fn((sessionId: string, notice: any) => {
-    mockChatStore.compactionNotice[sessionId] = notice;
+    mockSessionConfigStore.compactionNotice[sessionId] = notice;
   }),
   clearCompactionNotice: vi.fn((sessionId: string) => {
-    delete mockChatStore.compactionNotice[sessionId];
+    delete mockSessionConfigStore.compactionNotice[sessionId];
   }),
 };
 
@@ -120,6 +123,9 @@ const mockGetProjectsForBackend = vi.fn();
 vi.mock('../../stores/chatStore', () => ({
   useChatStore: { getState: () => mockChatStore },
 }));
+vi.mock('../../stores/sessionConfigStore', () => ({
+  useSessionConfigStore: { getState: () => mockSessionConfigStore },
+}));
 vi.mock('../../stores/projectStore', () => ({
   useProjectStore: { getState: () => mockProjectStore },
 }));
@@ -198,7 +204,7 @@ describe('handleServerMessage', () => {
     mockGetProjectsForBackend.mockReset();
     mockChatStore.activeRuns = {};
     mockChatStore.runHealth = {};
-    mockChatStore.compactionNotice = {};
+    mockSessionConfigStore.compactionNotice = {};
     mockBackgroundTaskStore.tasks = {};
     mockProjectStore.selectedSessionId = 'current-session';
     mockProjectStore.sessions = [];
@@ -276,7 +282,7 @@ describe('handleServerMessage', () => {
       }, makeCtx());
 
       expect(mockChatStore.startRun).toHaveBeenCalledWith('r1', 's1', false);
-      expect(mockChatStore.clearSystemInfo).toHaveBeenCalledWith('s1');
+      expect(mockSessionConfigStore.clearSystemInfo).toHaveBeenCalledWith('s1');
       expect(mockChatStore.updateMessageIdByClientMessageId).toHaveBeenCalledWith('s1', 'cr1', 'um1');
       expect(mockChatStore.addMessage).toHaveBeenCalled();
       expect(mockProjectStore.setSessionActive).toHaveBeenCalledWith('s1', true);
@@ -319,7 +325,7 @@ describe('handleServerMessage', () => {
         { type: 'run_started', runId: 'r1', sessionId: 's1' },
         makeCtx({ serverId: 'other-server' })
       );
-      expect(mockChatStore.clearSystemInfo).not.toHaveBeenCalled();
+      expect(mockSessionConfigStore.clearSystemInfo).not.toHaveBeenCalled();
     });
 
     it('does not add a duplicate assistant placeholder for metadata-only reruns', () => {
@@ -347,7 +353,7 @@ describe('handleServerMessage', () => {
       expect(mockPermissionStore.clearRequestsForSession).toHaveBeenCalledWith('s1');
       expect(mockInteractionStore.clearSession).toHaveBeenCalledWith('s1');
       expect(mockChatStore.finalizeRunToMessage).toHaveBeenCalledWith('r1');
-      expect(mockChatStore.addSessionUsage).toHaveBeenCalledWith('s1', { tokens: 100 });
+      expect(mockSessionConfigStore.addSessionUsage).toHaveBeenCalledWith('s1', { tokens: 100 });
       expect(mockProjectStore.setSessionActive).toHaveBeenCalledWith('s1', false);
       expect(mockChatStore.endRun).toHaveBeenCalledWith('r1');
       expect(mockEagerSyncCurrentSession).toHaveBeenCalledWith('server-1');
@@ -506,12 +512,12 @@ describe('handleServerMessage', () => {
 
   it('handles mode_change → passes mode string through to setMode', () => {
     handleServerMessage({ type: 'mode_change', sessionId: 's1', mode: 'plan' }, makeCtx());
-    expect(mockChatStore.setRuntimeMode).toHaveBeenCalledWith('s1', 'plan');
-    expect(mockChatStore.setMode).toHaveBeenCalledWith('s1', 'plan');
+    expect(mockSessionConfigStore.setRuntimeMode).toHaveBeenCalledWith('s1', 'plan');
+    expect(mockSessionConfigStore.setMode).toHaveBeenCalledWith('s1', 'plan');
 
-    mockChatStore.setMode.mockClear();
+    mockSessionConfigStore.setMode.mockClear();
     handleServerMessage({ type: 'mode_change', sessionId: 's1', mode: 'default' }, makeCtx());
-    expect(mockChatStore.setMode).toHaveBeenCalledWith('s1', 'default');
+    expect(mockSessionConfigStore.setMode).toHaveBeenCalledWith('s1', 'default');
   });
 
   it('handles permission_request', () => {
@@ -688,7 +694,7 @@ describe('handleServerMessage', () => {
     it('sets system info for active server', () => {
       mockChatStore.activeRuns = { r1: 's1' };
       handleServerMessage({ type: 'system_info', runId: 'r1', systemInfo: { version: '1.0' } }, makeCtx());
-      expect(mockChatStore.setSystemInfo).toHaveBeenCalledWith('s1', { version: '1.0' });
+      expect(mockSessionConfigStore.setSystemInfo).toHaveBeenCalledWith('s1', { version: '1.0' });
     });
 
     it('ignores system_info from non-active server', () => {
@@ -697,7 +703,7 @@ describe('handleServerMessage', () => {
         { type: 'system_info', runId: 'r1', systemInfo: {} },
         makeCtx({ serverId: 'other-server' })
       );
-      expect(mockChatStore.setSystemInfo).not.toHaveBeenCalled();
+      expect(mockSessionConfigStore.setSystemInfo).not.toHaveBeenCalled();
     });
 
     it('warns on untracked run', () => {
@@ -771,7 +777,7 @@ describe('handleServerMessage', () => {
         { type: 'compaction_failed', sessionId: 's1', reason: 'error: prompt_too_long', breakerOpen: true, nextRetryAtMs: 999 } as any,
         makeCtx(),
       );
-      const notice = mockChatStore.compactionNotice['s1'];
+      const notice = mockSessionConfigStore.compactionNotice['s1'];
       expect(notice).toBeTruthy();
       expect(notice.breakerOpen).toBe(true);
       expect(notice.reason).toContain('prompt_too_long');
@@ -779,7 +785,7 @@ describe('handleServerMessage', () => {
 
     it('ignores events missing sessionId', () => {
       handleServerMessage({ type: 'compaction_failed', sessionId: '', reason: 'x', breakerOpen: false } as any, makeCtx());
-      expect(Object.keys(mockChatStore.compactionNotice)).toHaveLength(0);
+      expect(Object.keys(mockSessionConfigStore.compactionNotice)).toHaveLength(0);
     });
   });
 
@@ -1112,7 +1118,7 @@ describe('handleServerMessage', () => {
           runId: 'r1', sessionId: 's1', systemInfo: { version: '2.0' },
         }],
       }), makeCtx());
-      expect(mockChatStore.setSystemInfo).toHaveBeenCalledWith('s1', { version: '2.0' });
+      expect(mockSessionConfigStore.setSystemInfo).toHaveBeenCalledWith('s1', { version: '2.0' });
     });
 
     it('marks stale background-run tasks as stopped after reconnect', () => {

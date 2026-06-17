@@ -5,7 +5,7 @@ import { ACTIONABLE_LABEL, extractDefaultTitleFromPlan } from '@zclaudia/shared'
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useLocalIssueStore } from '../local-issues/store';
 import { useProjectStore } from '../../stores/projectStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { SavePlanAsIssueDialog } from './SavePlanAsIssueDialog';
 import { useChatActionsOptional } from './ChatActionsContext';
@@ -401,7 +401,7 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
     if (isClientSynth && chatActions && interaction.sessionId) {
       const trimmed = feedback.trim();
       const text = trimmed ? `${ALLOW_MESSAGE}\n\n${trimmed}` : ALLOW_MESSAGE;
-      const priorMode = useChatStore.getState().getMode(interaction.sessionId);
+      const priorMode = useSessionConfigStore.getState().getMode(interaction.sessionId);
       chatActions.setMode(interaction.sessionId, 'default');
       setDecision({ kind: 'approved' });
       try {

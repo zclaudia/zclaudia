@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Session } from '@zclaudia/shared';
 import { useChatStore } from '../chatStore';
+import { useSessionConfigStore } from '../sessionConfigStore';
 import { useOwnershipStore } from '../ownershipStore';
 import { useProjectStore } from '../projectStore';
 import { useSessionRunStateStore } from '../sessionRunStateStore';
@@ -32,10 +33,13 @@ function resetStores() {
     activeToolCalls: {},
     toolCallsHistory: {},
     runContentBlocks: {},
+  } as any);
+  useSessionConfigStore.setState({
     systemInfoBySession: {},
     modeBySession: {},
     runtimeModes: {},
     sessionUsage: {},
+    compactionNotice: {},
   } as any);
   useProjectStore.setState({
     projects: [],

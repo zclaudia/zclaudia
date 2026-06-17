@@ -1,5 +1,6 @@
 import type { StateHeartbeatMessage } from '@zclaudia/shared';
 import { useChatStore } from '../../stores/chatStore';
+import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useServerStore } from '../../stores/serverStore';
 import { usePermissionStore } from '../../stores/permissionStore';
@@ -188,7 +189,7 @@ export function handleHeartbeat(
   // Update run health
   for (const run of heartbeat.activeRuns) {
     if (run.systemInfo) {
-      chatState.setSystemInfo(run.sessionId, run.systemInfo);
+      useSessionConfigStore.getState().setSystemInfo(run.sessionId, run.systemInfo);
     }
     chatState.updateRunHealth(run.runId, {
       sessionId: run.sessionId,

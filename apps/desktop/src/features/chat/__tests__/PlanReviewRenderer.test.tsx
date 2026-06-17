@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { PlanReviewInteractionMessage } from '@zclaudia/shared';
 import { ChatActionsProvider } from '../ChatActionsContext';
 import { useInteractionStore } from '../../../stores/interactionStore';
-import { useChatStore } from '../../../stores/chatStore';
+import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 
 const sendMessage = vi.fn();
 const createIssue = vi.fn();
@@ -307,8 +307,8 @@ describe('PlanReviewRenderer — client_synth', () => {
   });
 
   it('on Approve when handleSendMessage rejects: reverts to captured prior mode and decision state', async () => {
-    // Seed the chat store with the prior mode so the rollback uses the captured value
-    useChatStore.setState({ modeBySession: { 'session-1': 'plan' } } as any);
+    // Seed the session config store with the prior mode so the rollback uses the captured value
+    useSessionConfigStore.setState({ modeBySession: { 'session-1': 'plan' } } as any);
     handleSendMessage.mockRejectedValueOnce(new Error('network down'));
     renderWithActions(<InteractionItem interaction={synthInteraction} />);
     fireEvent.click(screen.getByRole('button', { name: /approve/i }));

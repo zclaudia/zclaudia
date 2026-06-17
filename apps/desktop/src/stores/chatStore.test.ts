@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useChatStore } from './chatStore';
 import type { Message } from '@zclaudia/shared';
-import type { UsageInfo } from '@zclaudia/shared/core/message';
-
-const u = (input: number, output: number): UsageInfo => ({
-  input, output, cacheRead: 0, cacheWrite: 0, totalTokens: input + output,
-  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
-});
 
 describe('chatStore', () => {
   beforeEach(() => {
@@ -17,8 +11,6 @@ describe('chatStore', () => {
       activeRuns: {},
       activeToolCalls: {},
       toolCallsHistory: {},
-      sessionUsage: {},
-      modeBySession: {},
     });
   });
 
@@ -257,101 +249,6 @@ describe('chatStore', () => {
       const pagination = useChatStore.getState().pagination['session-1'];
       expect(pagination?.total).toBe(1);
       expect(pagination?.newestTimestamp).toBe(timestamp);
-    });
-  });
-
-  describe('sessionUsage', () => {
-    it('addSessionUsage initializes usage for new session', () => {
-      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
-
-      const usage = useChatStore.getState().sessionUsage['session-1'];
-      expect(usage).toEqual({
-        inputTokens: 100,
-        outputTokens: 50,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        latestInputTokens: 100,
-        latestOutputTokens: 50,
-        latestCacheReadTokens: 0,
-        latestCacheWriteTokens: 0,
-      });
-    });
-
-    it('addSessionUsage accumulates tokens across multiple calls', () => {
-      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
-      useChatStore.getState().addSessionUsage('session-1', u(200, 75));
-
-      const usage = useChatStore.getState().sessionUsage['session-1'];
-      expect(usage).toEqual({
-        inputTokens: 300,
-        outputTokens: 125,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        latestInputTokens: 200,
-        latestOutputTokens: 75,
-        latestCacheReadTokens: 0,
-        latestCacheWriteTokens: 0,
-      });
-    });
-
-    it('addSessionUsage does not affect other sessions', () => {
-      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
-      useChatStore.getState().addSessionUsage('session-2', u(200, 75));
-
-      expect(useChatStore.getState().sessionUsage['session-1']).toEqual({
-        inputTokens: 100,
-        outputTokens: 50,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        latestInputTokens: 100,
-        latestOutputTokens: 50,
-        latestCacheReadTokens: 0,
-        latestCacheWriteTokens: 0,
-      });
-      expect(useChatStore.getState().sessionUsage['session-2']).toEqual({
-        inputTokens: 200,
-        outputTokens: 75,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        latestInputTokens: 200,
-        latestOutputTokens: 75,
-        latestCacheReadTokens: 0,
-        latestCacheWriteTokens: 0,
-      });
-    });
-
-    it('clearSessionUsage removes only the reset session usage', () => {
-      useChatStore.getState().addSessionUsage('session-1', u(100, 50));
-      useChatStore.getState().addSessionUsage('session-2', u(200, 75));
-
-      useChatStore.getState().clearSessionUsage('session-1');
-
-      expect(useChatStore.getState().sessionUsage['session-1']).toBeUndefined();
-      expect(useChatStore.getState().sessionUsage['session-2']).toEqual({
-        inputTokens: 200,
-        outputTokens: 75,
-        cacheReadTokens: 0,
-        cacheWriteTokens: 0,
-        latestInputTokens: 200,
-        latestOutputTokens: 75,
-        latestCacheReadTokens: 0,
-        latestCacheWriteTokens: 0,
-      });
-    });
-  });
-
-  describe('mode (per-session)', () => {
-    it('setMode sets mode for a specific session', () => {
-      useChatStore.getState().setMode('session-1', 'plan');
-      expect(useChatStore.getState().getMode('session-1')).toBe('plan');
-      expect(useChatStore.getState().getMode('session-2')).toBe('');
-    });
-
-    it('different sessions have independent modes', () => {
-      useChatStore.getState().setMode('session-1', 'plan');
-      useChatStore.getState().setMode('session-2', 'default');
-      expect(useChatStore.getState().getMode('session-1')).toBe('plan');
-      expect(useChatStore.getState().getMode('session-2')).toBe('default');
     });
   });
 
