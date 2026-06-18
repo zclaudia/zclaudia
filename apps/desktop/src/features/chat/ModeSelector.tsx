@@ -57,7 +57,7 @@ export function ModeSelector({
         aria-expanded={open}
         className={[
           'inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-medium h-7 transition-colors',
-          'bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+          'bg-accent text-accent-foreground hover:bg-accent/80',
           isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer',
         ].join(' ')}
       >
