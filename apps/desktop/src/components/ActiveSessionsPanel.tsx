@@ -196,6 +196,8 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
   });
   const hasRecentlyCompleted = visibleRecentlyCompletedSessions.length > 0;
 
+  if (!hasActiveSessions && !hasRecentlyCompleted) return null;
+
   return (
     <div className="px-2 pb-2">
       <div className="rounded-xl border border-border/50 bg-muted/30 p-1.5 transition-all duration-200">
@@ -224,11 +226,7 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
           </svg>
         </button>
 
-        {!isCollapsed && (!hasActiveSessions ? (
-          <div className="px-2 py-2 text-center text-[10px] text-muted-foreground/50">
-            No active sessions
-          </div>
-        ) : (
+        {!isCollapsed && hasActiveSessions && (
           <div className="mt-0.5 max-h-[200px] overflow-y-auto space-y-1">
             {Array.from(allActiveSessionsByBackend.entries()).map(([backendId, sessions]) => {
               const sortedSessions = sortSessions(sessions);
@@ -284,7 +282,7 @@ export function ActiveSessionsPanel({ onSessionSelect }: ActiveSessionsPanelProp
               );
             })}
           </div>
-        ))}
+        )}
 
         {/* Recently Completed */}
         {hasRecentlyCompleted && (

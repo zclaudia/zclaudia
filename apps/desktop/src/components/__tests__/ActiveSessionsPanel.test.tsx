@@ -10,7 +10,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 describe('ActiveSessionsPanel', () => {
   beforeEach(() => {
     // Reset stores
-    useSessionsStore.setState({ remoteSessions: new Map(), activeSessionIdsByBackend: new Map() });
+    useSessionsStore.setState({ remoteSessions: new Map(), activeSessionIdsByBackend: new Map(), recentlyCompletedSessions: [] });
     useServerStore.setState({
       servers: [{ id: 'local', name: 'Local', address: 'localhost:3100', isDefault: true, createdAt: 0 }],
       activeServerId: 'local',
@@ -302,9 +302,18 @@ describe('ActiveSessionsPanel', () => {
       expect(container.firstChild).toBeNull();
     });
 
-    it('shows "No active sessions" when no sessions are active', () => {
-      render(<ActiveSessionsPanel />);
-      expect(screen.getByText('No active sessions')).toBeDefined();
+    it('renders nothing when there are no active sessions and no recently completed', () => {
+      // allActiveSessionsByBackend will be empty (no activeSessionIdsByBackend entries)
+      // and recentlyCompletedSessions is [] from the mock defaults
+      const { container } = render(<ActiveSessionsPanel onSessionSelect={vi.fn()} />);
+      expect(screen.queryByText('No active sessions')).toBeNull();
+      expect(container.firstChild).toBeNull();
+    });
+
+    it('renders nothing (not even a header) when no sessions and no recently completed', () => {
+      // Duplicate coverage for the early-return path (complements the test above).
+      const { container } = render(<ActiveSessionsPanel />);
+      expect(container.firstChild).toBeNull();
     });
 
     it('toggles collapse on header click', () => {
