@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/chatMessageStore';
-import type { ToolCallState } from '../../stores/chatStore';
+import type { ToolCallState } from '../../stores/runStore';
 import { extractMessageText } from '../../utils/messageContent';
 
 type LegacyWriteToolKind = 'edit' | 'write' | 'multiEdit' | 'notebook';

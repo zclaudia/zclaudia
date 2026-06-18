@@ -1,6 +1,6 @@
 import { CheckCircle2, Loader2, Square } from 'lucide-react';
 import type { ToolEffect, ToolSemantic } from '@zclaudia/shared';
-import { type ToolCallState } from '../../../stores/chatStore';
+import { type ToolCallState } from '../../../stores/runStore';
 import { CodeViewer } from '../../../components/renderers/CodeViewer';
 import { DiffViewer, UnifiedDiffViewer } from '../../../components/renderers/DiffViewer';
 import { toolRendererRegistry } from '../../../services/toolRendererRegistry';

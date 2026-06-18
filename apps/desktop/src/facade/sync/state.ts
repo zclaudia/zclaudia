@@ -1,4 +1,4 @@
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useFacadeStore } from '../../stores/facadeStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 
@@ -66,7 +66,7 @@ export function scheduleAutoOpenBackends(backendIds: string[]): void {
 }
 
 export function hasActiveRunsForBackend(backendId: string): boolean {
-  const chatStore = useChatStore.getState();
+  const chatStore = useRunStore.getState();
   const ownershipStore = useOwnershipStore.getState();
   const activeRunsForBackend = facadeServerRuns.get(backendId);
 

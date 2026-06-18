@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { Session } from '@zclaudia/shared';
-import { useChatStore } from '../chatStore';
+import { useRunStore } from '../runStore';
 import { useSessionConfigStore } from '../sessionConfigStore';
 import { useOwnershipStore } from '../ownershipStore';
 import { useProjectStore } from '../projectStore';
@@ -24,7 +24,7 @@ const baseRemoteSession: RemoteSession = {
 
 function resetStores() {
   useSessionRunStateStore.setState({ records: {} });
-  useChatStore.setState({
+  useRunStore.setState({
     activeRuns: {},
     backgroundRunIds: new Set(),
     runHealth: {},
@@ -86,7 +86,7 @@ describe('sessionRunStateStore', () => {
   });
 
   it('authoritative idle status clears a stale chat run', () => {
-    useChatStore.getState().startRun('r1', 's1');
+    useRunStore.getState().startRun('r1', 's1');
     useSessionRunStateStore.getState().markRunStarted({
       backendId: 'b1',
       runId: 'r1',
@@ -101,14 +101,14 @@ describe('sessionRunStateStore', () => {
       source: 'backend_event',
     });
 
-    expect(useChatStore.getState().activeRuns.r1).toBeUndefined();
+    expect(useRunStore.getState().activeRuns.r1).toBeUndefined();
     expect(useSessionRunStateStore.getState().records['b1::s1'].phase).toBe('idle');
     expect(useProjectStore.getState().sessions[0].isActive).toBe(false);
     expect(useSessionsStore.getState().activeSessionIdsByBackend.get('b1')?.has('s1')).toBe(false);
   });
 
   it('heartbeat reconciliation clears runs even when local run tracking was reset', () => {
-    useChatStore.getState().startRun('r1', 's1');
+    useRunStore.getState().startRun('r1', 's1');
     useSessionRunStateStore.getState().markRunStarted({
       backendId: 'b1',
       runId: 'r1',
@@ -122,7 +122,7 @@ describe('sessionRunStateStore', () => {
       source: 'heartbeat',
     });
 
-    expect(useChatStore.getState().activeRuns.r1).toBeUndefined();
+    expect(useRunStore.getState().activeRuns.r1).toBeUndefined();
     expect(useSessionRunStateStore.getState().records['b1::s1'].phase).toBe('idle');
     expect(useSessionsStore.getState().activeSessionIdsByBackend.get('b1')?.has('s1')).toBe(false);
   });

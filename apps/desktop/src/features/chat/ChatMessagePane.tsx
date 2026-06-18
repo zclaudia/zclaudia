@@ -7,7 +7,7 @@ import { CompactionNoticeBanner } from './CompactionNoticeBanner';
 import { InlinePermissionRequest } from './InlinePermissionRequest';
 import { InteractionItem } from './InteractionItem';
 import type { MessageWithToolCalls, PaginationInfo } from '../../stores/chatMessageStore';
-import type { ToolCallState, RunHealth, RunRetryStatus } from '../../stores/chatStore';
+import type { ToolCallState, RunHealth, RunRetryStatus } from '../../stores/runStore';
 import type { PermissionRequest } from '../../stores/permissionStore';
 import type { ContentBlock } from '@zclaudia/shared';
 import { useInteractionStore } from '../../stores/interactionStore';

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { type ToolCallState } from '../../../stores/chatStore';
+import { type ToolCallState } from '../../../stores/runStore';
 import { CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, Wrench } from 'lucide-react';
 import {
   isTodoTool,

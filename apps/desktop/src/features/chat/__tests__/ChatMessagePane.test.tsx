@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { createRef } from 'react';
 import { ChatMessagePane } from '../ChatMessagePane';
-import type { ToolCallState } from '../../../stores/chatStore';
+import type { ToolCallState } from '../../../stores/runStore';
 
 const mockInteractionsState = {
   interactions: {} as Record<string, any>,

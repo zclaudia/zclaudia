@@ -1,6 +1,6 @@
 import type { ServerMessage } from '@zclaudia/shared';
 import type { MessageDispatchContext } from './types';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore } from '../../stores/composerStore';
@@ -43,8 +43,8 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'delta': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      useChatStore.getState().clearRunRetryStatus(msg.runId);
-      const deltaSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
+      useRunStore.getState().clearRunRetryStatus(msg.runId);
+      const deltaSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       if (deltaSession) {
         scheduleDelta(deltaSession, msg.runId, msg.content);
       } else if (msg.runId) {
@@ -67,7 +67,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       const clientReqId = msg.clientRequestId;
       const isBackground = msg.sessionType === 'background';
 
-      const chat = useChatStore.getState();
+      const chat = useRunStore.getState();
       const alreadyTrackingRun = chat.activeRuns[msg.runId] === targetSessionId;
       chat.startRun(msg.runId, targetSessionId, isBackground);
       const now = Date.now();
@@ -112,13 +112,13 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       flushDeltaForRun(msg.runId);
-      const completedSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
+      const completedSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       console.log(`[${logTag}] run_completed runId=${msg.runId} sessionId=${completedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`);
       if (completedSession) {
         usePromptRequestStore.getState().clearRequestsForSession(completedSession);
         usePermissionStore.getState().clearRequestsForSession(completedSession);
         useInteractionStore.getState().clearSession(completedSession);
-        useChatStore.getState().finalizeRunToMessage(msg.runId);
+        useRunStore.getState().finalizeRunToMessage(msg.runId);
         if (msg.usage) {
           useSessionConfigStore.getState().addSessionUsage(completedSession, msg.usage);
         }
@@ -134,7 +134,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       }
       ctx.recordTerminalRun(msg.runId, msg.seq);
       ctx.clearRunActivity(msg.runId);
-      useChatStore.getState().endRun(msg.runId);
+      useRunStore.getState().endRun(msg.runId);
       serverRunsRef.get(serverId)?.delete(msg.runId);
       ctx.clearRunSeq(msg.runId);
       return true;
@@ -144,7 +144,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       flushDeltaForRun(msg.runId);
-      const failedSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
+      const failedSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       console.log(`[${logTag}] run_failed runId=${msg.runId} sessionId=${failedSession ?? 'unknown'} seq=${msg.seq ?? 'none'}`);
       if (failedSession) {
         usePromptRequestStore.getState().clearRequestsForSession(failedSession);
@@ -164,7 +164,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
           }
           useChatMessageStore.getState().appendToLastMessage(failedSession, `\n\n**Error:** ${msg.error}`);
         }
-        useChatStore.getState().finalizeRunToMessage(msg.runId);
+        useRunStore.getState().finalizeRunToMessage(msg.runId);
         useSessionRunStateStore.getState().markRunEnded({
           backendId,
           runId: msg.runId,
@@ -182,7 +182,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
       }
       ctx.recordTerminalRun(msg.runId, msg.seq);
       ctx.clearRunActivity(msg.runId);
-      useChatStore.getState().endRun(msg.runId);
+      useRunStore.getState().endRun(msg.runId);
       serverRunsRef.get(serverId)?.delete(msg.runId);
       ctx.clearRunSeq(msg.runId);
       console.error(`[${logTag}] Run failed:`, msg.error);
@@ -191,10 +191,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
 
     case 'run_retrying': {
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      const retryingSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
+      const retryingSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       console.log(`[${logTag}] run_retrying runId=${msg.runId} attempt=${msg.attempt}/${msg.maxAttempts} delayMs=${msg.delayMs} status=${msg.status ?? 'network'}`);
       if (retryingSession) {
-        useChatStore.getState().updateRunRetryStatus(msg.runId, {
+        useRunStore.getState().updateRunRetryStatus(msg.runId, {
           sessionId: retryingSession,
           attempt: msg.attempt,
           maxAttempts: msg.maxAttempts,
@@ -232,11 +232,11 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'tool_use': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      useChatStore.getState().clearRunRetryStatus(msg.runId);
-      const toolSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
+      useRunStore.getState().clearRunRetryStatus(msg.runId);
+      const toolSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       if (toolSession) {
-        useChatStore.getState().addToolCall(msg.runId, msg.toolUseId, msg.toolName, msg.toolInput, msg.semantic, msg.effect);
-        useChatStore.getState().addToolUseBlock(msg.runId, msg.toolUseId);
+        useRunStore.getState().addToolCall(msg.runId, msg.toolUseId, msg.toolName, msg.toolInput, msg.semantic, msg.effect);
+        useRunStore.getState().addToolUseBlock(msg.runId, msg.toolUseId);
       } else if (msg.runId) {
         console.warn(`[${logTag}] tool_use for untracked run ${msg.runId}`);
       }
@@ -246,10 +246,10 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'tool_result': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      useChatStore.getState().clearRunRetryStatus(msg.runId);
-      const resultSession = msg.sessionId || useChatStore.getState().activeRuns[msg.runId];
+      useRunStore.getState().clearRunRetryStatus(msg.runId);
+      const resultSession = msg.sessionId || useRunStore.getState().activeRuns[msg.runId];
       if (resultSession) {
-        useChatStore.getState().updateToolCallResult(msg.runId, msg.toolUseId, msg.result, msg.isError, msg.effect);
+        useRunStore.getState().updateToolCallResult(msg.runId, msg.toolUseId, msg.result, msg.isError, msg.effect);
       } else if (msg.runId) {
         console.warn(`[${logTag}] tool_result for untracked run ${msg.runId}`);
       }
@@ -259,9 +259,9 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'tool_activity': {
       if (ctx.isRunEventGap(msg.runId, msg.seq)) ctx.recoverRunGap(msg.runId, msg.seq, msg.sessionId);
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
-      useChatStore.getState().clearRunRetryStatus(msg.runId);
+      useRunStore.getState().clearRunRetryStatus(msg.runId);
       if (msg.runId && msg.toolUseId && msg.content) {
-        useChatStore.getState().updateToolCallActivity(msg.runId, msg.toolUseId, msg.content);
+        useRunStore.getState().updateToolCallActivity(msg.runId, msg.toolUseId, msg.content);
       }
       return true;
     }
@@ -279,7 +279,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
     case 'system_info':
       if (ctx.isStaleRunEvent(msg.runId, msg.seq)) return true;
       if (serverId === activeServerId) {
-        const sessionId = useChatStore.getState().activeRuns[msg.runId];
+        const sessionId = useRunStore.getState().activeRuns[msg.runId];
         if (sessionId) {
           useSessionConfigStore.getState().setSystemInfo(sessionId, msg.systemInfo);
         } else {

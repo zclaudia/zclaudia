@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
-import type { ToolCallState } from '../../../stores/chatStore';
+import type { ToolCallState } from '../../../stores/runStore';
 import type { ContentBlock } from '@zclaudia/shared';
 
 // ── Mocks ──────────────────────────────────────────────────────────────────────

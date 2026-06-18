@@ -1,5 +1,5 @@
 import type { StateHeartbeatMessage } from '@zclaudia/shared';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -128,7 +128,7 @@ export function handleHeartbeat(
 ): void {
   const { serverId, backendId, serverRunsRef, logTag } = ctx;
   const backendName = ctx.resolveBackendName();
-  const chatState = useChatStore.getState();
+  const chatState = useRunStore.getState();
   clearExpiredTerminalRuns(state);
 
   useServerStore.getState().recordHeartbeat(serverId);

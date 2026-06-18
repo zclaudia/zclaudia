@@ -5,7 +5,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 
 describe('useActiveSessionStream', () => {
   const facade = {
@@ -62,7 +62,7 @@ describe('useActiveSessionStream', () => {
       taskOwners: {},
     });
 
-    useChatStore.setState((state) => ({
+    useRunStore.setState((state) => ({
       ...state,
       pagination: {
         ...state.pagination,

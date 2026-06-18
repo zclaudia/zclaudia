@@ -2,7 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { useMessagePagination } from '../chat/useMessagePagination';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -17,7 +17,7 @@ import * as api from '../../services/api';
 describe('useMessagePagination', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useChatStore.setState({
+    useRunStore.setState({
       activeRuns: {},
       backgroundRunIds: new Set(),
       runHealth: {},

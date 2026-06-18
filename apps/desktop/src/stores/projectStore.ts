@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Project, Session, SlashCommand, LlmProfileConfig, ProviderCapabilities } from '@zclaudia/shared';
-import { useChatStore } from './chatStore';
+import { useRunStore } from './runStore';
 import { useLlmProfileMetaStore } from './llmProfileMetaStore';
 import { useServerStore } from './serverStore';
 import { useOwnershipStore } from './ownershipStore';
@@ -277,7 +277,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
         }
 
         if (existing.isActive && incomingIsActive === false) {
-          const chat = useChatStore.getState();
+          const chat = useRunStore.getState();
           const hasForegroundRun = Object.entries(chat.activeRuns).some(
             ([runId, sid]) => sid === s.id && !chat.backgroundRunIds.has(runId)
           );

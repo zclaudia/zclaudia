@@ -10,7 +10,7 @@ import { FilePreviewModal } from './FilePreviewModal';
 import { CompactionMarkerCard } from './CompactionMarkerCard';
 import { ContextUsageCard } from './ContextUsageCard';
 import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
-import type { ToolCallState } from '../../stores/chatStore';
+import type { ToolCallState } from '../../stores/runStore';
 import type { ContentBlock, ThinkingBlock as ThinkingBlockMeta } from '@zclaudia/shared';
 import { useFilePushStore, type FilePushItem } from '../../stores/filePushStore';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';

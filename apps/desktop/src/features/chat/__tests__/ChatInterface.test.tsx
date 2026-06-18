@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, fireEvent, waitFor, act } from '@testing-library/react';
 import { useProjectStore } from '../../../stores/projectStore';
-import { useChatStore } from '../../../stores/chatStore';
+import { useRunStore } from '../../../stores/runStore';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../../stores/sessionConfigStore';
 import { useSessionOverridesStore } from '../../../stores/sessionOverridesStore';
@@ -359,7 +359,7 @@ function setDefaultStores(overrides?: {
     deleteSession: vi.fn(),
     ...overrides?.projectStore,
   } as any);
-  useChatStore.setState({
+  useRunStore.setState({
     activeRuns: {},
     backgroundRunIds: new Set(),
     runHealth: {},

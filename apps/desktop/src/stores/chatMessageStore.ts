@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Message, ContentBlock } from '@zclaudia/shared';
-import type { ToolCallState } from './chatStore';
+import type { ToolCallState } from './runStore';
 
 export interface PaginationInfo {
   total: number;

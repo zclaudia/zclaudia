@@ -138,8 +138,8 @@ const mockEagerSyncCurrentSession = vi.fn(() => Promise.resolve());
 const mockRecoverCurrentSessionTail = vi.fn(() => Promise.resolve());
 const mockGetProjectsForBackend = vi.fn();
 
-vi.mock('../../stores/chatStore', () => ({
-  useChatStore: { getState: () => mockChatStore },
+vi.mock('../../stores/runStore', () => ({
+  useRunStore: { getState: () => mockChatStore },
 }));
 vi.mock('../../stores/chatMessageStore', () => ({
   useChatMessageStore: { getState: () => mockChatMessageStore },

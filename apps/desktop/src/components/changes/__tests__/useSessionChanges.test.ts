@@ -7,7 +7,7 @@ import {
   type TurnStat,
 } from '../useSessionChanges';
 import type { MessageWithToolCalls } from '../../../stores/chatMessageStore';
-import type { ToolCallState } from '../../../stores/chatStore';
+import type { ToolCallState } from '../../../stores/runStore';
 
 const PROJECT_ROOT = '/repo';
 

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore, type ToolCallState } from '../../stores/runStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useSessionOverridesStore } from '../../stores/sessionOverridesStore';
@@ -9,7 +9,6 @@ import { useServerStore } from '../../stores/serverStore';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useProviderCapabilities } from './useProviderCapabilities';
 import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
-import type { ToolCallState } from '../../stores/chatStore';
 import type { ContentBlock } from '@zclaudia/shared';
 
 const EMPTY_MESSAGES: MessageWithToolCalls[] = [];
@@ -24,21 +23,21 @@ interface UseChatSessionParams {
 export function useChatSession({ sessionId, isConnected }: UseChatSessionParams) {
   // ── Session-scoped store selectors ──
   const sessionMessages = useChatMessageStore((s) => s.messages[sessionId] || EMPTY_MESSAGES);
-  const sessionRunId = useChatStore((s) => s.getSessionRunId(sessionId));
-  const isSessionRunning = useChatStore((s) => {
+  const sessionRunId = useRunStore((s) => s.getSessionRunId(sessionId));
+  const isSessionRunning = useRunStore((s) => {
     return Object.values(s.activeRuns).some((sid) => sid === sessionId);
   });
-  const isLoading = useChatStore((s) => {
+  const isLoading = useRunStore((s) => {
     const { activeRuns, backgroundRunIds } = s;
     return Object.entries(activeRuns).some(([runId, sid]) => sid === sessionId && !backgroundRunIds.has(runId));
   });
-  const sessionHealth = useChatStore((s) => s.getSessionHealth(sessionId));
-  const sessionRetryStatus = useChatStore((s) => {
+  const sessionHealth = useRunStore((s) => s.getSessionHealth(sessionId));
+  const sessionRetryStatus = useRunStore((s) => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return null;
     return s.runRetryStatus[runId] || null;
   });
-  const sessionToolCallsRecord = useChatStore((s) => {
+  const sessionToolCallsRecord = useRunStore((s) => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return null;
     return s.activeToolCalls[runId] || null;
@@ -47,12 +46,12 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     () => (sessionToolCallsRecord ? Object.values(sessionToolCallsRecord) : EMPTY_TOOL_CALLS),
     [sessionToolCallsRecord]
   );
-  const sessionContentBlocks = useChatStore((s) => {
+  const sessionContentBlocks = useRunStore((s) => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return EMPTY_CONTENT_BLOCKS;
     return s.runContentBlocks[runId] || EMPTY_CONTENT_BLOCKS;
   });
-  const sessionToolCallHistory = useChatStore((s) => {
+  const sessionToolCallHistory = useRunStore((s) => {
     const runId = s.getSessionRunId(sessionId);
     if (!runId) return EMPTY_TOOL_CALLS;
     return s.toolCallsHistory[runId] || EMPTY_TOOL_CALLS;

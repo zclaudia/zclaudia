@@ -19,7 +19,7 @@
  */
 
 import type { ServerMessage, StateHeartbeatMessage } from '@zclaudia/shared';
-import { useChatStore } from '../stores/chatStore';
+import { useRunStore } from '../stores/runStore';
 import { dispatchFeatureMessage } from '../features/message-dispatcher';
 import { recoverCurrentSessionTail } from './sessionSync';
 import { handleClaudiaMessage } from './message-handlers/claudia-messages';
@@ -51,7 +51,7 @@ function updateRunActivity(runId: string): void {
   const last = lastActivityUpdate.get(runId) || 0;
   if (now - last < 1000) return;
   lastActivityUpdate.set(runId, now);
-  const chat = useChatStore.getState();
+  const chat = useRunStore.getState();
   const health = chat.runHealth[runId];
   if (health) {
     chat.updateRunHealth(runId, { ...health, lastActivityAt: now });
@@ -110,7 +110,7 @@ function recoverRunGap(
   seq: number | undefined,
   sessionId?: string,
 ): void {
-  const resolvedSessionId = sessionId || useChatStore.getState().activeRuns[runId];
+  const resolvedSessionId = sessionId || useRunStore.getState().activeRuns[runId];
   console.warn(
     `[${ctx.logTag}] Run event gap detected for ${runId}: expected ${((maxSeqByRun.get(runId) ?? 0) + 1)}, got ${seq ?? 'none'}`
   );

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ToolCallItem } from '../ToolCallItem';
 import { ToolCallList } from '../tool-call/ToolCallList';
-import type { ToolCallState } from '../../../stores/chatStore';
+import type { ToolCallState } from '../../../stores/runStore';
 
 const mockSendMessage = vi.fn();
 const mockHandlePromptAnswer = vi.fn();

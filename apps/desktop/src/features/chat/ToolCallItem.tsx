@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, memo } from 'react';
-import { type ToolCallState } from '../../stores/chatStore';
+import { type ToolCallState } from '../../stores/runStore';
 import { getToolIcon } from '../../config/icons';
 import { Icon } from '../../components/ui/Icon';
 import { CheckCircle2, XCircle, Loader2, ChevronDown, ChevronRight, SendToBack } from 'lucide-react';

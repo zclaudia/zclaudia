@@ -10,7 +10,7 @@ import { useFacadeStore } from '../../stores/facadeStore';
 import { useToastStore } from '../../stores/toastStore';
 import { handleServerMessage } from '../../services/messageHandler';
 import { useServerStore } from '../../stores/serverStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore } from '../../stores/composerStore';
@@ -57,7 +57,7 @@ describe('useBackendFacade run_event forwarding', () => {
       currentDeviceId: 'device-local',
       snapshotVersion: 1,
     });
-    useChatStore.setState({
+    useRunStore.setState({
       activeRuns: {},
       backgroundRunIds: new Set(),
       runHealth: {},
@@ -328,8 +328,8 @@ describe('useBackendFacade run_event forwarding', () => {
   });
 
   it('keeps active runs alive while a backend reconnects unexpectedly', () => {
-    useChatStore.setState({
-      ...useChatStore.getState(),
+    useRunStore.setState({
+      ...useRunStore.getState(),
       activeRuns: { 'run-1': 'session-1' },
     });
 
@@ -351,7 +351,7 @@ describe('useBackendFacade run_event forwarding', () => {
       error: 'peer_disconnected',
     } as any);
 
-    expect(useChatStore.getState().activeRuns['run-1']).toBe('session-1');
+    expect(useRunStore.getState().activeRuns['run-1']).toBe('session-1');
     expect(useProjectStore.getState().sessions.find((s) => s.id === 'session-1')?.lastRunStatus).toBeUndefined();
     expect(Array.from(useSessionsStore.getState().activeSessionIdsByBackend.get('remote-1') ?? [])).toEqual(['session-1']);
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
@@ -407,8 +407,8 @@ describe('useBackendFacade run_event forwarding', () => {
   });
 
   it('cleans up stale runs only for the snapshot backend', () => {
-    useChatStore.getState().startRun('run-remote', 'session-1');
-    useChatStore.getState().startRun('run-local', 'session-local');
+    useRunStore.getState().startRun('run-remote', 'session-1');
+    useRunStore.getState().startRun('run-local', 'session-local');
     useProjectStore.setState({
       ...useProjectStore.getState(),
       sessions: [
@@ -426,12 +426,12 @@ describe('useBackendFacade run_event forwarding', () => {
       projects: [],
     } as any);
 
-    expect(useChatStore.getState().activeRuns['run-remote']).toBeUndefined();
-    expect(useChatStore.getState().activeRuns['run-local']).toBe('session-local');
+    expect(useRunStore.getState().activeRuns['run-remote']).toBeUndefined();
+    expect(useRunStore.getState().activeRuns['run-local']).toBe('session-local');
   });
 
   it('snapshot stale-run cleanup clears backend activity markers', () => {
-    useChatStore.getState().startRun('run-1', 'session-1');
+    useRunStore.getState().startRun('run-1', 'session-1');
     useOwnershipStore.getState().setSessionOwner('session-1', 'remote-1');
 
     syncToGatewayStore({
@@ -459,7 +459,7 @@ describe('useBackendFacade run_event forwarding', () => {
       error: 'transport_disconnected',
     } as any);
 
-    expect(useChatStore.getState().activeRuns['run-1']).toBeUndefined();
+    expect(useRunStore.getState().activeRuns['run-1']).toBeUndefined();
     expect(useToastStore.getState().toasts).toEqual([]);
   });
 

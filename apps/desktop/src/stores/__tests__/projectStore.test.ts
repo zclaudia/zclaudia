@@ -31,8 +31,8 @@ vi.mock('../../utils/controlPlane', () => ({
   resolveCanonicalBackendId: (backendId: string | null | undefined, fallback: string | null = null) => backendId ?? fallback,
 }));
 
-vi.mock('../chatStore', () => ({
-  useChatStore: {
+vi.mock('../runStore', () => ({
+  useRunStore: {
     getState: () => ({
       activeRuns: {},
       backgroundRunIds: new Set(),

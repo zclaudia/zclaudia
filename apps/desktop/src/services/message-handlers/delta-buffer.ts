@@ -1,4 +1,4 @@
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 
 /**
@@ -30,7 +30,7 @@ function flushAll(): void {
   // chatStore.set don't get dropped — they'll be picked up by the next rAF.
   const snapshot = Array.from(pendingByRun.entries());
   pendingByRun.clear();
-  const chat = useChatStore.getState();
+  const chat = useRunStore.getState();
   const messageStore = useChatMessageStore.getState();
   for (const [runId, { sessionId, content }] of snapshot) {
     messageStore.appendToLastMessage(sessionId, content);
@@ -74,7 +74,7 @@ export function flushDeltaForRun(runId: string): void {
   const pending = pendingByRun.get(runId);
   if (!pending) return;
   pendingByRun.delete(runId);
-  const chat = useChatStore.getState();
+  const chat = useRunStore.getState();
   const messageStore = useChatMessageStore.getState();
   messageStore.appendToLastMessage(pending.sessionId, pending.content);
   chat.appendTextBlock(runId, pending.content);

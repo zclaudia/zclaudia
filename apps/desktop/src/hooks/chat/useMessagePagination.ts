@@ -1,5 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useChatMessageStore, type MessageWithToolCalls } from '../../stores/chatMessageStore';
 import { useFilePushStore } from '../../stores/filePushStore';
 import { useUIStore } from '../../stores/uiStore';
@@ -176,7 +176,7 @@ export function useMessagePagination({
 
         // Restore active run state (fixes loading state lost after page refresh)
         if (result.activeRun) {
-          const chatState = useChatStore.getState();
+          const chatState = useRunStore.getState();
           if (!chatState.activeRuns[result.activeRun.runId]) {
             chatState.startRun(result.activeRun.runId, sessionId);
           }

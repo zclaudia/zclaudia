@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { activatePanel } from '../../utils/openPanel';
 import * as api from '../../services/api';
@@ -237,9 +237,9 @@ export function useCommandHandler({
       await api.resetSessionSdkSession(sessionId);
       useSessionConfigStore.getState().clearSessionUsage(sessionId);
       // Clear any stale frontend run state so the session is no longer stuck in loading
-      const staleRunId = useChatStore.getState().getSessionRunId(sessionId);
+      const staleRunId = useRunStore.getState().getSessionRunId(sessionId);
       if (staleRunId) {
-        useChatStore.getState().endRun(staleRunId);
+        useRunStore.getState().endRun(staleRunId);
       }
       useProjectStore.getState().setSessionActive(sessionId, false);
       addMessage(sessionId, {

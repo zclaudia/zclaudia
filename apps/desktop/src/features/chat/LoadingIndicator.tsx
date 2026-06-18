@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { RunHealthStatus } from '@zclaudia/shared';
 import { BrandMark } from '../../components/BrandMark';
-import type { RunRetryStatus } from '../../stores/chatStore';
+import type { RunRetryStatus } from '../../stores/runStore';
 
 interface LoadingIndicatorProps {
   isLoading: boolean;

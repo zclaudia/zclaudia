@@ -80,7 +80,7 @@ import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import { usePermissionStore } from '../../stores/permissionStore';
 import { useInteractionStore } from '../../stores/interactionStore';
-import { useChatStore } from '../../stores/chatStore';
+import { useRunStore } from '../../stores/runStore';
 import { useSessionRunStateStore } from '../../stores/sessionRunStateStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useAgentReadinessStore } from '../../stores/agentReadinessStore';
@@ -166,7 +166,7 @@ function setupStores(overrides: Record<string, any> = {}) {
   useSupervisionStore.setState({ agents: {}, ...overrides.supervisionStore } as any);
   usePermissionStore.setState({ pendingRequests: [], ...overrides.permissionStore } as any);
   useInteractionStore.setState({ interactions: {}, ...overrides.interactionStore } as any);
-  useChatStore.setState({ activeRuns: {}, ...overrides.chatStore } as any);
+  useRunStore.setState({ activeRuns: {}, ...overrides.chatStore } as any);
   useSessionRunStateStore.setState({ records: {}, ...overrides.sessionRunStateStore } as any);
   useAgentReadinessStore.setState({
     readiness: { usable: true },

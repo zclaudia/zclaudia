@@ -41,7 +41,7 @@ export interface RunRetryStatus {
   receivedAt: number;
 }
 
-interface ChatState {
+interface RunState {
   // Active runs: runId → sessionId (supports concurrent runs)
   activeRuns: Record<string, string>;
   // Background run IDs: runs that should not affect the session's loading state
@@ -85,7 +85,7 @@ interface ChatState {
   getSessionToolCallHistory: (sessionId: string) => ToolCallState[];
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useRunStore = create<RunState>((set, get) => ({
   activeRuns: {},
   backgroundRunIds: new Set<string>(),
   runHealth: {},
@@ -109,7 +109,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   endRun: (runId) => {
-    const sessionId = useChatStore.getState().activeRuns[runId];
+    const sessionId = get().activeRuns[runId];
     set((state) => {
       const { [runId]: _removedRun, ...remainingRuns } = state.activeRuns;
       const { [runId]: _removedTC, ...remainingTC } = state.activeToolCalls;
@@ -269,11 +269,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   // Finalize run data (tool calls + content blocks) onto the assistant message in one atomic update.
   // Prefers existing data when it's more complete (e.g., from API/metadata loaded before mid-stream join).
   finalizeRunToMessage: (runId) => {
-    const runState = useChatStore.getState();
-    const sessionId = runState.activeRuns[runId];
+    const sessionId = get().activeRuns[runId];
     if (!sessionId) return;
-    const runHistory = runState.toolCallsHistory[runId] || [];
-    const blocks = runState.runContentBlocks[runId] || [];
+    const runHistory = get().toolCallsHistory[runId] || [];
+    const blocks = get().runContentBlocks[runId] || [];
     useChatMessageStore.setState((state) => {
       const sessionMessages = state.messages[sessionId] || [];
       if (sessionMessages.length === 0) return state;

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { RunStatus } from '@zclaudia/protocol/zclaudia';
-import { useChatStore } from './chatStore';
+import { useRunStore } from './runStore';
 import { useInteractionStore } from './interactionStore';
 import { useOwnershipStore } from './ownershipStore';
 import { usePermissionStore } from './permissionStore';
@@ -97,7 +97,7 @@ function resolveRunSessionId(runId: string, records: Record<string, SessionRunRe
   for (const record of Object.values(records)) {
     if (record.foregroundRunIds.includes(runId)) return record.sessionId;
   }
-  return useChatStore.getState().activeRuns?.[runId] ?? null;
+  return useRunStore.getState().activeRuns?.[runId] ?? null;
 }
 
 function setLegacySessionActive(
@@ -141,7 +141,7 @@ function cleanupForegroundChatRunsForSession(
   sessionId: string,
   allowedRunIds: Set<string> = new Set(),
 ): void {
-  const chatStore = useChatStore.getState() as ReturnType<typeof useChatStore.getState> & {
+  const chatStore = useRunStore.getState() as ReturnType<typeof useRunStore.getState> & {
     activeRuns?: Record<string, string>;
     backgroundRunIds?: Set<string>;
     finalizeRunToMessage?: (runId: string) => void;
@@ -162,7 +162,7 @@ function cleanupForegroundChatRunsForBackend(
   activeRunIds: Set<string>,
   knownSessionIds: Set<string>,
 ): void {
-  const chatStore = useChatStore.getState() as ReturnType<typeof useChatStore.getState> & {
+  const chatStore = useRunStore.getState() as ReturnType<typeof useRunStore.getState> & {
     activeRuns?: Record<string, string>;
     backgroundRunIds?: Set<string>;
     finalizeRunToMessage?: (runId: string) => void;
