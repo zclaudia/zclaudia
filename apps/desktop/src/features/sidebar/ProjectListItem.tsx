@@ -311,8 +311,9 @@ export function ProjectListItem({
           {!isCreatingSession && (
             <button
               type="button"
-              onClick={() => onStartCreatingSession?.()}
-              className="flex h-7 w-full items-center gap-1.5 rounded-lg px-2 pl-7 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground"
+              onClick={() => onStartCreatingSession()}
+              disabled={!isConnected}
+              className="flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 pl-7 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
             >
               <Plus size={12} className="shrink-0" />
               新建 session
