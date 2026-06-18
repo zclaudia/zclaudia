@@ -91,7 +91,7 @@ function CodeRow({
         ...style,
         display: 'flex',
         whiteSpace: 'pre',
-        backgroundColor: inRange ? 'rgba(250, 204, 21, 0.2)' : themeBg,
+        backgroundColor: inRange ? 'hsl(var(--primary) / 0.12)' : themeBg,
       }}
     >
       <span
@@ -168,7 +168,7 @@ function VirtualizedCodeView({
             height: '100%',
             width: '100%',
             margin: 0,
-            fontFamily: 'Menlo, Monaco, Consolas, monospace',
+            fontFamily: 'var(--font-mono)',
             fontSize: '0.75rem',
             lineHeight: `${ROW_HEIGHT_PX}px`,
           }}
