@@ -361,6 +361,11 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
             {projectRoot}
           </span>
         )}
+        {filePath && lang && lang !== 'text' && (
+          <span className="ml-auto hidden shrink-0 rounded bg-secondary/60 px-1.5 py-0.5 text-[10px] capitalize text-muted-foreground sm:inline">
+            {lang}
+          </span>
+        )}
         {!isMobile && (
           <button
             type="button"
