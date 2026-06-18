@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff, Bot, Cpu, FolderOpen, PieChart, ChevronDown, Package, Shield, Key, Wrench, Monitor, Terminal, Users, PanelRight } from 'lucide-react';
+import { RotateCcw, Download, ExternalLink, Archive, ArrowLeft, MoreHorizontal, WifiOff, Bot, Cpu, FolderOpen, PieChart, ChevronDown, Package, Shield, Key, Wrench, Monitor, Terminal, Users, PanelRight, MessageSquare } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { Session, Project, SystemInfo } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
@@ -8,6 +8,7 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { usePanelRegion } from '../../components/panels/usePanelRegion';
 import { activatePanel } from '../../utils/openPanel';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
 
 const DEFAULT_AGENT_LABEL = 'Default Coding Agent';
 
@@ -78,6 +79,13 @@ export function SessionHeader({
     ? `${agent.name}${modelValue ? ` (${modelValue})` : ''}`
     : DEFAULT_AGENT_LABEL;
   const pathValue = systemInfo?.cwd || currentSession?.workingDirectory || null;
+
+  // Topic anchor chip: first user message in the session
+  const firstUserText = useChatMessageStore((s) => {
+    const msgs = s.messages[currentSession.id];
+    return msgs?.find((m) => m.role === 'user')?.content ?? null;
+  });
+  const topicText = firstUserText ? firstUserText.replace(/\s+/g, ' ').trim().slice(0, 40) : null;
 
   // Right-panel toggle — a persistent affordance on desktop (like Cursor's panel toggle).
   const rightCollapsed = useRightSidebarStore((s) => s.collapsed);
@@ -157,6 +165,15 @@ export function SessionHeader({
             {currentSession.name || 'Untitled Session'}
           </button>
         </div>
+      )}
+      {currentSession.type !== 'background' && topicText && (
+        <span
+          className="hidden min-w-0 shrink items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] leading-none text-primary sm:inline-flex"
+          title={firstUserText ?? undefined}
+        >
+          <MessageSquare size={11} className="shrink-0" />
+          <span className="truncate">{topicText}</span>
+        </span>
       )}
       <div className="hidden min-w-6 flex-1 self-stretch sm:block" data-tauri-drag-region />
       {/* Session info chip — agent/model + context%, opens a details popover */}
