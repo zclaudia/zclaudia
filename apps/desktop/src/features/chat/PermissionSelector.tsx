@@ -136,8 +136,8 @@ export function PermissionSelector({ value, onChange, disabled }: PermissionSele
             : isElevated
             ? 'bg-warning/10 text-warning border border-warning/40 hover:bg-warning/15 active:bg-warning/20 cursor-pointer'
             : hasOverride
-            ? 'text-primary hover:bg-secondary hover:text-foreground cursor-pointer'
-            : 'text-muted-foreground hover:bg-secondary hover:text-foreground cursor-pointer'
+            ? 'text-primary hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
+            : 'text-muted-foreground hover:bg-secondary active:bg-secondary/80 hover:text-foreground cursor-pointer'
           }
         `}
         title={triggerLabel}
