@@ -82,4 +82,9 @@ describe('ProjectListItem', () => {
     render(<ProjectListItem {...makeProps({ isExpanded: false })} />);
     expect(screen.queryByText('新建 session')).toBeNull();
   });
+
+  it('hides the "新建 session" entry while the create form is open', () => {
+    render(<ProjectListItem {...makeProps({ isCreatingSession: true })} />);
+    expect(screen.queryByText('新建 session')).toBeNull();
+  });
 });
