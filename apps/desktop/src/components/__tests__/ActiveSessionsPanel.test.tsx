@@ -310,12 +310,6 @@ describe('ActiveSessionsPanel', () => {
       expect(container.firstChild).toBeNull();
     });
 
-    it('renders nothing (not even a header) when no sessions and no recently completed', () => {
-      // Duplicate coverage for the early-return path (complements the test above).
-      const { container } = render(<ActiveSessionsPanel />);
-      expect(container.firstChild).toBeNull();
-    });
-
     it('toggles collapse on header click', () => {
       const sessionId = 'sess-1';
       useProjectStore.setState({
