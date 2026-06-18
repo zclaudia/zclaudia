@@ -10,6 +10,7 @@ import { SortableList, SortableItem } from '../../components/SortableList';
 import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
+import { SidebarNav } from './SidebarNav';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
@@ -50,6 +51,10 @@ interface SidebarProps {
   onClose?: () => void;
   onOpenDashboard?: (projectId: string) => void;
   onOpenAutomations?: () => void;
+  /** Navigate to the welcome screen (deselect session + exit any dashboard). */
+  onHome: () => void;
+  /** Whether the welcome screen is currently showing. */
+  isHomeActive: boolean;
   onOpenNotifications?: () => void;
   isNotificationsOpen?: boolean;
   disableNotifications?: boolean;
@@ -67,6 +72,8 @@ export function Sidebar({
   onClose,
   onOpenDashboard,
   onOpenAutomations,
+  onHome,
+  isHomeActive,
   onOpenNotifications,
   isNotificationsOpen = false,
   disableNotifications = false,
@@ -574,6 +581,12 @@ export function Sidebar({
             onResultSelect={actions.handleSearchResultSelect}
           />
 
+          <SidebarNav
+            onHome={() => { onHome(); onClose?.(); }}
+            isHomeActive={isHomeActive}
+            isMobile
+          />
+
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
             {renderProjectList()}
           </div>
@@ -648,6 +661,12 @@ export function Sidebar({
         }}
       />
 
+      <SidebarNav
+        onHome={onHome}
+        isHomeActive={isHomeActive}
+        onOpenAutomations={onOpenAutomations}
+      />
+
       <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
         {renderProjectList()}
       </div>
@@ -659,9 +678,7 @@ export function Sidebar({
       </div>
 
       <SidebarFooter
-        onOpenAutomations={onOpenAutomations}
         onShowSettings={() => setShowSettings(true)}
-        onClose={onClose}
       />
     </div>
     {renderPortaledModals()}

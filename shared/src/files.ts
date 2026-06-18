@@ -21,3 +21,16 @@ export interface FileContentResponse {
   content: string;        // file content
   size: number;           // file size in bytes
 }
+
+// Directory browser types (project root picker)
+
+export interface DirectoryBrowseEntry {
+  name: string;           // directory name, e.g. "my-project"
+  path: string;           // absolute path of the directory on the backend host
+}
+
+export interface DirectoryBrowseResponse {
+  path: string;                      // resolved absolute path of the current directory
+  parent: string | null;            // absolute parent path, or null at the filesystem root
+  directories: DirectoryBrowseEntry[]; // immediate subdirectories (sorted, dirs only)
+}

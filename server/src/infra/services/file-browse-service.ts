@@ -1,6 +1,7 @@
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
-import type { DirectoryListingResponse, FileContentResponse, FileEntry } from '@zclaudia/shared/files';
+import type { DirectoryBrowseResponse, DirectoryListingResponse, FileContentResponse, FileEntry } from '@zclaudia/shared/files';
 
 const IGNORED_DIRS = new Set([
   'node_modules',
@@ -206,6 +207,37 @@ export class FileBrowseService {
       entries,
       currentPath: normalizedRelPath,
       hasMore,
+    };
+  }
+
+  /**
+   * Browse directories for the project-root picker. Lists immediate
+   * subdirectories of an absolute path on the backend host (defaulting to the
+   * home directory), returning the resolved path and its parent so the client
+   * can navigate without doing OS-specific path math.
+   */
+  browseDirectories(absPath: string | undefined): DirectoryBrowseResponse {
+    const base = absPath && absPath.trim() ? path.resolve(absPath) : os.homedir();
+
+    if (!fs.existsSync(base)) {
+      throw new FileBrowseError(404, 'NOT_FOUND', 'Directory not found');
+    }
+    if (!fs.statSync(base).isDirectory()) {
+      throw new FileBrowseError(400, 'INVALID_PATH', 'Path is not a directory');
+    }
+
+    const directories = fs.readdirSync(base, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .filter((entry) => !entry.name.startsWith('.'))
+      .filter((entry) => !IGNORED_DIRS.has(entry.name))
+      .map((entry) => ({ name: entry.name, path: path.join(base, entry.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
+    const parent = path.dirname(base);
+    return {
+      path: base,
+      parent: parent === base ? null : parent,
+      directories,
     };
   }
 

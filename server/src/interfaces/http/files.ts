@@ -4,7 +4,7 @@ import * as os from 'os';
 import { newId } from '../../utils/uuid.js';
 import multer from 'multer';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
-import type { DirectoryListingResponse, FileContentResponse } from '@zclaudia/shared/files';
+import type { DirectoryBrowseResponse, DirectoryListingResponse, FileContentResponse } from '@zclaudia/shared/files';
 import { fileStore } from '../../infra/storage/fileStore.js';
 import { FileBrowseError, FileBrowseService } from '../../infra/services/file-browse-service.js';
 import {
@@ -126,6 +126,30 @@ export function createFilesRoutes(broadcastCtx?: FilesRouteBroadcastContext): Ro
       res.status(500).json({
         success: false,
         error: { code: 'SERVER_ERROR', message: 'Failed to list directory' }
+      });
+    }
+  });
+
+  // GET /api/files/browse-dirs
+  // Query param: path (absolute; defaults to the backend home dir)
+  // Returns immediate subdirectories for the project-root picker.
+  router.get('/browse-dirs', (req: Request, res: Response) => {
+    try {
+      const { path: absPath } = req.query as Record<string, string>;
+      const response = fileBrowseService.browseDirectories(absPath);
+      res.json({ success: true, data: response } as ApiResponse<DirectoryBrowseResponse>);
+    } catch (error) {
+      if (error instanceof FileBrowseError) {
+        res.status(error.status).json({
+          success: false,
+          error: { code: error.code, message: error.message }
+        });
+        return;
+      }
+      console.error('Error browsing directories:', error);
+      res.status(500).json({
+        success: false,
+        error: { code: 'SERVER_ERROR', message: 'Failed to browse directories' }
       });
     }
   });

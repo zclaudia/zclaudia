@@ -1,4 +1,8 @@
+import { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { FolderOpen } from 'lucide-react';
 import type { NewProjectFormProps } from './types';
+import { DirectoryPickerModal } from './DirectoryPickerModal';
 
 export function NewProjectForm({
   showForm,
@@ -18,9 +22,12 @@ export function NewProjectForm({
   const inputClass = isMobile
     ? 'w-full px-3 py-2.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50'
     : 'w-full px-2 py-1.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
-  const rootInputClass = isMobile
-    ? 'w-full px-3 py-2.5 mt-1 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50'
-    : 'w-full px-2 py-1.5 mt-1 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
+  const rootFieldClass = isMobile
+    ? 'flex-1 min-w-0 px-3 py-2.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50'
+    : 'flex-1 min-w-0 px-2 py-1.5 bg-muted/60 border-0 rounded-lg text-sm shadow-apple-sm focus:outline-none focus:ring-1 focus:ring-primary/50';
+  const browseBtnClass = isMobile
+    ? 'flex-shrink-0 px-3 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80 rounded-lg flex items-center justify-center shadow-apple-sm'
+    : 'flex-shrink-0 px-2 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg flex items-center justify-center shadow-apple-sm';
   const buttonRowClass = isMobile ? 'flex gap-2 mt-2' : 'flex gap-1 mt-1.5';
   const createBtnClass = isMobile
     ? 'flex-1 px-3 py-2.5 bg-accent text-foreground font-medium shadow-apple-sm hover:bg-accent/80 active:bg-accent/70 rounded-lg text-sm disabled:opacity-50'
@@ -31,6 +38,8 @@ export function NewProjectForm({
   const newProjectBtnClass = isMobile
     ? 'w-full mt-1 min-h-[36px] text-left px-1 text-sm flex items-center gap-1.5 text-muted-foreground/50 hover:text-muted-foreground active:text-muted-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed'
     : 'w-full mt-1 h-7 text-left px-1 text-sm flex items-center gap-1.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed';
+
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const handleCancel = () => {
     onShowForm(false);
@@ -64,17 +73,38 @@ export function NewProjectForm({
           className={inputClass}
           autoFocus
         />
-        <input
-          type="text"
-          value={newProjectRootPath}
-          onChange={(e) => onProjectRootPathChange(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onCreateProject();
-            if (e.key === 'Escape') handleCancel();
-          }}
-          placeholder="Working directory (e.g. /path/to/project)"
-          className={rootInputClass}
-        />
+        <div className="mt-1 flex gap-1">
+          <input
+            type="text"
+            value={newProjectRootPath}
+            onChange={(e) => onProjectRootPathChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') onCreateProject();
+              if (e.key === 'Escape') handleCancel();
+            }}
+            placeholder="Working directory (browse or type)"
+            className={rootFieldClass}
+          />
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            aria-label="Browse for folder"
+            title="Browse for folder"
+            className={browseBtnClass}
+          >
+            <FolderOpen size={16} strokeWidth={1.75} />
+          </button>
+        </div>
+        {pickerOpen && createPortal(
+          <DirectoryPickerModal
+            open={pickerOpen}
+            backendId={selectedBackendId ?? backends[0]?.backendId ?? null}
+            initialPath={newProjectRootPath.trim() || undefined}
+            onClose={() => setPickerOpen(false)}
+            onSelect={(path) => onProjectRootPathChange(path)}
+          />,
+          document.body,
+        )}
         <div className={buttonRowClass}>
           <button
             onClick={onCreateProject}

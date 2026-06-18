@@ -326,6 +326,11 @@ function AppContent() {
             setDashboardView(projectId, 'home');
             setDashboardProjectId(projectId);
           }}
+          onHome={() => {
+            selectSession(null);
+            setDashboardProjectId(null);
+          }}
+          isHomeActive={!selectedSessionId && !dashboardProjectId}
           onOpenAutomations={openAutomationWindowFn}
         />
 

@@ -108,8 +108,6 @@ export interface NewProjectFormProps {
 
 /** Props for SidebarFooter */
 export interface SidebarFooterProps {
-  onOpenAutomations?: () => void;
   onShowSettings: () => void;
-  onClose?: () => void;
   isMobile?: boolean;
 }

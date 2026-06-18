@@ -1,5 +1,19 @@
-import type { DirectoryListingResponse, FileContentResponse } from '@zclaudia/shared';
+import type { DirectoryBrowseResponse, DirectoryListingResponse, FileContentResponse } from '@zclaudia/shared';
 import { apiCall, apiCallForBackend } from './unwrap';
+
+export async function browseDirectories(params: {
+  path?: string;
+  backendId?: string | null;
+}): Promise<DirectoryBrowseResponse> {
+  const queryParams = new URLSearchParams({
+    ...(params.path && { path: params.path }),
+  });
+  const suffix = queryParams.toString() ? `?${queryParams}` : '';
+
+  return params.backendId
+    ? apiCallForBackend<DirectoryBrowseResponse>(params.backendId, `/api/files/browse-dirs${suffix}`)
+    : apiCall<DirectoryBrowseResponse>(`/api/files/browse-dirs${suffix}`);
+}
 
 export async function listDirectory(params: {
   projectRoot: string;
