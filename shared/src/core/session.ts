@@ -6,6 +6,10 @@ export interface Session {
   id: string;
   projectId: string;
   name?: string;
+  /** AI-generated topic title shown in the header chip. Distinct from `name`. */
+  autoTitle?: string;
+  /** User-message count at the moment `autoTitle` was last generated. */
+  autoTitleMsgCount?: number;
   /** FK to agent_profiles.id (NOT NULL on the server schema). Optional in the
    *  shared type to accommodate sync payloads that omit it; populated by the
    *  server before any session can be persisted. */

@@ -18,6 +18,7 @@ import { migration as m_015_llm_profile_cache_retention } from './015_llm_profil
 import { migration as m_016_user_hooks } from './016_user_hooks.js';
 import { migration as m_017_compaction_overflow_source } from './017_compaction_overflow_source.js';
 import { migration as m_018_eval_task_type } from './018_eval_task_type.js';
+import { migration as m_019_session_auto_title } from './019_session_auto_title.js';
 
 export type { Migration };
 
@@ -40,6 +41,7 @@ export const migrations: Migration[] = [
   m_016_user_hooks,
   m_017_compaction_overflow_source,
   m_018_eval_task_type,
+  m_019_session_auto_title,
 ];
 
 /**
