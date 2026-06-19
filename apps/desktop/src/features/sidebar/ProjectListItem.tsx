@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { Folder, FolderOpen, ChevronDown, ChevronRight, Plus } from 'lucide-react';
+import { Folder, FolderOpen, ChevronDown, ChevronRight, Plus, Settings } from 'lucide-react';
 import { isDesktopTauri } from '../../utils/platform';
 import { SessionItem } from './SessionItem';
 import { WorktreeGroupItem } from './WorktreeGroupItem';
@@ -205,6 +205,24 @@ export function ProjectListItem({
             <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" strokeWidth={2} />
           )}
         </button>
+        {/* Quick actions — revealed on row hover (Codex-style) */}
+        <button
+          onClick={() => onStartCreatingSession()}
+          disabled={!isConnected}
+          className={`${menuButtonClass} disabled:cursor-not-allowed`}
+          title="New session"
+          aria-label="New session"
+        >
+          <Plus className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={2} />
+        </button>
+        <button
+          onClick={() => onSettingsProject(project.id)}
+          className={menuButtonClass}
+          title="Project settings"
+          aria-label="Project settings"
+        >
+          <Settings className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
+        </button>
         {/* Project menu button */}
         <button
           onClick={(e) => onOpenContextMenu(e, 'project', project.id)}
@@ -306,19 +324,6 @@ export function ProjectListItem({
             </div>
           )}
           {!hasSupervisor && renderRegularSessions()}
-
-          {/* New session entry */}
-          {!isCreatingSession && (
-            <button
-              type="button"
-              onClick={() => onStartCreatingSession()}
-              disabled={!isConnected}
-              className="flex h-7 w-full items-center gap-1.5 rounded-lg pr-2 pl-7 text-[11px] text-muted-foreground hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
-            >
-              <Plus size={12} className="shrink-0" />
-              新建 session
-            </button>
-          )}
 
           {/* New session form */}
           {isCreatingSession && (

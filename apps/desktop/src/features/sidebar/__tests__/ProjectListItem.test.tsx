@@ -66,25 +66,27 @@ function makeProps(overrides: Partial<ProjectListItemProps> = {}): ProjectListIt
 }
 
 describe('ProjectListItem', () => {
-  it('shows a "新建 session" entry when expanded', () => {
-    render(<ProjectListItem {...makeProps()} />);
-    expect(screen.getByText('新建 session')).toBeDefined();
-  });
-
-  it('calls onStartCreatingSession when "新建 session" is clicked', () => {
+  it('shows a New session quick action that calls onStartCreatingSession', () => {
     const onStartCreatingSession = vi.fn();
     render(<ProjectListItem {...makeProps({ onStartCreatingSession })} />);
-    fireEvent.click(screen.getByText('新建 session'));
+    fireEvent.click(screen.getByLabelText('New session'));
     expect(onStartCreatingSession).toHaveBeenCalledTimes(1);
   });
 
-  it('does not show "新建 session" when collapsed', () => {
-    render(<ProjectListItem {...makeProps({ isExpanded: false })} />);
-    expect(screen.queryByText('新建 session')).toBeNull();
+  it('shows a Settings quick action that calls onSettingsProject', () => {
+    const onSettingsProject = vi.fn();
+    render(<ProjectListItem {...makeProps({ onSettingsProject })} />);
+    fireEvent.click(screen.getByLabelText('Project settings'));
+    expect(onSettingsProject).toHaveBeenCalledWith('proj-1');
   });
 
-  it('hides the "新建 session" entry while the create form is open', () => {
-    render(<ProjectListItem {...makeProps({ isCreatingSession: true })} />);
+  it('disables the New session quick action when disconnected', () => {
+    render(<ProjectListItem {...makeProps({ isConnected: false })} />);
+    expect((screen.getByLabelText('New session') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('no longer renders a Chinese inline "新建 session" entry', () => {
+    render(<ProjectListItem {...makeProps()} />);
     expect(screen.queryByText('新建 session')).toBeNull();
   });
 });
