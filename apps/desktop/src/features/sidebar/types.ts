@@ -99,7 +99,6 @@ export interface NewProjectFormProps {
   onProjectRootPathChange: (path: string) => void;
   onCreateProject: () => void;
   creatingProject: boolean;
-  isConnected: boolean;
   isMobile?: boolean;
   backends: { backendId: string; name: string; online: boolean }[];
   selectedBackendId: string | null;

@@ -504,7 +504,6 @@ export function Sidebar({
                       onProjectRootPathChange={setNewProjectRootPath}
                       onCreateProject={() => runAfterAgentGate(() => actions.handleCreateProject(backend.backendId), { forceRefresh: true })}
                       creatingProject={creatingProject}
-                      isConnected={isConnected}
                       isMobile={isMobile}
                       backends={[backend]}
                       selectedBackendId={backend.backendId}

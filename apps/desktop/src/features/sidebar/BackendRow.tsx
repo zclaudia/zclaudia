@@ -39,7 +39,7 @@ export function BackendRow({ name, online, expanded, onToggle, children, onNewPr
             type="button"
             onClick={onNewProject}
             disabled={newProjectDisabled}
-            className="mr-1 hidden h-6 w-6 flex-shrink-0 items-center justify-center rounded-md hover:bg-secondary group-hover:flex disabled:cursor-not-allowed"
+            className="mr-1 hidden h-6 w-6 flex-shrink-0 items-center justify-center rounded-md hover:bg-accent group-hover:flex disabled:cursor-not-allowed"
             title="New project"
             aria-label="New project"
           >
