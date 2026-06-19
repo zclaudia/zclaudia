@@ -55,6 +55,13 @@ export class SessionMessageRepository {
     return row.total;
   }
 
+  countUserMessagesBySession(sessionId: string): number {
+    const row = this.db
+      .prepare("SELECT COUNT(*) as total FROM messages WHERE session_id = ? AND role = 'user'")
+      .get(sessionId) as { total: number };
+    return row.total;
+  }
+
   listBySession(sessionId: string, options: SessionMessageListOptions): StoredSessionMessage[] {
     const { limit, before, after, afterOffset, aroundMessageId } = options;
 

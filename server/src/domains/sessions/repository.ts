@@ -32,7 +32,20 @@ export class SessionRepository extends BaseRepository<
       planStatus: row.plan_status || undefined,
       isReadOnly: row.is_read_only === 1 ? true : undefined,
       lastRunStatus: row.last_run_status || undefined,
+      autoTitle: row.auto_title || undefined,
+      autoTitleMsgCount: row.auto_title_msg_count ?? undefined,
     };
+  }
+
+  /**
+   * Persist the AI-generated topic title. Intentionally does NOT touch
+   * `updated_at` — this is a background enrichment and must not reorder
+   * sidebar lists that sort by recency.
+   */
+  updateAutoTitle(sessionId: string, autoTitle: string, autoTitleMsgCount: number): void {
+    this.db
+      .prepare('UPDATE sessions SET auto_title = ?, auto_title_msg_count = ? WHERE id = ?')
+      .run(autoTitle, autoTitleMsgCount, sessionId);
   }
 
   createQuery(data: Omit<Session, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: any[] } {
