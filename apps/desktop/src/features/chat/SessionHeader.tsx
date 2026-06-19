@@ -9,6 +9,7 @@ import { usePanelRegion } from '../../components/panels/usePanelRegion';
 import { activatePanel } from '../../utils/openPanel';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
+import { resolveTopicChip } from './sessionTopicChip';
 
 const DEFAULT_AGENT_LABEL = 'Default Coding Agent';
 
@@ -86,6 +87,7 @@ export function SessionHeader({
     return msgs?.find((m) => m.role === 'user')?.content ?? null;
   });
   const topicText = firstUserText ? firstUserText.replace(/\s+/g, ' ').trim().slice(0, 40) : null;
+  const chipText = resolveTopicChip(currentSession.autoTitle, topicText);
 
   // Right-panel toggle — a persistent affordance on desktop (like Cursor's panel toggle).
   const rightCollapsed = useRightSidebarStore((s) => s.collapsed);
@@ -166,13 +168,13 @@ export function SessionHeader({
           </button>
         </div>
       )}
-      {currentSession.type !== 'background' && topicText && (
+      {currentSession.type !== 'background' && chipText && (
         <span
           className="hidden min-w-0 shrink items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] leading-none text-primary sm:inline-flex"
           title={firstUserText ?? undefined}
         >
           <MessageSquare size={11} className="shrink-0" />
-          <span className="truncate">{topicText}</span>
+          <span className="truncate">{chipText}</span>
         </span>
       )}
       <div className="hidden min-w-6 flex-1 self-stretch sm:block" data-tauri-drag-region />
