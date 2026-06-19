@@ -59,6 +59,10 @@ interface ChatMessagePaneProps {
   // File reference resolution context
   fileReferenceRoot?: string;
   fileReferenceBackendId?: string | null;
+
+  /** When true, the pane is hidden (display:none) so the centered empty-state
+      composer can fill the viewport. Refs stay mounted for instant re-show. */
+  collapsed?: boolean;
 }
 
 export const ChatMessagePane = memo(function ChatMessagePane({
@@ -96,6 +100,7 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   onPermissionDecision,
   fileReferenceRoot,
   fileReferenceBackendId,
+  collapsed,
 }: ChatMessagePaneProps) {
   const interactionsMap = useInteractionStore((state) => state.interactions);
   const promptInteractions = useMemo(() => {
@@ -253,7 +258,11 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   return (
     <div
       ref={messagesContainerRef}
-      className="flex-1 overflow-y-auto overflow-x-hidden pl-2 pr-3 py-2 md:p-4 relative min-h-0"
+      className={
+        collapsed
+          ? 'hidden'
+          : 'flex-1 overflow-y-auto overflow-x-hidden pl-2 pr-3 py-2 md:p-4 relative min-h-0'
+      }
       onScroll={handleMessagesScroll}
       onWheel={(e) => handleMessageWheel(e.deltaY)}
     >

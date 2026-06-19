@@ -59,6 +59,8 @@ interface ChatInputAreaProps {
   onSendMessage: (content: string, attachments?: Attachment[]) => void;
   onCancelRun: () => void;
   onCommand: (command: string, args: string) => Promise<void>;
+  /** When true, the composer is vertically centered in the viewport (empty session). */
+  centered?: boolean;
 }
 
 export function ChatInputArea({
@@ -87,6 +89,7 @@ export function ChatInputArea({
   onSendMessage,
   onCancelRun,
   onCommand,
+  centered = false,
 }: ChatInputAreaProps) {
   const setDrawerOpen = useTerminalStore((s) => s.setDrawerOpen);
   const isDrawerOpen = useTerminalStore((s) => s.isDrawerOpen);
@@ -316,7 +319,13 @@ export function ChatInputArea({
   );
 
   return (
-    <div className="p-2 pb-3 md:px-4 md:pb-3 md:pt-2 safe-bottom-pad overflow-visible flex-shrink-0">
+    <div
+      className={
+        centered
+          ? 'p-2 pb-3 md:px-4 md:pb-3 md:pt-2 overflow-visible flex-1 flex flex-col justify-center min-h-0'
+          : 'p-2 pb-3 md:px-4 md:pb-3 md:pt-2 safe-bottom-pad overflow-visible flex-shrink-0'
+      }
+    >
       {/* Centered column matching the message reading column (ChatMessagePane) so
           the composer aligns with the chat content instead of stretching edge-to-edge. */}
       <div className="mx-auto w-full max-w-3xl">

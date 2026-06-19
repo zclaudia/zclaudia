@@ -165,6 +165,16 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   const poppedOutLabel = poppedOutSessions.get(sessionId);
 
+  // Brand-new session with no messages and nothing running: center the composer
+  // in the viewport (Cursor-style) instead of pinning it to the bottom.
+  const isEmptySession =
+    !!currentSession &&
+    !currentSession.isReadOnly &&
+    pagination.initialLoadDone &&
+    sessionMessages.length === 0 &&
+    permissionRequests.length === 0 &&
+    !isLoading;
+
   return (
     <ChatActionsProvider value={chatActionsValue}>
     <div ref={chatRootRef} className="flex flex-col flex-1 min-w-0 h-full bg-background">
@@ -284,6 +294,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
         onPermissionDecision={handlePermissionDecision}
         fileReferenceRoot={fileReferenceRoot}
         fileReferenceBackendId={fileReferenceBackendId}
+        collapsed={isEmptySession}
       />
 
       {/* Background Tasks Panel */}
@@ -337,6 +348,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           onSendMessage={handleSendMessage}
           onCancelRun={handleCancelRun}
           onCommand={handleCommand}
+          centered={isEmptySession}
         />
       )}
       </>}

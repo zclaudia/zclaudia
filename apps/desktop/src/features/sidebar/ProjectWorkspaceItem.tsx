@@ -4,82 +4,52 @@ interface ProjectWorkspaceItemProps {
   onSelect: () => void;
   isSelected: boolean;
   isActive?: boolean;
-  phase?: string;
   taskCount: number;
   taskChildren: React.ReactNode;
 }
 
-const phaseConfig: Record<string, { label: string; color: string }> = {
-  active:  { label: 'Active',  color: 'bg-green-500/15 text-green-600 dark:text-green-400' },
-  paused:  { label: 'Paused',  color: 'bg-yellow-500/15 text-yellow-600 dark:text-yellow-400' },
-  setup:   { label: 'Setup',   color: 'bg-blue-500/15 text-blue-600 dark:text-blue-400' },
-  idle:    { label: 'Idle',    color: 'bg-gray-500/15 text-gray-500' },
-  archived:{ label: 'Archived',color: 'bg-gray-500/15 text-gray-400' },
-};
-
 /**
- * Card-style Project Workspace entry. Clicking opens the project workspace
- * (project-level operations: tasks, issues, worktrees, git, etc.). Task
+ * Lightweight Project Workspace row, styled to sit at the same visual weight as
+ * the worktree/session rows below it. Clicking opens the project workspace
+ * (project-level operations: tasks, issues, worktrees, git, etc.). The
+ * supervisor phase is surfaced as a status dot on the project header row; task
  * sessions are listed directly below.
  */
 export function ProjectWorkspaceItem({
   onSelect,
   isSelected,
   isActive,
-  phase,
   taskCount,
   taskChildren,
 }: ProjectWorkspaceItemProps) {
-  const cfg = phase ? phaseConfig[phase] : undefined;
-
   return (
     <div className="relative" data-testid="supervisor-group">
-      <div>
-        {/* Card — clickable to open dashboard */}
-        <button
-          onClick={onSelect}
-          className={`w-full flex items-center gap-2 px-2.5 py-2 rounded-lg border transition-colors ${
-            isSelected
-              ? 'bg-accent border-border text-foreground'
-              : 'bg-muted/40 border-transparent hover:bg-muted/70 text-foreground/80 hover:text-foreground'
-          }`}
-        >
-          <div className={`shrink-0 w-6 h-6 rounded-md flex items-center justify-center ${
-            isSelected ? 'bg-foreground/10 text-foreground' : 'bg-muted-foreground/10 text-muted-foreground/60'
-          }`}>
-            <Bot className="w-3.5 h-3.5" />
-          </div>
-
-          <div className="flex-1 min-w-0 flex items-center gap-1.5">
-            <span className="text-xs font-semibold tracking-wide">
-              Project Workspace
-            </span>
-            {isActive && (
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
-            )}
-          </div>
-
-          <div className="flex items-center gap-1.5 shrink-0">
-            {cfg && (
-              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${cfg.color}`}>
-                {cfg.label}
-              </span>
-            )}
-            {taskCount > 0 && (
-              <span className="text-[10px] text-muted-foreground/60">
-                {taskCount} task{taskCount > 1 ? 's' : ''}
-              </span>
-            )}
-          </div>
-        </button>
-
-        {/* Task sessions — shown directly under supervisor */}
-        {taskCount > 0 && (
-          <div className="mt-0.5 pl-2">
-            {taskChildren}
-          </div>
+      <button
+        onClick={onSelect}
+        className={`w-full flex items-center gap-1.5 px-1 h-7 rounded-md transition-colors ${
+          isSelected
+            ? 'bg-accent text-foreground'
+            : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+        }`}
+      >
+        <Bot className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
+        <span className="text-xs font-medium truncate">Project Workspace</span>
+        {isActive && (
+          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0" />
         )}
-      </div>
+        {taskCount > 0 && (
+          <span className="ml-auto text-[10px] text-muted-foreground/60 shrink-0">
+            {taskCount} task{taskCount > 1 ? 's' : ''}
+          </span>
+        )}
+      </button>
+
+      {/* Task sessions — shown directly under supervisor */}
+      {taskCount > 0 && (
+        <div className="mt-0.5 pl-2">
+          {taskChildren}
+        </div>
+      )}
     </div>
   );
 }

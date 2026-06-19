@@ -1,4 +1,4 @@
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Trash2, GitBranch } from 'lucide-react';
 import type { Session } from '@zclaudia/shared';
 
 interface SessionItemProps {
@@ -9,8 +9,14 @@ interface SessionItemProps {
   isActive?: boolean;
   providerName?: string;
   worktreeBranch?: string;
+  /** Suppress the worktree branch tag (e.g. when shown inside a worktree group header). */
+  hideWorktreeBranch?: boolean;
   isMobile?: boolean;
   onPopOut?: () => void;
+  /** When set, a hover "remove worktree" button is shown — used on flattened
+      single-session worktree rows where there is no group header to host it. */
+  onDeleteWorktree?: () => void;
+  deleteWorktreeTitle?: string;
 }
 
 const ROLE_BADGES: Record<string, { label: string; className: string }> = {
@@ -37,12 +43,19 @@ export function SessionItem({
   isActive,
   providerName,
   worktreeBranch,
+  hideWorktreeBranch,
   isMobile,
   onPopOut,
+  onDeleteWorktree,
+  deleteWorktreeTitle = 'Remove worktree',
 }: SessionItemProps) {
   const isTask = session.projectRole === 'task';
   const roleBadge = session.projectRole ? ROLE_BADGES[session.projectRole] : undefined;
   const statusLabel = getStatusLabel(session, isActive, hasPending);
+
+  // Right-side hover actions (desktop only): worktree-delete and/or pop-out.
+  const desktopActionCount = isMobile ? 0 : (onDeleteWorktree ? 1 : 0) + (onPopOut ? 1 : 0);
+  const actionPadding = desktopActionCount >= 2 ? 'pr-12' : desktopActionCount === 1 ? 'pr-6' : '';
 
   // Task items under Supervisor use lighter styling
   const selectedClass = isTask
@@ -65,7 +78,7 @@ export function SessionItem({
           isTask ? 'text-xs' : 'text-sm'
         } ${
           isMobile ? 'min-h-[44px]' : 'h-7'
-        } ${onPopOut && !isMobile ? 'pr-6' : ''} ${isSelected ? selectedClass : unselectedClass}`}
+        } ${actionPadding} ${isSelected ? selectedClass : unselectedClass}`}
       >
         {!isTask && (
           <span
@@ -95,12 +108,13 @@ export function SessionItem({
             <path d="M7 11V7a5 5 0 0 1 10 0v4" />
           </svg>
         )}
-        {/* Worktree branch indicator */}
-        {!session.projectRole && worktreeBranch && (
-          <span className={`text-[9px] truncate max-w-[60px] shrink-0 ${
+        {/* Worktree branch indicator — right-aligned with a branch glyph */}
+        {!session.projectRole && worktreeBranch && !hideWorktreeBranch && (
+          <span className={`ml-auto flex items-center gap-0.5 text-[9px] truncate max-w-[90px] shrink-0 ${
             isSelected ? 'text-foreground/50' : 'text-muted-foreground/50'
           }`} title={worktreeBranch}>
-            {worktreeBranch}
+            <GitBranch size={9} strokeWidth={2} className="shrink-0" />
+            <span className="truncate">{worktreeBranch}</span>
           </span>
         )}
         {/* Status label (right side) */}
@@ -113,14 +127,29 @@ export function SessionItem({
           </span>
         )}
       </button>
-      {onPopOut && !isMobile && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onPopOut(); }}
-          className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded-md opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground hover:bg-muted transition-opacity"
-          title="Open in new window"
-        >
-          <ExternalLink size={11} />
-        </button>
+      {!isMobile && (onDeleteWorktree || onPopOut) && (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {onDeleteWorktree && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeleteWorktree(); }}
+              className="p-0.5 rounded-md text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+              title={deleteWorktreeTitle}
+              aria-label={deleteWorktreeTitle}
+            >
+              <Trash2 size={11} />
+            </button>
+          )}
+          {onPopOut && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPopOut(); }}
+              className="p-0.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Open in new window"
+              aria-label="Open in new window"
+            >
+              <ExternalLink size={11} />
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

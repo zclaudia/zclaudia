@@ -82,4 +82,62 @@ describe('ProjectListItem', () => {
     render(<ProjectListItem {...makeProps()} />);
     expect(screen.queryByText('新建 session')).toBeNull();
   });
+
+  describe('worktree flattening', () => {
+    const rootSession = {
+      ...mockSession,
+      id: 'root-sess',
+      name: 'Root Session',
+      workingDirectory: '/home/user/code/test',
+    } as any;
+    const wtSessionA = {
+      ...mockSession,
+      id: 'wt-a-1',
+      name: 'Worktree A Session',
+      workingDirectory: '/home/user/code/test/.worktrees/feat-a',
+    } as any;
+    const wtSessionA2 = {
+      ...mockSession,
+      id: 'wt-a-2',
+      name: 'Worktree A Session 2',
+      workingDirectory: '/home/user/code/test/.worktrees/feat-a',
+    } as any;
+    const worktrees = [
+      { path: '/home/user/code/test', branch: 'main', isMain: true },
+      { path: '/home/user/code/test/.worktrees/feat-a', branch: 'feat/a', isMain: false },
+    ] as any;
+
+    it('flattens a single-session worktree into a plain row with no group toggle', () => {
+      render(
+        <ProjectListItem
+          {...makeProps({ sessions: [rootSession, wtSessionA], worktrees })}
+        />
+      );
+      // The session shows directly...
+      expect(screen.getByText('Worktree A Session')).toBeDefined();
+      // ...with its git branch label (not the dir basename "feat-a")...
+      expect(screen.getByText('feat/a')).toBeDefined();
+      // ...and a remove-worktree affordance is reachable on the flat row.
+      expect(screen.getByRole('button', { name: 'Remove worktree' })).toBeDefined();
+    });
+
+    it('keeps a collapsible group (with count) for worktrees with 2+ sessions', () => {
+      render(
+        <ProjectListItem
+          {...makeProps({
+            sessions: [rootSession, wtSessionA, wtSessionA2],
+            worktrees,
+            expandedWorktrees: new Set(['proj-1:/home/user/code/test/.worktrees/feat-a']),
+          })}
+        />
+      );
+      // Group header label is present...
+      expect(screen.getByText('feat/a')).toBeDefined();
+      // ...children render when expanded, and they do NOT repeat the branch tag
+      // (only the group header carries it).
+      expect(screen.getByText('Worktree A Session')).toBeDefined();
+      // Single header-level "feat/a" only — no duplicate branch tags on children.
+      expect(screen.getAllByText('feat/a')).toHaveLength(1);
+    });
+  });
 });

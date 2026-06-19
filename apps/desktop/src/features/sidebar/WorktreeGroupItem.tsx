@@ -81,9 +81,9 @@ export function WorktreeGroupItem({
         )}
       </div>
 
-      {/* Expanded children */}
+      {/* Expanded children — guide rail fades in only while hovered */}
       {isExpanded && (
-        <div className="ml-2 mt-0.5">
+        <div className="ml-2 mt-0.5 pl-2 border-l border-transparent hover:border-border/60 transition-colors">
           {children}
         </div>
       )}

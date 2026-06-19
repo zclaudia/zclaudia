@@ -1289,7 +1289,7 @@ describe('Sidebar', () => {
 
   // ---- Supervision agents ----
 
-  it('shows supervisor group phase for projects with agents', () => {
+  it('shows supervisor phase as a status dot on the project row', () => {
     setupStores({
       supervisionStore: {
         agents: { 'proj-1': { phase: 'active', mainSessionId: 'main-sess' } },
@@ -1300,10 +1300,10 @@ describe('Sidebar', () => {
     const projBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    expect(container.querySelector('[data-testid="supervisor-group"]')?.getAttribute('data-phase')).toBe('active');
+    expect(container.querySelector('[aria-label="Workspace active"]')).toBeTruthy();
   });
 
-  it('shows paused supervisor group phase', () => {
+  it('shows paused supervisor phase on the project row', () => {
     setupStores({
       supervisionStore: {
         agents: { 'proj-1': { phase: 'paused', mainSessionId: 'main-sess' } },
@@ -1314,7 +1314,7 @@ describe('Sidebar', () => {
     const projBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    expect(container.querySelector('[data-testid="supervisor-group"]')?.getAttribute('data-phase')).toBe('paused');
+    expect(container.querySelector('[aria-label="Workspace paused"]')).toBeTruthy();
   });
 
   // ---- Supervisor groups ----
@@ -1402,12 +1402,17 @@ describe('Sidebar', () => {
   });
 
   it('keeps supervisor at project level when worktree groups exist', () => {
+    // A multi-session group still renders as a collapsible worktree group
+    // (single-session groups are flattened into plain rows).
     vi.mocked(groupSessionsByWorktree).mockReturnValue([
       {
         key: '__root__',
         label: 'main',
         isRoot: true,
-        sessions: [{ ...baseSession, id: 'regular-1', name: 'Regular 1', projectId: 'proj-1' } as any],
+        sessions: [
+          { ...baseSession, id: 'regular-1', name: 'Regular 1', projectId: 'proj-1' } as any,
+          { ...baseSession, id: 'regular-2', name: 'Regular 2', projectId: 'proj-1' } as any,
+        ],
       },
     ] as any);
 
@@ -1420,6 +1425,7 @@ describe('Sidebar', () => {
           { ...baseSession, id: 'main-sess', name: 'Main', projectRole: 'main', projectId: 'proj-1' },
           { ...baseSession, id: 'task-1', name: 'Task 1', projectRole: 'task', parentSessionId: 'main-sess', projectId: 'proj-1' },
           { ...baseSession, id: 'regular-1', name: 'Regular 1', projectId: 'proj-1' },
+          { ...baseSession, id: 'regular-2', name: 'Regular 2', projectId: 'proj-1' },
         ],
       },
     });

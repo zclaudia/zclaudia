@@ -14,6 +14,14 @@ function normalizePath(p: string): string {
   return p.replace(/\\/g, '/').replace(/\/$/, '');
 }
 
+// Supervisor phase shown as a small status dot on the project header row.
+const PHASE_DOT: Record<string, { label: string; dot: string }> = {
+  active: { label: 'active', dot: 'bg-green-500' },
+  paused: { label: 'paused', dot: 'bg-yellow-500' },
+  setup:  { label: 'setup',  dot: 'bg-blue-500' },
+  idle:   { label: 'idle',   dot: 'bg-muted-foreground/40' },
+};
+
 function splitProjectSessions(
   sessionList: Session[],
   hasSupervisor: boolean,
@@ -106,7 +114,16 @@ export function ProjectListItem({
     : 'flex-1 px-2 py-1 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg text-xs';
   const sessionFormWrapperClass = isMobile ? '' : 'mt-1';
 
-  const renderSession = (session: Session) => (
+  interface RenderSessionOptions {
+    /** Override the branch tag (e.g. flattened worktree rows use the git branch). */
+    worktreeBranchOverride?: string;
+    /** Hide the branch tag entirely (grouped rows — the header already shows it). */
+    hideWorktreeBranch?: boolean;
+    onDeleteWorktree?: () => void;
+    deleteWorktreeTitle?: string;
+  }
+
+  const renderSession = (session: Session, opts: RenderSessionOptions = {}) => (
     <SessionItem
       key={session.id}
       session={session}
@@ -115,7 +132,10 @@ export function ProjectListItem({
       hasPending={hasPendingForSession(session.id)}
       isActive={activeRunSessionIds.has(session.id)}
       providerName={getProviderName(session)}
-      worktreeBranch={getWorktreeBranch(session, project)}
+      worktreeBranch={opts.worktreeBranchOverride ?? getWorktreeBranch(session, project)}
+      hideWorktreeBranch={opts.hideWorktreeBranch}
+      onDeleteWorktree={opts.onDeleteWorktree}
+      deleteWorktreeTitle={opts.deleteWorktreeTitle}
       isMobile={isMobile}
       onPopOut={
         !isMobile && isDesktopTauri() && onPopOutSession
@@ -125,7 +145,11 @@ export function ProjectListItem({
     />
   );
 
-  const renderSortableSessions = (sessionList: Session[], className = 'space-y-0.5') => (
+  const renderSortableSessions = (
+    sessionList: Session[],
+    className = 'space-y-0.5',
+    sessionOpts: RenderSessionOptions = {},
+  ) => (
     <SortableList
       items={sessionList.map((s) => s.id)}
       onReorder={(ordered) => onReorderSessions(project.id, ordered)}
@@ -133,7 +157,7 @@ export function ProjectListItem({
     >
       {sessionList.map((session) => (
         <SortableItem key={session.id} id={session.id} dragHandleClassName="w-3 h-3 -ml-0.5 mr-0.5">
-          {renderSession(session)}
+          {renderSession(session, sessionOpts)}
         </SortableItem>
       ))}
     </SortableList>
@@ -146,6 +170,7 @@ export function ProjectListItem({
     supervisorAgent?.mainSessionId,
   );
   const supervisorSessionId = hasSupervisor ? (supervisorAgent?.mainSessionId ?? mainSession?.id) : undefined;
+  const phaseDot = hasSupervisor ? (PHASE_DOT[supervisorAgent?.phase ?? 'idle'] ?? PHASE_DOT.idle) : undefined;
   const regularSessionIds = new Set(regularSessions.map((session) => session.id));
   const groups = groupSessionsByWorktree(sessions, project.rootPath, worktrees)
     .map((group) => ({
@@ -166,6 +191,27 @@ export function ProjectListItem({
       const canDeleteWorktree = Boolean(
         matchedWorktree && !matchedWorktree.isMain && matchedWorktree.managedBy !== 'supervisor'
       );
+      const onDelete = matchedWorktree
+        ? () => onDeleteWorktree(project.id, matchedWorktree.path, matchedWorktree.branch)
+        : undefined;
+
+      // Single-session worktrees collapse to a plain session row — no group
+      // header, no expand step. The row carries the git branch label, and the
+      // remove-worktree action moves onto the row's hover affordance.
+      if (group.sessions.length === 1) {
+        const session = group.sessions[0];
+        return (
+          <div key={group.key} className="mt-0.5">
+            {renderSession(session, {
+              // Root worktree gets no branch tag; named worktrees show the git
+              // branch (e.g. "feat/my-test") for consistency with group headers.
+              worktreeBranchOverride: group.isRoot ? undefined : (group.branchName || group.label),
+              onDeleteWorktree: canDeleteWorktree ? onDelete : undefined,
+            })}
+          </div>
+        );
+      }
+
       return (
         <WorktreeGroupItem
           key={group.key}
@@ -174,13 +220,10 @@ export function ProjectListItem({
           onToggle={() => onToggleWorktree(`${project.id}:${group.key}`)}
           isMobile={isMobile}
           canDelete={canDeleteWorktree}
-          onDelete={
-            matchedWorktree
-              ? () => onDeleteWorktree(project.id, matchedWorktree.path, matchedWorktree.branch)
-              : undefined
-          }
+          onDelete={onDelete}
         >
-          {renderSortableSessions(group.sessions)}
+          {/* Branch shown once on the group header — suppress it on each child row. */}
+          {renderSortableSessions(group.sessions, 'space-y-0.5', { hideWorktreeBranch: true })}
         </WorktreeGroupItem>
       );
     });
@@ -205,6 +248,16 @@ export function ProjectListItem({
             <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" strokeWidth={2} />
           )}
         </button>
+        {/* Supervisor phase — shown at rest, yields to the hover actions */}
+        {phaseDot && (
+          <span
+            className="flex group-hover:hidden items-center gap-1 pr-1 shrink-0"
+            aria-label={`Workspace ${phaseDot.label}`}
+          >
+            <span className={`w-1.5 h-1.5 rounded-full ${phaseDot.dot}`} />
+            <span className="text-[10px] text-muted-foreground/60">{phaseDot.label}</span>
+          </span>
+        )}
         {/* Project menu button */}
         <button
           onClick={(e) => onOpenContextMenu(e, 'project', project.id)}
@@ -261,9 +314,12 @@ export function ProjectListItem({
         )}
       </div>
 
-      {/* Sessions */}
+      {/* Sessions — a left guide rail fades in only while this region is hovered */}
       {isExpanded && (
-        <div className="ml-1 mt-0.5" data-testid="session-list">
+        <div
+          className="ml-1 mt-0.5 pl-2 border-l border-transparent hover:border-border/60 transition-colors"
+          data-testid="session-list"
+        >
           {hasSupervisor && (
             <ProjectWorkspaceItem
               key={supervisorSessionId ?? `${project.id}:supervisor`}
@@ -272,12 +328,20 @@ export function ProjectListItem({
               }}
               isSelected={!!supervisorSessionId && selectedSessionId === supervisorSessionId}
               isActive={!!supervisorSessionId && activeRunSessionIds.has(supervisorSessionId)}
-              phase={supervisorAgent?.phase}
               taskCount={taskSessions.length}
               taskChildren={taskSessions.length > 0 ? renderSortableSessions(taskSessions) : null}
             />
           )}
-          {regularSessions.length > 0 && hasSupervisor && (
+          {/* Worktree groups already convey structure + counts, so under a
+              supervisor we render them directly and drop the redundant
+              "SESSIONS N" header. The header (a collapse-all toggle) is only
+              useful for the flat, ungrouped list. */}
+          {regularSessions.length > 0 && hasSupervisor && groups.length > 0 && (
+            <div className="mt-1">
+              {renderRegularSessions()}
+            </div>
+          )}
+          {regularSessions.length > 0 && hasSupervisor && groups.length === 0 && (
             <div className="mt-1">
               <button
                 onClick={onToggleRegularSessions}

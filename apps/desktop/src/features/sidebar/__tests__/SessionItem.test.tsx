@@ -89,4 +89,48 @@ describe('SessionItem', () => {
     );
     expect(screen.queryByText('running')).toBeNull();
   });
+
+  it('renders the worktree branch tag when provided', () => {
+    render(
+      <SessionItem
+        session={mockSession}
+        isSelected={false}
+        onSelect={vi.fn()}
+        hasPending={false}
+        worktreeBranch="feat/my-test"
+      />
+    );
+    expect(screen.getByText('feat/my-test')).toBeDefined();
+  });
+
+  it('hides the worktree branch tag when hideWorktreeBranch is set', () => {
+    render(
+      <SessionItem
+        session={mockSession}
+        isSelected={false}
+        onSelect={vi.fn()}
+        hasPending={false}
+        worktreeBranch="feat/my-test"
+        hideWorktreeBranch
+      />
+    );
+    expect(screen.queryByText('feat/my-test')).toBeNull();
+  });
+
+  it('renders a remove-worktree button that fires onDeleteWorktree without selecting', () => {
+    const onDeleteWorktree = vi.fn();
+    const onSelect = vi.fn();
+    render(
+      <SessionItem
+        session={mockSession}
+        isSelected={false}
+        onSelect={onSelect}
+        hasPending={false}
+        onDeleteWorktree={onDeleteWorktree}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove worktree' }));
+    expect(onDeleteWorktree).toHaveBeenCalledTimes(1);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
 });
