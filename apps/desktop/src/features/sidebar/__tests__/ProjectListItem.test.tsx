@@ -73,13 +73,6 @@ describe('ProjectListItem', () => {
     expect(onStartCreatingSession).toHaveBeenCalledTimes(1);
   });
 
-  it('shows a Settings quick action that calls onSettingsProject', () => {
-    const onSettingsProject = vi.fn();
-    render(<ProjectListItem {...makeProps({ onSettingsProject })} />);
-    fireEvent.click(screen.getByLabelText('Project settings'));
-    expect(onSettingsProject).toHaveBeenCalledWith('proj-1');
-  });
-
   it('disables the New session quick action when disconnected', () => {
     render(<ProjectListItem {...makeProps({ isConnected: false })} />);
     expect((screen.getByLabelText('New session') as HTMLButtonElement).disabled).toBe(true);

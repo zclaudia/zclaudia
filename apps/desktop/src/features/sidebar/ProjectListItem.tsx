@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { Folder, FolderOpen, ChevronDown, ChevronRight, Plus, Settings } from 'lucide-react';
+import { Folder, FolderOpen, ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import { isDesktopTauri } from '../../utils/platform';
 import { SessionItem } from './SessionItem';
 import { WorktreeGroupItem } from './WorktreeGroupItem';
@@ -86,7 +86,7 @@ export function ProjectListItem({
   const menuWidthClass = isMobile ? 'w-44' : 'w-36';
   const menuButtonClass = isMobile
     ? 'w-8 h-8 rounded-md hover:bg-secondary active:bg-secondary flex-shrink-0 flex items-center justify-center opacity-0 group-hover:opacity-100'
-    : 'w-6 h-6 rounded-md opacity-0 group-hover:opacity-100 hover:bg-secondary flex-shrink-0 flex items-center justify-center';
+    : 'w-6 h-6 rounded-md hidden group-hover:flex hover:bg-secondary flex-shrink-0 items-center justify-center';
   const projectButtonClass = isMobile
     ? 'flex-1 min-w-0 min-h-[36px] text-left px-1 text-sm flex items-center gap-1.5 text-foreground'
     : 'flex-1 min-w-0 h-7 text-left px-1 text-sm flex items-center gap-1.5';
@@ -205,7 +205,17 @@ export function ProjectListItem({
             <ChevronRight className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" strokeWidth={2} />
           )}
         </button>
-        {/* Quick actions — revealed on row hover (Codex-style) */}
+        {/* Project menu button */}
+        <button
+          onClick={(e) => onOpenContextMenu(e, 'project', project.id)}
+          className={menuButtonClass}
+          aria-label="Project menu"
+        >
+          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+          </svg>
+        </button>
+        {/* New session — placed last */}
         <button
           onClick={() => onStartCreatingSession()}
           disabled={!isConnected}
@@ -214,23 +224,6 @@ export function ProjectListItem({
           aria-label="New session"
         >
           <Plus className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={2} />
-        </button>
-        <button
-          onClick={() => onSettingsProject(project.id)}
-          className={menuButtonClass}
-          title="Project settings"
-          aria-label="Project settings"
-        >
-          <Settings className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.75} />
-        </button>
-        {/* Project menu button */}
-        <button
-          onClick={(e) => onOpenContextMenu(e, 'project', project.id)}
-          className={menuButtonClass}
-        >
-          <svg className="w-3.5 h-3.5 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
-          </svg>
         </button>
 
         {/* Project context menu */}
