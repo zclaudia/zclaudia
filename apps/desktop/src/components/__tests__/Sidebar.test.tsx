@@ -939,11 +939,7 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
-      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
-    });
-    fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-    const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session')!;
+    const newSessionBtn = projBtn.closest('div')!.querySelector('button[aria-label="New session"]') as HTMLButtonElement;
     fireEvent.click(newSessionBtn);
 
     const sessionInput = container.querySelector('input[placeholder="Session name (optional)"]')!;
@@ -977,11 +973,7 @@ describe('Sidebar', () => {
     const projBtn = buttons.find(b => b.textContent?.includes('Project One'))!;
     fireEvent.click(projBtn);
 
-    const dotsButtons = Array.from(container.querySelectorAll('button')).filter(b => {
-      return b.className.includes('flex-shrink-0') && b.textContent?.trim() === '';
-    });
-    fireEvent.click(dotsButtons[0], { clientX: 100, clientY: 100 });
-    const newSessionBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent?.trim() === 'New Session')!;
+    const newSessionBtn = projBtn.closest('div')!.querySelector('button[aria-label="New session"]') as HTMLButtonElement;
     fireEvent.click(newSessionBtn);
 
     const createBtn = Array.from(container.querySelectorAll('button')).find(b => b.textContent === 'Create')!;
