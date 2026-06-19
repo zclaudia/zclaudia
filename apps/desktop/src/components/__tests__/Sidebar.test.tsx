@@ -341,10 +341,11 @@ describe('Sidebar', () => {
       },
     });
 
-    const { getByText } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const newProjectButton = getByText('New Project').closest('button');
-
-    expect(newProjectButton).toBeDisabled();
+    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+    // When the backend is not online, no BackendRow is rendered so there is no + button.
+    // Creating a project is effectively unavailable.
+    const newProjectButtons = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    expect(newProjectButtons.length).toBe(0);
   });
 
   // ---- Project expand/collapse ----
@@ -560,10 +561,9 @@ describe('Sidebar', () => {
 
   it('shows New Project button when connected', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'));
-    expect(newProjectBtn).toBeTruthy();
-    expect(newProjectBtn?.disabled).toBe(false);
+    const newProjectBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    expect(newProjectBtns.length).toBeGreaterThan(0);
+    expect(newProjectBtns[0].disabled).toBe(false);
   });
 
   it('disables New Project button when disconnected', () => {
@@ -576,16 +576,15 @@ describe('Sidebar', () => {
       },
     });
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'));
-    expect(newProjectBtn).toBeTruthy();
-    expect(newProjectBtn?.disabled).toBe(true);
+    // When disconnected there are no online backends — no BackendRow renders, so the
+    // + button is absent entirely (new project creation is unavailable).
+    const newProjectBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    expect(newProjectBtns.length).toBe(0);
   });
 
   it('shows new project form when New Project is clicked', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -608,8 +607,7 @@ describe('Sidebar', () => {
     });
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
     fireEvent.click(newProjectBtn);
 
     await waitFor(() => {
@@ -626,8 +624,7 @@ describe('Sidebar', () => {
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
     // Open form
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -666,8 +663,7 @@ describe('Sidebar', () => {
     });
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
     fireEvent.click(newProjectBtn);
 
     const nameInput = container.querySelector('input[placeholder="Project name"]')!;
@@ -688,8 +684,7 @@ describe('Sidebar', () => {
 
   it('cancels new project form', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
     fireEvent.click(newProjectBtn);
 
     // Click Cancel
@@ -705,8 +700,7 @@ describe('Sidebar', () => {
 
   it('cancels new project form on Escape key', () => {
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -723,8 +717,7 @@ describe('Sidebar', () => {
     setupStores({ projectStore: { addProject } });
 
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'))!;
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
     fireEvent.click(newProjectBtn);
 
     const inputs = container.querySelectorAll('input');
@@ -1202,10 +1195,10 @@ describe('Sidebar', () => {
     });
     const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
 
-    // The New Project button should be disabled
-    const buttons = Array.from(container.querySelectorAll('button'));
-    const newProjectBtn = buttons.find(b => b.textContent?.includes('New Project'));
-    expect(newProjectBtn?.disabled).toBe(true);
+    // When disconnected there are no online backends — no BackendRow renders,
+    // so the + button is absent entirely (new project creation is unavailable).
+    const newProjectBtns = Array.from(container.querySelectorAll<HTMLButtonElement>('button[aria-label="New project"]'));
+    expect(newProjectBtns.length).toBe(0);
   });
 
   // ---- Mobile rendering ----

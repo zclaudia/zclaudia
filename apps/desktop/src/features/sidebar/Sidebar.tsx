@@ -475,47 +475,48 @@ export function Sidebar({
             const backendProjects = getProjectsForBackend(backend.backendId);
             const expanded = expandedBackendIds.includes(backend.backendId);
             return (
-              <BackendRow
-                key={backend.backendId}
-                name={backend.name}
-                online={backend.online}
-                expanded={expanded}
-                onToggle={() => toggleBackend(backend.backendId)}
-              >
-                {backendProjects.length === 0 ? (
-                  <p className="px-2 py-1 text-xs text-muted-foreground">No projects yet</p>
-                ) : (
-                  renderProjectItems(backendProjects)
+              <div key={backend.backendId} className="space-y-1">
+                <BackendRow
+                  name={backend.name}
+                  online={backend.online}
+                  expanded={expanded}
+                  onToggle={() => toggleBackend(backend.backendId)}
+                  onNewProject={() => runAfterAgentGate(() => {
+                    setNewProjectBackendId(backend.backendId);
+                    setShowNewProjectForm(true);
+                  })}
+                  newProjectDisabled={!isConnected}
+                >
+                  {backendProjects.length === 0 ? (
+                    <p className="px-2 py-1 text-xs text-muted-foreground">No projects yet</p>
+                  ) : (
+                    renderProjectItems(backendProjects)
+                  )}
+                </BackendRow>
+                {showNewProjectForm && newProjectBackendId === backend.backendId && (
+                  <div className="pl-3">
+                    <NewProjectForm
+                      showForm
+                      onShowForm={(show: boolean) => { if (!show) setShowNewProjectForm(false); }}
+                      newProjectName={newProjectName}
+                      onProjectNameChange={setNewProjectName}
+                      newProjectRootPath={newProjectRootPath}
+                      onProjectRootPathChange={setNewProjectRootPath}
+                      onCreateProject={() => runAfterAgentGate(() => actions.handleCreateProject(backend.backendId), { forceRefresh: true })}
+                      creatingProject={creatingProject}
+                      isConnected={isConnected}
+                      isMobile={isMobile}
+                      backends={[backend]}
+                      selectedBackendId={backend.backendId}
+                      onSelectedBackendIdChange={setNewProjectBackendId}
+                    />
+                  </div>
                 )}
-              </BackendRow>
+              </div>
             );
           })}
         </div>
       )}
-
-      <NewProjectForm
-        showForm={showNewProjectForm}
-        onShowForm={(show: boolean) => {
-          if (!show) {
-            setShowNewProjectForm(false);
-            return;
-          }
-          runAfterAgentGate(() => setShowNewProjectForm(true));
-        }}
-        newProjectName={newProjectName}
-        onProjectNameChange={setNewProjectName}
-        newProjectRootPath={newProjectRootPath}
-        onProjectRootPathChange={setNewProjectRootPath}
-        onCreateProject={() => {
-          runAfterAgentGate(() => actions.handleCreateProject(newProjectBackendId), { forceRefresh: true });
-        }}
-        creatingProject={creatingProject}
-        isConnected={isConnected}
-        isMobile={isMobile}
-        backends={onlineBackends}
-        selectedBackendId={newProjectBackendId}
-        onSelectedBackendIdChange={setNewProjectBackendId}
-      />
     </>
   );
 

@@ -13,7 +13,6 @@ export function NewProjectForm({
   onProjectRootPathChange,
   onCreateProject,
   creatingProject,
-  isConnected,
   isMobile,
   backends,
   selectedBackendId,
@@ -35,9 +34,6 @@ export function NewProjectForm({
   const cancelBtnClass = isMobile
     ? 'flex-1 px-3 py-2.5 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground active:bg-muted/80 rounded-lg text-sm'
     : 'flex-1 px-2 py-1 bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground rounded-lg text-xs';
-  const newProjectBtnClass = isMobile
-    ? 'w-full mt-1 min-h-[36px] text-left px-1 text-sm flex items-center gap-1.5 text-muted-foreground/50 hover:text-muted-foreground active:text-muted-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed'
-    : 'w-full mt-1 h-7 text-left px-1 text-sm flex items-center gap-1.5 text-muted-foreground/50 hover:text-muted-foreground transition-colors disabled:opacity-30 disabled:cursor-not-allowed';
 
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -124,16 +120,5 @@ export function NewProjectForm({
     );
   }
 
-  return (
-    <button
-      onClick={() => onShowForm(true)}
-      disabled={!isConnected}
-      className={newProjectBtnClass}
-    >
-      <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-      </svg>
-      <span className="text-[11px] tracking-wide">New Project</span>
-    </button>
-  );
+  return null;
 }

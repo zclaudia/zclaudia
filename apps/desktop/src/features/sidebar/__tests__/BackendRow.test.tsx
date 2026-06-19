@@ -39,4 +39,15 @@ describe('BackendRow', () => {
     fireEvent.click(screen.getByRole('button', { name: /Local Server/ }));
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
+
+  it('calls onNewProject when the + button is clicked', () => {
+    const onNewProject = vi.fn();
+    render(
+      <BackendRow name="Local Server" online expanded={false} onToggle={() => {}} onNewProject={onNewProject}>
+        <div />
+      </BackendRow>,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'New project' }));
+    expect(onNewProject).toHaveBeenCalledTimes(1);
+  });
 });
