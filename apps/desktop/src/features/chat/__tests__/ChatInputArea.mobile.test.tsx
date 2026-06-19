@@ -114,10 +114,10 @@ vi.mock('../../../stores/pluginStore', () => ({
 }));
 
 const rightSidebarState = {
-  widthPx: 380,
+  widthFraction: 0.26,
   activeTab: null as string | null,
   setActiveTab: vi.fn(),
-  setWidth: vi.fn(),
+  setWidthFraction: vi.fn(),
 };
 
 vi.mock('../../../stores/rightSidebarStore', () => ({
@@ -128,7 +128,7 @@ vi.mock('../../../stores/rightSidebarStore', () => ({
       getState: () => rightSidebarState,
     },
   ),
-  RIGHT_SIDEBAR_LIMITS: { MIN_WIDTH_PX: 240, MAX_WIDTH_VW: 50, DEFAULT_WIDTH_PX: 380 },
+  RIGHT_SIDEBAR_LIMITS: { MIN_WIDTH_PX: 240, MIN_WIDTH_FRACTION: 0.15, MAX_WIDTH_FRACTION: 0.5, DEFAULT_WIDTH_FRACTION: 0.26 },
 }));
 
 const draftEditorState = {

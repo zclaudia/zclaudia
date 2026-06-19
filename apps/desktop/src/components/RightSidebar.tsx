@@ -33,11 +33,11 @@ interface RightSidebarProps {
 export function RightSidebar({ projectId, projectRoot, workingDirectory }: RightSidebarProps) {
   const isMobile = useIsMobile();
   const setPanelPlacement = usePluginStore((s) => s.setPanelPlacement);
-  const widthPx = useRightSidebarStore((s) => s.widthPx);
+  const widthFraction = useRightSidebarStore((s) => s.widthFraction);
   const activeTab = useRightSidebarStore((s) => s.activeTab);
   const collapsed = useRightSidebarStore((s) => s.collapsed);
   const setActiveTab = useRightSidebarStore((s) => s.setActiveTab);
-  const setWidth = useRightSidebarStore((s) => s.setWidth);
+  const setWidthFraction = useRightSidebarStore((s) => s.setWidthFraction);
   const setBottomPanelTab = useBottomPanelStore((s) => s.setActiveTab);
   // Pinned tool tabs (Draft / Files / Changes / Terminal), published by the composer.
   const pinnedTools = useSessionToolsStore((s) => s.tools);
@@ -56,6 +56,7 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
   });
 
   // Width drag state
+  const rootRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
@@ -70,14 +71,16 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
       e.preventDefault();
       dragging.current = true;
       startX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
-      startWidth.current = widthPx;
+      startWidth.current = widthFraction;
 
       const onMove = (ev: MouseEvent | TouchEvent) => {
         if (!dragging.current) return;
         const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
-        // Drag handle is on left edge — moving left increases width
+        // Convert the px drag delta into a fraction of the container width so the
+        // panel stays proportional. Handle is on the left edge — moving left widens.
+        const container = rootRef.current?.parentElement?.clientWidth || window.innerWidth;
         const deltaPx = startX.current - clientX;
-        setWidth(startWidth.current + deltaPx);
+        setWidthFraction(startWidth.current + deltaPx / container);
       };
 
       const cleanup = () => {
@@ -97,7 +100,7 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
       document.addEventListener('touchmove', onMove);
       document.addEventListener('touchend', onUp);
     },
-    [widthPx, setWidth],
+    [widthFraction, setWidthFraction],
   );
 
   const handleClose = () => {
@@ -127,16 +130,16 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
   // the sidebar renderable even before any panel content has been opened.
   const expanded = !collapsed && (isOpen || hasPinned);
 
-  const clampedWidth = Math.max(
-    RIGHT_SIDEBAR_LIMITS.MIN_WIDTH_PX,
-    Math.min(window.innerWidth * (RIGHT_SIDEBAR_LIMITS.MAX_WIDTH_VW / 100), widthPx),
-  );
-
   return (
     <div
+      ref={rootRef}
       className={`flex flex-col flex-shrink-0 bg-card ${expanded ? 'border-l border-border' : ''} relative`}
       style={{
-        width: expanded ? `${clampedWidth}px` : '0px',
+        // Width is a fraction of the container so it scales with the window; the
+        // browser keeps the ratio on resize, with a px floor and a max share cap.
+        width: expanded ? `${widthFraction * 100}%` : '0px',
+        minWidth: expanded ? `${RIGHT_SIDEBAR_LIMITS.MIN_WIDTH_PX}px` : undefined,
+        maxWidth: expanded ? `${RIGHT_SIDEBAR_LIMITS.MAX_WIDTH_FRACTION * 100}%` : undefined,
         overflow: 'hidden',
         contain: 'layout paint style',
       }}

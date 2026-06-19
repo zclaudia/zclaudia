@@ -22,7 +22,7 @@ describe('openPanel utility', () => {
   beforeEach(() => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
     useBottomPanelStore.setState({ activeTab: '' });
-    useRightSidebarStore.setState({ activeTab: null, widthPx: 380, collapsed: false, unread: false });
+    useRightSidebarStore.setState({ activeTab: null, widthFraction: 0.26, collapsed: false, unread: false });
   });
 
   describe('activatePanel', () => {

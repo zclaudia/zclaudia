@@ -58,7 +58,7 @@ function registerRightFileViewer(visible = true) {
 describe('RightSidebar', () => {
   beforeEach(() => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
-    useRightSidebarStore.setState({ widthPx: 380, activeTab: null, collapsed: false, unread: false });
+    useRightSidebarStore.setState({ widthFraction: 0.26, activeTab: null, collapsed: false, unread: false });
     useSessionToolsStore.setState({ tools: [] });
     useBottomPanelStore.setState({ activeTab: '' });
     onCloseSpy.mockClear();
@@ -180,12 +180,13 @@ describe('RightSidebar', () => {
     expect(onChanges).toHaveBeenCalled();
   });
 
-  it('uses widthPx from store as the sidebar width', () => {
+  it('uses widthFraction from store as the sidebar width (proportional)', () => {
     registerRightTerminal(true);
-    useRightSidebarStore.setState({ widthPx: 420, activeTab: 'terminal' });
+    useRightSidebarStore.setState({ widthFraction: 0.3, activeTab: 'terminal' });
 
     const { container } = render(<RightSidebar projectId="p1" projectRoot="/test" />);
     const wrapper = container.firstChild as HTMLElement;
-    expect(wrapper.style.width).toBe('420px');
+    expect(wrapper.style.width).toBe('30%');
+    expect(wrapper.style.minWidth).toBe('240px');
   });
 });
