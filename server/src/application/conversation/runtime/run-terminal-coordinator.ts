@@ -26,6 +26,8 @@ import {
   type RunDomainEventListenerRegistry,
 } from './run-domain-event-listeners.js';
 import { projectRunDomainEventToWireMessages } from './wire-projector.js';
+import { broadcastRunMessage } from '../transport/broadcast.js';
+import { maybeGenerateSessionTitle } from '../title/session-title-service.js';
 
 export interface TerminalProviderEventState {
   systemInfo?: SystemInfo;
@@ -142,6 +144,17 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
     }
   };
 
+  const triggerSessionTitle = () => {
+    if (!activeRun.agentProfile || !activeRun.llmProfile) return;
+    maybeGenerateSessionTitle({
+      db,
+      sessionId,
+      agentProfile: activeRun.agentProfile,
+      llmProfile: activeRun.llmProfile,
+      broadcast: (m) => broadcastRunMessage(activeRun, m),
+    });
+  };
+
   if (shouldRunCompaction) {
     setPhase(activeRun, 'completed');
     maybeCompact({
@@ -179,10 +192,12 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
     }).finally(() => {
       emitRunCompleted();
       emitBackgroundUpdate();
+      triggerSessionTitle();
     });
   } else {
     emitRunCompleted();
     emitBackgroundUpdate();
+    triggerSessionTitle();
   }
 
 }
