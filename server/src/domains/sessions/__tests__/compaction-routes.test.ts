@@ -5,7 +5,44 @@ import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { newId } from '../../../utils/uuid.js';
 import { createSessionRoutes } from '../routes.js';
-import { SessionCompactionRepository } from '../compaction-repository.js';
+
+/**
+ * Insert a native compaction entry into the session tree (Route C), the way the
+ * compaction service now persists them. The route reader projects this back into
+ * the `SessionCompaction` shape; `createdAt` round-trips through the ISO timestamp.
+ */
+function insertCompactionEntry(
+  db: Database.Database,
+  sessionId: string,
+  input: {
+    id: string;
+    summary: string;
+    firstKeptEntryId: string;
+    tokensBefore: number;
+    source: 'auto' | 'manual' | 'overflow' | 'preflight';
+    customInstructions?: string | null;
+    readFiles?: string[];
+    modifiedFiles?: string[];
+    createdAt: number;
+  },
+): void {
+  const payload = JSON.stringify({
+    summary: input.summary,
+    firstKeptEntryId: input.firstKeptEntryId,
+    tokensBefore: input.tokensBefore,
+    details: {
+      source: input.source,
+      customInstructions: input.customInstructions ?? null,
+      readFiles: input.readFiles ?? [],
+      modifiedFiles: input.modifiedFiles ?? [],
+    },
+    fromHook: false,
+  });
+  db.prepare(
+    `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
+     VALUES (?, ?, ?, 'compaction', ?, ?)`,
+  ).run(input.id, sessionId, input.firstKeptEntryId, payload, new Date(input.createdAt).toISOString());
+}
 
 vi.mock('../../../infra/events/index.js', () => ({
   pluginEvents: { emit: vi.fn().mockReturnValue(Promise.resolve()) },
@@ -63,13 +100,13 @@ describe('sessions compaction routes', () => {
     it('returns the compaction record when found', async () => {
       const { messageId } = seedSession(db);
       const cid = newId();
-      new SessionCompactionRepository(db).create({
+      insertCompactionEntry(db, 's1', {
         id: cid,
-        sessionId: 's1',
         summary: 'a summary',
-        firstKeptMessageId: messageId,
+        firstKeptEntryId: messageId,
         tokensBefore: 12345,
-        details: { readFiles: ['/a.ts'], modifiedFiles: ['/b.ts'] },
+        readFiles: ['/a.ts'],
+        modifiedFiles: ['/b.ts'],
         source: 'manual',
         customInstructions: 'focus on auth',
         createdAt: 2000,
@@ -95,11 +132,10 @@ describe('sessions compaction routes', () => {
         .run(newId(), 's1', 'assistant', 'reply', 3000, 2);
 
       const cid = newId();
-      new SessionCompactionRepository(db).create({
+      insertCompactionEntry(db, 's1', {
         id: cid,
-        sessionId: 's1',
         summary: 'mid summary',
-        firstKeptMessageId: messageId,
+        firstKeptEntryId: messageId,
         tokensBefore: 7777,
         source: 'auto',
         createdAt: 2000,
@@ -126,8 +162,8 @@ describe('sessions compaction routes', () => {
         .run(newId(), 's1', 'assistant', 'reply', 3000, 2);
 
       // Marker BEFORE the page window (createdAt < oldest message)
-      new SessionCompactionRepository(db).create({
-        id: newId(), sessionId: 's1', summary: 'stale', firstKeptMessageId: messageId,
+      insertCompactionEntry(db, 's1', {
+        id: newId(), summary: 'stale', firstKeptEntryId: messageId,
         tokensBefore: 1, source: 'auto', createdAt: 500,
       });
 

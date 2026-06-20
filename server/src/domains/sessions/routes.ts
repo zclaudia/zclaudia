@@ -4,7 +4,7 @@ import type { ApiResponse } from '@zclaudia/shared/core/api';
 import type { Message } from '@zclaudia/shared/core/message';
 import type { Session } from '@zclaudia/shared/core/session';
 import { SessionRepository } from './repository.js';
-import { SessionCompactionRepository } from './compaction-repository.js';
+import { getCompactionById } from './compaction-tree-read.js';
 import { mountSearchRoutes } from './search-routes.js';
 import { mountMessageRoutes } from './message-routes.js';
 import { SessionLifecycleError, SessionLifecycleService } from './lifecycle-service.js';
@@ -334,11 +334,10 @@ export function createSessionRoutes(
   // Get a single compaction record (UI uses this to populate marker card details
   // after receiving a compaction_completed event without re-fetching the whole
   // messages list).
-  const compactionRepo = new SessionCompactionRepository(db);
   router.get('/:id/compactions/:compactionId', (req: Request, res: Response) => {
     try {
       const { id: sessionId, compactionId } = req.params;
-      const compaction = compactionRepo.getById(sessionId, compactionId);
+      const compaction = getCompactionById(db, sessionId, compactionId);
       if (!compaction) {
         sendApiError(res, 404, 'NOT_FOUND', 'Compaction not found');
         return;

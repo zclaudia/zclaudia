@@ -178,6 +178,21 @@ function createDb(): Database.Database {
       allowed_root TEXT,
       created_at INTEGER
     );
+
+    -- Session tree (Route C): the run lifecycle dual-writes message entries here.
+    CREATE TABLE IF NOT EXISTS session_entries (
+      id          TEXT NOT NULL,
+      session_id  TEXT NOT NULL,
+      parent_id   TEXT,
+      type        TEXT NOT NULL,
+      payload     TEXT NOT NULL,
+      timestamp   TEXT NOT NULL,
+      PRIMARY KEY (session_id, id)
+    );
+    CREATE TABLE IF NOT EXISTS session_leaf (
+      session_id  TEXT PRIMARY KEY,
+      leaf_id     TEXT
+    );
   `);
   createAgentProfilesTable(db);
 

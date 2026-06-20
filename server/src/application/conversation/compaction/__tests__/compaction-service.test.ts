@@ -3,10 +3,27 @@ import Database from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
-import { SessionCompactionRepository } from '../../../../domains/sessions/compaction-repository.js';
+import { listCompactions, type SessionCompaction } from '../../../../domains/sessions/compaction-tree-read.js';
+import { appendMessagesToTree } from '../../../../infra/providers/pi-runtime/session-tree/write-path.js';
+import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import { maybeCompact, forceCompact, compactForOverflow } from '../compaction-service.js';
 import { compactionCircuitBreaker } from '../circuit-breaker.js';
 import * as pi from '@earendil-works/pi-agent-core';
+
+/** Latest compaction (tree is the source of truth; entries are oldest-first). */
+function latestCompaction(db: Database.Database, sessionId: string): SessionCompaction | null {
+  const all = listCompactions(db, sessionId);
+  return all.length ? all[all.length - 1] : null;
+}
+
+/** Alternating user/assistant messages, ~500 tokens each. */
+function treeMessages(count: number): AgentMessage[] {
+  const msgs: AgentMessage[] = [];
+  for (let i = 0; i < count; i++) {
+    msgs.push({ role: i % 2 === 0 ? 'user' : 'assistant', content: 'x'.repeat(2000) } as AgentMessage);
+  }
+  return msgs;
+}
 
 // Mock pi generateSummary to avoid hitting a real LLM. The other pure helpers
 // (shouldCompact / estimateContextTokens / findCutPoint / DEFAULT_COMPACTION_SETTINGS)
@@ -49,10 +66,8 @@ function seedSession(db: Database.Database, messageCount: number): SeedResult {
     .run('p1', 'P', 'code', 0, 0);
   db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
     .run('s1', 'p1', 'ap1', 0, 0);
-  for (let i = 0; i < messageCount; i++) {
-    db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
-      .run(`m${i + 1}`, 's1', i % 2 === 0 ? 'user' : 'assistant', 'x'.repeat(2000), i * 1000, i + 1);
-  }
+  // Route C: compaction reads the session tree, not the messages table.
+  appendMessagesToTree(db, 's1', treeMessages(messageCount));
   return {
     agentProfile: {
       id: 'ap1', name: 'a', llmProfileId: 'lp1', model: 'claude-sonnet-4-6',
@@ -101,7 +116,7 @@ describe('compaction-service', () => {
     });
     expect(result.compacted).toBe(true);
     expect(result.compactionId).toBeTruthy();
-    const created = new SessionCompactionRepository(db).getLatest('s1')!;
+    const created = latestCompaction(db, 's1')!;
     expect(created.summary).toBe('MOCKED-SUMMARY');
     expect(created.source).toBe('auto');
   });
@@ -116,7 +131,7 @@ describe('compaction-service', () => {
       customInstructions: 'focus on auth',
     });
     expect(result.compacted).toBe(true);
-    const created = new SessionCompactionRepository(db).getLatest('s1')!;
+    const created = latestCompaction(db, 's1')!;
     expect(created.source).toBe('manual');
     expect(created.customInstructions).toBe('focus on auth');
   });
@@ -173,15 +188,20 @@ describe('compaction-service', () => {
     expect(result.reason).toMatch(/^error:/);
   });
 
-  it('stores correct boundary id (matches a real message id)', async () => {
-    // Long enough conversation that findCutPoint finds a meaningful boundary.
+  it('stores a boundary id that points at a real tree entry', async () => {
+    // Long enough conversation that prepareCompaction finds a meaningful boundary.
     const { agentProfile, llmProfile } = seedSession(db, 100);
     const result = await forceCompact({
       db, sessionId: 's1', agentProfile, llmProfile, source: 'manual',
     });
     expect(result.compacted).toBe(true);
-    const created = new SessionCompactionRepository(db).getLatest('s1')!;
-    expect(created.firstKeptMessageId).toMatch(/^m\d+$/);
+    const created = latestCompaction(db, 's1')!;
+    // firstKeptMessageId is now a tree entry id — assert it resolves to a real message entry.
+    expect(created.firstKeptMessageId).toBeTruthy();
+    const entry = db.prepare(
+      `SELECT type FROM session_entries WHERE session_id = 's1' AND id = ?`,
+    ).get(created.firstKeptMessageId) as { type: string } | undefined;
+    expect(entry?.type).toBe('message');
   });
 });
 
@@ -282,7 +302,7 @@ describe('compactForOverflow', () => {
     });
     expect(result.outcome).toBe('compacted');
     expect(result.compacted).toBe(true);
-    const created = new SessionCompactionRepository(db).getLatest('s1')!;
+    const created = latestCompaction(db, 's1')!;
     expect(created.source).toBe('overflow');
   });
 
@@ -311,14 +331,10 @@ describe('compactForOverflow', () => {
     const sessionId = 'overflow-success-test';
     // Pre-seed one failure so we can verify it gets cleared.
     compactionCircuitBreaker.recordFailure(sessionId, 1);
-    // Insert messages into the db under the unique sessionId.
-    // seedSession hardcodes 's1', so we copy the rows into a new session row.
+    // seedSession hardcodes 's1'; seed a tree under the unique sessionId instead.
     db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
       .run(sessionId, 'p1', 'ap1', 0, 0);
-    for (let i = 0; i < 100; i++) {
-      db.prepare(`INSERT INTO messages (id, session_id, role, content, created_at, offset) VALUES (?, ?, ?, ?, ?, ?)`)
-        .run(`mo${i + 1}`, sessionId, i % 2 === 0 ? 'user' : 'assistant', 'x'.repeat(2000), i * 1000, i + 1);
-    }
+    appendMessagesToTree(db, sessionId, treeMessages(100));
     const result = await compactForOverflow({
       db, sessionId, agentProfile, llmProfile, source: 'overflow',
     });

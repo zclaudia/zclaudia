@@ -1,9 +1,11 @@
 import {
   estimateContextTokens,
-  findCutPoint,
   generateSummary,
+  prepareCompaction,
+  Session,
   DEFAULT_COMPACTION_SETTINGS,
   type AgentMessage,
+  type SessionTreeEntry,
 } from '@earendil-works/pi-agent-core';
 import {
   compactionTriggerThreshold,
@@ -14,9 +16,7 @@ import type { Usage } from '@earendil-works/pi-ai';
 import type { Database } from 'better-sqlite3';
 import type { AgentProfileConfig } from '@zclaudia/shared/core/agent-profile';
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
-import { newId } from '../../../utils/uuid.js';
-import { SessionCompactionRepository } from '../../../domains/sessions/compaction-repository.js';
-import { rebuildHistory } from '../../../infra/providers/pi-runtime/history-rebuilder.js';
+import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/session-tree/index.js';
 import { buildModel } from '../../../infra/providers/pi-runtime/build-model.js';
 import { resolveContextWindow } from './context-windows.js';
 import { compactionCircuitBreaker } from './circuit-breaker.js';
@@ -81,7 +81,7 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
     });
   }
   try {
-    const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
+    const { session, branch, messages } = await loadTreeSnapshot(ctx);
     if (messages.length === 0) return skipped('no_messages');
     const window = resolveContextWindow(ctx.agentProfile, undefined, ctx.llmProfile).value;
     // Threshold input is the real prompt-token count from the last response's
@@ -98,7 +98,7 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
     if (!willCompact) {
       return skipped('below_threshold', tokens);
     }
-    const result = await runCompaction(ctx, messages, dbIds, tokens);
+    const result = await runCompaction(ctx, session, branch, tokens);
     if (result.outcome === 'compacted') compactionCircuitBreaker.recordSuccess(ctx.sessionId);
     return result;
   } catch (err) {
@@ -121,10 +121,10 @@ export async function maybeCompact(ctx: CompactionContext): Promise<CompactionOu
  */
 export async function forceCompact(ctx: CompactionContext): Promise<CompactionOutcome> {
   try {
-    const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
+    const { session, branch, messages } = await loadTreeSnapshot(ctx);
     if (messages.length === 0) return skipped('no_messages');
     const tokens = estimateContextTokens(messages).tokens;
-    const result = await runCompaction(ctx, messages, dbIds, tokens);
+    const result = await runCompaction(ctx, session, branch, tokens);
     if (result.outcome === 'compacted') compactionCircuitBreaker.reset(ctx.sessionId);
     return result;
   } catch (err) {
@@ -156,10 +156,10 @@ export async function compactForOverflow(ctx: CompactionContext): Promise<Compac
     });
   }
   try {
-    const { messages, dbIds } = rebuildHistory(ctx.db, ctx.sessionId);
+    const { session, branch, messages } = await loadTreeSnapshot(ctx);
     if (messages.length === 0) return skipped('no_messages');
     const tokens = estimateContextTokens(messages).tokens;
-    const result = await runCompaction(ctx, messages, dbIds, tokens);
+    const result = await runCompaction(ctx, session, branch, tokens);
     if (result.outcome === 'compacted') compactionCircuitBreaker.recordSuccess(ctx.sessionId);
     return result;
   } catch (err) {
@@ -167,40 +167,72 @@ export async function compactForOverflow(ctx: CompactionContext): Promise<Compac
   }
 }
 
+/** Snapshot of the session tree's active branch + its projected context messages. */
+interface TreeSnapshot {
+  session: Session;
+  /** Root→leaf path entries (what pi's prepareCompaction consumes). */
+  branch: SessionTreeEntry[];
+  /** buildContext projection — used for the token estimate / threshold decision. */
+  messages: AgentMessage[];
+}
+
+/** Load the session tree's active branch and its projected messages (Route C). */
+async function loadTreeSnapshot(ctx: CompactionContext): Promise<TreeSnapshot> {
+  const session = new Session(new SqliteSessionStorage(ctx.db, ctx.sessionId));
+  const branch = await session.getBranch();
+  const messages = (await session.buildContext()).messages;
+  return { session, branch, messages };
+}
+
+export interface TreeCompactionInput {
+  summary: string;
+  firstKeptEntryId: string;
+  tokensBefore: number;
+  details: { source: string; customInstructions: string | null; readFiles: string[]; modifiedFiles: string[] };
+}
+
 /**
- * Wrap a flat `Message[]` into a minimal `SessionTreeEntry[]` of `type:
- * 'message'` so we can call pi's `findCutPoint` (which expects entries, not
- * raw messages). The fake ids/parentIds/timestamps satisfy the
- * `SessionTreeEntryBase` shape — `findCutPoint` only inspects `entry.type`
- * and `entry.message`.
+ * Append a native pi `CompactionEntry` to the session tree and return its id.
+ * `appendCompaction` over `SqliteSessionStorage` advances the leaf to the new
+ * entry, so the next `buildContext` honors the boundary natively (drops
+ * pre-boundary history, prepends the summary). Replaces the old
+ * `session_compactions` table write.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function wrapAsEntries(messages: AgentMessage[]): any[] {
-  return messages.map((message, i) => ({
-    type: 'message',
-    id: `e${i}`,
-    parentId: i === 0 ? null : `e${i - 1}`,
-    timestamp: '0',
-    message,
-  }));
+export async function appendCompactionToTree(session: Session, input: TreeCompactionInput): Promise<string> {
+  return session.appendCompaction(input.summary, input.firstKeptEntryId, input.tokensBefore, input.details, false);
+}
+
+/** Mirror of pi's (non-exported) computeFileLists: modified = written ∪ edited; read-only excludes modified. */
+function computeFileLists(
+  fileOps: { read: Set<string>; written: Set<string>; edited: Set<string> },
+): { readFiles: string[]; modifiedFiles: string[] } {
+  const modified = new Set([...fileOps.edited, ...fileOps.written]);
+  const readFiles = [...fileOps.read].filter((f) => !modified.has(f)).sort();
+  const modifiedFiles = [...modified].sort();
+  return { readFiles, modifiedFiles };
 }
 
 async function runCompaction(
   ctx: CompactionContext,
-  messages: AgentMessage[],
-  dbIds: (string | null)[],
+  session: Session,
+  branch: SessionTreeEntry[],
   tokens: number,
 ): Promise<CompactionOutcome> {
-  const entries = wrapAsEntries(messages);
-  const cut = findCutPoint(entries, 0, entries.length, DEFAULT_COMPACTION_SETTINGS.keepRecentTokens);
-  if (cut.firstKeptEntryIndex <= 0) {
+  // pi resolves the cut point natively over the tree entries — no fake-entry
+  // wrapping or DB-id parallel array. `undefined` means no meaningful cut point
+  // (recent budget already covers everything).
+  const prep = prepareCompaction(branch, DEFAULT_COMPACTION_SETTINGS);
+  if (!prep.ok) {
+    throw prep.error instanceof Error ? prep.error : new Error(String(prep.error));
+  }
+  const preparation = prep.value;
+  // pi returns a preparation even when the cut sits at the branch start (nothing
+  // to summarize) — e.g. the recent-token budget already covers the whole
+  // history. Treat that as no cut point, matching the prior findCutPoint<=0 gate.
+  if (!preparation || (preparation.messagesToSummarize.length === 0 && preparation.turnPrefixMessages.length === 0)) {
     return skipped('no_cut_point', tokens);
   }
-  const firstKeptDbId = dbIds[cut.firstKeptEntryIndex];
-  if (!firstKeptDbId) {
-    return skipped('cut_point_unmappable', tokens);
-  }
-  const toSummarize = messages.slice(0, cut.firstKeptEntryIndex);
+  const toSummarize = preparation.messagesToSummarize;
 
   // Build the model with the agent's model id over the llm profile config so
   // compaction uses the SAME provider/model the session is already using. A
@@ -218,6 +250,9 @@ async function runCompaction(
   const summary = await summarizeChunked({
     messages: toSummarize,
     chunkBudget,
+    // Seed the rollup with any prior compaction's summary so iterative
+    // compactions UPDATE rather than re-summarize from scratch (pi semantics).
+    previousSummary: preparation.previousSummary,
     generate: (chunk, previousSummary) => generateSummary(
       chunk,
       built.model,
@@ -231,18 +266,19 @@ async function runCompaction(
     ),
   });
 
-  const created = new SessionCompactionRepository(ctx.db).create({
-    id: newId(),
-    sessionId: ctx.sessionId,
+  // pi extracts real file operations from the summarized history; project them
+  // into the UI's read/modified lists (previously stubbed empty).
+  const { readFiles, modifiedFiles } = computeFileLists(preparation.fileOps);
+  const compactionId = await appendCompactionToTree(session, {
     summary,
-    firstKeptMessageId: firstKeptDbId,
+    firstKeptEntryId: preparation.firstKeptEntryId,
     tokensBefore: tokens,
-    // File-op extraction is a follow-up — pi's extractFileOpsFromMessage lives
-    // on the harness path and isn't re-exported from the main barrel.
-    details: { readFiles: [], modifiedFiles: [] },
-    source: ctx.source,
-    customInstructions: ctx.customInstructions,
-    createdAt: Date.now(),
+    details: {
+      source: ctx.source,
+      customInstructions: ctx.customInstructions ?? null,
+      readFiles,
+      modifiedFiles,
+    },
   });
-  return { outcome: 'compacted', compacted: true, compactionId: created.id, tokensBefore: tokens };
+  return { outcome: 'compacted', compacted: true, compactionId, tokensBefore: tokens };
 }

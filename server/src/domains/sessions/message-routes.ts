@@ -7,7 +7,7 @@ import { extractAndIndexMetadata } from '../../infra/storage/metadata-extractor.
 import { findForegroundActiveRunIdForSession } from '../../utils/run-state.js';
 import { parsePersistedMessageMetadata } from '../../utils/persisted-message.js';
 import { SessionMessageRepository } from './message-repository.js';
-import { SessionCompactionRepository, type SessionCompaction } from './compaction-repository.js';
+import { listCompactions, type SessionCompaction } from './compaction-tree-read.js';
 import { applyMessagePageBudget } from './message-page-budget.js';
 import type { RunPhase } from '../../application/conversation/runtime/active-run-phase.js';
 /** Minimal shape — avoids depending on application/conversation types */
@@ -42,7 +42,6 @@ function compactionToTimelineEntry(compaction: SessionCompaction): Message {
 
 export function mountMessageRoutes(router: Router, db: Database.Database, activeRuns: ActiveRunsMap): void {
   const repo = new SessionMessageRepository(db);
-  const compactionRepo = new SessionCompactionRepository(db);
 
   router.get('/:id/messages', (req: Request, res: Response) => {
     try {
@@ -86,7 +85,7 @@ export function mountMessageRoutes(router: Router, db: Database.Database, active
       // filter" full-history view this becomes the entire compaction list.
       const oldestInPage = parsedMessages.length > 0 ? parsedMessages[0].createdAt : undefined;
       const newestInPage = parsedMessages.length > 0 ? parsedMessages[parsedMessages.length - 1].createdAt : undefined;
-      const allCompactions = compactionRepo.list(req.params.id);
+      const allCompactions = listCompactions(db, req.params.id);
       const markerEntries = allCompactions
         .filter((c) => {
           if (oldestInPage == null || newestInPage == null) return parsedMessages.length === 0;
