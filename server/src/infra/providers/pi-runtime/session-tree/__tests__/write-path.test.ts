@@ -46,6 +46,34 @@ describe('write-path builders', () => {
     expect(msgs[1].content).toEqual([{ type: 'text', text: 'ok' }]);
   });
 
+  it('buildAssistantTurnMessages: carries usage onto the assistant message', () => {
+    const msgs = buildAssistantTurnMessages({
+      fullContent: 'done',
+      collectedToolCalls: [],
+      usage: { input: 12, output: 34, cacheRead: 56 },
+    }) as any[];
+    expect(msgs[0].role).toBe('assistant');
+    expect(msgs[0].usage).toEqual({ input: 12, output: 34, cacheRead: 56 });
+  });
+
+  it('buildAssistantTurnMessages: omits usage when not provided', () => {
+    const msgs = buildAssistantTurnMessages({ fullContent: 'a', collectedToolCalls: [] }) as any[];
+    expect(msgs[0].usage).toBeUndefined();
+  });
+
+  it('usage survives the tree round-trip and is readable for the compaction threshold', async () => {
+    const { Session: _S } = await import('@earendil-works/pi-agent-core');
+    const { lastAssistantPromptTokens } = await import('../../../../../application/conversation/compaction/context-estimate.js');
+    const db = makeDb();
+    appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
+    appendMessagesToTree(db, 's1', buildAssistantTurnMessages({
+      fullContent: 'a', collectedToolCalls: [], usage: { input: 1000, cacheRead: 500, output: 20 },
+    }));
+    const ctx = await new _S(new SqliteSessionStorage(db, 's1')).buildContext();
+    // input + cacheRead + cacheWrite (output excluded) = 1500
+    expect(lastAssistantPromptTokens(ctx.messages as any)).toBe(1500);
+  });
+
   it('appendMessagesToTree writes entries readable via buildContext, chained + leaf advanced', async () => {
     const db = makeDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);

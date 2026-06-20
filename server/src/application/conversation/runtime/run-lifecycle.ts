@@ -295,6 +295,7 @@ export function upsertAssistantMessage(
       fullContent: run.fullContent,
       thinkingBlocks: run.thinkingBlocks,
       collectedToolCalls: run.collectedToolCalls,
+      usage: options.usage,
     }));
     run.treeTurnAppended = true;
   }

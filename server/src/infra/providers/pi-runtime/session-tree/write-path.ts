@@ -7,6 +7,10 @@ export interface AssistantTurnData {
   fullContent: string;
   thinkingBlocks?: Array<{ text: string; signature?: string; redacted?: boolean }>;
   collectedToolCalls?: Array<{ toolUseId: string; name: string; input?: unknown; output?: unknown; isError?: boolean }>;
+  /** Provider usage for this turn. Stored on the assistant entry so the
+   *  compaction threshold (lastAssistantPromptTokens) can anchor on the real
+   *  prompt-token count instead of degrading to a chars/4 estimate. */
+  usage?: unknown;
 }
 
 /** Build a pi user AgentMessage. Image attachments become ref-carrying image
@@ -47,6 +51,7 @@ export function buildAssistantTurnMessages(turn: AssistantTurnData): AgentMessag
     role: 'assistant',
     content,
     stopReason: (turn.collectedToolCalls?.length ? 'toolUse' : 'stop'),
+    ...(turn.usage ? { usage: turn.usage } : {}),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any];
   for (const tc of turn.collectedToolCalls ?? []) {
