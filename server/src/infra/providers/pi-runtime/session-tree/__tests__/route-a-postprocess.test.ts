@@ -34,6 +34,21 @@ describe('trimMessagesToBudget', () => {
     const blockMsg = { role: 'assistant', content: [{ type: 'text', text: 'hi' }, { type: 'image' }] } as unknown as Message;
     expect(estimateMessageTokens(blockMsg)).toBeGreaterThan(1000); // image adds a flat estimate
   });
+
+  it('estimateMessageTokens counts a compactionSummary message body', () => {
+    const summaryMsg = { role: 'compactionSummary', summary: 'word '.repeat(800), tokensBefore: 1 } as unknown as Message;
+    expect(estimateMessageTokens(summaryMsg)).toBeGreaterThan(0);
+  });
+
+  it('never drops a leading compaction summary — trims the kept tail instead', () => {
+    const summary = { role: 'compactionSummary', summary: 'PRE-COMPACTION-SUMMARY', tokensBefore: 1 } as unknown as Message;
+    const msgs = [summary, userMsg('a'.repeat(8000)), userMsg('b'.repeat(8000)), userMsg('newest')];
+    const out = trimMessagesToBudget(msgs, 50); // tiny budget forces trimming the tail
+    expect((out[0] as { role: string }).role).toBe('compactionSummary');
+    expect((out[0] as { summary: string }).summary).toBe('PRE-COMPACTION-SUMMARY');
+    expect(out[out.length - 1]).toBe(msgs[msgs.length - 1]); // newest kept
+    expect(out.length).toBeLessThan(msgs.length); // tail was trimmed
+  });
 });
 
 describe('resolveImagesInMessages', () => {

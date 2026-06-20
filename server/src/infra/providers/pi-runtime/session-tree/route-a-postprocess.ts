@@ -6,7 +6,10 @@ const IMAGE_TOKEN_ESTIMATE = 1500;
 
 export function estimateMessageTokens(msg: Message): number {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content = (msg as any).content;
+  const m = msg as any;
+  // A compactionSummary message carries its text in `summary`, not `content`.
+  if (m.role === 'compactionSummary') return estimateTokens(typeof m.summary === 'string' ? m.summary : '');
+  const content = m.content;
   if (typeof content === 'string') return estimateTokens(content);
   if (!Array.isArray(content)) return 0;
   let text = '';
@@ -21,12 +24,8 @@ export function estimateMessageTokens(msg: Message): number {
   return estimateTokens(text) + images * IMAGE_TOKEN_ESTIMATE;
 }
 
-/**
- * Trim a rebuilt `Message[]` (from buildContext) to fit `budget` tokens,
- * dropping from the OLDEST end. Always keeps the newest message; never starts
- * the kept slice on an orphaned `toolResult`.
- */
-export function trimMessagesToBudget(messages: Message[], budget: number): Message[] {
+/** Drop from the OLDEST end to fit `budget`; keep the newest; never lead on an orphaned toolResult. */
+function trimOldest(messages: Message[], budget: number): Message[] {
   if (!(budget > 0) || messages.length === 0) return messages;
   let acc = 0;
   let cut = messages.length;
@@ -39,6 +38,25 @@ export function trimMessagesToBudget(messages: Message[], budget: number): Messa
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   while (cut > 0 && (messages[cut] as any)?.role === 'toolResult') cut--;
   return messages.slice(cut);
+}
+
+/**
+ * Trim a rebuilt `Message[]` (from buildContext) to fit `budget` tokens.
+ *
+ * A leading `compactionSummary` is PINNED: after a compaction it is the sole
+ * carrier of all pre-compaction history, so dropping it would silently erase
+ * that context. We keep it and trim only the kept tail between it and the
+ * newest messages (with the summary's tokens counted against the budget).
+ */
+export function trimMessagesToBudget(messages: Message[], budget: number): Message[] {
+  if (!(budget > 0) || messages.length === 0) return messages;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if ((messages[0] as any)?.role === 'compactionSummary') {
+    const summary = messages[0];
+    const tailBudget = Math.max(0, budget - estimateMessageTokens(summary));
+    return [summary, ...trimOldest(messages.slice(1), tailBudget)];
+  }
+  return trimOldest(messages, budget);
 }
 
 export interface ImageResolver {
