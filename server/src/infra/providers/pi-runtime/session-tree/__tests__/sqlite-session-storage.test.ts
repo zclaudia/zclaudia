@@ -39,10 +39,29 @@ describe('SqliteSessionStorage', () => {
 
   it('getLeafId / setLeafId persists the active leaf', async () => {
     expect(await storage.getLeafId()).toBeNull();
+    await storage.appendEntry(userEntry('e2', null, 'x'));
     await storage.setLeafId('e2');
     expect(await storage.getLeafId()).toBe('e2');
+    await storage.appendEntry(userEntry('e3', 'e2', 'y'));
     await storage.setLeafId('e3');
     expect(await storage.getLeafId()).toBe('e3');
+  });
+
+  it('appendEntry advances the leaf to the appended entry', async () => {
+    await storage.appendEntry(userEntry('e1', null, 'a'));
+    expect(await storage.getLeafId()).toBe('e1');
+    await storage.appendEntry(userEntry('e2', 'e1', 'b'));
+    expect(await storage.getLeafId()).toBe('e2');
+  });
+
+  it('setLeafId throws not_found for a non-existent target', async () => {
+    await expect(storage.setLeafId('ghost')).rejects.toThrow(/not found/i);
+  });
+
+  it('setLeafId(null) is allowed (resets to empty)', async () => {
+    await storage.appendEntry(userEntry('e1', null, 'a'));
+    await storage.setLeafId(null);
+    expect(await storage.getLeafId()).toBeNull();
   });
 
   it('getPathToRoot walks parent_id from leaf to root in root→leaf order', async () => {

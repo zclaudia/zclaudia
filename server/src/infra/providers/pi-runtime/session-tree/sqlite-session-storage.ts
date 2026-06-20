@@ -1,6 +1,6 @@
 import type { Database } from 'better-sqlite3';
 import type {
-  SessionStorage, SessionTreeEntry, SessionMetadata, LabelEntry,
+  SessionStorage, SessionTreeEntry, SessionMetadata, LabelEntry, LeafEntry,
 } from '@earendil-works/pi-agent-core';
 import { SessionError } from '@earendil-works/pi-agent-core';
 import { newId } from '../../../../utils/uuid.js';
@@ -53,11 +53,21 @@ export class SqliteSessionStorage implements SessionStorage {
     return row?.leafId ?? null;
   }
 
-  async setLeafId(leafId: string | null): Promise<void> {
+  private writeLeaf(leafId: string | null): void {
     this.db.prepare(
       `INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)
        ON CONFLICT(session_id) DO UPDATE SET leaf_id = excluded.leaf_id`,
     ).run(this.sessionId, leafId);
+  }
+
+  async setLeafId(leafId: string | null): Promise<void> {
+    if (leafId !== null) {
+      const exists = this.db.prepare(
+        `SELECT 1 FROM session_entries WHERE id = ? AND session_id = ?`,
+      ).get(leafId, this.sessionId);
+      if (!exists) throw new SessionError('not_found', `Entry ${leafId} not found`);
+    }
+    this.writeLeaf(leafId);
   }
 
   async createEntryId(): Promise<string> {
@@ -70,6 +80,8 @@ export class SqliteSessionStorage implements SessionStorage {
       `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
        VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(row.id, this.sessionId, row.parent_id, row.type, row.payload, row.timestamp);
+    const newLeaf = entry.type === 'leaf' ? (entry as LeafEntry).targetId : entry.id;
+    this.writeLeaf(newLeaf);
   }
 
   async getEntry(id: string): Promise<SessionTreeEntry | undefined> {
