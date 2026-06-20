@@ -21,8 +21,10 @@ import {
 import { resolveEnvModel } from '../pi-runtime/env-model.js';
 import { isSandboxAvailable } from '../pi-runtime/sandbox.js';
 import { SANDBOX_NETWORK_ESCALATION_TOOL } from '../pi-runtime/sandbox-denial.js';
+import { formatMcpInstructionsForPrompt } from '../pi-runtime/index.js';
 import { SqliteSessionStorage } from '../pi-runtime/session-tree/index.js';
 import { trimMessagesToBudget, resolveImagesInMessages } from '../pi-runtime/session-tree/route-a-postprocess.js';
+import { mcpClientManager } from '../../../utils/mcp-client-manager.js';
 import { resolveContextWindow } from '../../../application/conversation/compaction/context-windows.js';
 import { historyTokenBudget } from '../../../application/conversation/compaction/context-estimate.js';
 import { resolveImageAttachments } from '../../../application/conversation/runtime/resolve-image-attachments.js';
@@ -222,12 +224,21 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
 
     // 6. Construct Agent — wire tools + hooks from pi-runtime
     const { tools, hooks, externalProviderCatalog, skillCatalog, activeSkillContext } = toolBundle;
+    // Route C: surface connected MCP servers' instructions in the system prompt.
+    // The context tree dropped the old delta-in-history MCP notices, so this is
+    // now the model's only path to MCP instructions.
+    const mcpInstructions = formatMcpInstructionsForPrompt(
+      mcpClientManager.listStatuses()
+        .filter((s) => s.state === 'connected' && s.instructions?.trim())
+        .map((s) => ({ name: s.name, instructions: s.instructions as string })),
+    );
     const promptBundle = buildPiRunPrompt({
       systemPrompt: options.systemPrompt,
       externalProviderCatalog,
       skillCatalog,
       activeSkillContext,
       isPlanMode,
+      mcpInstructions,
     });
 
     // Context snapshot for the /context command. The skill catalog is counted
