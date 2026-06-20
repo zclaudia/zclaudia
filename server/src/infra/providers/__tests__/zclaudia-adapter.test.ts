@@ -62,7 +62,7 @@ vi.mock('@earendil-works/pi-ai', async () => {
 });
 
 // Hoisted collections used inside vi.mock factory.
-const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
+const { mockAgentInstances, scriptQueue, mockSessionContextQueue, mockSessionErrorQueue } = vi.hoisted(() => ({
   mockAgentInstances: [] as Array<{
     initialState: { systemPrompt: string; model: unknown; messages: unknown[]; tools?: unknown[] };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -74,6 +74,12 @@ const { mockAgentInstances, scriptQueue } = vi.hoisted(() => ({
   // `waitForPromise` lets tests gate agent.prompt() resolution until an
   // async condition is satisfied (e.g. waiting for a retry timer to fire).
   scriptQueue: [] as Array<{ events: AgentEvent[]; rejectWith?: Error; waitForPromise?: Promise<void> }>,
+  // Queue of AgentMessage[] arrays for MockSession.buildContext() to return.
+  // Each entry is consumed once. If empty, buildContext returns { messages: [] }.
+  mockSessionContextQueue: [] as AgentMessage[][],
+  // Queue of errors for MockSession.buildContext() to throw.
+  // Each entry is consumed once before checking mockSessionContextQueue.
+  mockSessionErrorQueue: [] as Error[],
 }));
 
 vi.mock('@earendil-works/pi-agent-core', () => {
@@ -121,7 +127,19 @@ vi.mock('@earendil-works/pi-agent-core', () => {
       // No-op for tests: pi documents abort() as safe to call on an idle agent.
     }
   }
-  return { Agent: MockAgent };
+
+  class MockSession {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    constructor(_storage: any) {}
+    async buildContext() {
+      const err = mockSessionErrorQueue.shift();
+      if (err) throw err;
+      const messages = mockSessionContextQueue.shift() ?? [];
+      return { messages, thinkingLevel: 'none', model: null, activeToolNames: null };
+    }
+  }
+
+  return { Agent: MockAgent, Session: MockSession };
 });
 
 // Helper to enqueue the script that the next `new Agent()` will play back.
@@ -468,6 +486,8 @@ describe('PiAgentProviderAdapter.run', () => {
   beforeEach(() => {
     mockAgentInstances.length = 0;
     scriptQueue.length = 0;
+    mockSessionContextQueue.length = 0;
+    mockSessionErrorQueue.length = 0;
   });
 
   it('happy path: emits init, streamed assistant chunks, and result', async () => {
@@ -506,10 +526,14 @@ describe('PiAgentProviderAdapter.run', () => {
     expect(last.usage).toMatchObject({ input: 130, output: 70, cacheRead: 5, cacheWrite: 2, totalTokens: 207 });
   });
 
-  it('loads history from DB and passes it to Agent initialState', async () => {
-    const db = createTestDb();
-    insertMessage(db, { id: 'h1', sessionId: 'sess-test', role: 'user',      content: 'prev question', createdAt: 100, offset: 1 });
-    insertMessage(db, { id: 'h2', sessionId: 'sess-test', role: 'assistant', content: 'prev answer',   createdAt: 200, offset: 2 });
+  it('loads history from session tree (buildContext) and passes it to Agent initialState', async () => {
+    // Seed MockSession.buildContext() to return two history messages + the current
+    // user turn (which the adapter pops before passing to the Agent).
+    mockSessionContextQueue.push([
+      { role: 'user', content: 'prev question' } as AgentMessage,
+      { role: 'assistant', content: 'prev answer' } as AgentMessage,
+      { role: 'user', content: 'follow up' } as AgentMessage, // trailing user turn — adapter pops this
+    ]);
 
     scriptNextAgent([
       { type: 'agent_start' },
@@ -517,7 +541,8 @@ describe('PiAgentProviderAdapter.run', () => {
     ]);
 
     const adapter = new PiAgentProviderAdapter();
-    await collect(adapter, 'follow up', { db, claudiaSessionId: 'sess-test' });
+    // db must be truthy to enter the history-load branch; MockSession ignores the actual db.
+    await collect(adapter, 'follow up', { db: {} as Database.Database, claudiaSessionId: 'sess-test' });
 
     expect(mockAgentInstances.length).toBe(1);
     const initialMessages = mockAgentInstances[0].initialState.messages;
@@ -570,9 +595,9 @@ describe('PiAgentProviderAdapter.run', () => {
   });
 
   it('history load failure: yields non-terminal error then continues with empty history', async () => {
-    const brokenDb = {
-      prepare: () => { throw new Error('disk error'); },
-    } as unknown as Database.Database;
+    // Simulate buildContext() throwing (e.g. DB error). MockSession checks
+    // mockSessionErrorQueue first; if non-empty it throws instead of returning messages.
+    mockSessionErrorQueue.push(new Error('disk error'));
 
     scriptNextAgent([
       { type: 'agent_start' },
@@ -581,7 +606,8 @@ describe('PiAgentProviderAdapter.run', () => {
     ]);
 
     const adapter = new PiAgentProviderAdapter();
-    const out = await collect(adapter, 'hi', { db: brokenDb, claudiaSessionId: 'sess-test' });
+    // db must be truthy to enter the history-load branch; MockSession ignores the actual db.
+    const out = await collect(adapter, 'hi', { db: {} as Database.Database, claudiaSessionId: 'sess-test' });
 
     const errors = out.filter(m => m.type === 'error');
     expect(errors.length).toBe(1);

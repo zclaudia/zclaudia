@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Message } from '@earendil-works/pi-ai';
-import { trimMessagesToBudget, estimateMessageTokens } from '../route-a-postprocess.js';
+import { trimMessagesToBudget, estimateMessageTokens, resolveImagesInMessages } from '../route-a-postprocess.js';
 
 const userMsg = (content: string): Message => ({ role: 'user', content } as Message);
 
@@ -33,5 +33,35 @@ describe('trimMessagesToBudget', () => {
     expect(estimateMessageTokens(userMsg('hello world'))).toBeGreaterThan(0);
     const blockMsg = { role: 'assistant', content: [{ type: 'text', text: 'hi' }, { type: 'image' }] } as unknown as Message;
     expect(estimateMessageTokens(blockMsg)).toBeGreaterThan(1000); // image adds a flat estimate
+  });
+});
+
+describe('resolveImagesInMessages', () => {
+  const userWithRef = () => ({
+    role: 'user',
+    content: [
+      { type: 'text', text: 'look' },
+      { type: 'image', attachmentRef: { type: 'image', name: 'a.png', fileId: 'f1', mimeType: 'image/png' } },
+    ],
+  }) as unknown as import('@earendil-works/pi-ai').Message;
+
+  it('replaces ref image blocks with resolved bytes', () => {
+    const out = resolveImagesInMessages([userWithRef()], {
+      resolve: () => ({ images: [{ mimeType: 'image/png', data: 'BYTES' }], notices: [] }),
+    }) as any[];
+    expect(out[0].content[0]).toEqual({ type: 'text', text: 'look' });
+    expect(out[0].content[1]).toEqual({ type: 'image', data: 'BYTES', mimeType: 'image/png' });
+  });
+
+  it('falls back to text + notice when no images resolved (non-vision)', () => {
+    const out = resolveImagesInMessages([userWithRef()], {
+      resolve: () => ({ images: [], notices: ['[Image attached: a.png — no vision]'] }),
+    }) as any[];
+    expect(out[0].content).toBe('look\n\n[Image attached: a.png — no vision]');
+  });
+
+  it('passes through messages without image refs', () => {
+    const plain = { role: 'user', content: 'hi' } as unknown as import('@earendil-works/pi-ai').Message;
+    expect(resolveImagesInMessages([plain], { resolve: () => ({ images: [], notices: [] }) })).toEqual([plain]);
   });
 });

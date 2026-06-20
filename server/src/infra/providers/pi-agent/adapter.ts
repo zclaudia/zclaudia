@@ -1,4 +1,5 @@
 import type { AgentMessage } from '@earendil-works/pi-agent-core';
+import { Session } from '@earendil-works/pi-agent-core';
 import type { PCPProviderManifest } from '@zclaudia/shared/core/pcp';
 import type { ProviderPolicy } from '@zclaudia/shared/core/provider-policy';
 import { ALL_TOOL_NAMES, normalizeToolName, type ToolName } from '@zclaudia/shared/core/tools';
@@ -11,7 +12,6 @@ import {
   capturePiRunContextSnapshot,
   extractErrorStop,
   extractLastCallUsage,
-  rebuildHistory,
   resolvePlanModeTools,
   runPiAgentStream,
   translateEvent,
@@ -21,6 +21,8 @@ import {
 import { resolveEnvModel } from '../pi-runtime/env-model.js';
 import { isSandboxAvailable } from '../pi-runtime/sandbox.js';
 import { SANDBOX_NETWORK_ESCALATION_TOOL } from '../pi-runtime/sandbox-denial.js';
+import { SqliteSessionStorage } from '../pi-runtime/session-tree/index.js';
+import { trimMessagesToBudget, resolveImagesInMessages } from '../pi-runtime/session-tree/route-a-postprocess.js';
 import { resolveContextWindow } from '../../../application/conversation/compaction/context-windows.js';
 import { historyTokenBudget } from '../../../application/conversation/compaction/context-estimate.js';
 import { resolveImageAttachments } from '../../../application/conversation/runtime/resolve-image-attachments.js';
@@ -180,28 +182,42 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
       },
     };
 
-    // 5. Load history (non-fatal failure)
+    // 5. Load history from the session tree (Route C source of truth). buildContext
+    //    handles compaction/branch_summary boundaries natively; Route A postprocessors
+    //    (image resolve + token-budget trim) run on top. Non-fatal on failure.
     let history: AgentMessage[] = [];
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      history = rebuildHistory(options.db, options.claudiaSessionId, {
-        tokenBudget: historyTokenBudget(effectiveContextWindow),
-        resolveImages: (atts) => {
-          const resolved = resolveImageAttachments(atts, getFileStore());
-          if (supportsVision) return resolved;
-          return {
-            images: [],
-            notices: atts.map((a) => `[Image attached: ${a.name} — current model does not support vision]`),
-          };
-        },
-      }).messages as any;
-    } catch (err) {
-      console.error('[PiAgentProviderAdapter] history load failed:', err);
-      yield {
-        type: 'error',
-        error: 'history unavailable, continuing fresh',
-        isComplete: false,
-      };
+    if (options.db && options.claudiaSessionId) {
+      try {
+        const session = new Session(new SqliteSessionStorage(options.db, options.claudiaSessionId));
+        // buildContext().messages is AgentMessage[] at runtime; postprocessors expect
+        // pi-ai Message[] (structurally equivalent for user/assistant turns). Cast
+        // through unknown for both directions.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let messages = (await session.buildContext()).messages as unknown as import('@earendil-works/pi-ai').Message[];
+        messages = resolveImagesInMessages(messages, {
+          resolve: (atts) => {
+            const resolved = resolveImageAttachments(atts, getFileStore());
+            if (supportsVision) return resolved;
+            return {
+              images: [],
+              notices: atts.map((a) => `[Image attached: ${a.name} — current model does not support vision]`),
+            };
+          },
+        });
+        messages = trimMessagesToBudget(messages, historyTokenBudget(effectiveContextWindow));
+        // The trailing user message is the current input, passed separately to the agent loop.
+        if (messages.length && (messages[messages.length - 1] as { role?: string }).role === 'user') {
+          messages.pop();
+        }
+        history = messages as unknown as AgentMessage[];
+      } catch (err) {
+        console.error('[PiAgentProviderAdapter] history load failed:', err);
+        yield {
+          type: 'error',
+          error: 'history unavailable, continuing fresh',
+          isComplete: false,
+        };
+      }
     }
 
     // 6. Construct Agent — wire tools + hooks from pi-runtime
