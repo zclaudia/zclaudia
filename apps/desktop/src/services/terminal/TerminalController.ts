@@ -56,6 +56,27 @@ type Listener = (state: TerminalLifecycleState) => void;
 const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 
+/**
+ * Fallback mono stack, kept in sync with `--font-mono` in styles/index.css.
+ * Used only when the CSS custom property can't be resolved (e.g. no DOM in tests/SSR).
+ */
+const FALLBACK_MONO_FONT =
+  "'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Monaco, Consolas, 'PingFang SC', 'Microsoft YaHei', monospace";
+
+/**
+ * Resolve the app-wide mono font stack from the `--font-mono` CSS variable so the
+ * terminal matches the rest of the UI (including the CJK fallbacks). xterm.js needs a
+ * plain string, so we read the computed value rather than passing the var directly.
+ */
+function resolveMonoFontFamily(): string {
+  if (typeof document === 'undefined') return FALLBACK_MONO_FONT;
+  const value = getComputedStyle(document.documentElement)
+    .getPropertyValue('--font-mono')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return value || FALLBACK_MONO_FONT;
+}
+
 export class TerminalController {
   private state: TerminalLifecycleState = { kind: 'idle' };
   private readonly listeners = new Set<Listener>();
@@ -283,7 +304,7 @@ export class TerminalController {
       : new Terminal({
           cursorBlink: true,
           fontSize: 14,
-          fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+          fontFamily: resolveMonoFontFamily(),
           theme,
           allowProposedApi: true,
         });
