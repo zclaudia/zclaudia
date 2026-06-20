@@ -227,6 +227,58 @@ describe('rebuildHistory', () => {
     expect((out[0] as any).content).toBe('q1');
     expect((out[1] as any).content).toEqual(expect.arrayContaining([{ type: 'text', text: 'r1' }]));
   });
+
+  it('tokenBudget trims oldest messages but keeps newest', () => {
+    const db = createTestDb();
+    const big = 'x'.repeat(4000); // ~1000 tokens each (chars/4)
+    for (let i = 1; i <= 10; i++) {
+      // Delimited sentinels so e.g. "#1#" isn't a substring of "#10#".
+      insertMsg(db, { id: `m${i}`, sessionId: 's', role: i % 2 ? 'user' : 'assistant', content: `${big}#${i}#`, createdAt: i, offset: i });
+    }
+    // budget ~ 2500 tokens => keep only the newest ~2 messages
+    const { messages: out } = rebuildHistory(db, 's', { tokenBudget: 2500 });
+    const blob = JSON.stringify(out);
+    expect(blob).toContain('#10#');          // newest kept
+    expect(blob).not.toContain('#1#');       // oldest dropped
+    expect(out.length).toBeLessThan(10);
+  });
+
+  it('tokenBudget never starts history on an orphaned toolResult', () => {
+    const db = createTestDb();
+    const big = 'y'.repeat(4000);
+    // user, assistant(+toolCall→toolResult), user, assistant ...
+    insertMsg(db, { id: 'u1', sessionId: 's', role: 'user', content: `${big}#u1`, createdAt: 1, offset: 1 });
+    insertMsg(db, { id: 'a1', sessionId: 's', role: 'assistant', content: `${big}#a1`, createdAt: 2, offset: 2,
+      metadata: { toolCalls: [{ toolUseId: 't1', name: 'Read', input: {}, output: 'file-bytes', isError: false }] } });
+    insertMsg(db, { id: 'u2', sessionId: 's', role: 'user', content: `${big}#u2`, createdAt: 3, offset: 3 });
+    insertMsg(db, { id: 'a2', sessionId: 's', role: 'assistant', content: `${big}#a2`, createdAt: 4, offset: 4 });
+    const { messages: out } = rebuildHistory(db, 's', { tokenBudget: 2500 });
+    // 第一条绝不能是 toolResult
+    expect((out[0] as any).role).not.toBe('toolResult');
+  });
+
+  it('tokenBudget keeps the compaction summary even when trimming', () => {
+    const db = createTestDb();
+    const repo = new SessionCompactionRepository(db);
+    const big = 'z'.repeat(4000);
+    insertMsg(db, { id: 'k1', sessionId: 's', role: 'user', content: `${big}#k1`, createdAt: 10, offset: 1 });
+    insertMsg(db, { id: 'k2', sessionId: 's', role: 'assistant', content: `${big}#k2`, createdAt: 11, offset: 2 });
+    insertMsg(db, { id: 'k3', sessionId: 's', role: 'user', content: `${big}#k3`, createdAt: 12, offset: 3 });
+    insertMsg(db, { id: 'k4', sessionId: 's', role: 'assistant', content: `${big}#k4`, createdAt: 13, offset: 4 });
+    repo.create({ id: 'cmp1', sessionId: 's', summary: 'PRIOR_SUMMARY', firstKeptMessageId: 'k1', tokensBefore: 999, source: 'auto', createdAt: 20 });
+    const { messages: out } = rebuildHistory(db, 's', { tokenBudget: 2500 });
+    expect((out[0] as any).content).toContain('PRIOR_SUMMARY');
+  });
+
+  it('non-positive tokenBudget does not trim', () => {
+    const db = createTestDb();
+    for (let i = 1; i <= 6; i++) {
+      insertMsg(db, { id: `m${i}`, sessionId: 's', role: i % 2 ? 'user' : 'assistant', content: `c${i}`, createdAt: i, offset: i });
+    }
+    const full = rebuildHistory(db, 's').messages.length;
+    const zero = rebuildHistory(db, 's', { tokenBudget: 0 }).messages.length;
+    expect(zero).toBe(full);
+  });
 });
 
 describe('history-rebuilder — usage handling', () => {

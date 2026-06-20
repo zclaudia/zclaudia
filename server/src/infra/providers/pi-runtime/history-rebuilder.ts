@@ -6,6 +6,7 @@ import {
   type McpInstructionsDelta,
 } from '@zclaudia/shared/core/mcp';
 import type { MessageAttachment } from '@zclaudia/shared/core/message';
+import { estimateTokens } from '../context-snapshot.js';
 
 /** Generous default/safety ceiling on rows scanned per rebuild. adapter is
  * additionally bounded by token budget; compaction keeps context bounded — so
@@ -103,6 +104,60 @@ function renderMcpInstructionsDelta(delta: McpInstructionsDelta): string {
   }
   sections.push('</system-reminder>');
   return sections.join('\n\n');
+}
+
+/** Flat per-image token estimate used only by budget trimming. */
+const IMAGE_TOKEN_ESTIMATE = 1500;
+
+function estimateMessageTokens(msg: Message): number {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const content = (msg as any).content;
+  if (typeof content === 'string') return estimateTokens(content);
+  if (!Array.isArray(content)) return 0;
+  let text = '';
+  let images = 0;
+  for (const block of content) {
+    if (!block || typeof block !== 'object') continue;
+    if (block.type === 'text' && typeof block.text === 'string') text += block.text;
+    else if (block.type === 'thinking' && typeof block.thinking === 'string') text += block.thinking;
+    else if (block.type === 'toolCall') text += JSON.stringify(block.arguments ?? {});
+    else if (block.type === 'image') images += 1;
+  }
+  return estimateTokens(text) + images * IMAGE_TOKEN_ESTIMATE;
+}
+
+/**
+ * Trim rebuilt history to fit `budget` tokens, dropping from the OLDEST end.
+ * Invariants: keep the synthesized summary (index 0 when present); always keep
+ * the newest message; never start the kept slice on an orphaned 'toolResult'
+ * (snap backward to its owning assistant).
+ */
+function trimToBudget(
+  messages: Message[],
+  dbIds: (string | null)[],
+  budget: number,
+  hasSummary: boolean,
+): RebuiltHistory {
+  const startKeep = hasSummary ? 1 : 0;
+  let acc = hasSummary ? estimateMessageTokens(messages[0]) : 0;
+  let cut = messages.length; // keep [cut .. end]
+  for (let i = messages.length - 1; i >= startKeep; i--) {
+    const t = estimateMessageTokens(messages[i]);
+    // Always keep the newest message; otherwise stop once we'd overflow.
+    if (acc + t > budget && i + 1 < messages.length) {
+      cut = i + 1;
+      break;
+    }
+    acc += t;
+    cut = i;
+  }
+  // Snap backward off any leading toolResult so we don't orphan it.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  while (cut > startKeep && (messages[cut] as any)?.role === 'toolResult') cut--;
+
+  const keptMessages = hasSummary ? [messages[0], ...messages.slice(cut)] : messages.slice(cut);
+  const keptDbIds = hasSummary ? [dbIds[0], ...dbIds.slice(cut)] : dbIds.slice(cut);
+  return { messages: keptMessages, dbIds: keptDbIds };
 }
 
 /**
@@ -286,5 +341,10 @@ export function rebuildHistory(
     }
   }
 
+  const budget = options?.tokenBudget;
+  if (budget != null && budget > 0) {
+    const hasSummary = !!(compaction && boundaryOffset !== null);
+    return trimToBudget(messages, dbIds, budget, hasSummary);
+  }
   return { messages, dbIds };
 }
