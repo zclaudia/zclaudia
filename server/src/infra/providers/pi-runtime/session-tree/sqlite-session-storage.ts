@@ -2,6 +2,7 @@ import type { Database } from 'better-sqlite3';
 import type {
   SessionStorage, SessionTreeEntry, SessionMetadata, LabelEntry,
 } from '@earendil-works/pi-agent-core';
+import { SessionError } from '@earendil-works/pi-agent-core';
 import { newId } from '../../../../utils/uuid.js';
 
 interface EntryRow {
@@ -12,7 +13,10 @@ interface EntryRow {
   timestamp: string;
 }
 
-/** Columns that live in their own table columns; everything else is in payload JSON. */
+/**
+ * The four base fields (id, parentId, type, timestamp) are split into their own columns and
+ * intentionally excluded from `payload`; `fromRow` re-merges them so payload never contains them.
+ */
 function toRow(entry: SessionTreeEntry): EntryRow {
   const { id, parentId, type, timestamp, ...rest } = entry as SessionTreeEntry & Record<string, unknown>;
   return {
@@ -86,6 +90,9 @@ export class SqliteSessionStorage implements SessionStorage {
   }
 
   async getLabel(id: string): Promise<string | undefined> {
+    // Scans label entries for the session and returns the latest matching targetId (latest-wins,
+    // matching pi). O(number of label entries) — acceptable: labels are not on any hot path (no
+    // label/moveTo UI this period) and findEntries already restricts to label-type rows.
     const labels = (await this.findEntries('label')) as LabelEntry[];
     const matching = labels.filter((l) => l.targetId === id);
     return matching.length ? matching[matching.length - 1].label : undefined;
@@ -104,6 +111,9 @@ export class SqliteSessionStorage implements SessionStorage {
        )
        SELECT id, parent_id, type, payload, timestamp FROM path ORDER BY depth DESC`,
     ).all(leafId, this.sessionId, this.sessionId) as EntryRow[];
+    if (rows.length === 0) {
+      throw new SessionError('not_found', `Entry ${leafId} not found`);
+    }
     return rows.map(fromRow);
   }
 

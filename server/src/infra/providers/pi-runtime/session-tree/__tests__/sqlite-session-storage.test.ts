@@ -69,4 +69,31 @@ describe('SqliteSessionStorage', () => {
     await storage.appendEntry({ type: 'label', id: 'l2', parentId: 'l1', timestamp: '2026-06-20T00:00:02.000Z', targetId: 'e1', label: 'second' });
     expect(await storage.getLabel('e1')).toBe('second');
   });
+
+  it('getMetadata returns id + ISO createdAt, throws when session missing', async () => {
+    const meta = await storage.getMetadata();
+    expect(meta.id).toBe('s1');
+    expect(meta.createdAt).toBe(new Date(1000).toISOString());
+    const missing = new SqliteSessionStorage(db, 'nope');
+    await expect(missing.getMetadata()).rejects.toThrow();
+  });
+
+  it('getEntry returns undefined for a missing id', async () => {
+    expect(await storage.getEntry('nonexistent')).toBeUndefined();
+  });
+
+  it('getPathToRoot throws for a non-existent non-null leaf', async () => {
+    await expect(storage.getPathToRoot('ghost')).rejects.toThrow(/not found/i);
+  });
+
+  it('round-trips a CompactionEntry with optional details + fromHook', async () => {
+    const entry = {
+      type: 'compaction' as const, id: 'c1', parentId: 'e1',
+      timestamp: '2026-06-20T00:00:05.000Z',
+      summary: 'SUM', firstKeptEntryId: 'e1', tokensBefore: 42,
+      details: { source: 'auto', readFiles: ['a.ts'], modifiedFiles: [] }, fromHook: false,
+    };
+    await storage.appendEntry(entry as Parameters<typeof storage.appendEntry>[0]);
+    expect(await storage.getEntry('c1')).toEqual(entry);
+  });
 });
