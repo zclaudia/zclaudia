@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import type { Usage } from '@earendil-works/pi-ai';
-import { rebuildHistory, HISTORY_LIMIT } from '../history-rebuilder.js';
+import { rebuildHistory, HISTORY_SCAN_MAX } from '../history-rebuilder.js';
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { newId } from '../../../../utils/uuid.js';
 import { SessionCompactionRepository } from '../../../../domains/sessions/compaction-repository.js';
@@ -190,18 +190,30 @@ describe('rebuildHistory', () => {
     expect((out[0] as any).content).toEqual([{ type: 'text', text: 'hello' }]);
   });
 
-  it('caps at HISTORY_LIMIT messages (newest N)', () => {
+  it('default scan returns more than the old 50 cap (no fixed HISTORY_LIMIT)', () => {
     const db = createTestDb();
-    for (let i = 0; i < 60; i++) {
-      insertMsg(db, {
-        id: `m${i}`, sessionId: 's',
-        role: i % 2 === 0 ? 'user' : 'assistant',
-        content: `msg${i}`, createdAt: 100 + i, offset: i + 1,
-      });
+    for (let i = 1; i <= 60; i++) {
+      insertMsg(db, { id: `m${i}`, sessionId: 's', role: i % 2 ? 'user' : 'assistant', content: `c${i}`, createdAt: i, offset: i });
     }
+    // 60 条,末条 offset 60 是 'assistant'(i=60 偶数);无尾部 user 弹出
     const { messages: out } = rebuildHistory(db, 's');
-    expect(out.length).toBe(50);
-    expect(HISTORY_LIMIT).toBe(50);
+    expect(out.length).toBeGreaterThan(50);
+  });
+
+  it('maxMessages caps the number of scanned rows (newest N)', () => {
+    const db = createTestDb();
+    for (let i = 1; i <= 30; i++) {
+      insertMsg(db, { id: `m${i}`, sessionId: 's', role: i % 2 ? 'user' : 'assistant', content: `c${i}`, createdAt: i, offset: i });
+    }
+    const { messages: out } = rebuildHistory(db, 's', { maxMessages: 10 });
+    // 取最新 10 条(offset 21..30),反转为升序;不含早期消息
+    expect(out.length).toBeLessThanOrEqual(10);
+    expect(JSON.stringify(out)).not.toContain('"c1"');
+    expect(JSON.stringify(out)).toContain('c30');
+  });
+
+  it('HISTORY_SCAN_MAX is the generous default ceiling', () => {
+    expect(HISTORY_SCAN_MAX).toBe(1000);
   });
 
   it('orders by offset, not created_at, when timestamps collide', () => {

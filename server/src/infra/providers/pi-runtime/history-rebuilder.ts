@@ -7,7 +7,10 @@ import {
 } from '@zclaudia/shared/core/mcp';
 import type { MessageAttachment } from '@zclaudia/shared/core/message';
 
-export const HISTORY_LIMIT = 50;
+/** Generous default/safety ceiling on rows scanned per rebuild. adapter is
+ * additionally bounded by token budget; compaction keeps context bounded — so
+ * this is a runaway guard normal sessions never hit. */
+export const HISTORY_SCAN_MAX = 1000;
 
 // Inlined from pi harness/messages — main barrel does not re-export these.
 const COMPACTION_SUMMARY_PREFIX = 'The conversation history before this point was compacted into the following summary:\n\n<summary>\n';
@@ -51,6 +54,14 @@ export interface RebuildImageOptions {
     images: Array<{ name: string; mimeType: string; data: string }>;
     notices: string[];
   };
+}
+
+export interface RebuildOptions extends RebuildImageOptions {
+  /** Trim rebuilt history (oldest-first) to fit this many tokens. adapter sets
+   * this; compaction/title leave it undefined. */
+  tokenBudget?: number;
+  /** Hard cap on rows scanned. Defaults to HISTORY_SCAN_MAX. */
+  maxMessages?: number;
 }
 
 export interface RebuiltHistory {
@@ -111,9 +122,11 @@ function renderMcpInstructionsDelta(delta: McpInstructionsDelta): string {
 export function rebuildHistory(
   db: Database.Database | undefined,
   sessionId: string | undefined,
-  imageOptions?: RebuildImageOptions,
+  options?: RebuildOptions,
 ): RebuiltHistory {
   if (!db || !sessionId) return { messages: [], dbIds: [] };
+
+  const scanLimit = options?.maxMessages ?? HISTORY_SCAN_MAX;
 
   // Resolve compaction boundary if one exists
   const compactionRepo = new SessionCompactionRepository(db);
@@ -142,7 +155,7 @@ export function rebuildHistory(
        WHERE session_id = ? AND offset >= ?
        ORDER BY offset DESC, created_at DESC, id DESC
        LIMIT ?`,
-    ).all(sessionId, boundaryOffset, HISTORY_LIMIT);
+    ).all(sessionId, boundaryOffset, scanLimit);
   } else {
     rows = db.prepare<[string, number], StoredRow>(
       `SELECT id, role, content, metadata, created_at AS createdAt
@@ -150,7 +163,7 @@ export function rebuildHistory(
        WHERE session_id = ?
        ORDER BY offset DESC, created_at DESC, id DESC
        LIMIT ?`,
-    ).all(sessionId, HISTORY_LIMIT);
+    ).all(sessionId, scanLimit);
   }
 
   const chronological = rows.reverse();
@@ -190,9 +203,9 @@ export function rebuildHistory(
       let content: string | any[] = row.content;
       const userMeta = parseMetadata(row.metadata);
       const attachments = userMeta?.attachments?.filter((a) => a.type === 'image') ?? [];
-      if (attachments.length > 0 && imageOptions?.resolveImages) {
+      if (attachments.length > 0 && options?.resolveImages) {
         try {
-          const { images, notices } = imageOptions.resolveImages(attachments);
+          const { images, notices } = options.resolveImages(attachments);
           if (images.length > 0) {
             const text = notices.length > 0 ? `${row.content}\n\n${notices.join('\n')}` : row.content;
             content = [
