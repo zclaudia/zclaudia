@@ -22,6 +22,7 @@ import { resolveEnvModel } from '../pi-runtime/env-model.js';
 import { isSandboxAvailable } from '../pi-runtime/sandbox.js';
 import { SANDBOX_NETWORK_ESCALATION_TOOL } from '../pi-runtime/sandbox-denial.js';
 import { resolveContextWindow } from '../../../application/conversation/compaction/context-windows.js';
+import { historyTokenBudget } from '../../../application/conversation/compaction/context-estimate.js';
 import { resolveImageAttachments } from '../../../application/conversation/runtime/resolve-image-attachments.js';
 import { getFileStore } from '../../storage/fileStore.js';
 
@@ -184,6 +185,7 @@ export class PiAgentProviderAdapter implements ProviderAdapter {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       history = rebuildHistory(options.db, options.claudiaSessionId, {
+        tokenBudget: historyTokenBudget(effectiveContextWindow),
         resolveImages: (atts) => {
           const resolved = resolveImageAttachments(atts, getFileStore());
           if (supportsVision) return resolved;

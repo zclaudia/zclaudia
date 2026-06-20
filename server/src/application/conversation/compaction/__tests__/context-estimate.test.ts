@@ -5,6 +5,7 @@ import {
   compactionTriggerThreshold,
   lastAssistantPromptTokens,
   estimateContextTokensForThreshold,
+  historyTokenBudget,
 } from '../context-estimate.js';
 
 // Minimal message shapes — the helpers only read role / stopReason / usage.
@@ -80,5 +81,15 @@ describe('estimateContextTokensForThreshold', () => {
   it('returns the larger of anchor and chars estimate (stays conservative)', () => {
     const msgs = [asst({ input: 100_000, cacheRead: 0, cacheWrite: 0 })];
     expect(estimateContextTokensForThreshold(msgs, WINDOW, chars(150_000))).toBe(150_000);
+  });
+});
+
+describe('historyTokenBudget', () => {
+  it('stays strictly below the compaction trigger threshold', () => {
+    const w = 1_000_000;
+    expect(historyTokenBudget(w)).toBeLessThan(compactionTriggerThreshold(w));
+  });
+  it('never negative for small windows', () => {
+    expect(historyTokenBudget(1000)).toBe(0);
   });
 });

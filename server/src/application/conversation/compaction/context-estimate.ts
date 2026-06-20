@@ -71,3 +71,13 @@ export function estimateContextTokensForThreshold(
   const saneAnchor = anchor != null && anchor <= contextWindow ? anchor : 0;
   return Math.max(saneAnchor, charsEstimate);
 }
+
+/** Extra margin so filling history never by itself reaches the compaction
+ * trigger threshold (avoids fill↔compact thrash). */
+export const HISTORY_BUDGET_MARGIN_TOKENS = 8_000;
+
+/** Token budget for rebuilt history fed to the model: kept strictly below the
+ * proactive-compaction threshold. */
+export function historyTokenBudget(contextWindow: number): number {
+  return Math.max(0, compactionTriggerThreshold(contextWindow) - HISTORY_BUDGET_MARGIN_TOKENS);
+}
