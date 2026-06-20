@@ -35,7 +35,7 @@ describe('mcp-bridge-launch', () => {
     const result = resolveMcpBridgeLaunchConfig('file:///tmp/providers/pi-agent/adapter.js');
 
     expect(result.command).toBe(process.execPath);
-    expect(result.args).toEqual(['/dist/application/plugins/mcp-bridge.js']);
+    expect(result.args).toEqual(['/tmp/dist/application/plugins/mcp-bridge.js']);
   });
 
   it('prefers server/dist js bridge over source ts bridge in dev', async () => {
@@ -58,7 +58,7 @@ describe('mcp-bridge-launch', () => {
     const result = resolveMcpBridgeLaunchConfig('file:///tmp/providers/pi-agent/adapter.js');
 
     expect(result.command).toBe(process.execPath);
-    expect(result.args).toEqual(['--import', 'tsx/esm', '/tmp/application/plugins/mcp-bridge.ts']);
+    expect(result.args).toEqual(['--import', 'tsx/esm', '/tmp/providers/application/plugins/mcp-bridge.ts']);
   });
 
   it('does not force an empty CLAUDIA_SESSION_ID when no static session is provided', async () => {
