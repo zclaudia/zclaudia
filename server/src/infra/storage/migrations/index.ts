@@ -20,6 +20,7 @@ import { migration as m_017_compaction_overflow_source } from './017_compaction_
 import { migration as m_018_eval_task_type } from './018_eval_task_type.js';
 import { migration as m_019_session_auto_title } from './019_session_auto_title.js';
 import { migration as m_020_backfill_message_offset } from './020_backfill_message_offset.js';
+import { migration as m_021_session_entries } from './021_session_entries.js';
 
 export type { Migration };
 
@@ -44,6 +45,7 @@ export const migrations: Migration[] = [
   m_018_eval_task_type,
   m_019_session_auto_title,
   m_020_backfill_message_offset,
+  m_021_session_entries,
 ];
 
 /**
