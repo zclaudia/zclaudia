@@ -18,8 +18,6 @@ export { buildPiRunToolBundle, type PiRunToolBundle } from './run-tools.js';
 export { buildPiRunPrompt, PLAN_MODE_SYSTEM_PROMPT_SUFFIX, type PiRunPromptBundle } from './run-prompt.js';
 export { capturePiRunContextSnapshot, recordPiContextUsage } from './context-observer.js';
 export { runPiAgentStream } from './agent-stream.js';
-export { rebuildHistory, HISTORY_SCAN_MAX } from './history-rebuilder.js';
-export type { RebuildOptions, RebuildImageOptions, RebuiltHistory } from './history-rebuilder.js';
 export { buildModel, type BuiltModel } from './build-model.js';
 export {
   buildExternalMetaTools,

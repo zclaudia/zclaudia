@@ -18,9 +18,9 @@ function isMessageEntry(e: SessionTreeEntry): e is MessageEntry {
 
 /**
  * Collapse a contiguous list of tree entries (one active path, or one turn's
- * fresh entries) into the coarse `messages` projection rows. Inverse of
- * history-rebuilder's row->messages expansion. Non-message entries
- * (compaction / state-change) are skipped here — compaction projects separately.
+ * fresh entries) into the coarse `messages` projection rows — the inverse of the
+ * old messages-row→message expansion. Non-message entries (compaction /
+ * state-change) are skipped here — compaction projects separately.
  */
 export function projectEntriesToMessageRows(entries: SessionTreeEntry[]): ProjectedMessageRow[] {
   const rows: ProjectedMessageRow[] = [];

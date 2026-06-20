@@ -3,10 +3,10 @@ import { fetchApiForBackend } from './base';
 import { apiCall, apiCallForBackend, apiCallVoid, apiCallVoidForBackend } from './unwrap';
 
 /**
- * Server-side shape of a single compaction record. Mirrors
- * `SessionCompactionRepository.SessionCompaction` — we keep it inline rather
- * than crossing the server/desktop boundary with that type so the desktop
- * package doesn't import server internals.
+ * Server-side shape of a single compaction record. Mirrors the server's
+ * `compaction-tree-read.SessionCompaction` (projected from the session tree) —
+ * we keep it inline rather than crossing the server/desktop boundary with that
+ * type so the desktop package doesn't import server internals.
  */
 export interface SessionCompactionResponse {
   id: string;
