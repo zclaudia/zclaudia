@@ -1637,6 +1637,12 @@ describe('Edit bridge tool', () => {
       firstChangedLine: 2,
       originalContent: 'const a = 1;\nconst b = 2;\n',
       updatedContent: 'const a = 1;\nconst b = 3;\n',
+      state: {
+        previousSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+        newSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+        snapshotUpdated: true,
+        changedRanges: [expect.objectContaining({ start: 2, end: 2 })],
+      },
     });
     expect(res.details.diff).toContain('--- f.ts');
     expect(res.details.diff).toContain('+++ f.ts');
@@ -1644,6 +1650,7 @@ describe('Edit bridge tool', () => {
     expect(res.details.diff).toContain('+const b = 3;');
     expect(res.content[0].text).toContain('Edited f.ts');
     expect(res.content[0].text).toContain('Snapshot: internal file state updated');
+    expect(res.content[0].text).toContain('State: previousSnapshotId=f.ts#');
     expect(res.content[0].text).toContain('-const b = 2;');
     expect(res.content[0].text).toContain('+const b = 3;');
     expect(res.details.structuredPatch).toEqual([
@@ -1711,6 +1718,11 @@ describe('Edit bridge tool', () => {
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details).toMatchObject({ ok: true, editCount: 2, replaced: 2 });
+    expect(res.details.state).toMatchObject({
+      previousSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+      newSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+      snapshotUpdated: true,
+    });
     expect(res.content[0].text).toContain('Edits applied: 2');
     expect(res.content[0].text).toContain('Snapshot: internal file state updated');
     expect(res.content[0].text).toContain('-const a = 1;');
@@ -2194,7 +2206,48 @@ describe('Edit bridge tool', () => {
 
     rmSync(dir, { recursive: true, force: true });
     expect(res.details.error).toBe('file_modified_since_read');
+    expect(res.details).toMatchObject({
+      retryable: true,
+      suggestedAction: 'refresh_snapshot',
+      state: {
+        currentSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+        readSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+      },
+      rebaseFailed: true,
+      rebaseError: 'not_found',
+    });
     expect(onDisk).toBe('const external = true;\n');
+  });
+
+  it('rebases an edit when the file changed but old_string still matches uniquely', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-edit-rebase-'));
+    const filePath = path.join(dir, 'f.ts');
+    writeFileSync(filePath, 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'Edit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const edit = tools.find((t: any) => t.name === 'Edit') as any;
+
+    await read.execute('r-edit-rebase', { path: 'f.ts' });
+    writeFileSync(filePath, '// external change\nconst a = 1;\nconst b = 2;\n');
+    const res = await edit.execute('e-rebase', {
+      file_path: 'f.ts',
+      old_string: 'const b = 2;',
+      new_string: 'const b = 3;',
+    });
+    const onDisk = readFileSync(filePath, 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(res.details).toMatchObject({
+      ok: true,
+      rebased: true,
+      state: {
+        rebased: true,
+        readSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+        newSnapshotId: expect.stringMatching(/^f\.ts#[a-f0-9]{12}$/),
+      },
+    });
+    expect(res.content[0].text).toContain('Rebased: file changed since the last Read');
+    expect(onDisk).toBe('// external change\nconst a = 1;\nconst b = 3;\n');
   });
 
   it('errors when old_string is not unique and replace_all is false', async () => {

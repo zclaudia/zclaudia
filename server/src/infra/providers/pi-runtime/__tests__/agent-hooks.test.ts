@@ -245,6 +245,14 @@ describe('buildAgentHooks Edit flood advisory', () => {
     expect(adviceText(r1)).toBe('');
     expect(adviceText(r2)).toBe('');
     expect(adviceText(r3)).toBe('');
+    expect(r3?.details?.mutationBudget).toMatchObject({
+      tool: 'Edit',
+      path: 'a.md',
+      attemptsThisTurn: 3,
+      advisoryThreshold: 4,
+      remainingBeforeAdvisory: 1,
+      batchConsumesOneAttempt: true,
+    });
   });
 
   it('appends the [fix] advisory on the 4th Edit to the same file', async () => {

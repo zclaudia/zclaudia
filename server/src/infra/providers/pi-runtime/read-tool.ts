@@ -9,6 +9,7 @@ import { buildHashlineEntries, formatHashlineOutput, hashlineSnapshotId, hashlin
 import { readLineWindowStreaming } from './read-window.js';
 import { compressImageToLimit, extractPdfText, renderNotebook } from './rich-read.js';
 import { errorResult, textResult, toolParams } from './tool-common.js';
+import { buildPartialReadStateDescriptor, buildRangeDescriptor, buildReadStateDescriptor } from './file-state.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 export interface ReadToolOptions {
@@ -553,6 +554,8 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const totalLines = lines.length;
           if (multiRanges) {
             const view = renderMultiRangeWindow(lines, multiRanges, totalLines, relPath);
+            const rangeStates = view.shownRanges.map(range =>
+              buildRangeDescriptor(range.start, lines.slice(range.start - 1, range.end)));
             // We hold the whole file, so record full content: edits stay safe even
             // though only the requested ranges were shown.
             await options?.readFileState?.recordRead(filePath, {
@@ -574,6 +577,13 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
               totalLines,
               returnedLines: view.returnedLines,
               size: fileStat.size,
+              state: buildReadStateDescriptor({
+                relPath,
+                content: text,
+                ranges: rangeStates,
+                fullContentCaptured: true,
+                partialView: true,
+              }),
               ...(view.columnTruncated ? { columnTruncated: READ_MAX_LINE_COLUMNS } : {}),
             });
           }
@@ -613,6 +623,12 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
                     elidedRanges: folds.map(f => [f.startLine, f.endLine]),
                     returnedLines: skeleton.visibleLines,
                     size: fileStat.size,
+                    state: buildReadStateDescriptor({
+                      relPath,
+                      content: text,
+                      fullContentCaptured: true,
+                      partialView: true,
+                    }),
                   });
                 }
               }
@@ -625,6 +641,7 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           const view = renderTextWindow(selected, offset, totalLines);
           const hashlineView = isHashline ? renderHashlineWindow(relPath, text, selected, offset, totalLines) : undefined;
           const returnedLines = isHashline ? hashlineView!.returnedLines : view.returnedLines;
+          const returnedLineTexts = selected.slice(0, returnedLines);
           await options?.readFileState?.recordRead(filePath, {
             content: text,
             offset,
@@ -645,6 +662,13 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
               totalLines,
               returnedLines,
               size: fileStat.size,
+              state: buildReadStateDescriptor({
+                relPath,
+                content: text,
+                range: buildRangeDescriptor(offset, returnedLineTexts),
+                fullContentCaptured: true,
+                partialView: offset !== 1 || returnedLines < totalLines,
+              }),
               ...(!isHashline && view.columnTruncated ? { columnTruncated: READ_MAX_LINE_COLUMNS } : {}),
               ...(isHashline ? {
                 hashline: {
@@ -689,6 +713,11 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
           returnedLines: view.returnedLines,
           size: fileStat.size,
           streamed: true,
+          state: buildPartialReadStateDescriptor({
+            start: offset,
+            lines: window.lines.slice(0, view.returnedLines),
+            streamed: true,
+          }),
           ...(view.columnTruncated ? { columnTruncated: READ_MAX_LINE_COLUMNS } : {}),
         });
       } catch (err) {

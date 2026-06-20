@@ -27,7 +27,15 @@ describe('Read bridge tool module', () => {
       limit: 2,
       totalLines: 4,
       returnedLines: 2,
+      state: {
+        fullContentCaptured: true,
+        partialView: true,
+        range: { start: 2, end: 3 },
+      },
     });
+    expect(result.details.state.snapshotId).toMatch(/^sample\.ts#[a-f0-9]{12}$/);
+    expect(result.details.state.fileDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(result.details.state.range.rangeDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(result.content[0].text).toContain('2|two');
     expect(result.content[0].text).toContain('3|three');
     expect(result.content[0].text).not.toContain('1|one');

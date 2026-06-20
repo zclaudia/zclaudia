@@ -4,7 +4,7 @@ import * as path from 'path';
 
 import { findActualString, countOccurrences, applyEdit, findWhitespaceMatch } from './edit-match.js';
 import { buildFileDiff, type FileDiffHunk, type FileDiffResult } from './diff.js';
-import type { ReadFileStateStore } from './read-file-state.js';
+import type { ReadFileStateEntry, ReadFileStateStore } from './read-file-state.js';
 import {
   mergeWriteLifecycleResults,
   runDiagnosticsProvider,
@@ -21,7 +21,8 @@ import { recordFileBackup } from './file-history.js';
 import { runWithFileWriteLock } from './file-write-lock.js';
 import { parseApplyPatch } from './apply-patch.js';
 import { hashlineForLine, hashlineTag, parseHashlineOperation, replaceHashlineLine } from './hashline.js';
-import { NoopEditGuard, NOOP_EDIT_HARD_LIMIT } from './noop-edit-guard.js';
+import { buildFileStateErrorDescriptor, buildMutationStateDescriptor, type MutationStateDescriptor } from './file-state.js';
+import { NOOP_EDIT_HARD_LIMIT, type NoopEditGuard } from './noop-edit-guard.js';
 import { resolveInsideWorkspace, toWorkspaceRelative } from './workspace-paths.js';
 
 type TextBlock = { type: 'text'; text: string };
@@ -77,6 +78,77 @@ function validateUpdatedContent(
     ok: false,
     result: errorResult(guard.code, guard.message, guardErrorDetails(guard, details)),
   };
+}
+
+function suggestedActionForReadGuard(code: string): string {
+  switch (code) {
+    case 'file_not_read':
+      return 'read_file';
+    case 'partial_read':
+      return 'read_full_file';
+    case 'file_modified_since_read':
+      return 'refresh_snapshot';
+    default:
+      return 'inspect_file_state';
+  }
+}
+
+function readGuardFailureDetails(input: {
+  code: string;
+  relPath: string;
+  currentContent?: string;
+  readEntry?: ReadFileStateEntry;
+  extra?: Record<string, unknown>;
+}): Record<string, unknown> {
+  return {
+    path: input.relPath,
+    retryable: true,
+    suggestedAction: suggestedActionForReadGuard(input.code),
+    state: buildFileStateErrorDescriptor({
+      relPath: input.relPath,
+      currentContent: input.currentContent,
+      readContent: input.readEntry?.content,
+      hasFullContent: input.readEntry?.hasFullContent,
+      partialView: input.readEntry?.isPartialView,
+    }),
+    ...(input.extra ?? {}),
+  };
+}
+
+function assertRebaseAnchorsWereRead(
+  readContent: string | undefined,
+  edits: BatchEditInput[],
+): { ok: true } | { ok: false; code: string; message: string; details: Record<string, unknown> } {
+  if (readContent === undefined) {
+    return {
+      ok: false,
+      code: 'missing_read_snapshot',
+      message: 'Cannot rebase because no previous read snapshot is available.',
+      details: {},
+    };
+  }
+  for (let index = 0; index < edits.length; index += 1) {
+    const edit = edits[index];
+    const actual = findActualString(readContent, edit.oldString);
+    if (actual === null) {
+      return {
+        ok: false,
+        code: 'not_found_in_read_snapshot',
+        message: `edits[${index}].old_string was not present in the last Read snapshot.`,
+        details: { editIndex: index },
+      };
+    }
+    const occurrences = countOccurrences(readContent, actual);
+    if (!edit.replaceAll && occurrences > 1) {
+      return {
+        ok: false,
+        code: 'not_unique_in_read_snapshot',
+        message: `edits[${index}].old_string appeared ${occurrences} times in the last Read snapshot.`,
+        details: { editIndex: index, occurrences },
+      };
+    }
+  }
+  return { ok: true };
 }
 
 function toolParams(first: unknown, second: unknown): Record<string, unknown> {
@@ -211,6 +283,16 @@ function formatFirstChangedLine(value: unknown): string | undefined {
   return typeof value === 'number' ? String(value) : undefined;
 }
 
+function formatMutationStateLine(state: MutationStateDescriptor | undefined): string | undefined {
+  if (!state) return undefined;
+  const ranges = state.changedRanges.length > 0
+    ? state.changedRanges.map(range => `${range.start}-${range.end}`).join(',')
+    : 'none';
+  const previous = state.previousSnapshotId ?? 'new-file';
+  const rebase = state.rebased ? ' rebased=true;' : '';
+  return `State:${rebase} previousSnapshotId=${previous} newSnapshotId=${state.newSnapshotId} changedRanges=${ranges}.`;
+}
+
 function formatPerFileResults(perFileResults: unknown): string[] {
   if (!Array.isArray(perFileResults) || perFileResults.length === 0) return [];
   return perFileResults.map((raw, index) => {
@@ -249,6 +331,8 @@ function buildMutationResultText(input: {
   diff?: string;
   perFileResults?: unknown;
   snapshotUpdated?: boolean;
+  state?: MutationStateDescriptor;
+  rebased?: boolean;
 }): string {
   const headlineParts = [input.action];
   if (input.path) headlineParts.push(input.path);
@@ -264,6 +348,13 @@ function buildMutationResultText(input: {
 
   const changes = formatLineChanges(input.lineChanges);
   if (changes) lines.push(`Line changes: ${changes}`);
+
+  if (input.rebased) {
+    lines.push('Rebased: file changed since the last Read, but each requested replacement still matched current content uniquely.');
+  }
+
+  const stateLine = formatMutationStateLine(input.state);
+  if (stateLine) lines.push(stateLine);
 
   const perFileLines = formatPerFileResults(input.perFileResults);
   if (perFileLines.length > 0) lines.push('Files:', ...perFileLines);
@@ -402,7 +493,13 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
           }
           const readCheck = await options?.readFileState?.assertSafeToWrite(filePath, originalContent);
           if (readCheck && !readCheck.ok) {
-            return errorResult(readCheck.code, readCheck.message, { path: toWorkspaceRelative(cwd, filePath) });
+            const relPath = toWorkspaceRelative(cwd, filePath);
+            return errorResult(readCheck.code, readCheck.message, readGuardFailureDetails({
+              code: readCheck.code,
+              relPath,
+              currentContent: originalContent,
+              readEntry: options?.readFileState?.get(filePath),
+            }));
           }
         }
         await mkdir(path.dirname(writePath), { recursive: true });
@@ -419,6 +516,13 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
           ? buildFileDiff(relPath, originalContent, content)
           : buildFileDiff(relPath, '', content);
         const diffDetails = buildBudgetedDiffDetails(diff);
+        const state = buildMutationStateDescriptor({
+          relPath,
+          originalContent,
+          updatedContent: content,
+          diff,
+          snapshotUpdated: true,
+        });
         const writeType = existed ? 'update' : 'create';
         const lifecycleInput = {
           operation: 'write',
@@ -444,6 +548,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
           firstChangedLine: diff.firstChangedLine,
           structuredPatch: diffDetails.structuredPatch,
           lineChanges: diff.lineChanges,
+          state,
           ...(diffDetails.diffTruncated ? { diffTruncated: true } : {}),
           ...(diffDetails.structuredPatchTruncated ? { structuredPatchTruncated: true } : {}),
           ...buildContentDetailFields(originalContent, content),
@@ -458,6 +563,7 @@ export function createWriteBridgeTool(cwd: string, options?: FileMutationToolOpt
           diff: diff.diff,
           firstChangedLine: diff.firstChangedLine,
           lineChanges: diff.lineChanges,
+          state,
         }), details);
         });
       } catch (err) {
@@ -471,7 +577,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
   return {
     name: 'Edit',
     label: 'Edit',
-    description: 'Replace exact strings in existing files. For several replacements in the same file, pass `edits` so the file is read, checked, and written once. For small multi-file changes, use `patch`. For structurally-sensitive rewrites (Markdown tables, JSON arrays, indented YAML/TOML), prefer a single Write. Successful mutation results include a model-visible diff and update the internal file snapshot, so do not call Read again only to verify the edit.',
+    description: 'Replace exact strings in existing files. If you need two or more replacements in the same file, always pass one `edits` array so the file is read, checked, and written once; the batch is atomic and counts as one mutation attempt. For small multi-file changes, use `patch`. For structurally-sensitive rewrites (Markdown tables, JSON arrays, indented YAML/TOML), prefer a single Write. Successful mutation results include a model-visible diff plus snapshot state, and update the internal file snapshot, so do not call Read again only to verify the edit.',
     parameters: {
       type: 'object',
       properties: {
@@ -481,7 +587,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         replace_all: { type: 'boolean', default: false },
         edits: {
           type: 'array',
-          description: 'Optional same-file batch replacements. Use this instead of multiple Edit calls against one file.',
+          description: 'Same-file batch replacements. Use this by default for multiple replacements in one file; all replacements apply atomically and consume one mutation attempt.',
           items: {
             type: 'object',
             properties: {
@@ -837,11 +943,57 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         if (isHashlineEdit && typeof args.hashline_tag === 'string' && args.hashline_tag.trim()) {
           hashlineTagDrift = hashlineTag(original) !== args.hashline_tag.trim();
         }
+        const readEntry = options?.readFileState?.get(filePath);
         const readCheck = isHashlineEdit
           ? options?.readFileState?.assertEditableHashline(filePath)
           : options?.readFileState?.assertEditable(filePath, original);
+        let rebased = false;
         if (readCheck && !readCheck.ok) {
-          return errorResult(readCheck.code, readCheck.message, { path: toWorkspaceRelative(cwd, filePath) });
+          const relPath = toWorkspaceRelative(cwd, filePath);
+          if (!isHashlineEdit && readCheck.code === 'file_modified_since_read') {
+            rebased = true;
+          } else {
+            return errorResult(readCheck.code, readCheck.message, readGuardFailureDetails({
+              code: readCheck.code,
+              relPath,
+              currentContent: original,
+              readEntry,
+            }));
+          }
+        }
+        const staleRebaseFailure = (
+          code: string,
+          message: string,
+          details: Record<string, unknown> = {},
+        ): ReturnType<typeof errorResult> => {
+          const relPath = toWorkspaceRelative(cwd, filePath);
+          if (!rebased) return errorResult(code, message, details);
+          return errorResult('file_modified_since_read',
+            'File has changed since it was read and the requested edit could not be safely rebased. Read it again before editing.',
+            readGuardFailureDetails({
+              code: 'file_modified_since_read',
+              relPath,
+              currentContent: original,
+              readEntry,
+              extra: {
+                rebaseFailed: true,
+                rebaseError: code,
+                ...details,
+              },
+            }));
+        };
+        if (rebased) {
+          const rebaseAnchorCheck = assertRebaseAnchorsWereRead(
+            readEntry?.content,
+            batchEdits ?? [{ oldString, newString, replaceAll }],
+          );
+          if (!rebaseAnchorCheck.ok) {
+            return staleRebaseFailure(
+              rebaseAnchorCheck.code,
+              rebaseAnchorCheck.message,
+              rebaseAnchorCheck.details,
+            );
+          }
         }
         if (batchEdits) {
           const relPath = toWorkspaceRelative(cwd, filePath);
@@ -860,7 +1012,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 continue;
               }
               if (ws.reason === 'ambiguous') {
-                return errorResult('not_unique',
+                return staleRebaseFailure('not_unique',
                   `edits[${index}].old_string matches ${ws.count} locations after whitespace-normalization; add more surrounding context`,
                   { path: relPath, editIndex: index, occurrences: ws.count });
               }
@@ -871,11 +1023,11 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                     + 'Read the file again to see its current content before retrying.',
                   { path: relPath, editIndex: index, attempts });
               }
-              return errorResult('not_found', `edits[${index}].old_string not found in file`, { path: relPath, editIndex: index });
+              return staleRebaseFailure('not_found', `edits[${index}].old_string not found in file`, { path: relPath, editIndex: index });
             }
             const occurrences = countOccurrences(updated, actual);
             if (!edit.replaceAll && occurrences > 1) {
-              return errorResult('not_unique', `edits[${index}].old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
+              return staleRebaseFailure('not_unique', `edits[${index}].old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
                 path: relPath,
                 editIndex: index,
                 occurrences,
@@ -901,6 +1053,15 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           const updatedGuard = validateUpdatedContent(filePath, updated, { path: relPath });
           if (!updatedGuard.ok) return updatedGuard.result;
           const diff = buildFileDiff(relPath, original, updated);
+          const state = buildMutationStateDescriptor({
+            relPath,
+            originalContent: original,
+            updatedContent: updated,
+            diff,
+            snapshotUpdated: args.preview_only !== true,
+            readSnapshotContent: rebased ? readEntry?.content : undefined,
+            rebased,
+          });
           const detailsBase = buildMutationDetailsBase({
             path: relPath,
             diff,
@@ -910,6 +1071,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               replaced: totalReplaced,
               editCount: batchEdits.length,
               edits: appliedEdits,
+              state,
+              ...(rebased ? { rebased: true } : {}),
             },
           });
           if (args.preview_only === true) {
@@ -923,6 +1086,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               lineChanges: diff.lineChanges,
               preview: true,
               snapshotUpdated: false,
+              state,
+              rebased,
             }), {
               ...detailsBase,
               preview: true,
@@ -957,6 +1122,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             diff: diff.diff,
             firstChangedLine: diff.firstChangedLine,
             lineChanges: diff.lineChanges,
+            state,
+            rebased,
           }), {
             ...detailsBase,
             backup,
@@ -983,12 +1150,30 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                 + (hashlineTagDrift ? ' (the file has changed since it was read)' : ''),
               {
                 path: relPath,
+                retryable: true,
+                suggestedAction: 'refresh_hashline',
                 suggestion: 'Read the file again with hashline:true before editing.',
+                state: buildFileStateErrorDescriptor({
+                  relPath,
+                  currentContent: original,
+                  readContent: readEntry?.content,
+                  hasFullContent: readEntry?.hasFullContent,
+                  partialView: readEntry?.isPartialView,
+                }),
               });
           }
           const updatedGuard = validateUpdatedContent(filePath, updated, { path: relPath });
           if (!updatedGuard.ok) return updatedGuard.result;
           const diff = buildFileDiff(relPath, original, updated);
+          const state = buildMutationStateDescriptor({
+            relPath,
+            originalContent: original,
+            updatedContent: updated,
+            diff,
+            snapshotUpdated: args.preview_only !== true,
+            readSnapshotContent: hashlineTagDrift ? readEntry?.content : undefined,
+            rebased: hashlineTagDrift,
+          });
           const hashlineDetailsBase = buildMutationDetailsBase({
             path: relPath,
             diff,
@@ -996,6 +1181,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             updatedContent: updated,
             extra: {
               replaced: 1,
+              state,
+              ...(hashlineTagDrift ? { rebased: true } : {}),
             },
           });
           if (args.preview_only === true) {
@@ -1008,6 +1195,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
               lineChanges: diff.lineChanges,
               preview: true,
               snapshotUpdated: false,
+              state,
+              rebased: hashlineTagDrift,
             }), {
               ...hashlineDetailsBase,
               preview: true,
@@ -1035,6 +1224,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             diff: diff.diff,
             firstChangedLine: diff.firstChangedLine,
             lineChanges: diff.lineChanges,
+            state,
+            rebased: hashlineTagDrift,
           }), {
             ...hashlineDetailsBase,
             hashline: { tag: hashlineTag(updated), ...(hashlineTagDrift ? { tagDrift: true } : {}) },
@@ -1052,7 +1243,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             replaced = 1;
             matchStrategy = 'whitespace';
           } else if (ws.reason === 'ambiguous') {
-            return errorResult('not_unique',
+            return staleRebaseFailure('not_unique',
               `old_string matches ${ws.count} locations after whitespace-normalization; add more surrounding context`,
               { path: relPathNF, occurrences: ws.count });
           } else {
@@ -1063,12 +1254,12 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
                   + 'Read the file again to see its current content before retrying.',
                 { path: relPathNF, attempts });
             }
-            return errorResult('not_found', 'old_string not found in file', { path: relPathNF });
+            return staleRebaseFailure('not_found', 'old_string not found in file', { path: relPathNF });
           }
         } else {
           const occurrences = countOccurrences(original, actual);
           if (!replaceAll && occurrences > 1) {
-            return errorResult('not_unique', `old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
+            return staleRebaseFailure('not_unique', `old_string appears ${occurrences} times; pass replace_all:true or add more context`, {
               path: toWorkspaceRelative(cwd, filePath),
               occurrences,
             });
@@ -1081,6 +1272,15 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         const updatedGuard = validateUpdatedContent(filePath, updated, { path: relPath });
         if (!updatedGuard.ok) return updatedGuard.result;
         const diff = buildFileDiff(relPath, original, updated);
+        const state = buildMutationStateDescriptor({
+          relPath,
+          originalContent: original,
+          updatedContent: updated,
+          diff,
+          snapshotUpdated: args.preview_only !== true,
+          readSnapshotContent: rebased ? readEntry?.content : undefined,
+          rebased,
+        });
         const detailsBase = buildMutationDetailsBase({
           path: relPath,
           diff,
@@ -1088,6 +1288,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           updatedContent: updated,
           extra: {
             replaced,
+            state,
+            ...(rebased ? { rebased: true } : {}),
           },
         });
         if (args.preview_only === true) {
@@ -1100,6 +1302,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
             lineChanges: diff.lineChanges,
             preview: true,
             snapshotUpdated: false,
+            state,
+            rebased,
           }), {
             ...detailsBase,
             matchStrategy,
@@ -1133,6 +1337,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
           diff: diff.diff,
           firstChangedLine: diff.firstChangedLine,
           lineChanges: diff.lineChanges,
+          state,
+          rebased,
         }), {
           ...detailsBase,
           matchStrategy,

@@ -227,6 +227,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       let content = result.content;
       let hookAppended = false;
       let telemetryUpdated = false;
+      let detailsUpdated = false;
       // Auto-fix: append a concrete next step for recognizable failures so the
       // model self-corrects instead of blindly retrying.
       let remediationAppended = false;
@@ -249,6 +250,19 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         if (key) {
           const next = (editAttemptsByPath.get(key) ?? 0) + 1;
           editAttemptsByPath.set(key, next);
+          result.details = {
+            ...(result.details ?? {}),
+            mutationBudget: {
+              tool: 'Edit',
+              path: key,
+              attemptsThisTurn: next,
+              advisoryThreshold: EDIT_FLOOD_THRESHOLD,
+              remainingBeforeAdvisory: Math.max(EDIT_FLOOD_THRESHOLD - next, 0),
+              batchConsumesOneAttempt: true,
+              failedAttemptsCount: true,
+            },
+          };
+          detailsUpdated = true;
           if (next >= EDIT_FLOOD_THRESHOLD) {
             const advisory = `Edit has now run ${next} times against ${key} this turn. For several replacements in this same file, use one Edit call with the \`edits\` array so the file is written once. If you're rewriting a structural file (Markdown tables, JSON arrays, indented YAML), switch to a single Write; for multi-file changes, use Edit's \`patch\` parameter.`;
             content = [...content, { type: 'text', text: `[fix] ${advisory}` }];
@@ -377,7 +391,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
       }
       turnSpentBytes += finalSize;
 
-      if (!truncated.didTruncate && !hookAppended && !remediationAppended && !telemetryUpdated) return undefined;
+      if (!truncated.didTruncate && !hookAppended && !remediationAppended && !telemetryUpdated && !detailsUpdated) return undefined;
       return {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         content: finalContent as any,
