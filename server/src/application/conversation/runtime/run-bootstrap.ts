@@ -24,6 +24,7 @@ import type { TraceRecorder } from '../../../utils/provider-trace.js';
 import { resolveAgentForSession } from '../../../domains/agent-profiles/agent-resolver.js';
 import { PhaseEmitter, isTerminalPhase } from './active-run-phase.js';
 import { attachRunPhaseDomainEventEmitter } from './run-phase-domain-events.js';
+import { appendMessagesToTree, buildUserMessage } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
 
 export interface RunStartMessage extends Record<string, unknown> {
   type: 'run_start';
@@ -275,6 +276,8 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
       Date.now(),
       userOffset,
     );
+    // Route C: mirror the user message into the session tree (truth source).
+    appendMessagesToTree(db, message.sessionId, [buildUserMessage(parsedInput.text, parsedInput.attachments)]);
   }
 
   // Wire broadcast: sends to ALL connected clients (originating + others).

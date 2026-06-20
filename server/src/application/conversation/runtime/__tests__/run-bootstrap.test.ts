@@ -81,6 +81,21 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       project_id TEXT,
       allowed_root TEXT
     );
+
+    CREATE TABLE session_entries (
+      id          TEXT NOT NULL,
+      session_id  TEXT NOT NULL,
+      parent_id   TEXT,
+      type        TEXT NOT NULL,
+      payload     TEXT NOT NULL,
+      timestamp   TEXT NOT NULL,
+      PRIMARY KEY (session_id, id)
+    );
+
+    CREATE TABLE session_leaf (
+      session_id  TEXT PRIMARY KEY,
+      leaf_id     TEXT
+    );
   `);
   createAgentProfilesTable(db);
 

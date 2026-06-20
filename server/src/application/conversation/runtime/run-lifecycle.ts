@@ -11,6 +11,7 @@ import { extractAndIndexMetadata, removeIndexedMetadata } from '../../../infra/s
 import { broadcastRunMessage, sendMessage } from '../transport/broadcast.js';
 import type { ConnectedClient, ActiveRun } from '../transport/types.js';
 import { setPhase, isTerminalPhase } from './active-run-phase.js';
+import { appendMessagesToTree, buildAssistantTurnMessages } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
 
 /**
  * Extract a plain-text string from an AgentMessage's content field, handling
@@ -284,6 +285,18 @@ export function upsertAssistantMessage(
       removeIndexedMetadata(run.db, run.assistantMessageId);
       extractAndIndexMetadata(run.db, run.assistantMessageId, row.rowid, run.sessionId, metadata as Parameters<typeof extractAndIndexMetadata>[4], Date.now());
     }
+  }
+
+  // Route C: append this turn to the session tree (truth source) exactly once,
+  // at the final save. Idempotent via run.treeTurnAppended so the multiple
+  // final-save call sites (normal / cancel / recovery / terminal) don't duplicate.
+  if (options?.indexMetadata && !run.treeTurnAppended) {
+    appendMessagesToTree(run.db, run.sessionId, buildAssistantTurnMessages({
+      fullContent: run.fullContent,
+      thinkingBlocks: run.thinkingBlocks,
+      collectedToolCalls: run.collectedToolCalls,
+    }));
+    run.treeTurnAppended = true;
   }
 }
 
