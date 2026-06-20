@@ -1,8 +1,7 @@
 import { completeSimple } from '@earendil-works/pi-ai';
 import type { Message } from '@earendil-works/pi-ai';
-import { Session } from '@earendil-works/pi-agent-core';
 import { buildModel } from '../../../infra/providers/pi-runtime/build-model.js';
-import { SqliteSessionStorage } from '../../../infra/providers/pi-runtime/session-tree/index.js';
+import { readRecentMessages } from '../../../infra/providers/pi-runtime/session-tree/index.js';
 import type { TitleGenerateInput } from './session-title-service.js';
 import {
   TITLE_SYSTEM_PROMPT,
@@ -20,13 +19,11 @@ export async function generateSessionTitle(input: TitleGenerateInput): Promise<s
   const { db, sessionId, agentProfile, llmProfile } = input;
   const built = buildModel(llmProfile, agentProfile.model);
 
-  // Title only needs a handful of messages (pickTitleWindow keeps ~9). Read the
-  // session tree (Route C) and cap to the recent window so long sessions don't
-  // reconstruct the whole history just to drop it.
-  const session = new Session(new SqliteSessionStorage(db, sessionId));
-  const all = (await session.buildContext()).messages as unknown as Message[];
-  if (all.length === 0) return null;
-  const messages = all.slice(-16);
+  // Title only needs a handful of messages (pickTitleWindow keeps ~9). Read a
+  // bounded recent window from the session tree (Route C) so long sessions don't
+  // reconstruct the whole branch just to drop most of it.
+  const messages = readRecentMessages(db, sessionId, 16) as unknown as Message[];
+  if (messages.length === 0) return null;
 
   const window = pickTitleWindow(messages);
   const contextMessages: Message[] = [
