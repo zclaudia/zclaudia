@@ -17,6 +17,11 @@ describe('migration 021_session_entries', () => {
 
     const idx = (db.prepare(`PRAGMA index_list(session_entries)`).all() as Array<{ name: string }>)
       .map((i) => i.name);
-    expect(idx).toContain('idx_session_entries_session');
+    expect(idx).toContain('idx_session_entries_parent');
+
+    // composite primary key (session_id, id)
+    const pk = (db.prepare(`PRAGMA table_info(session_entries)`).all() as Array<{ name: string; pk: number }>)
+      .filter((c) => c.pk > 0).sort((a, b) => a.pk - b.pk).map((c) => c.name);
+    expect(pk).toEqual(['session_id', 'id']);
   });
 });
