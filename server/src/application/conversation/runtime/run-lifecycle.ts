@@ -262,43 +262,49 @@ export function upsertAssistantMessage(
   const metadataJson = Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : null;
 
   const assistantOffset = getNextOffset(run.db, run.sessionId);
-  run.db.prepare(`
-    INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
-    VALUES (?, ?, 'assistant', ?, ?, ?, ?)
-    ON CONFLICT(id) DO UPDATE SET
-      content = excluded.content,
-      metadata = excluded.metadata
-  `).run(
-    run.assistantMessageId,
-    run.sessionId,
-    run.fullContent,
-    metadataJson,
-    Date.now(),
-    assistantOffset
-  );
+  // Route C: the assistant messages-table row, its derived index entries, and
+  // the session-tree turn all commit together — a partial write would leave the
+  // UI projection and the context truth source disagreeing. The tree append
+  // happens exactly once (run.treeTurnAppended), but the flag is only set AFTER
+  // the transaction commits so a rollback-then-retry re-appends rather than
+  // silently skipping. (appendMessagesToTree's own transaction nests as a savepoint.)
+  const willAppendTree = Boolean(options?.indexMetadata) && !run.treeTurnAppended;
+  run.db.transaction(() => {
+    run.db.prepare(`
+      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+      VALUES (?, ?, 'assistant', ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        content = excluded.content,
+        metadata = excluded.metadata
+    `).run(
+      run.assistantMessageId,
+      run.sessionId,
+      run.fullContent,
+      metadataJson,
+      Date.now(),
+      assistantOffset
+    );
 
-  // Extended indexing (file_references, tool_call_records) — only on final/cancel save
-  if (options?.indexMetadata && metadataJson) {
-    const row = run.db.prepare('SELECT rowid FROM messages WHERE id = ?').get(run.assistantMessageId) as { rowid: number } | undefined;
-    if (row) {
-      // Clean previous index entries then re-extract
-      removeIndexedMetadata(run.db, run.assistantMessageId);
-      extractAndIndexMetadata(run.db, run.assistantMessageId, row.rowid, run.sessionId, metadata as Parameters<typeof extractAndIndexMetadata>[4], Date.now());
+    // Extended indexing (file_references, tool_call_records) — only on final/cancel save
+    if (options?.indexMetadata && metadataJson) {
+      const row = run.db.prepare('SELECT rowid FROM messages WHERE id = ?').get(run.assistantMessageId) as { rowid: number } | undefined;
+      if (row) {
+        // Clean previous index entries then re-extract
+        removeIndexedMetadata(run.db, run.assistantMessageId);
+        extractAndIndexMetadata(run.db, run.assistantMessageId, row.rowid, run.sessionId, metadata as Parameters<typeof extractAndIndexMetadata>[4], Date.now());
+      }
     }
-  }
 
-  // Route C: append this turn to the session tree (truth source) exactly once,
-  // at the final save. Idempotent via run.treeTurnAppended so the multiple
-  // final-save call sites (normal / cancel / recovery / terminal) don't duplicate.
-  if (options?.indexMetadata && !run.treeTurnAppended) {
-    appendMessagesToTree(run.db, run.sessionId, buildAssistantTurnMessages({
-      fullContent: run.fullContent,
-      thinkingBlocks: run.thinkingBlocks,
-      collectedToolCalls: run.collectedToolCalls,
-      usage: options.usage,
-    }));
-    run.treeTurnAppended = true;
-  }
+    if (willAppendTree) {
+      appendMessagesToTree(run.db, run.sessionId, buildAssistantTurnMessages({
+        fullContent: run.fullContent,
+        thinkingBlocks: run.thinkingBlocks,
+        collectedToolCalls: run.collectedToolCalls,
+        usage: options?.usage,
+      }));
+    }
+  })();
+  if (willAppendTree) run.treeTurnAppended = true;
 }
 
 // --- Message parsing ---

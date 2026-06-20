@@ -265,19 +265,24 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     userMessageId = newId();
     const userOffset = getNextOffset(db, message.sessionId);
     const parsedInput = parseMessageInput(message.input);
-    db.prepare(`
-      INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
-      VALUES (?, ?, 'user', ?, ?, ?, ?)
-    `).run(
-      userMessageId,
-      message.sessionId,
-      parsedInput.text,
-      parsedInput.attachments.length > 0 ? JSON.stringify({ attachments: parsedInput.attachments }) : null,
-      Date.now(),
-      userOffset,
-    );
-    // Route C: mirror the user message into the session tree (truth source).
-    appendMessagesToTree(db, message.sessionId, [buildUserMessage(parsedInput.text, parsedInput.attachments)]);
+    // Route C: the messages-table row and the session-tree entry must commit
+    // together — a partial write would leave the UI projection and the context
+    // truth source disagreeing. (appendMessagesToTree's own transaction nests as
+    // a savepoint.)
+    db.transaction(() => {
+      db.prepare(`
+        INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+        VALUES (?, ?, 'user', ?, ?, ?, ?)
+      `).run(
+        userMessageId,
+        message.sessionId,
+        parsedInput.text,
+        parsedInput.attachments.length > 0 ? JSON.stringify({ attachments: parsedInput.attachments }) : null,
+        Date.now(),
+        userOffset,
+      );
+      appendMessagesToTree(db, message.sessionId, [buildUserMessage(parsedInput.text, parsedInput.attachments)]);
+    })();
   }
 
   // Wire broadcast: sends to ALL connected clients (originating + others).

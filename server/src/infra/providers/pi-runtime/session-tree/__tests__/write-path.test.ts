@@ -103,6 +103,23 @@ describe('write-path builders', () => {
     expect(leafAfter).toBe(leafBefore);   // leaf not advanced
   });
 
+  it('nests inside an outer transaction (savepoint) — a tree failure rolls back the whole turn across tables', () => {
+    // This is the cross-table atomicity contract the run-bootstrap / run-lifecycle
+    // dual-write call sites rely on: messages-table row + tree entry commit together.
+    const db = makeDb();
+    db.exec(`CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, content TEXT);`);
+    const circular: any = { role: 'assistant', content: 'x' };
+    circular.content = circular; // JSON.stringify throws inside appendMessagesToTree
+
+    expect(() => db.transaction(() => {
+      db.prepare(`INSERT INTO messages (id, session_id, content) VALUES ('m1', 's1', 'hi')`).run();
+      appendMessagesToTree(db, 's1', [circular]); // nested tx (savepoint) — throws
+    })()).toThrow();
+
+    expect((db.prepare(`SELECT count(*) AS c FROM messages`).get() as { c: number }).c).toBe(0);
+    expect((db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as { c: number }).c).toBe(0);
+  });
+
   it('projection parity: tree entries collapse to the coarse messages rows', async () => {
     const db = makeDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
