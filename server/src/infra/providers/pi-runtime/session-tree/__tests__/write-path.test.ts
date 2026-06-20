@@ -1,0 +1,73 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import Database from 'better-sqlite3';
+import { Session } from '@earendil-works/pi-agent-core';
+import { migration } from '../../../../storage/migrations/021_session_entries.js';
+import { SqliteSessionStorage } from '../sqlite-session-storage.js';
+import { projectEntriesToMessageRows } from '../message-projection.js';
+import {
+  buildUserMessage, buildAssistantTurnMessages, appendMessagesToTree,
+} from '../write-path.js';
+
+function makeDb(): Database.Database {
+  const db = new Database(':memory:');
+  db.exec(`CREATE TABLE sessions (id TEXT PRIMARY KEY, created_at INTEGER NOT NULL);`);
+  db.exec(`INSERT INTO sessions (id, created_at) VALUES ('s1', 1000);`);
+  db.exec(migration.sql);
+  return db;
+}
+
+describe('write-path builders', () => {
+  it('buildUserMessage: plain text', () => {
+    expect(buildUserMessage('hi', [])).toEqual({ role: 'user', content: 'hi' });
+  });
+
+  it('buildUserMessage: image attachment becomes a ref-carrying image block', () => {
+    const att = { type: 'image', name: 'a.png', fileId: 'f1', mimeType: 'image/png' } as never;
+    const msg = buildUserMessage('look', [att]) as { role: string; content: any[] };
+    expect(msg.role).toBe('user');
+    expect(msg.content[0]).toEqual({ type: 'text', text: 'look' });
+    expect(msg.content[1].type).toBe('image');
+    expect(msg.content[1].attachmentRef).toEqual(att); // ref carried, no bytes
+    expect(msg.content[1].data).toBeUndefined();
+  });
+
+  it('buildAssistantTurnMessages: assistant block + one toolResult per call', () => {
+    const msgs = buildAssistantTurnMessages({
+      fullContent: 'done',
+      thinkingBlocks: [{ text: 'hmm', signature: 'sig' }],
+      collectedToolCalls: [{ toolUseId: 'tc1', name: 'edit', input: { p: 1 }, output: 'ok', isError: false }],
+    }) as any[];
+    expect(msgs).toHaveLength(2);
+    expect(msgs[0].role).toBe('assistant');
+    const types = msgs[0].content.map((b: any) => b.type);
+    expect(types).toEqual(['thinking', 'text', 'toolCall']);
+    expect(msgs[0].content[2]).toMatchObject({ type: 'toolCall', id: 'tc1', name: 'edit', arguments: { p: 1 } });
+    expect(msgs[1]).toMatchObject({ role: 'toolResult', toolCallId: 'tc1', toolName: 'edit', isError: false });
+    expect(msgs[1].content).toEqual([{ type: 'text', text: 'ok' }]);
+  });
+
+  it('appendMessagesToTree writes entries readable via buildContext, chained + leaf advanced', async () => {
+    const db = makeDb();
+    appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
+    appendMessagesToTree(db, 's1', buildAssistantTurnMessages({ fullContent: 'a', collectedToolCalls: [] }));
+    const ctx = await new Session(new SqliteSessionStorage(db, 's1')).buildContext();
+    expect(ctx.messages.map((m: any) => m.role)).toEqual(['user', 'assistant']);
+    expect((ctx.messages[0] as any).content).toBe('q');
+  });
+
+  it('projection parity: tree entries collapse to the coarse messages rows', async () => {
+    const db = makeDb();
+    appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
+    appendMessagesToTree(db, 's1', buildAssistantTurnMessages({
+      fullContent: 'a', collectedToolCalls: [{ toolUseId: 't1', name: 'read', input: {}, output: 'file', isError: false }],
+    }));
+    const branch = await new SqliteSessionStorage(db, 's1').getEntries();
+    const rows = projectEntriesToMessageRows(branch);
+    expect(rows.map((r) => r.role)).toEqual(['user', 'assistant']);
+    expect(rows[0].content).toBe('q');
+    expect(rows[1].content).toBe('a');
+    expect(rows[1].metadata?.toolCalls).toEqual([
+      { toolUseId: 't1', name: 'read', input: {}, output: 'file', isError: false },
+    ]);
+  });
+});
