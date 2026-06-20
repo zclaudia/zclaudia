@@ -83,6 +83,26 @@ describe('write-path builders', () => {
     expect((ctx.messages[0] as any).content).toBe('q');
   });
 
+  it('appendMessagesToTree is atomic: a mid-batch failure rolls back the whole turn + leaf', () => {
+    const db = makeDb();
+    appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);
+    const leafBefore = (db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as { l: string }).l;
+    const countBefore = (db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as { c: number }).c;
+
+    // Second message has circular content → JSON.stringify throws after the first is inserted.
+    const circular: any = { role: 'assistant', content: 'x' };
+    circular.content = circular;
+    expect(() => appendMessagesToTree(db, 's1', [
+      { role: 'assistant', content: 'ok' } as any,
+      circular,
+    ])).toThrow();
+
+    const countAfter = (db.prepare(`SELECT count(*) AS c FROM session_entries WHERE session_id='s1'`).get() as { c: number }).c;
+    const leafAfter = (db.prepare(`SELECT leaf_id AS l FROM session_leaf WHERE session_id='s1'`).get() as { l: string }).l;
+    expect(countAfter).toBe(countBefore); // the 'ok' entry was rolled back
+    expect(leafAfter).toBe(leafBefore);   // leaf not advanced
+  });
+
   it('projection parity: tree entries collapse to the coarse messages rows', async () => {
     const db = makeDb();
     appendMessagesToTree(db, 's1', [buildUserMessage('q', [])]);

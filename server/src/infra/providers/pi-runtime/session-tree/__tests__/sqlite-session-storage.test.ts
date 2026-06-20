@@ -105,6 +105,15 @@ describe('SqliteSessionStorage', () => {
     await expect(storage.getPathToRoot('ghost')).rejects.toThrow(/not found/i);
   });
 
+  it('getPathToRoot throws when the parent chain is broken (does not reach root)', async () => {
+    await storage.appendEntry(userEntry('e1', null, 'a'));
+    await storage.appendEntry(userEntry('e2', 'e1', 'b'));
+    await storage.appendEntry(userEntry('e3', 'e2', 'c'));
+    // Break the chain: remove the middle entry so e3's path can't reach root.
+    db.prepare(`DELETE FROM session_entries WHERE id = 'e2' AND session_id = 's1'`).run();
+    await expect(storage.getPathToRoot('e3')).rejects.toThrow(/broken|root/i);
+  });
+
   it('round-trips a CompactionEntry with optional details + fromHook', async () => {
     const entry = {
       type: 'compaction' as const, id: 'c1', parentId: 'e1',

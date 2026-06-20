@@ -75,7 +75,6 @@ export function buildAssistantTurnMessages(turn: AssistantTurnData): AgentMessag
  * entry ids in order.
  */
 export function appendMessagesToTree(db: Database, sessionId: string, messages: AgentMessage[]): string[] {
-  const ids: string[] = [];
   const insert = db.prepare(
     `INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
      VALUES (?, ?, ?, ?, ?, ?)`,
@@ -85,15 +84,21 @@ export function appendMessagesToTree(db: Database, sessionId: string, messages: 
      ON CONFLICT(session_id) DO UPDATE SET leaf_id = excluded.leaf_id`,
   );
   const getLeaf = db.prepare(`SELECT leaf_id AS leafId FROM session_leaf WHERE session_id = ?`);
-  for (const message of messages) {
-    const id = newId();
-    const parentRow = getLeaf.get(sessionId) as { leafId: string | null } | undefined;
-    const parentId = parentRow?.leafId ?? null;
-    const timestamp = new Date().toISOString();
-    const payload = JSON.stringify({ message });
-    insert.run(id, sessionId, parentId, 'message', payload, timestamp);
-    setLeaf.run(sessionId, id);
-    ids.push(id);
-  }
-  return ids;
+  // One transaction per turn: a mid-batch failure (e.g. a bad payload) must not
+  // leave a half-written turn or a leaf pointing into the middle of one.
+  const appendAll = db.transaction((msgs: AgentMessage[]): string[] => {
+    const ids: string[] = [];
+    for (const message of msgs) {
+      const id = newId();
+      const parentRow = getLeaf.get(sessionId) as { leafId: string | null } | undefined;
+      const parentId = parentRow?.leafId ?? null;
+      const timestamp = new Date().toISOString();
+      const payload = JSON.stringify({ message });
+      insert.run(id, sessionId, parentId, 'message', payload, timestamp);
+      setLeaf.run(sessionId, id);
+      ids.push(id);
+    }
+    return ids;
+  });
+  return appendAll(messages);
 }

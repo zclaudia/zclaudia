@@ -352,6 +352,12 @@ export class SessionLifecycleService {
       throw new SessionLifecycleError(404, 'NOT_FOUND', 'Session not found');
     }
 
+    // The session-tree tables (Route C) have no FK to sessions, so the sessions
+    // delete doesn't cascade to them — remove their rows explicitly to avoid
+    // orphaned tree entries accumulating after a session is deleted.
+    this.db.prepare('DELETE FROM session_entries WHERE session_id = ?').run(sessionId);
+    this.db.prepare('DELETE FROM session_leaf WHERE session_id = ?').run(sessionId);
+
     this.broadcastSessionEvent('deleted', session);
     this.emitPluginEvent('session.deleted', { sessionId, session }).catch(() => {});
     this.domainEvents?.dispatch({

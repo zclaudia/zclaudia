@@ -126,6 +126,15 @@ export class SqliteSessionStorage implements SessionStorage {
     if (rows.length === 0) {
       throw new SessionError('not_found', `Entry ${leafId} not found`);
     }
+    // rows are ordered depth DESC, so rows[0] is the root-most entry on the path.
+    // If its parent_id is non-null the chain is broken (a parent row is missing),
+    // which would otherwise return a SILENTLY truncated context. Fail fast.
+    if (rows[0].parent_id !== null) {
+      throw new SessionError(
+        'invalid_session',
+        `Broken entry chain for leaf ${leafId}: path does not reach root (missing parent ${rows[0].parent_id})`,
+      );
+    }
     return rows.map(fromRow);
   }
 
