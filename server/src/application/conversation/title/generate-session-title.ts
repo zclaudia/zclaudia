@@ -19,7 +19,9 @@ export async function generateSessionTitle(input: TitleGenerateInput): Promise<s
   const { db, sessionId, agentProfile, llmProfile } = input;
   const built = buildModel(llmProfile, agentProfile.model);
 
-  const { messages } = rebuildHistory(db, sessionId);
+  // Title only needs a handful of messages (pickTitleWindow keeps ~9); cap the
+  // rebuild so long sessions don't reconstruct the whole history just to drop it.
+  const { messages } = rebuildHistory(db, sessionId, { maxMessages: 16 });
   if (messages.length === 0) return null;
 
   const window = pickTitleWindow(messages);
