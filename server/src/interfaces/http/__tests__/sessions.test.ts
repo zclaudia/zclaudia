@@ -1672,14 +1672,45 @@ internal reasoning zclaudia plan
   });
 
   describe('message size trimming', () => {
-    it('trims large messages to stay within size limit', async () => {
+    it('trims large messages once past the minimum count and over the byte budget', async () => {
       const now = Date.now();
       db.prepare(`
         INSERT INTO sessions (id, project_id, name, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?)
       `).run('s1', 'project-1', 'Test', now, now);
 
-      // Insert messages with large content (each > 256KB)
+      // The page budget keeps at least MESSAGE_PAGE_MIN_MESSAGES (10) before
+      // trimming, then caps at MESSAGE_PAGE_MAX_BYTES (4MB). Insert enough large
+      // messages to blow past both: 15 × 400KB = 6MB crosses the cap after the
+      // 10-message floor, so the page trims to the floor.
+      const largeContent = 'x'.repeat(400 * 1024);
+      const inserted = 15;
+      for (let i = 0; i < inserted; i++) {
+        db.prepare(`
+          INSERT INTO messages (id, session_id, role, content, created_at)
+          VALUES (?, ?, ?, ?, ?)
+        `).run(`m${i}`, 's1', 'user', largeContent, now + i * 1000);
+      }
+
+      const res = await request(app).get('/api/sessions/s1/messages?limit=100');
+      expect(res.status).toBe(200);
+      // Trimmed: fewer than all 15 are returned.
+      expect(res.body.data.messages.length).toBeLessThan(inserted);
+      // But never below the minimum-message floor.
+      expect(res.body.data.messages.length).toBeGreaterThanOrEqual(10);
+      // And the client is told to keep paginating.
+      expect(res.body.data.pagination.hasMore).toBe(true);
+    });
+
+    it('does not let a few oversized messages collapse the page below the floor', async () => {
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run('s1', 'project-1', 'Test', now, now);
+
+      // Three 300KB messages exceed the old 512KB cap, but the floor guarantees
+      // they all come back rather than collapsing to 1-2 items.
       const largeContent = 'x'.repeat(300 * 1024);
       for (let i = 0; i < 3; i++) {
         db.prepare(`
@@ -1690,10 +1721,7 @@ internal reasoning zclaudia plan
 
       const res = await request(app).get('/api/sessions/s1/messages?limit=100');
       expect(res.status).toBe(200);
-      // Should have trimmed - at 300KB per message, only 1-2 should fit in 512KB
-      expect(res.body.data.messages.length).toBeLessThan(3);
-      // But always at least 1
-      expect(res.body.data.messages.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.data.messages.length).toBe(3);
     });
   });
 
