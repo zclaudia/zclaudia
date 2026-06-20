@@ -203,6 +203,18 @@ describe('rebuildHistory', () => {
     expect(out.length).toBe(50);
     expect(HISTORY_LIMIT).toBe(50);
   });
+
+  it('orders by offset, not created_at, when timestamps collide', () => {
+    const db = createTestDb();
+    // 同一毫秒 created_at;真实顺序由 offset 决定:user(1) -> assistant(2) -> user(3 popped)
+    insertMsg(db, { id: 'u1', sessionId: 's', role: 'user', content: 'q1', createdAt: 100, offset: 1 });
+    insertMsg(db, { id: 'a1', sessionId: 's', role: 'assistant', content: 'r1', createdAt: 100, offset: 2 });
+    insertMsg(db, { id: 'u2', sessionId: 's', role: 'user', content: 'q2', createdAt: 100, offset: 3 });
+    const { messages: out } = rebuildHistory(db, 's');
+    expect(out).toHaveLength(2);
+    expect((out[0] as any).content).toBe('q1');
+    expect((out[1] as any).content).toEqual(expect.arrayContaining([{ type: 'text', text: 'r1' }]));
+  });
 });
 
 describe('history-rebuilder — usage handling', () => {

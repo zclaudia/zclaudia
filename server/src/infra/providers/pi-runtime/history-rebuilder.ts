@@ -140,7 +140,7 @@ export function rebuildHistory(
       `SELECT id, role, content, metadata, created_at AS createdAt
        FROM messages
        WHERE session_id = ? AND offset >= ?
-       ORDER BY created_at DESC
+       ORDER BY offset DESC, created_at DESC, id DESC
        LIMIT ?`,
     ).all(sessionId, boundaryOffset, HISTORY_LIMIT);
   } else {
@@ -148,7 +148,7 @@ export function rebuildHistory(
       `SELECT id, role, content, metadata, created_at AS createdAt
        FROM messages
        WHERE session_id = ?
-       ORDER BY created_at DESC
+       ORDER BY offset DESC, created_at DESC, id DESC
        LIMIT ?`,
     ).all(sessionId, HISTORY_LIMIT);
   }
