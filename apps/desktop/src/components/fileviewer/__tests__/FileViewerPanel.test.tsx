@@ -105,9 +105,11 @@ beforeEach(() => {
 });
 
 describe('FileViewerPanel', () => {
-  it('renders "No file selected" when no file is open', () => {
+  it('shows the search field and a full-width tree when no file is open', () => {
     render(<FileViewerPanel projectRoot="/project" />);
-    expect(screen.getByText('No file selected')).toBeInTheDocument();
+    expect(screen.getByTestId('file-search')).toBeInTheDocument();
+    expect(screen.getByTestId('file-tree')).toBeInTheDocument();
+    expect(screen.queryByText('No file selected')).not.toBeInTheDocument();
   });
 
   it('shows the file path as a breadcrumb when a file is open', () => {
@@ -149,12 +151,14 @@ describe('FileViewerPanel', () => {
     expect(screen.queryByTestId('code-viewer')).not.toBeInTheDocument();
   });
 
-  it('shows empty state prompt when no file and not loading', () => {
+  it('does not render the old @file empty-state pane', () => {
     const { container } = render(<FileViewerPanel projectRoot="/project" />);
-    expect(container.textContent).toContain('@file');
+    expect(container.textContent).not.toContain('Select a file to preview');
   });
 
-  it('renders FileSearchInput when searchOpen is true', () => {
+  it('renders FileSearchInput overlay when searchOpen is true with a file open', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.content = 'const x = 1;';
     mockFileViewerState.searchOpen = true;
     render(<FileViewerPanel projectRoot="/project" />);
     expect(screen.getByTestId('file-search')).toBeInTheDocument();
@@ -183,12 +187,11 @@ describe('FileViewerPanel', () => {
     expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
   });
 
-  it('renders the file tree toggle button in the file path bar', () => {
+  it('renders the tree toggle in read mode and toggles the tree', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.content = 'const x = 1;';
     render(<FileViewerPanel projectRoot="/project" />);
-
     const toggleBtn = screen.getByRole('button', { name: 'Hide file tree' });
-    expect(toggleBtn).toBeInTheDocument();
-
     toggleBtn.click();
     expect(mockFileViewerState.toggleTree).toHaveBeenCalled();
   });

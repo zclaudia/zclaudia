@@ -359,54 +359,20 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
     return () => window.clearTimeout(id);
   }, [highlightStart, content, loading, isMarkdown, targetNonce, listRef]);
 
+  const isBrowseMode = !filePath && !loading && !error;
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      {/* File path indicator */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
-        {headerIcon}
-        {filePath ? (
-          <span
-            className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
-            title={filePath}
-          >
-            {breadcrumbSegments(filePath).dirs.map((dir, i) => (
-              <span key={i} className="flex items-center gap-1 text-muted-foreground/80">
-                <span className="truncate">{dir}</span>
-                <span aria-hidden="true" className="text-muted-foreground/40">/</span>
-              </span>
-            ))}
-            <span className="truncate text-foreground">{breadcrumbSegments(filePath).file}</span>
-          </span>
-        ) : null}
-        {!isMobile && (
-          <button
-            type="button"
-            onClick={toggleTree}
-            className={`ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 transition-colors ${
-              showFileTree ? 'text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-            }`}
-            title={showFileTree ? 'Hide file tree' : 'Show file tree'}
-            aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
-          >
-            {showFileTree ? <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" /> : <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />}
-          </button>
-        )}
-      </div>
-
-      {/* Search input */}
-      {searchOpen && (
-        <FileSearchInput
-          projectRoot={projectRoot}
-          backendId={fileBackendId}
-          onSelect={handleSearchSelect}
-          onClose={() => setSearchOpen(false)}
-        />
-      )}
-
-      {/* Content area */}
-      <div className={`flex-1 min-h-0 overflow-hidden ${contentLayoutClass}`}>
-        {showFileTree && (
-          <div className={isMobile ? 'h-2/5 min-h-[180px] flex-shrink-0' : 'w-64 flex-shrink-0'}>
+      {isBrowseMode ? (
+        <>
+          {/* Browse: search field is the toolbar, tree fills the panel */}
+          <FileSearchInput
+            projectRoot={projectRoot}
+            backendId={fileBackendId}
+            onSelect={handleSearchSelect}
+            onClose={() => setSearchOpen(false)}
+          />
+          <div className="flex-1 min-h-0 overflow-hidden">
             <FileTree
               projectRoot={projectRoot}
               backendId={fileBackendId}
@@ -414,51 +380,92 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
               onOpenFile={handleSearchSelect}
             />
           </div>
-        )}
-        <div className="flex-1 min-h-0 min-w-0 h-full overflow-hidden">
-          {loading && (
-            <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-              Loading...
-            </div>
+        </>
+      ) : (
+        <>
+          {/* Read: breadcrumb toolbar */}
+          <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
+            {headerIcon}
+            {filePath && (
+              <span
+                className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
+                title={filePath}
+              >
+                {breadcrumbSegments(filePath).dirs.map((dir, i) => (
+                  <span key={i} className="flex items-center gap-1 text-muted-foreground/80">
+                    <span className="truncate">{dir}</span>
+                    <span aria-hidden="true" className="text-muted-foreground/40">/</span>
+                  </span>
+                ))}
+                <span className="truncate text-foreground">{breadcrumbSegments(filePath).file}</span>
+              </span>
+            )}
+            {!isMobile && (
+              <button
+                type="button"
+                onClick={toggleTree}
+                className={`ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 transition-colors ${
+                  showFileTree ? 'text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                }`}
+                title={showFileTree ? 'Hide file tree' : 'Show file tree'}
+                aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
+              >
+                {showFileTree ? <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" /> : <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />}
+              </button>
+            )}
+          </div>
+
+          {searchOpen && (
+            <FileSearchInput
+              projectRoot={projectRoot}
+              backendId={fileBackendId}
+              onSelect={handleSearchSelect}
+              onClose={() => setSearchOpen(false)}
+            />
           )}
-          {error && (
-            <div className="flex items-center justify-center h-full text-destructive text-sm px-4 text-center">
-              {error}
-            </div>
-          )}
-          {content && !loading && (
-            isMarkdown ? (
-              <div className="h-full overflow-auto">
-                <MarkdownFileContent content={content} />
+
+          <div className={`flex-1 min-h-0 overflow-hidden ${contentLayoutClass}`}>
+            {showFileTree && (
+              <div className={isMobile ? 'h-2/5 min-h-[180px] flex-shrink-0' : 'w-64 flex-shrink-0'}>
+                <FileTree
+                  projectRoot={projectRoot}
+                  backendId={fileBackendId}
+                  selectedPath={filePath}
+                  onOpenFile={handleSearchSelect}
+                />
               </div>
-            ) : (
-              <VirtualizedCodeView
-                content={content}
-                language={lang}
-                theme={codeTheme}
-                highlightStart={highlightStart}
-                highlightEnd={highlightEnd}
-                listRef={listRef}
-              />
-            )
-          )}
-          {!filePath && !loading && !searchOpen && (
-            <div className="flex h-full items-center justify-center px-6 text-center">
-              <div className="flex max-w-sm flex-col items-center gap-3 text-muted-foreground">
-                <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-border bg-muted/30 text-muted-foreground">
-                  <FileText className="h-6 w-6" aria-hidden="true" />
+            )}
+            <div className="flex-1 min-h-0 min-w-0 h-full overflow-hidden">
+              {loading && (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+                  Loading...
                 </div>
-                <div className="space-y-1">
-                  <div className="text-sm font-medium text-foreground">Select a file to preview</div>
-                  <div className="text-xs leading-5">
-                    Click a <span className="font-mono text-primary">@file</span> reference, browse the file tree, or press <span className="font-mono text-foreground">Cmd P</span> to search.
+              )}
+              {error && (
+                <div className="flex items-center justify-center h-full text-destructive text-sm px-4 text-center">
+                  {error}
+                </div>
+              )}
+              {content && !loading && (
+                isMarkdown ? (
+                  <div className="h-full overflow-auto">
+                    <MarkdownFileContent content={content} />
                   </div>
-                </div>
-              </div>
+                ) : (
+                  <VirtualizedCodeView
+                    content={content}
+                    language={lang}
+                    theme={codeTheme}
+                    highlightStart={highlightStart}
+                    highlightEnd={highlightEnd}
+                    listRef={listRef}
+                  />
+                )
+              )}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
