@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
-import { buildSessionSubgraph } from '../context-graph-read.js';
+import { buildSessionSubgraph, buildContextGraph } from '../context-graph-read.js';
 
 function seedProject(db: Database.Database) {
   db.prepare(`INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at) VALUES ('l','d','anthropic',1,1)`).run();
@@ -126,5 +126,64 @@ it('respects node cap and reports truncation', () => {
   setLeaf(db, 's', 'e6');
   const { truncated } = buildSessionSubgraph(db, 's', { forkBaseEntryId: null, forkPointEntryIds: new Set(), nodeCap: 3 });
   expect(truncated).toBe(true);
+  db.close();
+});
+
+function addForkChild(db: Database.Database, childId: string, parentId: string, forkEntryId: string, createdAt: number) {
+  db.pragma('foreign_keys = OFF');
+  db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, type, forked_from_session_id, fork_entry_id, created_at, updated_at) VALUES (?, 'p','a','regular', ?, ?, ?, ?)`)
+    .run(childId, parentId, forkEntryId, createdAt, createdAt);
+  db.pragma('foreign_keys = ON');
+}
+
+it('assembles a fork family: lanes, fork edges, root/focus, non-dangling toNode', () => {
+  const db = new Database(':memory:'); applyMigrations(db); seedProject(db); addSession(db, 'parent');
+  addEntry(db, 'parent', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'parent', 'e2', 'e1', 'message', msg('assistant', 'a1'));
+  addEntry(db, 'parent', 'e3', 'e2', 'message', msg('user', 'u2'));
+  setLeaf(db, 'parent', 'e3');
+  addForkChild(db, 'child', 'parent', 'e2', 2);
+  addEntry(db, 'child', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'child', 'e2', 'e1', 'message', msg('assistant', 'a1'));
+  addEntry(db, 'child', 'cx', 'e2', 'message', msg('user', 'other'));
+  setLeaf(db, 'child', 'cx');
+
+  const g = buildContextGraph(db, 'child')!;
+  expect(g.rootSessionId).toBe('parent');
+  expect(g.focusSessionId).toBe('child');
+  expect(g.sessions.map((s) => s.id).sort()).toEqual(['child', 'parent']);
+  expect(g.sessions.find((s) => s.id === 'parent')!.laneOrder).toBeLessThan(g.sessions.find((s) => s.id === 'child')!.laneOrder);
+  expect(g.forkEdges).toEqual([{ fromNodeId: 'parent:e2', toSessionId: 'child', toNodeId: 'child:e2' }]);
+  const nodeIds = new Set(g.nodes.map((n) => n.nodeId));
+  expect(nodeIds.has('parent:e2')).toBe(true);
+  expect(nodeIds.has('child:e2')).toBe(true);
+  db.close();
+});
+
+it('broken lineage (parent not in project) → child is its own family root', () => {
+  const db = new Database(':memory:'); applyMigrations(db); seedProject(db);
+  addForkChild(db, 'orphan', 'ghost', 'eX', 5);
+  addEntry(db, 'orphan', 'e1', null, 'message', msg('user', 'u1'));
+  setLeaf(db, 'orphan', 'e1');
+  const g = buildContextGraph(db, 'orphan')!;
+  expect(g.rootSessionId).toBe('orphan');
+  expect(g.sessions.map((s) => s.id)).toEqual(['orphan']);
+  db.close();
+});
+
+it('archived session in family is included and flagged', () => {
+  const db = new Database(':memory:'); applyMigrations(db); seedProject(db); addSession(db, 'parent');
+  addEntry(db, 'parent', 'e1', null, 'message', msg('user', 'u1')); setLeaf(db, 'parent', 'e1');
+  addForkChild(db, 'child', 'parent', 'e1', 2);
+  addEntry(db, 'child', 'e1', null, 'message', msg('user', 'u1')); setLeaf(db, 'child', 'e1');
+  db.prepare(`UPDATE sessions SET archived_at = 999 WHERE id = 'child'`).run();
+  const g = buildContextGraph(db, 'parent')!;
+  expect(g.sessions.find((s) => s.id === 'child')!.archived).toBe(true);
+  db.close();
+});
+
+it('returns null for unknown session', () => {
+  const db = new Database(':memory:'); applyMigrations(db); seedProject(db);
+  expect(buildContextGraph(db, 'nope')).toBeNull();
   db.close();
 });

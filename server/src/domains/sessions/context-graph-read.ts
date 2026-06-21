@@ -1,5 +1,5 @@
 import type { Database } from 'better-sqlite3';
-import type { GraphNode } from '@zclaudia/shared/core/context-graph';
+import type { ContextGraph, SessionLane, ForkEdge, GraphNode } from '@zclaudia/shared/core/context-graph';
 
 interface EntryRow { id: string; parent_id: string | null; type: string; payload: string; timestamp: string; }
 
@@ -135,4 +135,97 @@ export function buildSessionSubgraph(db: Database, sessionId: string, opts: Subg
   }
 
   return { nodes, truncated };
+}
+
+const TOTAL_NODE_CAP = 2000;
+
+interface SessionRow {
+  id: string;
+  name: string | null;
+  forked_from_session_id: string | null;
+  fork_entry_id: string | null;
+  created_at: number;
+  archived_at: number | null;
+}
+
+/**
+ * Build the whole fork family's context graph for any member session. Synchronous,
+ * direct-SQL, pure read. Returns null if the session does not exist.
+ */
+export function buildContextGraph(db: Database, sessionId: string): ContextGraph | null {
+  const focus = db.prepare(`SELECT project_id AS p FROM sessions WHERE id = ?`).get(sessionId) as { p: string } | undefined;
+  if (!focus) return null;
+
+  const all = db.prepare(
+    `SELECT id, name, forked_from_session_id, fork_entry_id, created_at, archived_at FROM sessions WHERE project_id = ?`,
+  ).all(focus.p) as SessionRow[];
+  const byId = new Map(all.map((s) => [s.id, s]));
+  const parentInProject = (s: SessionRow): string | null =>
+    (s.forked_from_session_id && byId.has(s.forked_from_session_id)) ? s.forked_from_session_id : null;
+
+  const childrenOf = new Map<string, SessionRow[]>();
+  for (const s of all) {
+    const p = parentInProject(s);
+    if (p) { const arr = childrenOf.get(p) ?? []; arr.push(s); childrenOf.set(p, arr); }
+  }
+
+  let rootId = sessionId;
+  { const seen = new Set<string>(); let cur: string | null = sessionId;
+    while (cur && byId.has(cur) && !seen.has(cur)) { seen.add(cur); rootId = cur; cur = parentInProject(byId.get(cur)!); } }
+
+  const familyIds = new Set<string>();
+  { const queue = [rootId];
+    while (queue.length) { const id = queue.shift()!; if (familyIds.has(id)) continue; familyIds.add(id);
+      for (const c of (childrenOf.get(id) ?? [])) queue.push(c.id); } }
+
+  const lanes: SessionLane[] = [];
+  { let order = 0; const queue: string[] = [rootId]; const seen = new Set<string>();
+    while (queue.length) {
+      const id = queue.shift()!; if (seen.has(id)) continue; seen.add(id);
+      const s = byId.get(id)!;
+      lanes.push({
+        id: s.id, name: s.name, forkedFromSessionId: parentInProject(s), forkEntryId: parentInProject(s) ? s.fork_entry_id : null,
+        createdAt: s.created_at, archived: s.archived_at != null, laneOrder: order++,
+      });
+      const kids = (childrenOf.get(id) ?? []).slice().sort((a, b) => a.created_at - b.created_at);
+      for (const k of kids) queue.push(k.id);
+    }
+  }
+
+  const forkSources = new Map<string, Set<string>>();
+  for (const s of all) {
+    const p = parentInProject(s);
+    if (p && familyIds.has(p) && s.fork_entry_id) { const set = forkSources.get(p) ?? new Set<string>(); set.add(s.fork_entry_id); forkSources.set(p, set); }
+  }
+
+  const nodes: GraphNode[] = [];
+  let truncated = false;
+  let remaining = TOTAL_NODE_CAP;
+  for (const lane of lanes) {
+    const s = byId.get(lane.id)!;
+    const sub = buildSessionSubgraph(db, lane.id, {
+      forkBaseEntryId: parentInProject(s) ? s.fork_entry_id : null,
+      forkPointEntryIds: forkSources.get(lane.id) ?? new Set<string>(),
+      nodeCap: Math.max(0, remaining),
+    });
+    truncated = truncated || sub.truncated;
+    remaining -= sub.nodes.length;
+    nodes.push(...sub.nodes);
+  }
+
+  const nodeIds = new Set(nodes.map((n) => n.nodeId));
+  const forkEdges: ForkEdge[] = [];
+  for (const lane of lanes) {
+    const s = byId.get(lane.id)!;
+    const p = parentInProject(s);
+    if (p && familyIds.has(p) && s.fork_entry_id) {
+      const fromNodeId = `${p}:${s.fork_entry_id}`;
+      const toNodeId = `${s.id}:${s.fork_entry_id}`;
+      if (nodeIds.has(fromNodeId) && nodeIds.has(toNodeId)) forkEdges.push({ fromNodeId, toSessionId: s.id, toNodeId });
+    }
+  }
+
+  for (const n of nodes) { if (n.parentNodeId && !nodeIds.has(n.parentNodeId)) n.parentNodeId = null; }
+
+  return { rootSessionId: rootId, focusSessionId: sessionId, sessions: lanes, nodes, forkEdges, truncated };
 }
