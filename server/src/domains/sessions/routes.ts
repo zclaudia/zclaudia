@@ -13,6 +13,7 @@ import { SessionQueryError, SessionQueryService } from './query-service.js';
 import { buildSessionUpdatePatch, isSessionValidationError } from './model.js';
 import type { SessionEventPublisherPort } from './session-event-port.js';
 import { hasForegroundActiveRunForSession, findForegroundActiveRunIdForSession, hasAnyActiveRunForSession } from '../../utils/run-state.js';
+import { branchSessionAt, BranchError } from './branch-service.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 import { NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import { resolveAgentReadinessForSession } from '../agent-readiness/check.js';
@@ -124,6 +125,33 @@ export function createSessionRoutes(
         success: false,
         error: { code: 'DB_ERROR', message: 'Failed to fetch run state' }
       });
+    }
+  });
+
+  // Branch (rewind): move the active leaf and rewrite the messages projection.
+  router.post('/:id/branch', async (req: Request, res: Response) => {
+    try {
+      const sessionId = req.params.id;
+      const { treeEntryId } = req.body as { treeEntryId?: string };
+      if (!treeEntryId) {
+        sendApiError(res, 400, 'VALIDATION_ERROR', 'treeEntryId is required');
+        return;
+      }
+      if (hasAnyActiveRunForSession(activeRuns, sessionId)) {
+        sendApiError(res, 409, 'SESSION_RUNNING', 'Cannot branch a running session');
+        return;
+      }
+      const result = await branchSessionAt(db, sessionId, treeEntryId);
+      const updated = repo.findById(sessionId);
+      if (updated) sessionEvents?.publishSessionEvent('updated', updated);
+      res.json({ success: true, data: result });
+    } catch (error) {
+      if (error instanceof BranchError) {
+        sendApiError(res, error.status, error.code, error.message);
+        return;
+      }
+      console.error('Error branching session:', error);
+      sendApiError(res, 500, 'DB_ERROR', 'Failed to branch session');
     }
   });
 
