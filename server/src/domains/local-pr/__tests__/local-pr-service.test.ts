@@ -132,6 +132,8 @@ function createTestDb(): Database.Database {
       is_read_only INTEGER DEFAULT 0,
       sort_order INTEGER,
       last_run_status TEXT,
+      forked_from_session_id TEXT,
+      fork_entry_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL
     );
@@ -141,7 +143,8 @@ function createTestDb(): Database.Database {
       session_id TEXT NOT NULL,
       role TEXT NOT NULL,
       content TEXT NOT NULL,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      tree_entry_id TEXT
     );
 
     CREATE TABLE llm_profiles (
@@ -875,8 +878,8 @@ describe('LocalPRService', () => {
       emptyDb.exec(`
         CREATE TABLE projects (id TEXT PRIMARY KEY, name TEXT, type TEXT DEFAULT 'code', default_agent_profile_id TEXT, root_path TEXT, system_prompt TEXT, permission_policy TEXT, agent_permission_override TEXT, agent TEXT, context_sync_status TEXT DEFAULT 'synced', is_internal INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
         CREATE TABLE local_prs (id TEXT PRIMARY KEY, project_id TEXT, worktree_path TEXT, branch_name TEXT, base_branch TEXT, title TEXT, description TEXT, status TEXT DEFAULT 'open', commits TEXT, diff_summary TEXT, review_notes TEXT, status_message TEXT, merged_at INTEGER, merge_commit_sha TEXT, review_session_id TEXT, conflict_session_id TEXT, auto_triggered INTEGER DEFAULT 0, auto_review INTEGER DEFAULT 0, execution_state TEXT DEFAULT 'idle', pending_action TEXT DEFAULT 'none', created_at INTEGER, updated_at INTEGER);
-        CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, name TEXT, agent_profile_id TEXT, sdk_session_id TEXT, type TEXT DEFAULT 'regular', parent_session_id TEXT, working_directory TEXT, project_role TEXT, task_id TEXT, archived_at INTEGER, plan_status TEXT, is_read_only INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
-        CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, created_at INTEGER);
+        CREATE TABLE sessions (id TEXT PRIMARY KEY, project_id TEXT, name TEXT, agent_profile_id TEXT, sdk_session_id TEXT, type TEXT DEFAULT 'regular', parent_session_id TEXT, working_directory TEXT, project_role TEXT, task_id TEXT, archived_at INTEGER, plan_status TEXT, is_read_only INTEGER DEFAULT 0, forked_from_session_id TEXT, fork_entry_id TEXT, created_at INTEGER, updated_at INTEGER);
+        CREATE TABLE messages (id TEXT PRIMARY KEY, session_id TEXT, role TEXT, content TEXT, created_at INTEGER, tree_entry_id TEXT);
         CREATE TABLE llm_profiles (id TEXT PRIMARY KEY, name TEXT, provider_type TEXT DEFAULT 'anthropic', base_url TEXT, api_key TEXT, compat TEXT, env TEXT, is_default INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
         CREATE TABLE worktree_configs (id TEXT PRIMARY KEY, project_id TEXT, worktree_path TEXT, auto_create_pr INTEGER DEFAULT 0, auto_review INTEGER DEFAULT 0, created_at INTEGER, updated_at INTEGER);
       `);
