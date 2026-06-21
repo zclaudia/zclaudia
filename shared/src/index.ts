@@ -32,6 +32,7 @@ export * from './core/skills.js';
 export * from './core/runtime-capabilities.js';
 export * from './core/session.js';
 export * from './core/message.js';
+export * from './core/context-graph.js';
 export * from './core/project.js';
 export * from './core/api.js';
 export * from './core/mcp.js';
