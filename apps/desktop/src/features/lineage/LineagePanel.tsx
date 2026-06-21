@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { ContextGraph, GraphNode } from '@zclaudia/shared';
 import { fetchContextGraph } from '../../services/api/context-graph';
@@ -23,16 +23,22 @@ export function LineagePanel() {
   const [graph, setGraph] = useState<ContextGraph | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const reqIdRef = useRef(0);
+
   const reload = useCallback(async () => {
     if (!selectedSessionId) { setGraph(null); return; }
+    const myReq = ++reqIdRef.current;
     setLoading(true);
     try {
-      setGraph(await fetchContextGraph(selectedSessionId));
+      const next = await fetchContextGraph(selectedSessionId);
+      if (reqIdRef.current === myReq) setGraph(next);
     } catch {
-      useToastStore.getState().add({ type: 'error', title: '该会话谱系已不可用' });
-      setGraph(null);
+      if (reqIdRef.current === myReq) {
+        useToastStore.getState().add({ type: 'error', title: '该会话谱系已不可用' });
+        setGraph(null);
+      }
     } finally {
-      setLoading(false);
+      if (reqIdRef.current === myReq) setLoading(false);
     }
   }, [selectedSessionId]);
 

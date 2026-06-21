@@ -40,4 +40,19 @@ describe('LineageGraph', () => {
     const { getByText } = render(<LineageGraph model={model} onNodeClick={() => {}} />);
     expect(getByText('2')).toBeTruthy();
   });
+
+  it('treats a compaction-only node (no messageId) as non-jumpable', () => {
+    const onNodeClick = vi.fn();
+    const m: LayoutModel = {
+      laneLabels: [], badges: [], edges: [], width: 100, height: 100, truncated: false,
+      nodes: [{ nodeId: 'S0:k', sessionId: 'S0', x: 44, y: 36, node: {
+        nodeId: 'S0:k', sessionId: 'S0', entryId: 'k', entryType: 'compaction', isRoot: false,
+        isBranchPoint: false, isForkPoint: false, isForkBase: false, isActiveLeaf: false,
+        isBranchTip: false, onActivePath: true, parentNodeId: null, incomingMessageCount: 0,
+        timestamp: 't', jump: { messageId: null, compactionId: 'cmp-1' } } }],
+    };
+    const { getByTestId } = render(<LineageGraph model={m} onNodeClick={onNodeClick} />);
+    fireEvent.click(getByTestId('lineage-node-S0:k'));
+    expect(onNodeClick).not.toHaveBeenCalled();
+  });
 });

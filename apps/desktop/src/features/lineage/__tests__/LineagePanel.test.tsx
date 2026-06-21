@@ -88,4 +88,31 @@ describe('LineagePanel', () => {
     render(<LineagePanel />);
     await waitFor(() => expect(add).toHaveBeenCalled());
   });
+
+  it('ignores a stale response when the session changed mid-flight', async () => {
+    let resolveS0!: (v: unknown) => void;
+    let resolveS1!: (v: unknown) => void;
+    const p0 = new Promise((r) => { resolveS0 = r; });
+    const p1 = new Promise((r) => { resolveS1 = r; });
+    fetchContextGraph.mockReturnValueOnce(p0).mockReturnValueOnce(p1);
+
+    const graphS1 = {
+      ...linearGraph, rootSessionId: 'S1', focusSessionId: 'S1',
+      sessions: [{ id: 'S1', name: 'one', forkedFromSessionId: null, forkEntryId: null, createdAt: 2, archived: false, laneOrder: 0 }],
+      nodes: [{ ...linearGraph.nodes[0], nodeId: 'S1:r', sessionId: 'S1' }],
+    };
+
+    selectedSessionId = 'S0';
+    const { rerender, queryByTestId } = render(<LineagePanel />);
+    selectedSessionId = 'S1';
+    rerender(<LineagePanel />);
+
+    resolveS1(graphS1);
+    await waitFor(() => expect(queryByTestId('lineage-node-S1:r')).toBeTruthy());
+
+    resolveS0(linearGraph); // stale — must be ignored
+    await new Promise((r) => setTimeout(r, 0));
+    expect(queryByTestId('lineage-node-S0:r')).toBeNull();
+    expect(queryByTestId('lineage-node-S1:r')).toBeTruthy();
+  });
 });

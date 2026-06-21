@@ -8,7 +8,7 @@ interface Props {
   laneColorOf?: (sessionId: string) => string;
 }
 
-const isJumpable = (n: GraphNode) => n.jump.messageId != null || n.jump.compactionId != null;
+const isJumpable = (n: GraphNode) => n.jump.messageId != null;
 
 function NodeShape({ ln }: { ln: LayoutNode }) {
   const { shape, ring, dimmed } = glyphFor(ln.node);
