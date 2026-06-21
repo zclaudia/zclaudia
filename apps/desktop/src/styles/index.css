@@ -432,14 +432,14 @@ body.notch-window {
 .prose.prose-sm :where(h3):not(:where([class~="not-prose"], [class~="not-prose"] *)) { font-size: 1em; }
 .prose.prose-sm :where(h4, h5, h6):not(:where([class~="not-prose"], [class~="not-prose"] *)) { font-size: 0.9em; }
 .prose.prose-sm :where(table, th, td):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-  font-size: 0.875rem; /* 14px */
+  font-size: inherit;
 }
 .prose.prose-sm :where(blockquote):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
-  font-size: 0.875rem; /* 14px */
+  font-size: inherit;
 }
 .prose.prose-sm :where(:not(pre) > code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   font-family: var(--font-mono);
-  font-size: 0.85em;
+  font-size: 1em;
   padding: 0.1em 0.4em;
   border-radius: 5px;
   background: hsl(var(--muted));
