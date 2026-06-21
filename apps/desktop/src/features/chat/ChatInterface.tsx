@@ -23,7 +23,7 @@ import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChatSession } from '../../hooks/chat/useChatSession';
 import { useSendMessage } from '../../hooks/chat/useSendMessage';
 import { useCommandHandler } from '../../hooks/chat/useCommandHandler';
-import { useMessagePagination } from '../../hooks/chat/useMessagePagination';
+import { useMessagePagination, restoreToolCalls } from '../../hooks/chat/useMessagePagination';
 import { useSessionActions } from '../../hooks/chat/useSessionActions';
 import { usePlanStatus } from '../../hooks/chat/usePlanStatus';
 import { useKeyboardShortcuts } from '../../hooks/chat/useKeyboardShortcuts';
@@ -201,24 +201,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
       await branchSession(sessionId, treeEntryId);
       // Reload messages for this session (full replace) — mirrors the initial-load path in useMessagePagination
       const result = await api.getSessionMessages(sessionId, { limit: 50 });
-      const restoredMessages = result.messages.map((msg) => {
-        const r: import('../../stores/chatMessageStore').MessageWithToolCalls = { ...msg };
-        if (msg.metadata?.toolCalls && msg.metadata.toolCalls.length > 0) {
-          r.toolCalls = msg.metadata.toolCalls.map((tc, i) => ({
-            id: tc.toolUseId || `persisted-${msg.id}-${i}`,
-            toolName: tc.name,
-            toolInput: tc.input,
-            status: (tc.isError ? 'error' : 'completed') as 'error' | 'completed',
-            result: tc.output,
-            isError: tc.isError,
-            effect: tc.effect,
-          }));
-        }
-        if (msg.metadata?.contentBlocks && msg.metadata.contentBlocks.length > 0) {
-          r.contentBlocks = msg.metadata.contentBlocks;
-        }
-        return r;
-      });
+      const restoredMessages = restoreToolCalls(result.messages);
       useChatMessageStore.getState().setMessages(sessionId, restoredMessages, result.pagination);
       useToastStore.getState().add({
         title: 'Session rewound',

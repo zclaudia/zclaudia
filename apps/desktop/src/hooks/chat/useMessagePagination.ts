@@ -12,7 +12,7 @@ const BOTTOM_REFRESH_COOLDOWN_MS = 2500;
 const SUPPRESS_LOAD_MORE_MS = 1200;
 
 // Restore tool calls and content blocks from persisted metadata when loading messages from the server
-function restoreToolCalls(messages: Message[]): MessageWithToolCalls[] {
+export function restoreToolCalls(messages: Message[]): MessageWithToolCalls[] {
   return messages.map(msg => {
     const result: MessageWithToolCalls = { ...msg };
     if (msg.metadata?.toolCalls && msg.metadata.toolCalls.length > 0) {
