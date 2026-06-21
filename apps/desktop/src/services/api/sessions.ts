@@ -169,3 +169,48 @@ export async function getSessionMessages(
 export async function exportSession(sessionId: string): Promise<{ markdown: string; sessionName: string }> {
   return apiCallForBackend<{ markdown: string; sessionName: string }>(getBackendIdForSession(sessionId), `/api/sessions/${sessionId}/export`);
 }
+
+/**
+ * Fork a session at a specific tree entry — creates a new session whose history
+ * is copied up to (and including) the targeted message. The original session is
+ * left untouched.
+ *
+ * POST /api/sessions/:id/fork  { treeEntryId, name? }
+ * Returns the newly-created Session (201).
+ */
+export async function forkSession(
+  sessionId: string,
+  treeEntryId: string,
+  name?: string,
+): Promise<Session> {
+  return apiCallForBackend<Session>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/fork`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ treeEntryId, ...(name ? { name } : {}) }),
+    },
+  );
+}
+
+/**
+ * Branch (rewind) a session from a specific tree entry — rewrites the session's
+ * live timeline to start from that point. The old tip is preserved server-side
+ * as a sibling but leaves the linear view.
+ *
+ * POST /api/sessions/:id/branch  { treeEntryId }
+ * Returns { sessionId, leafId } (200).
+ */
+export async function branchSession(
+  sessionId: string,
+  treeEntryId: string,
+): Promise<{ sessionId: string; leafId: string }> {
+  return apiCallForBackend<{ sessionId: string; leafId: string }>(
+    getBackendIdForSession(sessionId),
+    `/api/sessions/${sessionId}/branch`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ treeEntryId }),
+    },
+  );
+}

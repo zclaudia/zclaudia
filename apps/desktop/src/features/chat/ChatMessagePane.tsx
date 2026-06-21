@@ -60,6 +60,10 @@ interface ChatMessagePaneProps {
   fileReferenceRoot?: string;
   fileReferenceBackendId?: string | null;
 
+  /** SP-A fork/branch callbacks forwarded to the message list. */
+  onFork?: (treeEntryId: string) => void;
+  onBranch?: (treeEntryId: string) => void;
+
   /** When true, the pane is hidden (display:none) so the centered empty-state
       composer can fill the viewport. Refs stay mounted for instant re-show. */
   collapsed?: boolean;
@@ -100,6 +104,8 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   onPermissionDecision,
   fileReferenceRoot,
   fileReferenceBackendId,
+  onFork,
+  onBranch,
   collapsed,
 }: ChatMessagePaneProps) {
   const interactionsMap = useInteractionStore((state) => state.interactions);
@@ -326,6 +332,8 @@ export const ChatMessagePane = memo(function ChatMessagePane({
         onResendTarget={onResendTarget}
         fileReferenceRoot={fileReferenceRoot}
         fileReferenceBackendId={fileReferenceBackendId}
+        onFork={onFork}
+        onBranch={onBranch}
       />
 
       <LoadingIndicator
