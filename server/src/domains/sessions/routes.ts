@@ -15,6 +15,7 @@ import type { SessionEventPublisherPort } from './session-event-port.js';
 import { hasForegroundActiveRunForSession, findForegroundActiveRunIdForSession, hasAnyActiveRunForSession } from '../../utils/run-state.js';
 import { branchSessionAt, BranchError } from './branch-service.js';
 import { forkSession, ForkError } from './fork-service.js';
+import { buildContextGraph } from './context-graph-read.js';
 import { sendApiError } from '../../interfaces/http/response.js';
 import { NoAgentAvailableError } from '../agent-profiles/agent-resolver.js';
 import { resolveAgentReadinessForSession } from '../agent-readiness/check.js';
@@ -180,6 +181,21 @@ export function createSessionRoutes(
       }
       console.error('Error forking session:', error);
       sendApiError(res, 500, 'DB_ERROR', 'Failed to fork session');
+    }
+  });
+
+  // Context graph: the whole fork family's structural lineage graph (read-only, SP-B).
+  router.get('/:id/context-graph', (req: Request, res: Response) => {
+    try {
+      const graph = buildContextGraph(db, req.params.id);
+      if (!graph) {
+        sendApiError(res, 404, 'NOT_FOUND', 'Session not found');
+        return;
+      }
+      res.json({ success: true, data: graph });
+    } catch (error) {
+      console.error('Error building context graph:', error);
+      sendApiError(res, 500, 'DB_ERROR', 'Failed to build context graph');
     }
   });
 

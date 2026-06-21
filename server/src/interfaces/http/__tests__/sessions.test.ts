@@ -1840,6 +1840,46 @@ internal reasoning zclaudia plan
     });
   });
 
+  describe('GET /api/sessions/:id/context-graph', () => {
+    let sessionId: string;
+
+    beforeEach(() => {
+      const now = Date.now();
+      sessionId = 'cg-s1';
+      db.prepare(`
+        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(sessionId, 'project-1', 'Graph Session', now, now);
+
+      // Seed two entries + leaf for the graph builder to read
+      db.prepare(`
+        INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run('e1', sessionId, null, 'message', JSON.stringify({ message: { role: 'user', content: 'u1' } }), new Date(now).toISOString());
+      db.prepare(`
+        INSERT INTO session_entries (id, session_id, parent_id, type, payload, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run('e2', sessionId, 'e1', 'message', JSON.stringify({ message: { role: 'assistant', content: [{ type: 'text', text: 'a1' }] } }), new Date(now + 1000).toISOString());
+      db.prepare(`
+        INSERT INTO session_leaf (session_id, leaf_id) VALUES (?, ?)
+      `).run(sessionId, 'e2');
+    });
+
+    it('returns 200 with a context graph for a known session', async () => {
+      const res = await request(app).get(`/api/sessions/${sessionId}/context-graph`);
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.data.focusSessionId).toBe(sessionId);
+      expect(Array.isArray(res.body.data.nodes)).toBe(true);
+      expect(res.body.data.nodes.length).toBeGreaterThanOrEqual(2); // root + leaf
+    });
+
+    it('returns 404 for an unknown session context-graph', async () => {
+      const res = await request(app).get('/api/sessions/does-not-exist/context-graph');
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('POST /api/sessions/:id/fork — run-active + validation guards', () => {
     beforeEach(() => {
       const now = Date.now();
