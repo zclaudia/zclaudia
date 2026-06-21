@@ -23,6 +23,9 @@ export interface SubgraphOptions {
  * map (no recursive CTE — cycle-safe + node-capped). Pure read.
  */
 export function buildSessionSubgraph(db: Database, sessionId: string, opts: SubgraphOptions): { nodes: GraphNode[]; truncated: boolean } {
+  // Truncation is first-N-by-insertion-order (rowid), NOT a connected prefix: under
+  // truncation a kept entry may reference a dropped parent/fork entry. That is handled
+  // downstream by the dangling parentNodeId / fork-edge filters in buildContextGraph.
   const rawRows = db.prepare(
     `SELECT id, parent_id, type, payload, timestamp FROM session_entries WHERE session_id = ? ORDER BY rowid LIMIT ?`,
   ).all(sessionId, opts.nodeCap + 1) as EntryRow[];
@@ -225,7 +228,10 @@ export function buildContextGraph(db: Database, sessionId: string): ContextGraph
     }
   }
 
-  for (const n of nodes) { if (n.parentNodeId && !nodeIds.has(n.parentNodeId)) n.parentNodeId = null; }
+  for (const n of nodes) {
+    if (n.parentNodeId && !nodeIds.has(n.parentNodeId)) n.parentNodeId = null;
+    if (n.labelTargetNodeId && !nodeIds.has(n.labelTargetNodeId)) n.labelTargetNodeId = undefined;
+  }
 
   return { rootSessionId: rootId, focusSessionId: sessionId, sessions: lanes, nodes, forkEdges, truncated };
 }

@@ -187,3 +187,59 @@ it('returns null for unknown session', () => {
   expect(buildContextGraph(db, 'nope')).toBeNull();
   db.close();
 });
+
+it('grandchild fork: 3 lanes, fork edges at each level, both-level fork flags', () => {
+  const db = new Database(':memory:'); applyMigrations(db); seedProject(db); addSession(db, 'root');
+  addEntry(db, 'root', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'root', 'e2', 'e1', 'message', msg('assistant', 'a1'));
+  setLeaf(db, 'root', 'e2');
+  // mid forked from root@e2, then appended; child forked from mid@e2 as well
+  addForkChild(db, 'mid', 'root', 'e2', 2);
+  addEntry(db, 'mid', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'mid', 'e2', 'e1', 'message', msg('assistant', 'a1'));
+  addEntry(db, 'mid', 'm3', 'e2', 'message', msg('user', 'mid-more'));
+  setLeaf(db, 'mid', 'm3');
+  addForkChild(db, 'leafc', 'mid', 'e2', 3);
+  addEntry(db, 'leafc', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'leafc', 'e2', 'e1', 'message', msg('assistant', 'a1'));
+  addEntry(db, 'leafc', 'l3', 'e2', 'message', msg('user', 'leaf-more'));
+  setLeaf(db, 'leafc', 'l3');
+
+  const g = buildContextGraph(db, 'mid')!;
+  expect(g.rootSessionId).toBe('root');
+  expect(g.sessions.map((s) => s.id).sort()).toEqual(['leafc', 'mid', 'root']);
+  // lane order: root < mid < leafc
+  const order = Object.fromEntries(g.sessions.map((s) => [s.id, s.laneOrder]));
+  expect(order.root).toBeLessThan(order.mid);
+  expect(order.mid).toBeLessThan(order.leafc);
+  // fork edges at both levels, non-dangling
+  expect(g.forkEdges).toEqual(expect.arrayContaining([
+    { fromNodeId: 'root:e2', toSessionId: 'mid', toNodeId: 'mid:e2' },
+    { fromNodeId: 'mid:e2', toSessionId: 'leafc', toNodeId: 'leafc:e2' },
+  ]));
+  const nodeIds = new Set(g.nodes.map((n) => n.nodeId));
+  for (const e of g.forkEdges) { expect(nodeIds.has(e.fromNodeId)).toBe(true); expect(nodeIds.has(e.toNodeId)).toBe(true); }
+  db.close();
+});
+
+it('a session that is both fork child and fork parent gets isForkBase and isForkPoint', () => {
+  const db = new Database(':memory:'); applyMigrations(db); seedProject(db); addSession(db, 'root');
+  addEntry(db, 'root', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'root', 'e2', 'e1', 'message', msg('assistant', 'a1'));
+  setLeaf(db, 'root', 'e2');
+  addForkChild(db, 'mid', 'root', 'e2', 2);
+  addEntry(db, 'mid', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'mid', 'e2', 'e1', 'message', msg('assistant', 'a1'));   // fork base (from root) AND fork source (to leafc)
+  addEntry(db, 'mid', 'm3', 'e2', 'message', msg('user', 'more'));
+  setLeaf(db, 'mid', 'm3');
+  addForkChild(db, 'leafc', 'mid', 'e2', 3);
+  addEntry(db, 'leafc', 'e1', null, 'message', msg('user', 'u1'));
+  addEntry(db, 'leafc', 'e2', 'e1', 'message', msg('assistant', 'a1'));
+  setLeaf(db, 'leafc', 'e2');
+
+  const g = buildContextGraph(db, 'mid')!;
+  const midE2 = g.nodes.find((n) => n.nodeId === 'mid:e2')!;
+  expect(midE2.isForkBase).toBe(true);
+  expect(midE2.isForkPoint).toBe(true);
+  db.close();
+});
