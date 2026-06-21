@@ -28,6 +28,7 @@ export default defineConfig({
       'src/components/**/*.test.ts',
       'src/facade/**/*.test.ts',
       'src/features/sidebar/**/*.test.ts',
+      'src/features/lineage/__tests__/**/*.test.{ts,tsx}',
       'src/hooks/transport/**/*.test.ts',
       'src/services/__tests__/api.test.ts',
       'src/services/__tests__/fileDownload.test.ts',
