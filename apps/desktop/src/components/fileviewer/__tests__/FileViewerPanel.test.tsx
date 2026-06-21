@@ -102,6 +102,7 @@ beforeEach(() => {
   mockFileViewerState.error = null;
   mockFileViewerState.searchOpen = false;
   mockFileViewerState.showTree = true;
+  mockFileViewerState.projectRoot = null;
 });
 
 describe('FileViewerPanel', () => {
@@ -133,6 +134,17 @@ describe('FileViewerPanel', () => {
     mockFileViewerState.error = 'File not found';
     render(<FileViewerPanel projectRoot="/project" />);
     expect(screen.getByText('File not found')).toBeInTheDocument();
+  });
+
+  it('ignores a stale error from a different project and shows browse mode', () => {
+    // close() does not clear `error`; an error from a previous project must not
+    // leak into the new project's empty panel and force read mode.
+    mockFileViewerState.projectRoot = '/other-project';
+    mockFileViewerState.error = 'stale error from other project';
+    render(<FileViewerPanel projectRoot="/project" />);
+    expect(screen.getByTestId('file-search')).toBeInTheDocument();
+    expect(screen.getByTestId('file-tree')).toBeInTheDocument();
+    expect(screen.queryByText('stale error from other project')).not.toBeInTheDocument();
   });
 
   it('renders code viewer when content is available', () => {

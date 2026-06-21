@@ -281,7 +281,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const isMobile = useIsMobile();
   const store = useFileViewerStore();
   const {
-    loading, error, searchOpen,
+    loading, searchOpen,
     targetLine, targetEndLine, targetNonce,
     openFile, setContent, setError, setSearchOpen, showTree, toggleTree,
   } = store;
@@ -289,9 +289,12 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   // (e.g. user just switched session/project), treat the viewer as if no file
   // is selected. SessionChatLayout's effect will close()/reset the store
   // shortly; this prevents rendering stale content during the transition.
+  // `error` is gated the same way: close() does not clear it, so an unrelated
+  // error must not leak into the new project's panel and force read mode.
   const projectMatches = !store.projectRoot || store.projectRoot === projectRoot;
   const filePath = projectMatches ? store.filePath : null;
   const content = projectMatches ? store.content : null;
+  const error = projectMatches ? store.error : null;
   const fileBackendId = resolveProjectBackendId(projectRoot);
   const listRef = useListRef(null);
 
@@ -386,20 +389,23 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
           {/* Read: breadcrumb toolbar */}
           <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
             {headerIcon}
-            {filePath && (
-              <span
-                className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
-                title={filePath}
-              >
-                {breadcrumbSegments(filePath).dirs.map((dir, i) => (
-                  <span key={i} className="flex items-center gap-1 text-muted-foreground/80">
-                    <span className="truncate">{dir}</span>
-                    <span aria-hidden="true" className="text-muted-foreground/40">/</span>
-                  </span>
-                ))}
-                <span className="truncate text-foreground">{breadcrumbSegments(filePath).file}</span>
-              </span>
-            )}
+            {filePath && (() => {
+              const { dirs, file } = breadcrumbSegments(filePath);
+              return (
+                <span
+                  className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
+                  title={filePath}
+                >
+                  {dirs.map((dir, i) => (
+                    <span key={i} className="flex items-center gap-1 text-muted-foreground/80">
+                      <span className="truncate">{dir}</span>
+                      <span aria-hidden="true" className="text-muted-foreground/40">/</span>
+                    </span>
+                  ))}
+                  <span className="truncate text-foreground">{file}</span>
+                </span>
+              );
+            })()}
             {!isMobile && (
               <button
                 type="button"
