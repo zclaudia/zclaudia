@@ -261,7 +261,7 @@ describe('buildAgentHooks Edit flood advisory', () => {
     const r4 = await callEdit(hooks, 'a.md');
     const advice = adviceText(r4);
     expect(advice).toMatch(/Edit has now run 4 times against a\.md/);
-    expect(advice).toMatch(/edits/);
+    expect(advice).toMatch(/MultiEdit/);
     expect(advice).toMatch(/Write|patch/);
   });
 
@@ -537,6 +537,30 @@ describe('afterToolCall — tool failure loop guard', () => {
     const text = (third?.content ?? []).map((b: any) => b.text ?? '').join('\n');
     expect(text).toContain('[loop]');
     expect(third?.details?.error).toBe('tool_loop_detected');
+  });
+
+  it('adds a concrete edit recovery plan when identical Edit failures loop', async () => {
+    const hooks = makeHooks();
+    const ctx = () => ({
+      toolCall: { name: 'Edit' },
+      args: { file_path: 'src/app.ts', old_string: 'stale text', new_string: 'fresh text' },
+      result: {
+        content: [{ type: 'text', text: 'old_string not found' }],
+        details: { ok: false, error: 'not_found' },
+      },
+    });
+
+    await hooks.afterToolCall!(ctx() as any);
+    await hooks.afterToolCall!(ctx() as any);
+    const third = await hooks.afterToolCall!(ctx() as any);
+    const text = (third?.content ?? []).map((b: any) => b.text ?? '').join('\n');
+
+    expect(text).toContain('[loop]');
+    expect(text).toContain('hashline:true');
+    expect(text).toContain('MultiEdit');
+    expect(third?.details?.loopRecovery).toMatchObject({
+      nextTool: 'Read',
+    });
   });
 
   it('resets the counter on success so a later identical failure does not nudge', async () => {

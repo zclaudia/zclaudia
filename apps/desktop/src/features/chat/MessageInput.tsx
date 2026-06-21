@@ -3,12 +3,17 @@ import type { KeyboardEvent, ClipboardEvent, ChangeEvent } from 'react';
 import { ArrowUp, Paperclip, X, Square, File as FileIcon, ChevronRight, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { Icon } from '../../components/ui/Icon';
 import { getFileIcon } from '../../config/icons';
-import type { SlashCommand, FileEntry } from '@zclaudia/shared';
+import type { SlashCommand, FileEntry, SkillRef } from '@zclaudia/shared';
+import { skillRefKey } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
+import { useAgentProfileMetaStore } from '../../stores/agentProfileMetaStore';
+import { useAgentForSession } from '../../hooks/useAgentForSession';
 import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
 import { downscaleImageFile } from '../attachments/downscale-image';
+import { SlashMenu, type SlashSuggestion } from './SlashMenu';
+import { PinnedSkillChips } from './PinnedSkillChips';
 
 export interface Attachment {
   id: string;
@@ -48,22 +53,6 @@ interface MentionState {
   isLoading: boolean;
   hasError: boolean;
 }
-
-type SlashSuggestion =
-  | {
-      type: 'command';
-      value: string;
-      description: string;
-    }
-  | {
-      type: 'skill';
-      value: string;
-      description: string;
-      argumentHint?: string;
-      usageCount?: number;
-      source: string;
-      mode?: string;
-    };
 
 const initialMentionState: MentionState = {
   isActive: false,
@@ -126,6 +115,7 @@ export function MessageInput({
   const isMobile = useIsMobile();
   const setDraft = useComposerStore((s) => s.setDraft);
   const clearDraft = useComposerStore((s) => s.clearDraft);
+  const { agent } = useAgentForSession(sessionId);
   const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   const [value, setValue] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -266,31 +256,63 @@ export function MessageInput({
     };
   }, []);
 
+  // Pinned skill refs on the active agent profile. Empty when there is no
+  // profile (or before it loads). These are the source of truth for pin state;
+  // the runtime already auto-loads them at session start (pi-runtime/skills.ts).
+  const pinnedRefs = useMemo(
+    () => agent?.skillSelection?.pinned ?? [],
+    [agent?.skillSelection?.pinned],
+  );
+  const pinnedKeys = useMemo(
+    () => new Set(pinnedRefs.map((ref) => skillRefKey(ref))),
+    [pinnedRefs],
+  );
+
   // Filter commands based on input (memoized to avoid O(n) filter on every render)
   const slashSuggestions = useMemo<SlashSuggestion[]>(() => {
     if (!value.startsWith('/') || value.includes(' ')) return [];
     const query = value.toLowerCase();
+    const skillSuggestions: SlashSuggestion[] = workspaceSkills
+      .filter((skill) => skill.eligible !== false && skill.metadata?.userInvocable !== false)
+      .filter((skill) => `/${skill.id}`.toLowerCase().startsWith(query))
+      .map((skill): SlashSuggestion => {
+        const ref: SkillRef = { source: skill.source ?? 'workspace', id: skill.id };
+        return {
+          index: 0, // reassigned below after ordering
+          type: 'skill',
+          value: `/${skill.id}`,
+          description: skill.metadata?.whenToUse || skill.description,
+          argumentHint: skill.metadata?.argumentHint || skill.metadata?.arguments?.join(' '),
+          usageCount: skill.usage?.count,
+          source: skill.source ?? 'workspace',
+          mode: skill.execution?.defaultMode,
+          pinned: pinnedKeys.has(skillRefKey(ref)),
+          skillRef: ref,
+        };
+      });
     const commandSuggestions: SlashSuggestion[] = commands
       .filter((cmd) => cmd.command.toLowerCase().startsWith(query))
-      .map((cmd) => ({
+      .map((cmd): SlashSuggestion => ({
+        index: 0,
         type: 'command',
         value: cmd.command,
         description: cmd.description,
       }));
-    const skillSuggestions: SlashSuggestion[] = workspaceSkills
-      .filter((skill) => skill.eligible !== false && skill.metadata?.userInvocable !== false)
-      .filter((skill) => `/${skill.id}`.toLowerCase().startsWith(query))
-      .map((skill) => ({
-        type: 'skill',
-        value: `/${skill.id}`,
-        description: skill.metadata?.whenToUse || skill.description,
-        argumentHint: skill.metadata?.argumentHint || skill.metadata?.arguments?.join(' '),
-        usageCount: skill.usage?.count,
-        source: skill.source ?? 'workspace',
-        mode: skill.execution?.defaultMode,
-      }));
-    return [...skillSuggestions, ...commandSuggestions];
-  }, [value, commands, workspaceSkills]);
+    // Order: pinned skills first, then remaining skills by usage desc, then
+    // commands. Reassign contiguous indices so keyboard-nav + scroll-into-view
+    // stay aligned across the visual groups rendered by SlashMenu.
+    return [...skillSuggestions, ...commandSuggestions]
+      .sort((a, b) => {
+        const pa = a.type === 'skill' && a.pinned ? 1 : 0;
+        const pb = b.type === 'skill' && b.pinned ? 1 : 0;
+        if (pa !== pb) return pb - pa;
+        if (a.type !== 'skill' || b.type !== 'skill') return 0;
+        const ua = a.usageCount ?? 0;
+        const ub = b.usageCount ?? 0;
+        return ub - ua;
+      })
+      .map((s, index) => ({ ...s, index }));
+  }, [value, commands, workspaceSkills, pinnedKeys]);
 
   // Detect @ mention in text
   const detectMention = useCallback((text: string, cursorPos: number): { triggerIndex: number; query: string } | null => {
@@ -422,7 +444,9 @@ export function MessageInput({
   // Scroll selected command into view
   useEffect(() => {
     if (showCommands && commandListRef.current) {
-      const selectedElement = commandListRef.current.children[selectedCommandIndex] as HTMLElement;
+      const selectedElement = commandListRef.current.querySelector(
+        `[data-index="${selectedCommandIndex}"]`,
+      ) as HTMLElement | null;
       if (selectedElement?.scrollIntoView) {
         selectedElement.scrollIntoView({ block: 'nearest' });
       }
@@ -813,46 +837,65 @@ export function MessageInput({
     textareaRef.current?.focus();
   };
 
+  // Toggle a skill's pin state on the active agent profile. Pins auto-load the
+  // skill at session start (pi-runtime/skills.ts) and persist to agent_profiles
+  // (hence sync across devices). Optimistically updates the local cache.
+  const handleTogglePin = useCallback(
+    async (ref: SkillRef, nextPinned: boolean) => {
+      if (!agent) return;
+      const key = skillRefKey(ref);
+      const current = agent.skillSelection?.pinned ?? [];
+      const pinned = nextPinned
+        ? current.some((r) => skillRefKey(r) === key)
+          ? current
+          : [...current, ref]
+        : current.filter((r) => skillRefKey(r) !== key);
+      const nextSelection = { ...agent.skillSelection, pinned };
+      try {
+        await api.updateAgentProfile(agent.id, { skillSelection: nextSelection });
+        useAgentProfileMetaStore.getState().invalidate(agent.id);
+        await useAgentProfileMetaStore.getState().loadAll();
+      } catch (err) {
+        console.error('[MessageInput] failed to toggle skill pin:', err);
+        // reload to revert optimistic state back to server truth
+        useAgentProfileMetaStore.getState().invalidate(agent.id);
+        void useAgentProfileMetaStore.getState().loadAll();
+      }
+    },
+    [agent],
+  );
+
+  // Chip activation: insert the skill's slash command into the composer.
+  const handleActivateChip = useCallback(
+    (skillId: string) => {
+      updateValue(`/${skillId} `);
+      setShowCommands(false);
+      textareaRef.current?.focus();
+    },
+    [updateValue],
+  );
+
   return (
     <div className="relative">
-      {/* Command suggestions dropdown */}
+      {/* Cursor-style command/skill dropdown */}
       {showCommands && (
-        <div
+        <SlashMenu
           ref={commandListRef}
-          className="absolute bottom-full left-0 right-0 mb-1 bg-card border border-border rounded-lg shadow-lg overflow-y-auto max-h-64 z-10"
-        >
-          {slashSuggestions.map((suggestion, index) => (
-            <button
-              key={`${suggestion.type}:${suggestion.value}`}
-              onClick={() => selectSlashSuggestion(suggestion)}
-              className={`w-full px-4 py-2 text-left flex items-center gap-3 hover:bg-muted ${
-                index === selectedCommandIndex ? 'bg-muted' : ''
-              }`}
-            >
-              <span className="font-mono text-primary">{suggestion.value}</span>
-              <span className="text-muted-foreground text-sm truncate">{suggestion.description}</span>
-              {suggestion.type === 'skill' && (
-                <>
-                  {suggestion.argumentHint && (
-                    <span className="ml-auto text-xs text-muted-foreground font-mono">{suggestion.argumentHint}</span>
-                  )}
-                  <span className="text-[10px] uppercase tracking-wide text-primary bg-muted/60 px-1.5 py-0.5 rounded">
-                    skill{suggestion.usageCount ? ` · ${suggestion.usageCount}` : ''}
-                  </span>
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                    {suggestion.source}
-                  </span>
-                  {suggestion.mode && (
-                    <span className="text-[10px] uppercase tracking-wide text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
-                      {suggestion.mode}
-                    </span>
-                  )}
-                </>
-              )}
-            </button>
-          ))}
-        </div>
+          suggestions={slashSuggestions}
+          selectedIndex={selectedCommandIndex}
+          pinEnabled={!!agent}
+          onSelect={selectSlashSuggestion}
+          onTogglePin={handleTogglePin}
+        />
       )}
+
+      {/* Resident pinned-skill chips (renders nothing when empty) */}
+      <PinnedSkillChips
+        pinnedRefs={pinnedRefs}
+        skills={workspaceSkills}
+        onActivate={handleActivateChip}
+        onUnpin={(ref) => void handleTogglePin(ref, false)}
+      />
 
       {/* @ Mention suggestions dropdown */}
       {mentionState.isActive && (

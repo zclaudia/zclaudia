@@ -11,6 +11,12 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ToolDetails = Record<string, any> | undefined;
 
+export interface ToolFailureLoopRecovery {
+  summary: string;
+  nextTool?: string;
+  steps: string[];
+}
+
 /** Error codes that already carry their own escalation/guidance — don't pile on. */
 const SELF_EXPLANATORY = new Set([
   'edit_loop_detected',
@@ -41,6 +47,158 @@ function bashHint(details: NonNullable<ToolDetails>): string | undefined {
   if (details.timedOut === true) {
     return 'The command timed out. Re-run with run_in_background:true for long tasks, or raise the timeout if it legitimately needs longer.';
   }
+  return undefined;
+}
+
+function pathArg(args: Record<string, unknown> | undefined): string | undefined {
+  const value = args?.path ?? args?.file_path ?? args?.filePath;
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function isEditTool(toolName: string): boolean {
+  return toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'EditSymbol' || toolName === 'Write';
+}
+
+export function loopRecoveryForFailure(
+  toolName: string,
+  args: Record<string, unknown> | undefined,
+  details: ToolDetails,
+  attempts: number,
+): ToolFailureLoopRecovery | undefined {
+  if (!details || details.ok !== false) return undefined;
+  const code = typeof details.error === 'string' ? details.error : undefined;
+  const path = pathArg(args);
+  const pathText = path ? ` ${path}` : '';
+
+  if (toolName === 'Edit' || toolName === 'MultiEdit') {
+    switch (code) {
+      case 'not_found':
+        return {
+          summary: `The same replacement text has been rejected ${attempts} times.`,
+          nextTool: 'Read',
+          steps: [
+            `Read${pathText} again with hashline:true or a tight offset window.`,
+            'Copy the current target text exactly, including whitespace and indentation.',
+            toolName === 'Edit'
+              ? 'If more replacements remain in this file, send them together with MultiEdit.'
+              : 'Rebuild the MultiEdit edits array from the current file snapshot.',
+          ],
+        };
+      case 'not_unique':
+        return {
+          summary: `The same ambiguous replacement has been rejected ${attempts} times.`,
+          nextTool: toolName === 'Edit' ? 'MultiEdit' : 'Read',
+          steps: [
+            'Add enough surrounding context for each old_string to match once.',
+            'Use replace_all:true only when every occurrence should change.',
+            toolName === 'Edit'
+              ? 'Use MultiEdit when applying several same-file replacements.'
+              : 'Keep the MultiEdit array, but make each old_string unique.',
+          ],
+        };
+      case 'hashline_mismatch':
+      case 'hashline_tag_mismatch':
+        return {
+          summary: `The same stale hashline anchor has failed ${attempts} times.`,
+          nextTool: 'Read',
+          steps: [
+            `Read${pathText} again with hashline:true to get fresh anchors.`,
+            'Retry once with the new hashline_operation/hashline_tag pair.',
+            'If the surrounding block changed structurally, switch to Write for that block or file.',
+          ],
+        };
+      case 'invalid_edits':
+        return {
+          summary: `The MultiEdit schema has been rejected ${attempts} times.`,
+          nextTool: 'MultiEdit',
+          steps: [
+            'Pass edits as an array of objects.',
+            'Each edit must include old_string and new_string; replace_all is optional.',
+            'Do not mix hashline_operation/hashline_line with edits[].',
+          ],
+        };
+      default:
+        break;
+    }
+  }
+
+  if (toolName === 'ReadSymbol' || toolName === 'EditSymbol') {
+    switch (code) {
+      case 'symbol_not_found':
+        return {
+          summary: `The same symbol lookup failed ${attempts} times.`,
+          nextTool: 'Grep',
+          steps: [
+            `Search${pathText} for the current function, method, class, or export name.`,
+            'Use the qualified candidate name, for example ClassName.methodName.',
+            'If this file type is unsupported, fall back to Read plus Edit or MultiEdit.',
+          ],
+        };
+      case 'ambiguous_symbol':
+        return {
+          summary: `The same ambiguous symbol failed ${attempts} times.`,
+          nextTool: 'ReadSymbol',
+          steps: [
+            'Choose one candidate from the ambiguity list.',
+            'Call ReadSymbol with the fully qualified symbol name.',
+            'Use that fresh bodyDigest if you proceed with EditSymbol.',
+          ],
+        };
+      case 'stale_symbol':
+        return {
+          summary: `The same stale symbol digest failed ${attempts} times.`,
+          nextTool: 'ReadSymbol',
+          steps: [
+            'Re-run ReadSymbol for the exact symbol.',
+            'Use the returned bodyDigest as expected_body_digest.',
+            'Retry EditSymbol once against that current symbol body.',
+          ],
+        };
+      case 'unsupported_language':
+        return {
+          summary: `Symbol editing is not supported for this file after ${attempts} attempts.`,
+          nextTool: 'Read',
+          steps: [
+            `Read${pathText} directly instead of using ReadSymbol/EditSymbol.`,
+            'Use Edit or MultiEdit for exact replacements.',
+            'Use Write if the change is a structured block rewrite.',
+          ],
+        };
+      default:
+        break;
+    }
+  }
+
+  if (toolName === 'Write') {
+    switch (code) {
+      case 'file_modified_since_read':
+      case 'file_not_read':
+      case 'partial_read':
+        return {
+          summary: `The same guarded write failed ${attempts} times.`,
+          nextTool: 'Read',
+          steps: [
+            `Read${pathText} fully to refresh the write guard snapshot.`,
+            'Rebuild the final file content from the current snapshot.',
+            'Call Write once with the complete intended content.',
+          ],
+        };
+      default:
+        break;
+    }
+  }
+
+  if (isEditTool(toolName)) {
+    return {
+      summary: `The same editing attempt failed ${attempts} times.`,
+      steps: [
+        'Do not retry with identical inputs.',
+        'Refresh the current file or symbol snapshot.',
+        'Switch tools if the current primitive does not match the change shape: MultiEdit for same-file batches, EditSymbol for one supported symbol, or Write for a structural rewrite.',
+      ],
+    };
+  }
+
   return undefined;
 }
 

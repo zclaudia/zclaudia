@@ -6,7 +6,7 @@ import type { PermissionCallback } from '../types.js';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 import { runPreToolUseHooks, runPostToolUseHooks } from './user-hooks.js';
 import { measureTextBytes, persistToolResultText } from './tool-result-store.js';
-import { remediationForResult } from './remediation.js';
+import { loopRecoveryForFailure, remediationForResult } from './remediation.js';
 import { ToolFailureLoopGuard, TOOL_FAILURE_HARD_LIMIT } from './tool-failure-loop-guard.js';
 import { ToolCallTelemetry } from './tool-telemetry.js';
 
@@ -54,7 +54,7 @@ function buildToolDetail(toolName: string, args: unknown): string {
   if (toolName === 'Bash' && typeof argsObj.command === 'string') {
     return argsObj.command;
   }
-  if (toolName === 'Read' || toolName === 'Edit' || toolName === 'Write') {
+  if (toolName === 'Read' || toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Write' || toolName === 'ReadSymbol' || toolName === 'EditSymbol') {
     const filePath = argsObj.file_path ?? argsObj.path;
     if (typeof filePath === 'string') return filePath;
   }
@@ -241,7 +241,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
 
       // Edit flood advisory: when Edit keeps hitting the same file, the model
       // is usually fighting structural cascade (Markdown table / JSON array /
-      // indentation drift) — point it at Write or the `patch` parameter
+      // indentation drift) — point it at MultiEdit, Write, or the `patch` parameter
       // before it burns more turns. Counts both successes and failures (the
       // failure remediation hints already exist; this is the aggregate signal).
       // A successful Write clears the counter so post-rewrite Edits start fresh.
@@ -264,7 +264,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
           };
           detailsUpdated = true;
           if (next >= EDIT_FLOOD_THRESHOLD) {
-            const advisory = `Edit has now run ${next} times against ${key} this turn. For several replacements in this same file, use one Edit call with the \`edits\` array so the file is written once. If you're rewriting a structural file (Markdown tables, JSON arrays, indented YAML), switch to a single Write; for multi-file changes, use Edit's \`patch\` parameter.`;
+            const advisory = `Edit has now run ${next} times against ${key} this turn. For several replacements in this same file, use MultiEdit so the file is written once. If you're rewriting a structural file (Markdown tables, JSON arrays, indented YAML), switch to a single Write; for multi-file changes, use Edit's \`patch\` parameter.`;
             content = [...content, { type: 'text', text: `[fix] ${advisory}` }];
             remediationAppended = true;
           }
@@ -304,15 +304,25 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
         );
         const attempts = loopAttempt.attempts;
         if (attempts >= TOOL_FAILURE_HARD_LIMIT) {
+          const loopRecovery = loopRecoveryForFailure(
+            toolName,
+            args as Record<string, unknown> | undefined,
+            result.details as Record<string, unknown> | undefined,
+            attempts,
+          );
           const bashDetails = loopAttempt.kind === 'bash_failure' ? result.details as Record<string, unknown> | undefined : undefined;
           const sameFailure = Array.isArray(bashDetails?.diagnostics) && bashDetails.diagnostics.length > 0
             ? 'the same diagnostics'
             : Array.isArray(bashDetails?.failedTests) && bashDetails.failedTests.length > 0
               ? 'the same failed tests'
               : 'the same failure result';
-          const loopText = loopAttempt.kind === 'bash_failure'
+          const baseLoopText = loopAttempt.kind === 'bash_failure'
             ? `This Bash command has failed ${attempts} times with ${sameFailure}. Stop re-running it unchanged — inspect the reported files/tests, edit the underlying cause, or run a different diagnostic command.`
             : `This tool call has failed ${attempts} times with identical inputs. Stop retrying the same call — change the approach, inspect prerequisites, or ask the user.`;
+          const recoveryText = loopRecovery
+            ? ` Recovery: ${loopRecovery.summary} ${loopRecovery.steps.join(' ')}`
+            : '';
+          const loopText = baseLoopText + recoveryText;
           content = [
             ...content,
             {
@@ -327,6 +337,7 @@ export function buildAgentHooks(input: AgentHooksInput): AgentHooksOutput {
             error: loopAttempt.kind === 'bash_failure' ? 'bash_failure_loop_detected' : 'tool_loop_detected',
             loopAttempts: attempts,
             loopKind: loopAttempt.kind,
+            ...(loopRecovery ? { loopRecovery } : {}),
           };
           remediationAppended = true; // also covers [loop] nudge — ensures modified result is returned
         }

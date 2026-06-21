@@ -44,4 +44,26 @@ describe('ToolCallTelemetry', () => {
     expect(record.notable).toBe(true);
     expect(record.snapshot.bashRoutingBlocked).toBe(1);
   });
+
+  it('counts MultiEdit and EditSymbol as file mutations', () => {
+    const telemetry = new ToolCallTelemetry();
+    telemetry.record('Edit', { file_path: 'src/app.ts' }, {
+      content: [{ type: 'text', text: 'one' }],
+      details: { ok: true },
+    });
+    telemetry.record('MultiEdit', { file_path: 'src/app.ts', edits: [] }, {
+      content: [{ type: 'text', text: 'two' }],
+      details: { ok: true },
+    });
+    const third = telemetry.record('EditSymbol', { file_path: 'src/app.ts', symbol: 'run' }, {
+      content: [{ type: 'text', text: 'three' }],
+      details: { ok: true },
+    });
+
+    expect(third.advisories[0]).toContain('MultiEdit');
+    expect(third.snapshot).toMatchObject({
+      toolCounts: { Edit: 1, MultiEdit: 1, EditSymbol: 1 },
+      repeatedMutations: { 'src/app.ts': 3 },
+    });
+  });
 });

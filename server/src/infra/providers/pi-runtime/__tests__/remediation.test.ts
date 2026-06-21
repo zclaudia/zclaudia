@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { remediationForResult } from '../remediation.js';
+import { loopRecoveryForFailure, remediationForResult } from '../remediation.js';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function det(d: Record<string, unknown>): any {
@@ -101,6 +101,44 @@ describe('remediationForResult', () => {
 
   it('returns undefined for unknown error codes', () => {
     expect(remediationForResult('Grep', det({ ok: false, error: 'some_novel_error' }))).toBeUndefined();
+  });
+
+  describe('loopRecoveryForFailure', () => {
+    it('turns repeated Edit not_found failures into a hashline/MultiEdit recovery plan', () => {
+      const recovery = loopRecoveryForFailure(
+        'Edit',
+        { file_path: 'src/app.ts', old_string: 'stale' },
+        det({ ok: false, error: 'not_found' }),
+        3,
+      );
+      expect(recovery?.nextTool).toBe('Read');
+      expect(recovery?.summary).toMatch(/3 times/);
+      expect(recovery?.steps.join(' ')).toMatch(/hashline:true/);
+      expect(recovery?.steps.join(' ')).toMatch(/MultiEdit/);
+    });
+
+    it('turns repeated EditSymbol stale digest failures into a ReadSymbol recovery plan', () => {
+      const recovery = loopRecoveryForFailure(
+        'EditSymbol',
+        { file_path: 'src/app.ts', symbol: 'run' },
+        det({ ok: false, error: 'stale_symbol' }),
+        3,
+      );
+      expect(recovery?.nextTool).toBe('ReadSymbol');
+      expect(recovery?.steps.join(' ')).toMatch(/bodyDigest|expected_body_digest/);
+    });
+
+    it('explains invalid MultiEdit schemas without falling back to generic advice', () => {
+      const recovery = loopRecoveryForFailure(
+        'MultiEdit',
+        { file_path: 'src/app.ts', edits: 'bad' },
+        det({ ok: false, error: 'invalid_edits' }),
+        3,
+      );
+      expect(recovery?.nextTool).toBe('MultiEdit');
+      expect(recovery?.steps.join(' ')).toMatch(/array of objects/);
+      expect(recovery?.steps.join(' ')).toMatch(/old_string.*new_string/);
+    });
   });
 
   describe('remediationForResult — tool_loop_detected', () => {

@@ -63,10 +63,10 @@ export class ToolCallTelemetry {
       }
     }
 
-    if ((toolName === 'Edit' || toolName === 'Write') && path) {
+    if ((toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'EditSymbol' || toolName === 'Write') && path) {
       const count = increment(this.mutationsByPath, path);
       if (count === 3) {
-        advisories.push(`${toolName} has now mutated ${path} ${count} times in this run. Prefer batching related changes into one Edit/Write when possible.`);
+        advisories.push(`${toolName} has now mutated ${path} ${count} times in this run. Prefer MultiEdit for same-file batches or one Write for structural rewrites when possible.`);
       }
     }
 

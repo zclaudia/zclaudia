@@ -3,10 +3,26 @@ export const PLAN_MODE_SYSTEM_PROMPT_SUFFIX =
   'Do not modify files or execute side-effecting commands; only read-only or clarification tools are available. ' +
   'Once the plan is ready, end your turn and wait for the user to confirm before executing anything.';
 
+export const EDIT_TOOL_SELECTION_GUIDANCE = [
+  '# Editing Tool Selection',
+  'Use the narrowest editing tool that matches the change:',
+  '- Use MultiEdit for two or more exact replacements in the same file; put all replacements in one edits array so the tool can apply them atomically.',
+  '- Use ReadSymbol before EditSymbol when changing one function, method, class, or exported variable in Python, TypeScript, or JavaScript. Pass expected_body_digest from ReadSymbol to EditSymbol.',
+  '- Use Read with hashline:true plus Edit hashline_operation when line-level anchors may have drifted or line numbers are unreliable.',
+  '- Use Write for full-file rewrites or structurally sensitive blocks such as JSON arrays, Markdown tables, YAML, TOML, or generated structured sections.',
+  '- After a successful Write, Edit, MultiEdit, or EditSymbol result, rely on its diff and updated snapshot; do not call Read again only to verify the change.',
+].join('\n');
+
 export interface PiRunPromptBundle {
   effectiveSystemPrompt: string;
   snapshotSystemPromptText: string;
   snapshotSkillCatalogText: string;
+}
+
+function appendPromptBlock(prompt: string, block: string | undefined): string {
+  const text = block?.trim();
+  if (!text) return prompt;
+  return prompt ? `${prompt}\n\n${text}` : text;
 }
 
 /**
@@ -41,30 +57,25 @@ export function buildPiRunPrompt(input: {
   mcpInstructions?: string;
 }): PiRunPromptBundle {
   const { systemPrompt, externalProviderCatalog, skillCatalog, activeSkillContext, isPlanMode, mcpInstructions } = input;
-  const baseSystemPrompt = [
-    systemPrompt ?? '',
-    externalProviderCatalog
-      ? `\n\n${externalProviderCatalog}\nUse SearchExternalTools and InspectExternalTool before loading external tools. LoadExternalTool only makes a tool available in this session; execution may still require permission.`
-      : '',
-    skillCatalog
-      ? `\n\n${skillCatalog}`
-      : '',
-    activeSkillContext
-      ? `\n\n${activeSkillContext}`
-      : '',
-    mcpInstructions
-      ? `\n\n${mcpInstructions}`
-      : '',
-  ].join('');
+  const externalToolsPrompt = externalProviderCatalog
+    ? `${externalProviderCatalog}\nUse SearchExternalTools and InspectExternalTool before loading external tools. LoadExternalTool only makes a tool available in this session; execution may still require permission.`
+    : '';
+  let baseSystemPrompt = appendPromptBlock(systemPrompt ?? '', EDIT_TOOL_SELECTION_GUIDANCE);
+  baseSystemPrompt = appendPromptBlock(baseSystemPrompt, externalToolsPrompt);
+  baseSystemPrompt = appendPromptBlock(baseSystemPrompt, skillCatalog);
+  baseSystemPrompt = appendPromptBlock(baseSystemPrompt, activeSkillContext);
+  baseSystemPrompt = appendPromptBlock(baseSystemPrompt, mcpInstructions);
+
   const effectiveSystemPrompt = isPlanMode
     ? baseSystemPrompt + PLAN_MODE_SYSTEM_PROMPT_SUFFIX
     : baseSystemPrompt;
+  let snapshotSystemPromptText = appendPromptBlock(systemPrompt ?? '', EDIT_TOOL_SELECTION_GUIDANCE);
+  snapshotSystemPromptText = appendPromptBlock(snapshotSystemPromptText, externalProviderCatalog);
+  snapshotSystemPromptText = appendPromptBlock(snapshotSystemPromptText, mcpInstructions);
 
   return {
     effectiveSystemPrompt,
-    snapshotSystemPromptText: (systemPrompt ?? '')
-      + externalProviderCatalog
-      + (mcpInstructions ? `\n\n${mcpInstructions}` : '')
+    snapshotSystemPromptText: snapshotSystemPromptText
       + (isPlanMode ? PLAN_MODE_SYSTEM_PROMPT_SUFFIX : ''),
     snapshotSkillCatalogText: skillCatalog + activeSkillContext,
   };

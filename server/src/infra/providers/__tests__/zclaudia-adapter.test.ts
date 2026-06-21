@@ -6,6 +6,7 @@ import type { RunOptions, ProviderRuntimeEvent, SteerHandle } from '../types.js'
 import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
+import { EDIT_TOOL_SELECTION_GUIDANCE } from '../pi-runtime/run-prompt.js';
 
 // Mock sandbox so resolvePlanModeTools tests can control isSandboxAvailable()
 // without touching real system dependencies (sysbox/bwrap presence checks).
@@ -900,7 +901,7 @@ describe('PiAgentProviderAdapter.run', () => {
     expect(prompt).toContain('read-only');
   });
 
-  it('non-plan mode leaves systemPrompt untouched', async () => {
+  it('non-plan mode appends edit tool guidance without plan-mode instructions', async () => {
     scriptNextAgent([
       { type: 'agent_start' },
       { type: 'agent_end', messages: [] },
@@ -912,7 +913,8 @@ describe('PiAgentProviderAdapter.run', () => {
     });
 
     const prompt = mockAgentInstances[0]?.initialState?.systemPrompt as string;
-    expect(prompt).toBe('You are a coding assistant.');
+    expect(prompt).toContain('You are a coding assistant.');
+    expect(prompt).toContain(EDIT_TOOL_SELECTION_GUIDANCE);
     expect(prompt).not.toContain('PLAN mode');
   });
 });
