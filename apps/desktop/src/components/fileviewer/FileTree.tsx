@@ -141,15 +141,8 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
   };
 
   return (
-    <div className="h-full overflow-auto border-r border-border bg-card/50" data-testid="file-tree">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-3 py-2 backdrop-blur">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-          Files
-        </span>
-      </div>
-      <div className="py-1">
-        {renderEntries('', 0)}
-      </div>
+    <div className="h-full overflow-auto py-1" data-testid="file-tree">
+      {renderEntries('', 0)}
     </div>
   );
 }

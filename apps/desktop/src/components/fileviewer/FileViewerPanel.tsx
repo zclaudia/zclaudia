@@ -426,7 +426,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
           <div className={`flex-1 min-h-0 overflow-hidden ${contentLayoutClass}`}>
             {showFileTree && (
-              <div className={isMobile ? 'h-2/5 min-h-[180px] flex-shrink-0' : 'w-64 flex-shrink-0'}>
+              <div className={isMobile ? 'h-2/5 min-h-[180px] flex-shrink-0 border-b border-border' : 'w-64 flex-shrink-0 border-r border-border'}>
                 <FileTree
                   projectRoot={projectRoot}
                   backendId={fileBackendId}
