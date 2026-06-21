@@ -30,6 +30,10 @@ export interface Session {
   planStatus?: 'planning' | 'planned' | 'executing' | null;
   isReadOnly?: boolean;
   lastRunStatus?: 'running' | 'waiting' | 'interrupted' | null;
+  /** Cross-session fork lineage: the session this was forked from (SP-A). NULL once the source is deleted. */
+  forkedFromSessionId?: string;
+  /** The source tree entry id this session was forked at (SP-A). */
+  forkEntryId?: string;
 }
 
 // Session Draft Types
