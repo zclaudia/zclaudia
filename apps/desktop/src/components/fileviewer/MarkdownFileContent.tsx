@@ -2,6 +2,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useMemo } from 'react';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
+import { MarkdownChildrenWithInlineIcons } from '../markdown/InlineMarkdownIcons';
 
 function normalizeMarkdownForRender(content: string): string {
   const normalized = content.replace(/\r\n/g, '\n');
@@ -46,16 +47,40 @@ export function MarkdownFileContent({ content }: MarkdownFileContentProps) {
             th({ children }) {
               return (
                 <th className="border border-border px-3 py-2 bg-secondary text-left align-top whitespace-pre-wrap break-words">
-                  {children}
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
                 </th>
               );
             },
             td({ children }) {
               return (
                 <td className="border border-border px-3 py-2 align-top whitespace-pre-wrap break-words">
-                  {children}
+                  <MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons>
                 </td>
               );
+            },
+            h1({ children }) {
+              return <h1><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h1>;
+            },
+            h2({ children }) {
+              return <h2><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h2>;
+            },
+            h3({ children }) {
+              return <h3><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h3>;
+            },
+            h4({ children }) {
+              return <h4><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h4>;
+            },
+            h5({ children }) {
+              return <h5><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h5>;
+            },
+            h6({ children }) {
+              return <h6><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></h6>;
+            },
+            p({ children }) {
+              return <p><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></p>;
+            },
+            li({ children }) {
+              return <li><MarkdownChildrenWithInlineIcons>{children}</MarkdownChildrenWithInlineIcons></li>;
             },
           }}
         >

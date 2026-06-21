@@ -437,6 +437,9 @@ body.notch-window {
 .prose.prose-sm :where(blockquote):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   font-size: inherit;
 }
+.prose.prose-sm :where(strong, b):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
+  font-weight: inherit;
+}
 .prose.prose-sm :where(:not(pre) > code):not(:where([class~="not-prose"], [class~="not-prose"] *)) {
   font-family: var(--font-mono);
   font-size: 1em;

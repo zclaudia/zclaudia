@@ -111,4 +111,33 @@ describe('MarkdownChildrenWithFileRefs', () => {
     );
     expect(screen.getByText('Just plain text')).toBeInTheDocument();
   });
+
+  it('replaces known markdown emoji with inline icons', () => {
+    render(
+      <MarkdownChildrenWithFileRefs>
+        {'2 ✅'}
+      </MarkdownChildrenWithFileRefs>
+    );
+    expect(screen.getByRole('img', { name: 'Completed' })).toBeInTheDocument();
+  });
+
+  it('handles file refs and markdown emoji in the same string', () => {
+    render(
+      <MarkdownChildrenWithFileRefs>
+        {'🟢 See @src/index.ts ✅'}
+      </MarkdownChildrenWithFileRefs>
+    );
+    expect(screen.getByRole('img', { name: 'P3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /@src\/index\.ts/ })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Completed' })).toBeInTheDocument();
+  });
+
+  it('replaces known markdown emoji inside nested markdown elements', () => {
+    render(
+      <MarkdownChildrenWithFileRefs>
+        <strong>{'✅ Solved'}</strong>
+      </MarkdownChildrenWithFileRefs>
+    );
+    expect(screen.getByRole('img', { name: 'Completed' })).toBeInTheDocument();
+  });
 });

@@ -1,8 +1,13 @@
 import type { ReactNode } from 'react';
-import { Children } from 'react';
+import { Children, cloneElement, isValidElement } from 'react';
+import {
+  hasInlineMarkdownIcon,
+  pushTextWithInlineMarkdownIcons,
+  TextWithInlineMarkdownIcons,
+} from '../../components/markdown/InlineMarkdownIcons';
+import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 
 /**
  * Regex to match @file references in text.
@@ -10,6 +15,16 @@ import { useBottomPanelStore } from '../../stores/bottomPanelStore';
  * Must start after whitespace or at beginning of text.
  */
 const FILE_REF_REGEX = /(^|[\s(])(@[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/g;
+const FILE_REF_TEST_REGEX = /@[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+/;
+
+function pushTextPart(parts: ReactNode[], text: string, replaceEmojiIcons: boolean, keyPrefix: string) {
+  if (!text) return;
+  if (replaceEmojiIcons) {
+    pushTextWithInlineMarkdownIcons(parts, text, keyPrefix);
+    return;
+  }
+  parts.push(text);
+}
 
 /**
  * Parse text content and render @file references as clickable links.
@@ -17,10 +32,12 @@ const FILE_REF_REGEX = /(^|[\s(])(@[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+)/g;
  */
 export function TextWithFileRefs({
   text,
-  variant = 'default'
+  variant = 'default',
+  replaceEmojiIcons = false,
 }: {
   text: string;
   variant?: 'default' | 'user';
+  replaceEmojiIcons?: boolean;
 }) {
   const openFile = useFileViewerStore((s) => s.openFile);
   const projects = useProjectStore((s) => s.projects);
@@ -38,7 +55,7 @@ export function TextWithFileRefs({
     ? 'font-mono inline rounded-md px-1 py-0.5 border border-primary-foreground/40 bg-primary-foreground/20 text-foreground hover:bg-primary-foreground/30 hover:underline cursor-pointer'
     : 'text-primary hover:underline cursor-pointer font-mono inline';
 
-  const parts: (string | JSX.Element)[] = [];
+  const parts: ReactNode[] = [];
   let lastIndex = 0;
   let match: RegExpExecArray | null;
 
@@ -52,12 +69,12 @@ export function TextWithFileRefs({
 
     // Add text before this match (including the prefix whitespace)
     if (fullMatchStart > lastIndex) {
-      parts.push(text.slice(lastIndex, fullMatchStart));
+      pushTextPart(parts, text.slice(lastIndex, fullMatchStart), replaceEmojiIcons, `${lastIndex}`);
     }
 
     // Add the prefix (whitespace)
     if (prefix) {
-      parts.push(prefix);
+      pushTextPart(parts, prefix, replaceEmojiIcons, `${fullMatchStart}-prefix`);
     }
 
     // Add clickable reference
@@ -78,30 +95,49 @@ export function TextWithFileRefs({
 
   // Add remaining text
   if (lastIndex < text.length) {
-    parts.push(text.slice(lastIndex));
+    pushTextPart(parts, text.slice(lastIndex), replaceEmojiIcons, `${lastIndex}`);
   }
 
   // No matches, return plain text
   if (parts.length === 0) {
+    if (replaceEmojiIcons && hasInlineMarkdownIcon(text)) {
+      return <TextWithInlineMarkdownIcons text={text} />;
+    }
     return <>{text}</>;
   }
 
   return <>{parts}</>;
 }
 
+function replaceMarkdownInlineContent(children: ReactNode): ReactNode {
+  return Children.map(children, (child) => {
+    if (typeof child === 'string' && FILE_REF_TEST_REGEX.test(child)) {
+      return <TextWithFileRefs text={child} replaceEmojiIcons />;
+    }
+
+    if (typeof child === 'string' && hasInlineMarkdownIcon(child)) {
+      return <TextWithInlineMarkdownIcons text={child} />;
+    }
+
+    if (isValidElement<{ children?: ReactNode }>(child) && child.props.children) {
+      if (child.type === 'code' || child.type === 'pre') return child;
+      return cloneElement(child, {
+        children: replaceMarkdownInlineContent(child.props.children),
+      });
+    }
+
+    return child;
+  });
+}
+
 /**
  * Process ReactMarkdown children: replace string children containing @path
- * with clickable file references. Non-string children pass through unchanged.
+ * with clickable file references, and known emoji with app-native inline icons.
  */
 export function MarkdownChildrenWithFileRefs({ children }: { children: ReactNode }) {
   return (
     <>
-      {Children.map(children, (child) => {
-        if (typeof child === 'string' && /@[a-zA-Z0-9_\-./]+\.[a-zA-Z0-9]+/.test(child)) {
-          return <TextWithFileRefs text={child} />;
-        }
-        return child;
-      })}
+      {replaceMarkdownInlineContent(children)}
     </>
   );
 }
