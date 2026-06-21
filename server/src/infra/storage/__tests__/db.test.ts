@@ -397,8 +397,8 @@ describe('storage/db', () => {
   });
 });
 
-describe('migration 024: messages tree_entry_id', () => {
-  it('024: messages has tree_entry_id column and index', async () => {
+describe('migration 025: messages tree_entry_id', () => {
+  it('025: messages has tree_entry_id column and index', async () => {
     const { default: Database } = await vi.importActual<typeof import('better-sqlite3')>('better-sqlite3');
     const { applyMigrations } = await vi.importActual<typeof import('../migrations/index.js')>('../migrations/index.js');
 
@@ -414,8 +414,8 @@ describe('migration 024: messages tree_entry_id', () => {
   });
 });
 
-describe('migration 023: session fork lineage', () => {
-  it('023: sessions has fork lineage columns with ON DELETE SET NULL', async () => {
+describe('migration 024: session fork lineage', () => {
+  it('024: sessions has fork lineage columns with ON DELETE SET NULL', async () => {
     const { default: Database } = await vi.importActual<typeof import('better-sqlite3')>('better-sqlite3');
     const { applyMigrations } = await vi.importActual<typeof import('../migrations/index.js')>('../migrations/index.js');
 

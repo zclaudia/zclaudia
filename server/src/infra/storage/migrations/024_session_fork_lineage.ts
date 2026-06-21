@@ -8,7 +8,7 @@ import type { Migration } from './types.js';
  * (it names an entry in another session's id space; display/debug only).
  */
 export const migration: Migration = {
-  name: '023_session_fork_lineage',
+  name: '024_session_fork_lineage',
   sql: `
 ALTER TABLE sessions ADD COLUMN forked_from_session_id TEXT REFERENCES sessions(id) ON DELETE SET NULL;
 ALTER TABLE sessions ADD COLUMN fork_entry_id TEXT;
