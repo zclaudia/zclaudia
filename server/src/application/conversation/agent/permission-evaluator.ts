@@ -216,6 +216,7 @@ export function isOutsideWorkspacePathAllowed(
 
 const READONLY_TOOLS = [
   'Read',
+  'ReadSymbol',
   'Glob',
   'Grep',
   'WebFetch',
@@ -228,7 +229,7 @@ const READONLY_TOOLS = [
   'LSPTool',
 ];
 
-const EDIT_TOOLS = ['Write', 'Edit', 'NotebookEdit'];
+const EDIT_TOOLS = ['Write', 'Edit', 'MultiEdit', 'EditSymbol', 'NotebookEdit'];
 
 const DANGEROUS_BASH_PATTERNS = [
   /\brm\s+(-[a-z]*f|-[a-z]*r|--force|--recursive)\b/i,

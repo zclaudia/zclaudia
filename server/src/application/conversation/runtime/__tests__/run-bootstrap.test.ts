@@ -314,7 +314,7 @@ describe('initializeRunBootstrap Agent profile resolution', () => {
       },
     });
 
-    expect(result?.enabledTools).toEqual(['Read', 'Write', 'Edit', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory']);
+    expect(result?.enabledTools).toEqual(['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory']);
     expect(result?.agentProfile.resolvedTools).toContainEqual({ source: 'plugin', pluginId: 'jira', toolId: 'search' });
   });
 

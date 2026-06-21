@@ -122,6 +122,7 @@ describe('classify', () => {
   it('should classify fileRead tools', () => {
     for (const tool of [
       'Read',
+      'ReadSymbol',
       'Glob',
       'Grep',
       'WebFetch',
@@ -138,7 +139,7 @@ describe('classify', () => {
   });
 
   it('should classify fileWrite tools', () => {
-    for (const tool of ['Write', 'Edit', 'NotebookEdit']) {
+    for (const tool of ['Write', 'Edit', 'MultiEdit', 'EditSymbol', 'NotebookEdit']) {
       expect(classify(tool, {}, '')).toBe('fileWrite' as PermissionCategory);
     }
   });

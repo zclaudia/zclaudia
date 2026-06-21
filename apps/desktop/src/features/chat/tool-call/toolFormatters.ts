@@ -114,6 +114,9 @@ function formatToolInput(toolName: string, input: unknown, semantic?: ToolSemant
   }
 
   const obj = input as Record<string, unknown>;
+  const filePath = String(obj.file_path ?? obj.path ?? '');
+  const symbol = String(obj.symbol ?? '');
+  const fileAndSymbol = symbol ? `${filePath}#${symbol}` : filePath;
 
   // Handle MCP interaction tools before switch
   if (isTodoTool(toolName)) {
@@ -148,11 +151,17 @@ function formatToolInput(toolName: string, input: unknown, semantic?: ToolSemant
 
   switch (toolName) {
     case 'Read':
-      return obj.file_path as string || JSON.stringify(input);
+      return filePath || JSON.stringify(input);
+    case 'ReadSymbol':
+      return fileAndSymbol || JSON.stringify(input);
     case 'Write':
-      return obj.file_path as string || JSON.stringify(input);
+      return filePath || JSON.stringify(input);
     case 'Edit':
-      return obj.file_path as string || JSON.stringify(input);
+      return filePath || JSON.stringify(input);
+    case 'MultiEdit':
+      return `${filePath || 'file'} | ${Array.isArray(obj.edits) ? obj.edits.length : 0} edits`;
+    case 'EditSymbol':
+      return fileAndSymbol || JSON.stringify(input);
     case 'Bash':
       return obj.command as string || JSON.stringify(input);
     case 'Grep':

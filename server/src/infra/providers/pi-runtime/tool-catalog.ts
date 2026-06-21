@@ -4,7 +4,8 @@ import { createAgentTool, createMonitorTool, createTaskOutputTool } from './task
 import { createAskUserQuestionTool, createTodoWriteTool } from './interaction-tools.js';
 import { createAstEditTool, createAstGrepTool } from './ast-bridge-tools.js';
 import { createBashBridgeTool } from './bash-tool.js';
-import { createEditBridgeTool as createFileEditBridgeTool, createWriteBridgeTool as createFileWriteBridgeTool } from './edit-write-tools.js';
+import { createEditBridgeTool as createFileEditBridgeTool, createMultiEditBridgeTool, createWriteBridgeTool as createFileWriteBridgeTool } from './edit-write-tools.js';
+import { createEditSymbolTool, createReadSymbolTool } from './symbol-tools.js';
 import { createEnterPlanModeTool, createExitPlanModeTool } from './mode-tools.js';
 import { createEnterWorktreeTool, createExitWorktreeTool } from './worktree-tools.js';
 import { createEvalBridgeTool } from './eval-tool.js';
@@ -25,6 +26,9 @@ export const BUILTIN_TOOL_FACTORIES: Record<ToolName, ToolFactory> = {
   Read: (cwd, options) => createReadBridgeTool(cwd, options),
   Write: (cwd, options) => createFileWriteBridgeTool(cwd, options),
   Edit: (cwd, options) => createFileEditBridgeTool(cwd, options),
+  MultiEdit: (cwd, options) => createMultiEditBridgeTool(cwd, options),
+  ReadSymbol: (cwd, options) => createReadSymbolTool(cwd, options),
+  EditSymbol: (cwd, options) => createEditSymbolTool(cwd, options),
   Bash: (cwd, options) => createBashBridgeTool(cwd, options),
   Eval: (cwd, options) => createEvalBridgeTool(cwd, options),
   Grep: (cwd) => createGrepBridgeTool(cwd),

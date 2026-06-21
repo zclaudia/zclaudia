@@ -32,6 +32,22 @@ describe('remediationForResult', () => {
     expect(hint).toMatch(/hashline/i);
   });
 
+  it('suggests a qualified symbol name when ReadSymbol is ambiguous', () => {
+    const hint = remediationForResult('ReadSymbol', det({ ok: false, error: 'ambiguous_symbol', candidates: ['A.run', 'B.run'] }));
+    expect(hint).toMatch(/qualified|candidate|ReadSymbol/i);
+  });
+
+  it('suggests re-reading the symbol when EditSymbol has a stale digest', () => {
+    const hint = remediationForResult('EditSymbol', det({ ok: false, error: 'stale_symbol' }));
+    expect(hint).toMatch(/ReadSymbol|bodyDigest|expected_body_digest/i);
+  });
+
+  it('falls back to Read plus Edit for unsupported ReadSymbol file types', () => {
+    const hint = remediationForResult('ReadSymbol', det({ ok: false, error: 'unsupported_language' }));
+    expect(hint).toMatch(/Python|TypeScript|JavaScript/);
+    expect(hint).toMatch(/Read .* Edit/i);
+  });
+
   it('does not pile on when the loop guard already fired', () => {
     expect(remediationForResult('Edit', det({ ok: false, error: 'edit_loop_detected' }))).toBeUndefined();
   });

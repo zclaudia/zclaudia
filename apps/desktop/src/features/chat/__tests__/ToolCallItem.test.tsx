@@ -313,6 +313,14 @@ describe('ToolCallItem', () => {
       expect(screen.getByText('/project/src/index.ts')).toBeInTheDocument();
     });
 
+    it('formats ReadSymbol tool with file path and symbol name', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'ReadSymbol',
+        toolInput: { file_path: '/project/src/client.ts', symbol: 'Client.connect' },
+      })} />);
+      expect(screen.getByText('/project/src/client.ts#Client.connect')).toBeInTheDocument();
+    });
+
     it('formats Write tool with file path', () => {
       render(<ToolCallItem toolCall={createToolCall({
         toolName: 'Write',
@@ -327,6 +335,28 @@ describe('ToolCallItem', () => {
         toolInput: { file_path: '/project/file.ts', old_string: 'old', new_string: 'new' },
       })} />);
       expect(screen.getByText('/project/file.ts')).toBeInTheDocument();
+    });
+
+    it('formats MultiEdit tool with file path and edit count', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'MultiEdit',
+        toolInput: {
+          file_path: '/project/file.ts',
+          edits: [
+            { old_string: 'old a', new_string: 'new a' },
+            { old_string: 'old b', new_string: 'new b' },
+          ],
+        },
+      })} />);
+      expect(screen.getByText('/project/file.ts | 2 edits')).toBeInTheDocument();
+    });
+
+    it('formats EditSymbol tool with file path and symbol name', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'EditSymbol',
+        toolInput: { file_path: '/project/file.ts', symbol: 'Client.connect', new_body: 'connect() {}' },
+      })} />);
+      expect(screen.getByText('/project/file.ts#Client.connect')).toBeInTheDocument();
     });
 
     it('formats Bash tool with command', () => {
@@ -506,7 +536,7 @@ describe('ToolCallItem', () => {
       fireEvent.click(screen.getByRole('button'));
       const unifiedDiff = screen.getByTestId('unified-diff-viewer');
       expect(unifiedDiff).toBeInTheDocument();
-      expect(screen.getByText('/repo/src/app.ts')).toBeInTheDocument();
+      expect(screen.getAllByText('/repo/src/app.ts').length).toBeGreaterThan(0);
       expect(unifiedDiff.textContent).toContain('-old');
       expect(unifiedDiff.textContent).toContain('+new');
     });
@@ -530,6 +560,50 @@ describe('ToolCallItem', () => {
       const unifiedDiff = screen.getByTestId('unified-diff-viewer');
       expect(unifiedDiff.textContent).toContain('-old');
       expect(unifiedDiff.textContent).toContain('+new');
+    });
+
+    it('shows EditSymbol result diff and symbol metadata', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'EditSymbol',
+        toolInput: { file_path: 'client.ts', symbol: 'Client.connect', new_body: 'connect() { return true; }' },
+        status: 'completed',
+        result: {
+          details: {
+            ok: true,
+            path: 'client.ts',
+            symbol: 'Client.connect',
+            symbolKind: 'method',
+            diff: '--- client.ts\n+++ client.ts\n@@\n-old\n+new',
+          },
+        },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getByTestId('unified-diff-viewer')).toBeInTheDocument();
+      expect(screen.getByText('method Client.connect')).toBeInTheDocument();
+    });
+
+    it('shows MultiEdit result diff when available', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'MultiEdit',
+        toolInput: {
+          file_path: 'file.ts',
+          edits: [
+            { old_string: 'old a', new_string: 'new a' },
+            { old_string: 'old b', new_string: 'new b' },
+          ],
+        },
+        status: 'completed',
+        result: {
+          details: {
+            ok: true,
+            path: 'file.ts',
+            editCount: 2,
+            diff: '--- file.ts\n+++ file.ts\n@@\n-old\n+new',
+          },
+        },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getByTestId('unified-diff-viewer')).toBeInTheDocument();
     });
 
     it('shows multi-file patch results from Edit details', () => {
@@ -663,6 +737,20 @@ describe('ToolCallItem', () => {
       })} />);
       fireEvent.click(screen.getByRole('button'));
       expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
+    });
+
+    it('shows CodeViewer for ReadSymbol result text when expanded', () => {
+      render(<ToolCallItem toolCall={createToolCall({
+        toolName: 'ReadSymbol',
+        toolInput: { file_path: '/file.ts', symbol: 'run' },
+        status: 'completed',
+        result: {
+          content: [{ type: 'text', text: 'function run() { return 1; }' }],
+          details: { ok: true, path: '/file.ts', symbol: 'run' },
+        },
+      })} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(screen.getByTestId('code-viewer')).toHaveTextContent('function run() { return 1; }');
     });
 
     it('shows terminal-style command for Bash tool', () => {

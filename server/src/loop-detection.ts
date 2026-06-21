@@ -38,9 +38,9 @@ export function generateToolSignature(
     return `Bash:${sig.join(' ')}`;
   }
 
-  // For Read/Write/Edit, include file path with parent directory for better disambiguation.
+  // For file tools, include file path with parent directory for better disambiguation.
   const filePath = extractFilePath(toolInput);
-  if (['Read', 'Write', 'Edit'].includes(normalizedTool) && filePath) {
+  if (['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol'].includes(normalizedTool) && filePath) {
     const parts = filePath.split('/');
     const pathSignature = parts.length > 3
       ? `${parts[parts.length - 2]}/${parts[parts.length - 1]}`
@@ -74,6 +74,9 @@ function normalizeToolName(toolName: string): string {
   if (lower === 'read') return 'Read';
   if (['write', 'create'].includes(lower)) return 'Write';
   if (['edit', 'patch'].includes(lower)) return 'Edit';
+  if (['multiedit', 'multi_edit'].includes(lower)) return 'MultiEdit';
+  if (['readsymbol', 'read_symbol'].includes(lower)) return 'ReadSymbol';
+  if (['editsymbol', 'edit_symbol'].includes(lower)) return 'EditSymbol';
   if (['grep', 'search', 'find'].includes(lower)) return 'Grep';
   if (['websearch', 'web_search'].includes(lower)) return 'WebSearch';
   if (['task', 'subagent', 'delegate'].includes(lower)) return 'Task';

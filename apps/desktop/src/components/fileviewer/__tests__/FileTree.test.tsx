@@ -74,11 +74,11 @@ describe('FileTree', () => {
     render(<FileTree projectRoot="/repo" selectedPath="docs/readme.md" onOpenFile={() => {}} />);
 
     const docsButton = await screen.findByRole('button', { name: /docs/ });
-    expect(screen.getByTitle('docs')).toHaveTextContent('v');
+    expect(docsButton).toHaveAttribute('aria-expanded', 'true');
 
     fireEvent.click(docsButton);
 
-    expect(screen.getByTitle('docs')).toHaveTextContent('>');
+    expect(docsButton).toHaveAttribute('aria-expanded', 'false');
   });
 
   it('opens a file when clicked', async () => {

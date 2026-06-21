@@ -111,6 +111,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
                 style={entryIndent(depth)}
                 title={entry.path}
                 aria-current={isSelected ? 'page' : undefined}
+                aria-expanded={isDirectory ? showChildren : undefined}
               >
                 <span className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground/80 group-hover:text-foreground">
                   {isDirectory ? (

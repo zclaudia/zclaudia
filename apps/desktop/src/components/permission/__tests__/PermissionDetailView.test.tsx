@@ -97,6 +97,23 @@ describe('PermissionDetailView', () => {
     });
   });
 
+  describe('MultiEdit tool', () => {
+    it('renders file path and per-edit previews', () => {
+      const detail = JSON.stringify({
+        file_path: 'src/index.ts',
+        edits: [
+          { old_string: 'old a', new_string: 'new a' },
+          { old_string: 'old b', new_string: 'new b' },
+        ],
+      });
+      render(<PermissionDetailView toolName="MultiEdit" detail={detail} />);
+      expect(screen.getByText('src/index.ts')).toBeInTheDocument();
+      expect(screen.getByText('2 edits')).toBeInTheDocument();
+      expect(screen.getByText('- old a')).toBeInTheDocument();
+      expect(screen.getByText('+ new b')).toBeInTheDocument();
+    });
+  });
+
   describe('Write tool', () => {
     it('renders CodeViewer for Write tool', () => {
       const detail = JSON.stringify({

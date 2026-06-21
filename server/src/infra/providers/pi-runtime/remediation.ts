@@ -50,6 +50,14 @@ export function remediationForResult(toolName: string, details: ToolDetails): st
   if (code && (SELF_EXPLANATORY.has(code) || code.endsWith('_loop_detected'))) return undefined;
 
   switch (code) {
+    case 'symbol_not_found':
+      return 'The requested symbol was not found. Use Grep or ReadSymbol with a qualified name such as ClassName.methodName to locate the current symbol before editing.';
+    case 'ambiguous_symbol':
+      return 'That symbol name matches multiple declarations. Re-run ReadSymbol with one of the qualified candidates, then edit the exact symbol.';
+    case 'stale_symbol':
+      return 'The symbol body changed since it was read. Re-run ReadSymbol for a fresh bodyDigest, then retry EditSymbol with the new expected_body_digest.';
+    case 'unsupported_language':
+      return 'ReadSymbol/EditSymbol only support Python, TypeScript, and JavaScript. Use Read plus Edit for this file type.';
     case 'not_found':
       return 'The exact old_string was not found. Read the file again and copy the target text verbatim — watch for whitespace, indentation, and quote-style differences.';
     case 'not_unique':

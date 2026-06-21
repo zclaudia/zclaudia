@@ -40,6 +40,24 @@ function getFileChangeDiffs(effect?: ToolEffect): Array<{ path: string; diff: st
     .filter((file) => file.diff.trim().length > 0 && looksLikeUnifiedDiff(file.diff));
 }
 
+function extractToolResultText(result: unknown): string {
+  if (result && typeof result === 'object') {
+    const record = result as Record<string, unknown>;
+    const details = record.details && typeof record.details === 'object'
+      ? record.details as Record<string, unknown>
+      : undefined;
+    if (typeof details?.text === 'string') return details.text;
+    if (Array.isArray(record.content)) {
+      return record.content
+        .filter((block): block is Record<string, unknown> => block !== null && typeof block === 'object')
+        .filter((block) => block.type === 'text')
+        .map((block) => String(block.text ?? ''))
+        .join('');
+    }
+  }
+  return formatToolResult(result);
+}
+
 // Render expanded content based on tool type
 function ToolExpandedContent({ toolName, toolInput, status, result, isError, semantic, effect }: {
   toolName: string;
@@ -68,7 +86,8 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
 
   const input = normalizeToolInput(toolInput) as Record<string, unknown> | undefined;
   const fileChangeDiffs = getFileChangeDiffs(effect);
-  const fileMutationDetails = toolName === 'Edit' || toolName === 'Write' ? getToolResultDetails(result) : undefined;
+  const isFileMutationTool = toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'Write' || toolName === 'EditSymbol';
+  const fileMutationDetails = isFileMutationTool ? getToolResultDetails(result) : undefined;
   const hasFileMutationResult = Boolean(
     fileMutationDetails?.diff
     || fileMutationDetails?.perFileResults?.length
@@ -78,13 +97,13 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
     || fileMutationDetails?.preview
   );
 
-  if ((toolName === 'Edit' || toolName === 'Write') && fileMutationDetails && hasFileMutationResult) {
+  if (isFileMutationTool && fileMutationDetails && hasFileMutationResult) {
     return <FileMutationResult details={fileMutationDetails} />;
   }
 
   // Provider file-change tools may only provide a unified diff summary
   // (Cursor editToolCall, Codex fileChange, etc.).
-  if (toolName === 'Edit' && fileChangeDiffs.length > 0) {
+  if ((toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'EditSymbol') && fileChangeDiffs.length > 0) {
     return (
       <div className="px-3 pb-3 border-t border-border/50">
         <div className="mt-2 space-y-3">
@@ -157,13 +176,14 @@ function ToolExpandedContent({ toolName, toolInput, status, result, isError, sem
   }
 
   // Read tool: show file content with syntax highlighting
-  if (toolName === 'Read' && status !== 'running' && result !== undefined) {
+  if ((toolName === 'Read' || toolName === 'ReadSymbol') && status !== 'running' && result !== undefined) {
+    const filePath = input?.file_path ?? input?.path;
     return (
       <div className="px-3 pb-3 border-t border-border/50">
         <div className="mt-2">
           <CodeViewer
-            content={formatToolResult(result)}
-            filePath={input?.file_path ? String(input.file_path) : undefined}
+            content={extractToolResultText(result)}
+            filePath={filePath ? String(filePath) : undefined}
           />
         </div>
       </div>

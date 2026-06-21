@@ -56,6 +56,37 @@ export function PermissionDetailView({ toolName, detail, maxHeightClass = 'max-h
     );
   }
 
+  if (toolName === 'MultiEdit' && Array.isArray(input?.edits)) {
+    return (
+      <div className={`${maxHeightClass} overflow-y-auto space-y-2`}>
+        {input.file_path ? (
+          <div className="text-xs font-mono text-muted-foreground truncate">
+            {String(input.file_path)}
+          </div>
+        ) : null}
+        <div className="text-xs text-muted-foreground">
+          {input.edits.length} edit{input.edits.length === 1 ? '' : 's'}
+        </div>
+        <div className="space-y-1.5">
+          {input.edits.map((raw, index) => {
+            const edit = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+            return (
+              <div key={index} className="rounded-md border border-border bg-muted/50 p-2 text-xs">
+                <div className="mb-1 font-medium text-muted-foreground">edit {index + 1}</div>
+                <div className="font-mono text-destructive whitespace-pre-wrap break-words">
+                  - {String(edit.old_string ?? '')}
+                </div>
+                <div className="font-mono text-success whitespace-pre-wrap break-words">
+                  + {String(edit.new_string ?? '')}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   // Write tool: show file content with syntax highlighting
   if (toolName === 'Write' && input?.content) {
     return (

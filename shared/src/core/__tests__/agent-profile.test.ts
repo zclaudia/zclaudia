@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { AgentProfileConfig, ThinkingLevel } from '../agent-profile.js';
-import { ALL_TOOL_NAMES, normalizeToolName, type ToolName, isToolName } from '../tools.js';
+import { ALL_TOOL_NAMES, normalizeToolName, isToolName } from '../tools.js';
 
 describe('AgentProfileConfig type shape', () => {
   it('accepts minimal config', () => {
@@ -45,6 +45,7 @@ describe('ALL_TOOL_NAMES', () => {
       'AstGrep',
       'Bash',
       'Edit',
+      'EditSymbol',
       'EnterPlanMode',
       'EnterWorktree',
       'Eval',
@@ -58,8 +59,10 @@ describe('ALL_TOOL_NAMES', () => {
       'MCPTool',
       'Memory',
       'Monitor',
+      'MultiEdit',
       'Read',
       'ReadMcpResource',
+      'ReadSymbol',
       'TaskOutput',
       'TodoWrite',
       'ToolSearch',
@@ -73,6 +76,9 @@ describe('ALL_TOOL_NAMES', () => {
 describe('isToolName guard', () => {
   it('returns true for canonical tools', () => {
     expect(isToolName('Read')).toBe(true);
+    expect(isToolName('ReadSymbol')).toBe(true);
+    expect(isToolName('EditSymbol')).toBe(true);
+    expect(isToolName('MultiEdit')).toBe(true);
     expect(isToolName('Bash')).toBe(true);
     expect(isToolName('Glob')).toBe(true);
     expect(isToolName('WebFetch')).toBe(true);
@@ -86,6 +92,7 @@ describe('isToolName guard', () => {
     expect(normalizeToolName('read')).toBe('Read');
     expect(normalizeToolName('write')).toBe('Write');
     expect(normalizeToolName('edit')).toBe('Edit');
+    expect(normalizeToolName('multi_edit')).toBe('MultiEdit');
     expect(normalizeToolName('bash')).toBe('Bash');
     expect(normalizeToolName('grep')).toBe('Grep');
     expect(normalizeToolName('ls')).toBe('LS');

@@ -16,6 +16,8 @@ type FileMutationDetails = {
   path?: string;
   diff?: string;
   preview?: boolean;
+  symbol?: string;
+  symbolKind?: string;
   backup?: { id?: string; originalPath?: string; path?: string };
   perFileResults?: Array<{ path?: string; diff?: string; ok?: boolean; error?: string }>;
   lifecycle?: {
@@ -110,7 +112,7 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
   return (
     <div className="px-3 pb-3 border-t border-border/50">
       <div className="mt-2 space-y-3">
-        {(details.preview || details.backup || details.lifecycle?.deferredDiagnostics) && (
+        {(details.preview || details.backup || details.symbol || details.lifecycle?.deferredDiagnostics) && (
           <div className="flex flex-wrap gap-1.5">
             {details.preview && (
               <span className="rounded-md border border-primary/30 bg-muted/60 px-2 py-0.5 text-[11px] text-primary">Preview only</span>
@@ -118,6 +120,11 @@ export function FileMutationResult({ details }: { details: FileMutationDetails }
             {details.backup && (
               <span className="rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-[11px] text-success" title={details.backup.path}>
                 Backup created
+              </span>
+            )}
+            {details.symbol && (
+              <span className="rounded-md border border-border bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
+                {details.symbolKind ? `${details.symbolKind} ` : ''}{details.symbol}
               </span>
             )}
             {details.lifecycle?.deferredDiagnostics && (

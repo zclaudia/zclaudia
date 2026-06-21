@@ -57,14 +57,20 @@ describe('generateToolSignature', () => {
       expect(result).toBe('Write:components/Button.tsx');
     });
 
-    it('should work for Read, Write, and Edit', () => {
+    it('should work for file tools', () => {
       const readResult = generateToolSignature('Read', { file_path: '/app/src/file.ts' });
       const writeResult = generateToolSignature('Write', { file_path: '/app/src/file.ts' });
       const editResult = generateToolSignature('Edit', { file_path: '/app/src/file.ts' });
+      const multiEditResult = generateToolSignature('MultiEdit', { file_path: '/app/src/file.ts', edits: [] });
+      const readSymbolResult = generateToolSignature('ReadSymbol', { file_path: '/app/src/file.ts', symbol: 'run' });
+      const editSymbolResult = generateToolSignature('EditSymbol', { file_path: '/app/src/file.ts', symbol: 'run' });
 
       expect(readResult).toBe('Read:src/file.ts');
       expect(writeResult).toBe('Write:src/file.ts');
       expect(editResult).toBe('Edit:src/file.ts');
+      expect(multiEditResult).toBe('MultiEdit:src/file.ts');
+      expect(readSymbolResult).toBe('ReadSymbol:src/file.ts');
+      expect(editSymbolResult).toBe('EditSymbol:src/file.ts');
     });
   });
 

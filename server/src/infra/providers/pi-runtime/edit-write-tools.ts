@@ -1352,3 +1352,41 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
     },
   } as unknown as AgentTool<any>;
 }
+
+export function createMultiEditBridgeTool(cwd: string, options?: FileMutationToolOptions): AgentTool<any> {
+  const editTool = createEditBridgeTool(cwd, options) as any;
+  return {
+    ...editTool,
+    name: 'MultiEdit',
+    label: 'MultiEdit',
+    description: 'Apply two or more exact replacements to one existing workspace file atomically. This is the explicit form of Edit with an `edits` array; it reuses the same read-state, diff, backup, diagnostics, and snapshot behavior.',
+    parameters: {
+      type: 'object',
+      properties: {
+        file_path: { type: 'string', description: 'Workspace-relative path of the file to edit' },
+        edits: {
+          type: 'array',
+          description: 'Ordered same-file replacements. All replacements apply atomically and consume one mutation attempt.',
+          items: {
+            type: 'object',
+            properties: {
+              old_string: { type: 'string' },
+              new_string: { type: 'string' },
+              replace_all: { type: 'boolean', default: false },
+            },
+            required: ['old_string', 'new_string'],
+          },
+        },
+        preview_only: { type: 'boolean', default: false },
+      },
+      required: ['file_path', 'edits'],
+    } as any,
+    execute: async (toolCallId: string, params: unknown, signal?: AbortSignal, onUpdate?: any) => {
+      const args = toolParams(toolCallId, params);
+      if (!Array.isArray(args.edits)) {
+        return errorResult('invalid_edits', 'MultiEdit requires an edits array of { old_string, new_string, replace_all? } objects');
+      }
+      return editTool.execute(toolCallId, params, signal, onUpdate);
+    },
+  } as unknown as AgentTool<any>;
+}

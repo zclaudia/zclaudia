@@ -203,6 +203,17 @@ function compactToolInput(toolName: string, input: unknown): string {
       const newS = String(obj.new_string ?? obj.new_source ?? '');
       return `${path} | old: ${truncate(oldS, TOOL_INPUT_PREVIEW_CHARS)} | new: ${truncate(newS, TOOL_INPUT_PREVIEW_CHARS)}`;
     }
+    case 'ReadSymbol': {
+      const path = obj.file_path ?? obj.path ?? '';
+      const symbol = obj.symbol ?? '';
+      return `${path} | symbol: ${symbol}`;
+    }
+    case 'EditSymbol': {
+      const path = obj.file_path ?? obj.path ?? '';
+      const symbol = obj.symbol ?? '';
+      const newBody = String(obj.new_body ?? '');
+      return `${path} | symbol: ${symbol} | new: ${truncate(newBody, TOOL_INPUT_PREVIEW_CHARS)}`;
+    }
     case 'MultiEdit': {
       const path = obj.file_path ?? '';
       const edits = Array.isArray(obj.edits) ? obj.edits : [];

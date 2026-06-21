@@ -21,7 +21,7 @@ export function toolParams(first: unknown, second: unknown): Record<string, unkn
 
 export function extractTouchedPaths(toolName: ToolName, params: Record<string, unknown>): string[] {
   const value = (() => {
-    if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit') return params.path ?? params.file_path;
+    if (toolName === 'Read' || toolName === 'Write' || toolName === 'Edit' || toolName === 'MultiEdit' || toolName === 'ReadSymbol' || toolName === 'EditSymbol') return params.path ?? params.file_path;
     if (toolName === 'Grep' || toolName === 'Glob' || toolName === 'LS') return params.path;
     return undefined;
   })();

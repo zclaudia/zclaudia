@@ -223,10 +223,13 @@ describe('AgentManager', () => {
     expect(screen.getByText('System Prompt')).toBeInTheDocument();
     expect(screen.getByText('Tool Sets')).toBeInTheDocument();
     expect(screen.getByText('Core Coding')).toBeInTheDocument();
-    expect(screen.getByText('11 tools')).toBeInTheDocument();
+    expect(screen.getByText('14 tools')).toBeInTheDocument();
     expect(screen.queryByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeNull();
     await clickAsync(screen.getByLabelText('expand tool set core-coding'));
     expect(screen.getByText('Read')).toBeInTheDocument();
+    expect(screen.getByText('MultiEdit')).toBeInTheDocument();
+    expect(screen.getByText('ReadSymbol')).toBeInTheDocument();
+    expect(screen.getByText('EditSymbol')).toBeInTheDocument();
     expect(screen.getByText('Bash')).toBeInTheDocument();
     expect(screen.getByText('Read a text file with line pagination, size limits, and binary-file protection.')).toBeInTheDocument();
     expect(screen.getByLabelText('customize tool set core-coding')).toBeInTheDocument();
@@ -277,6 +280,9 @@ describe('AgentManager', () => {
               { source: 'builtin', name: 'Read' },
               { source: 'builtin', name: 'Write' },
               { source: 'builtin', name: 'Edit' },
+              { source: 'builtin', name: 'MultiEdit' },
+              { source: 'builtin', name: 'ReadSymbol' },
+              { source: 'builtin', name: 'EditSymbol' },
               { source: 'builtin', name: 'Eval' },
               { source: 'builtin', name: 'Grep' },
               { source: 'builtin', name: 'Glob' },
@@ -287,7 +293,7 @@ describe('AgentManager', () => {
             ],
             exclude: [],
           },
-          enabledTools: ['Read', 'Write', 'Edit', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory'],
+          enabledTools: ['Read', 'Write', 'Edit', 'MultiEdit', 'ReadSymbol', 'EditSymbol', 'Eval', 'Grep', 'Glob', 'LS', 'EnterPlanMode', 'ExitPlanMode', 'Memory'],
           thinkingLevel: 'low',
           isDefault: true,
         })

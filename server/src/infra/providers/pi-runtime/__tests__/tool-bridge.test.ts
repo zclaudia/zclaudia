@@ -72,6 +72,7 @@ describe('buildTools', () => {
       'AstGrep',
       'Bash',
       'Edit',
+      'EditSymbol',
       'EnterPlanMode',
       'EnterWorktree',
       'Eval',
@@ -84,8 +85,10 @@ describe('buildTools', () => {
       'ListMcpResources',
       'MCPTool',
       'Monitor',
+      'MultiEdit',
       'Read',
       'ReadMcpResource',
+      'ReadSymbol',
       'TaskOutput',
       'TodoWrite',
       'ToolSearch',
@@ -130,6 +133,7 @@ describe('buildTools', () => {
       'AstGrep',
       'Bash',
       'Edit',
+      'EditSymbol',
       'EnterPlanMode',
       'EnterWorktree',
       'Eval',
@@ -143,8 +147,10 @@ describe('buildTools', () => {
       'MCPTool',
       'Memory',
       'Monitor',
+      'MultiEdit',
       'Read',
       'ReadMcpResource',
+      'ReadSymbol',
       'TaskOutput',
       'TodoWrite',
       'ToolSearch',
@@ -1729,6 +1735,30 @@ describe('Edit bridge tool', () => {
     expect(res.content[0].text).toContain('+const a = 10;');
     expect(followup.details.ok).toBe(true);
     expect(onDisk).toBe('const a = 10;\nconst b = 20;\nconst c = 30;\n');
+  });
+
+  it('exposes MultiEdit as the explicit same-file batch edit tool', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-multiedit-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['Read', 'MultiEdit'] });
+    const read = tools.find((t: any) => t.name === 'Read') as any;
+    const multiEdit = tools.find((t: any) => t.name === 'MultiEdit') as any;
+
+    await read.execute('r-multi-edit', { path: 'f.ts' });
+    const res = await multiEdit.execute('me1', {
+      file_path: 'f.ts',
+      edits: [
+        { old_string: 'const a = 1;', new_string: 'const a = 10;' },
+        { old_string: 'const b = 2;', new_string: 'const b = 20;' },
+      ],
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(multiEdit.parameters.required).toEqual(['file_path', 'edits']);
+    expect(res.details).toMatchObject({ ok: true, editCount: 2, replaced: 2 });
+    expect(res.content[0].text).toContain('Edited f.ts');
+    expect(onDisk).toBe('const a = 10;\nconst b = 20;\n');
   });
 
   it('does not partially write batch edits when a later replacement fails', async () => {

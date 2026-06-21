@@ -150,6 +150,29 @@ describe('buildSummaryPrompt', () => {
     expect(prompt).toContain('wrote 3 lines');
   });
 
+  it('serializes ReadSymbol / EditSymbol tool calls compactly with symbol names', () => {
+    const prompt = buildSummaryPrompt([
+      { id: 'u1', role: 'user', content: 'do it', metadata: null, offset: 1, createdAt: 100 },
+      {
+        id: 'a1',
+        role: 'assistant',
+        content: 'OK',
+        metadata: JSON.stringify({
+          toolCalls: [
+            { name: 'ReadSymbol', input: { file_path: '/repo/client.ts', symbol: 'Client.connect' } },
+            { name: 'EditSymbol', input: { file_path: '/repo/client.ts', symbol: 'Client.connect', new_body: 'connect() { return true; }' } },
+          ],
+        }),
+        offset: 2,
+        createdAt: 110,
+      },
+    ]);
+    expect(prompt).toContain('[tool ReadSymbol]');
+    expect(prompt).toContain('/repo/client.ts | symbol: Client.connect');
+    expect(prompt).toContain('[tool EditSymbol]');
+    expect(prompt).toContain('new: connect() { return true; }');
+  });
+
   it('marks failed tool calls with FAILED so the model can mention them in openIssues', () => {
     const prompt = buildSummaryPrompt([
       { id: 'u1', role: 'user', content: 'do it', metadata: null, offset: 1, createdAt: 100 },

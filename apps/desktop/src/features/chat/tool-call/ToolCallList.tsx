@@ -56,10 +56,28 @@ function getToolCallSummary(tc: ToolCallState): string {
   switch (tc.toolName) {
     case 'Read':
       return input.file_path ? String(input.file_path).split('/').pop()! : 'Read';
+    case 'ReadSymbol': {
+      const filePath = String(input.file_path ?? input.path ?? '');
+      const fileName = filePath ? filePath.split('/').pop()! : 'ReadSymbol';
+      const symbol = String(input.symbol ?? '');
+      return symbol ? `${fileName}#${symbol}` : fileName;
+    }
     case 'Write':
       return input.file_path ? String(input.file_path).split('/').pop()! : 'Write';
     case 'Edit':
       return input.file_path ? String(input.file_path).split('/').pop()! : 'Edit';
+    case 'MultiEdit': {
+      const filePath = String(input.file_path ?? input.path ?? '');
+      const fileName = filePath ? filePath.split('/').pop()! : 'MultiEdit';
+      const count = Array.isArray(input.edits) ? input.edits.length : 0;
+      return `${fileName} | ${count} edits`;
+    }
+    case 'EditSymbol': {
+      const filePath = String(input.file_path ?? input.path ?? '');
+      const fileName = filePath ? filePath.split('/').pop()! : 'EditSymbol';
+      const symbol = String(input.symbol ?? '');
+      return symbol ? `${fileName}#${symbol}` : fileName;
+    }
     case 'Bash': {
       const cmd = String(input.command || '').split(' ')[0];
       return cmd || 'bash';
