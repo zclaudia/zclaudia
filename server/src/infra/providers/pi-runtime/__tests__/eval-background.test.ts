@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import Database from 'better-sqlite3';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 
 import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
 import { TaskRepository } from '../../../../domains/tasks/repository.js';
+import { TaskService } from '../../../../domains/tasks/task-service.js';
 import { createEvalBridgeTool } from '../eval-tool.js';
+import { EvalTaskRuntime } from '../eval-task-runtime.js';
 import { createTaskOutputTool } from '../task-tools.js';
 
 async function eventually<T>(fn: () => T, predicate: (value: T) => boolean): Promise<T> {
@@ -59,6 +61,10 @@ describe('Eval background runtime', () => {
 
     const taskId = start.details.taskId as string;
     const repo = new TaskRepository(db!);
+    expect(repo.findById(taskId)).toMatchObject({
+      sessionId: 's1',
+      runId: 'r1',
+    });
     const completed = await eventually(
       () => repo.findById(taskId),
       (task) => task?.status === 'completed' || task?.status === 'failed',
@@ -78,5 +84,60 @@ describe('Eval background runtime', () => {
     });
     expect(output.details.rawOutput).toContain('hello from eval');
     expect(output.details.rawOutput).toContain('42');
+  });
+
+  it('reconciles completed and failed tasks from result files after restart', () => {
+    expect(db).toBeDefined();
+    expect(dir).toBeDefined();
+    expect(dataDir).toBeDefined();
+    const repo = new TaskRepository(db!);
+    const service = new TaskService(repo);
+    const logsDir = path.join(dataDir!, 'task-logs');
+    mkdirSync(logsDir, { recursive: true });
+
+    const successLogPath = path.join(logsDir, 'eval-success.log');
+    const successResultPath = path.join(logsDir, 'eval-success.result.json');
+    writeFileSync(successLogPath, '42\n');
+    writeFileSync(successResultPath, JSON.stringify({ ok: true, text: '42' }));
+    const success = service.createTask({
+      type: 'eval',
+      sessionId: 's1',
+      runId: 'r1',
+      metadata: {
+        code: '42',
+        workspaceRoot: dir!,
+        logPath: successLogPath,
+        resultPath: successResultPath,
+      },
+    });
+    service.startTask(success.id, { executorRef: { pid: 999999, command: 'eval' } });
+
+    const failureLogPath = path.join(logsDir, 'eval-failure.log');
+    const failureResultPath = path.join(logsDir, 'eval-failure.result.json');
+    writeFileSync(failureLogPath, 'boom\n');
+    writeFileSync(failureResultPath, JSON.stringify({ ok: false, error: 'boom' }));
+    const failure = service.createTask({
+      type: 'eval',
+      sessionId: 's1',
+      runId: 'r1',
+      metadata: {
+        code: 'throw new Error("boom")',
+        workspaceRoot: dir!,
+        logPath: failureLogPath,
+        resultPath: failureResultPath,
+      },
+    });
+    service.startTask(failure.id, { executorRef: { pid: 999999, command: 'eval' } });
+
+    new EvalTaskRuntime(repo).reconcile();
+
+    expect(repo.findById(success.id)).toMatchObject({
+      status: 'completed',
+      result: { text: '42' },
+    });
+    expect(repo.findById(failure.id)).toMatchObject({
+      status: 'failed',
+      result: { error: 'boom' },
+    });
   });
 });

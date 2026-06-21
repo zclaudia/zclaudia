@@ -373,26 +373,38 @@ function buildMutationResultText(input: {
   return lines.join('\n');
 }
 
-function parseBatchEdits(value: unknown): { ok: true; edits: BatchEditInput[] } | { ok: false; code: string; message: string; details?: Record<string, unknown> } | undefined {
+function parseBatchEdits(
+  value: unknown,
+  options: { toolName?: string; minEdits?: number } = {},
+): { ok: true; edits: BatchEditInput[] } | { ok: false; code: string; message: string; details?: Record<string, unknown> } | undefined {
   if (value === undefined) return undefined;
+  const toolName = options.toolName ?? 'Edit';
+  const minEdits = options.minEdits ?? 1;
   if (!Array.isArray(value)) {
-    return { ok: false, code: 'invalid_edits', message: 'Edit edits must be an array of { old_string, new_string, replace_all? } objects' };
+    return { ok: false, code: 'invalid_edits', message: `${toolName} edits must be an array of { old_string, new_string, replace_all? } objects` };
   }
-  if (value.length === 0) {
-    return { ok: false, code: 'invalid_edits', message: 'Edit edits must include at least one replacement' };
+  if (value.length < minEdits) {
+    return {
+      ok: false,
+      code: 'invalid_edits',
+      message: minEdits === 1
+        ? `${toolName} edits must include at least one replacement`
+        : `${toolName} requires at least ${minEdits} replacements; use Edit for one exact replacement`,
+      details: { editCount: value.length, minEdits },
+    };
   }
   const edits: BatchEditInput[] = [];
   for (let index = 0; index < value.length; index += 1) {
     const entry = value[index];
     if (!entry || typeof entry !== 'object') {
-      return { ok: false, code: 'invalid_edits', message: `edits[${index}] must be an object`, details: { editIndex: index } };
+      return { ok: false, code: 'invalid_edits', message: `${toolName} edits[${index}] must be an object`, details: { editIndex: index } };
     }
     const edit = entry as Record<string, unknown>;
     if (typeof edit.old_string !== 'string' || typeof edit.new_string !== 'string') {
       return {
         ok: false,
         code: 'missing_strings',
-        message: `edits[${index}] requires old_string and new_string`,
+        message: `${toolName} edits[${index}] requires old_string and new_string`,
         details: { editIndex: index },
       };
     }
@@ -400,7 +412,7 @@ function parseBatchEdits(value: unknown): { ok: true; edits: BatchEditInput[] } 
       return {
         ok: false,
         code: 'no_op',
-        message: `edits[${index}].old_string and new_string are identical`,
+        message: `${toolName} edits[${index}].old_string and new_string are identical`,
         details: { editIndex: index },
       };
     }
@@ -577,7 +589,7 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
   return {
     name: 'Edit',
     label: 'Edit',
-    description: 'Replace exact strings in existing files. If you need two or more replacements in the same file, always pass one `edits` array so the file is read, checked, and written once; the batch is atomic and counts as one mutation attempt. For small multi-file changes, use `patch`. For structurally-sensitive rewrites (Markdown tables, JSON arrays, indented YAML/TOML), prefer a single Write. Successful mutation results include a model-visible diff plus snapshot state, and update the internal file snapshot, so do not call Read again only to verify the edit.',
+    description: 'Replace one exact string in an existing file. For two or more replacements in the same file, use MultiEdit so the file is read, checked, and written once; the batch is atomic and counts as one mutation attempt. This tool still accepts an `edits` array for compatibility, but new same-file batches should prefer MultiEdit. For small multi-file changes, use `patch`. For structurally-sensitive rewrites (Markdown tables, JSON arrays, indented YAML/TOML), prefer a single Write. Successful mutation results include a model-visible diff plus snapshot state, and update the internal file snapshot, so do not call Read again only to verify the edit.',
     parameters: {
       type: 'object',
       properties: {
@@ -587,7 +599,8 @@ export function createEditBridgeTool(cwd: string, options?: FileMutationToolOpti
         replace_all: { type: 'boolean', default: false },
         edits: {
           type: 'array',
-          description: 'Same-file batch replacements. Use this by default for multiple replacements in one file; all replacements apply atomically and consume one mutation attempt.',
+          description: 'Compatibility path for same-file batch replacements. Prefer MultiEdit for two or more replacements in one file; all replacements apply atomically and consume one mutation attempt.',
+          minItems: 1,
           items: {
             type: 'object',
             properties: {
@@ -1367,6 +1380,7 @@ export function createMultiEditBridgeTool(cwd: string, options?: FileMutationToo
         edits: {
           type: 'array',
           description: 'Ordered same-file replacements. All replacements apply atomically and consume one mutation attempt.',
+          minItems: 2,
           items: {
             type: 'object',
             properties: {
@@ -1383,8 +1397,9 @@ export function createMultiEditBridgeTool(cwd: string, options?: FileMutationToo
     } as any,
     execute: async (toolCallId: string, params: unknown, signal?: AbortSignal, onUpdate?: any) => {
       const args = toolParams(toolCallId, params);
-      if (!Array.isArray(args.edits)) {
-        return errorResult('invalid_edits', 'MultiEdit requires an edits array of { old_string, new_string, replace_all? } objects');
+      const editsResult = parseBatchEdits(args.edits, { toolName: 'MultiEdit', minEdits: 2 });
+      if (editsResult?.ok === false) {
+        return errorResult(editsResult.code, editsResult.message, editsResult.details ?? {});
       }
       return editTool.execute(toolCallId, params, signal, onUpdate);
     },

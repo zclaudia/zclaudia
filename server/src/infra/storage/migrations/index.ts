@@ -22,6 +22,7 @@ import { migration as m_019_session_auto_title } from './019_session_auto_title.
 import { migration as m_020_backfill_message_offset } from './020_backfill_message_offset.js';
 import { migration as m_021_session_entries } from './021_session_entries.js';
 import { migration as m_022_drop_session_compactions } from './022_drop_session_compactions.js';
+import { migration as m_023_web_search_config } from './023_web_search_config.js';
 
 export type { Migration };
 
@@ -48,6 +49,7 @@ export const migrations: Migration[] = [
   m_020_backfill_message_offset,
   m_021_session_entries,
   m_022_drop_session_compactions,
+  m_023_web_search_config,
 ];
 
 /**

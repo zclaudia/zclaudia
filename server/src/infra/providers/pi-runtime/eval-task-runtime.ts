@@ -94,6 +94,7 @@ function parseResult(resultPath: string): { ok: true; text: string } | { ok: fal
 export class EvalTaskRuntime implements TaskRuntime {
   readonly type = 'eval' as const;
   private readonly service: TaskService;
+  private readonly reconcileWatches = new Set<string>();
 
   constructor(private readonly repo: TaskRepository) {
     this.service = new TaskService(repo);
@@ -162,14 +163,81 @@ export class EvalTaskRuntime implements TaskRuntime {
       const result = parseResult(resultPath);
       if (errorNote) {
         this.service.failTask(taskId, { error: errorNote });
+      } else if (result?.ok === true) {
+        this.service.completeTask(taskId, { text: result.text });
+      } else if (result?.ok === false) {
+        this.service.failTask(taskId, { error: result.error });
       } else if (exitCode === 0) {
-        this.service.completeTask(taskId, { text: result?.ok === true ? result.text : 'Eval task completed' });
+        this.service.completeTask(taskId, { text: 'Eval task completed' });
       } else {
-        this.service.failTask(taskId, { error: result?.ok === false ? result.error : `Eval task exited with code ${exitCode}` });
+        this.service.failTask(taskId, { error: `Eval task exited with code ${exitCode}` });
       }
     } catch {
       // lifecycle race
     }
+  }
+
+  private settleObservedExit(task: TaskRecord, fallbackError: string): TaskRecord {
+    const current = this.repo.findById(task.id) ?? task;
+    if (TERMINAL.has(current.status)) return current;
+    const metadata = (current.metadata ?? {}) as Record<string, unknown>;
+    const resultPath = typeof metadata.resultPath === 'string' ? metadata.resultPath : evalTaskResultPath(current.id);
+    const result = parseResult(resultPath);
+    if (result?.ok === true) {
+      return this.service.completeTask(current.id, { text: result.text });
+    }
+    if (result?.ok === false) {
+      return this.service.failTask(current.id, { error: result.error });
+    }
+    return this.service.stopTask(current.id, { error: fallbackError });
+  }
+
+  private taskTimeoutMs(task: TaskRecord): number {
+    const metadata = (task.metadata ?? {}) as Record<string, unknown>;
+    return typeof metadata.timeoutMs === 'number' && Number.isFinite(metadata.timeoutMs)
+      ? metadata.timeoutMs
+      : 30_000;
+  }
+
+  private watchReconciledTask(task: TaskRecord): void {
+    if (this.reconcileWatches.has(task.id)) return;
+    const pid = task.executorRef?.pid;
+    if (typeof pid !== 'number') return;
+    this.reconcileWatches.add(task.id);
+    const timeoutAt = task.updatedAt + this.taskTimeoutMs(task);
+    let interval: NodeJS.Timeout | undefined;
+    let timeout: NodeJS.Timeout | undefined;
+    const clearWatch = () => {
+      if (interval) clearInterval(interval);
+      if (timeout) clearTimeout(timeout);
+      this.reconcileWatches.delete(task.id);
+    };
+    const check = () => {
+      const current = this.repo.findById(task.id);
+      if (!current || TERMINAL.has(current.status)) {
+        clearWatch();
+        return;
+      }
+      const currentPid = current.executorRef?.pid;
+      if (typeof currentPid !== 'number' || !pidAlive(currentPid)) {
+        try {
+          this.settleObservedExit(current, 'eval process not found after server restart');
+        } catch {
+          // lifecycle race
+        }
+        clearWatch();
+        return;
+      }
+      if (Date.now() >= timeoutAt) {
+        killProcessTree(currentPid);
+        this.finalize(current.id, null, 'Eval task timed out');
+        clearWatch();
+      }
+    };
+    interval = setInterval(check, 1000);
+    interval.unref?.();
+    timeout = setTimeout(check, Math.max(0, timeoutAt - Date.now()));
+    timeout.unref?.();
   }
 
   async stop(task: TaskRecord, reason?: string): Promise<TaskExecutorUpdate> {
@@ -202,7 +270,7 @@ export class EvalTaskRuntime implements TaskRuntime {
     const pid = task.executorRef?.pid;
     if (task.status === 'running' && typeof pid === 'number' && !pidAlive(pid)) {
       try {
-        current = this.service.completeTask(task.id, { text: 'Eval process exited (exit code unknown; observed after restart)' });
+        current = this.settleObservedExit(task, 'eval process not found after server restart');
       } catch {
         current = this.repo.findById(task.id) ?? task;
       }
@@ -247,8 +315,12 @@ export class EvalTaskRuntime implements TaskRuntime {
     for (const task of this.repo.listByTypeAndStatuses('eval', ['queued', 'running'])) {
       try {
         const pid = task.executorRef?.pid;
-        if (task.status === 'queued' || typeof pid !== 'number' || !pidAlive(pid)) {
-          this.service.stopTask(task.id, { error: 'eval process not found after server restart' });
+        if (task.status === 'queued') {
+          this.service.stopTask(task.id, { error: 'eval task was still queued after server restart' });
+        } else if (typeof pid !== 'number' || !pidAlive(pid)) {
+          this.settleObservedExit(task, 'eval process not found after server restart');
+        } else {
+          this.watchReconciledTask(task);
         }
       } catch {
         // best-effort

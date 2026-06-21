@@ -331,7 +331,7 @@ export function createBashBridgeTool(cwd: string, options?: BashBridgeToolOption
             },
           });
           handoff.detach();
-          const adopted = executor.adopt(task, handoff.child, result.fullOutput);
+          const adopted = executor.adopt(task, handoff.child, result.fullOutput, result.fullOutputPath);
           service.startTask(task.id, { executorRef: adopted.executorRef });
           const reason = manualBackground?.signal.aborted
             ? 'Moved to background at the user\'s request'

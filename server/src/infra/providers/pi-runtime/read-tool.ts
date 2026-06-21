@@ -157,6 +157,9 @@ function parseReadWindow(args: Record<string, unknown>): { ok: true; offset: num
 // reads a large window (or stops) instead of probing a few lines at a time.
 function buildReadFooter(offset: number, returnedLines: number, totalLines: number, cappedByTokens = false): string {
   if (totalLines === 0) return '\n\n[File is empty — 0 lines.]';
+  if (returnedLines === 0 && offset > totalLines) {
+    return `\n\n[Offset ${offset} is past end of file — ${totalLines} line${totalLines === 1 ? '' : 's'} total. Re-read with offset=${totalLines} or lower.]`;
+  }
   const lastLine = offset + returnedLines - 1;
   const remaining = totalLines - lastLine;
   if (cappedByTokens && remaining > 0) {
@@ -384,6 +387,10 @@ export function createReadBridgeTool(cwd: string, options?: ReadToolOptions): Ag
         hashline: { type: 'boolean', description: 'For text files: return content-addressed line hashes for precise edits' },
         full: { type: 'boolean', description: 'Read the entire file verbatim instead of a structural summary' },
       },
+      anyOf: [
+        { required: ['path'] },
+        { required: ['file_path'] },
+      ],
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
       const result = await (async () => {

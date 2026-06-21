@@ -68,6 +68,8 @@ export function createEvalBridgeTool(cwd: string, options?: EvalBridgeToolOption
         const task = service.createTask({
           type: 'eval',
           title: 'Eval background task',
+          sessionId: options.sessionId,
+          runId: options.runId,
           parentSessionId: options.sessionId,
           parentRunId: options.runId,
           parentToolUseId: typeof toolCallId === 'string' ? toolCallId : undefined,

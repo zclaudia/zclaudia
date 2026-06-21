@@ -1,4 +1,4 @@
-import { createElement, useState, useEffect, useMemo, type CSSProperties } from 'react';
+import { useState, useEffect, useMemo, type CSSProperties } from 'react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { Highlight, themes as prismThemes, type PrismTheme, type Token } from 'prism-react-renderer';
 import { List, useListRef, type RowComponentProps, type ListImperativeAPI } from 'react-window';
@@ -18,7 +18,7 @@ import * as api from '../../services/api';
 import { FileSearchInput } from './FileSearchInput';
 import { FileTree } from './FileTree';
 import { MarkdownFileContent } from './MarkdownFileContent';
-import { iconForFile } from './fileIcons';
+import { FileTypeIcon } from './fileIcons';
 import { isDesktopTauri } from '../../utils/platform';
 import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../utils/popoutWindow';
 import { useProjectStore } from '../../stores/projectStore';
@@ -317,10 +317,14 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const lang = filePath ? detectLanguage(filePath) : 'text';
   const codeTheme = isDarkTheme(resolvedTheme) ? prismThemes.oneDark : prismThemes.oneLight;
   const isMarkdown = lang === 'markdown';
-  const headerIcon = createElement(filePath ? iconForFile(filePath) : FileText, {
-    className: `w-3.5 h-3.5 flex-shrink-0 ${filePath ? 'text-muted-foreground' : 'text-muted-foreground/70'}`,
-    'aria-hidden': true,
-  });
+  const headerIcon = filePath ? (
+    <FileTypeIcon
+      name={filePath.split('/').pop() ?? filePath}
+      className="flex w-3.5 h-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
+    />
+  ) : (
+    <FileText className="w-3.5 h-3.5 flex-shrink-0 text-muted-foreground/70" aria-hidden="true" />
+  );
   const highlightStart = targetLine ?? null;
   const highlightEnd = targetEndLine ?? targetLine ?? null;
   const showFileTree = isMobile ? !filePath : showTree;

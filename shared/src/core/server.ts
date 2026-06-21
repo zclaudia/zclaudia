@@ -103,3 +103,22 @@ export interface ServerGatewayStatus {
   instanceId?: string;
   currentDeviceId?: string;
 }
+
+export type WebSearchConfigSource = 'stored' | 'env' | null;
+
+export interface WebSearchConfig {
+  braveApiKey: string | null;
+  braveApiKeySource: WebSearchConfigSource;
+  searxngBaseUrl: string | null;
+  searxngBaseUrlSource: WebSearchConfigSource;
+  duckDuckGoFallbackEnabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface UpdateWebSearchConfigRequest {
+  /** Undefined keeps the existing stored value; null or empty string clears it. */
+  braveApiKey?: string | null;
+  /** Undefined keeps the existing stored value; null or empty string clears it. */
+  searxngBaseUrl?: string | null;
+}

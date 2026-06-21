@@ -1,33 +1,18 @@
-import {
-  File,
-  FileCode2,
-  FileCog,
-  FileJson,
-  FileLock2,
-  FileText,
-  ScrollText,
-  type LucideIcon,
-} from 'lucide-react';
+import { getIcon } from 'material-file-icons';
 
-function fileNameAndExt(pathOrName: string) {
-  const fileName = pathOrName.split('/').pop()?.toLowerCase() ?? pathOrName.toLowerCase();
-  const ext = fileName.includes('.') ? fileName.split('.').pop() ?? '' : '';
-  return { fileName, ext };
-}
-
-export function iconForFile(pathOrName: string): LucideIcon {
-  const { fileName, ext } = fileNameAndExt(pathOrName);
-
-  if (fileName === 'package.json' || fileName.endsWith('.config.js') || fileName.endsWith('.config.ts') || fileName.endsWith('.config.mjs')) {
-    return FileCog;
-  }
-  if (fileName.includes('lock') || fileName === 'license') return FileLock2;
-  if (ext === 'md' || ext === 'mdx' || fileName === 'readme') return ScrollText;
-  if (ext === 'json' || ext === 'jsonc') return FileJson;
-  if (['ts', 'tsx', 'js', 'jsx', 'css', 'scss', 'html', 'xml', 'svg', 'rs', 'go', 'py', 'sh', 'yml', 'yaml', 'toml'].includes(ext)) {
-    return FileCode2;
-  }
-  if (['txt', 'log'].includes(ext)) return FileText;
-
-  return File;
+/**
+ * Renders a Material Icon Theme file-type icon (the same set Cursor/VS Code use).
+ * The SVGs are self-colored, so we render them raw and let their own fills show
+ * through in both light and dark mode — no text-color class needed.
+ */
+export function FileTypeIcon({ name, className }: { name: string; className?: string }) {
+  const { svg } = getIcon(name);
+  return (
+    <span
+      aria-hidden="true"
+      className={className}
+      // Icons are static, bundled SVG strings from material-file-icons — safe to inline.
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
 }

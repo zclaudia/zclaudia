@@ -19,6 +19,7 @@ import { NotificationSettingsInline } from '../features/settings/NotificationSet
 import { MobileGatewayConfig } from '../features/settings/MobileGatewayConfig';
 import { DebugSettings } from '../features/settings/DebugSettings';
 import { GeneralSettings } from '../features/settings/GeneralSettings';
+import { WebSearchSettings } from '../features/settings/WebSearchSettings';
 import {
   type SettingsTab,
   type SettingsTabDef,
@@ -337,6 +338,15 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                     : 'Workspace skills configured on this server.'}
                 </p>
                 <WorkspaceSkillsSettings readOnly={!isActiveLocalBackend} />
+              </div>
+            )}
+
+            {activeTab === 'web-search' && (
+              <div className="space-y-4">
+                {!isActiveLocalBackend && activeServer && (
+                  <RemoteServerBanner serverName={activeServer.name} label="Viewing Web Search settings" />
+                )}
+                <WebSearchSettings readOnly={!isActiveLocalBackend} />
               </div>
             )}
 

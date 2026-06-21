@@ -121,6 +121,32 @@ describe('Bash auto-background (tool integration)', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it('keeps spilled pre-handoff output in the adopted task log', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
+    const script = [
+      'process.stdout.write("EARLY_MARKER\\n");',
+      'process.stdout.write("x".repeat(70_000));',
+      'process.stdout.write("\\nEARLY_END\\n");',
+      'setTimeout(() => console.log("LATE_MARKER"), 500);',
+    ].join('');
+    const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 })
+      .execute('ab-spilled', { command: `${JSON.stringify(process.execPath)} -e ${JSON.stringify(script)}` });
+
+    expect(res.details.background).toBe(true);
+    expect(res.details.autoBackgrounded).toBe(true);
+
+    const repo = new TaskRepository(db);
+    const taskId = res.details.taskId as string;
+    const completed = await waitUntil(() => repo.findById(taskId)?.status === 'completed');
+    expect(completed).toBe(true);
+    const log = readFileSync(commandTaskLogPath(taskId), 'utf8');
+    expect(log).toContain('EARLY_MARKER');
+    expect(log).toContain('EARLY_END');
+    expect(log).toContain('LATE_MARKER');
+    expect(log.length).toBeGreaterThan(70_000);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it('marks the adopted task failed when the command exits non-zero', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-autobg-'));
     const res = await bashTool(dir, { db, bashAutoBackgroundMs: 200 })

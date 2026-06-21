@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Loader2 } from 'lucide-react';
 import type { FileEntry } from '@zclaudia/shared';
 import * as api from '../../services/api';
-import { iconForFile } from './fileIcons';
+import { FileTypeIcon } from './fileIcons';
 
 interface FileTreeProps {
   projectRoot: string;
@@ -96,7 +96,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
           const autoExpand = isDirectory && shouldAutoExpand(selectedPath, entry.path);
           const isExpanded = expandedPaths[entry.path] ?? autoExpand;
           const showChildren = isDirectory && isExpanded;
-          const EntryIcon = isDirectory ? (showChildren ? FolderOpen : Folder) : iconForFile(entry.path);
+          const FolderIcon = showChildren ? FolderOpen : Folder;
 
           return (
             <div key={entry.path}>
@@ -120,11 +120,16 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
                       : <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
                   ) : null}
                 </span>
-                <span className={`flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center ${
-                  isDirectory ? 'text-amber-500/90 dark:text-amber-400/90' : 'text-muted-foreground group-hover:text-foreground'
-                }`}>
-                  <EntryIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                </span>
+                {isDirectory ? (
+                  <span className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center text-sky-500/90 dark:text-sky-400/90">
+                    <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
+                  </span>
+                ) : (
+                  <FileTypeIcon
+                    name={entry.name}
+                    className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
+                  />
+                )}
                 <span className="truncate">{entry.name}</span>
               </button>
               {showChildren && renderEntries(entry.path, depth + 1)}

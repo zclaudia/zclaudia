@@ -71,7 +71,7 @@ export function PinnedSkillChips({ pinnedRefs, skills, onActivate, onUnpin }: Pi
           className={`group inline-flex items-center gap-1 rounded-full border pl-2 pr-1 py-0.5 text-[11px] font-medium transition-colors ${
             chip.stale
               ? 'border-border bg-muted/50 text-muted-foreground'
-              : 'border-primary/30 bg-primary/10 text-primary hover:bg-primary/15'
+              : 'border-primary/40 bg-primary/20 text-primary hover:bg-primary/30'
           }`}
         >
           <Sparkles size={11} strokeWidth={2} className="shrink-0 opacity-70" />

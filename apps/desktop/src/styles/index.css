@@ -6,16 +6,16 @@
   /* Light theme (default) — Apple HIG aligned */
   :root {
     /* Base colors */
-    --background: 40 30% 98%;
+    --background: 215 22% 98%;
     --foreground: 0 0% 0%;
 
     /* Card colors */
-    --card: 40 30% 98%;
-    --sidebar: 40 20% 93%;
+    --card: 215 22% 98%;
+    --sidebar: 215 18% 93%;
     --card-foreground: 0 0% 0%;
 
     /* Popover colors */
-    --popover: 40 30% 98%;
+    --popover: 215 22% 98%;
     --popover-foreground: 0 0% 0%;
 
     /* Primary colors — Apple System Blue #007AFF */
@@ -23,15 +23,15 @@
     --primary-foreground: 0 0% 100%;
 
     /* Secondary colors — Apple systemGray6 (deepened for stronger button/surface contrast) */
-    --secondary: 40 16% 90%;
+    --secondary: 215 15% 90%;
     --secondary-foreground: 0 0% 20%;
 
     /* Muted colors — Apple systemFill (deepened for stronger button/surface contrast) */
-    --muted: 40 16% 91%;
+    --muted: 215 15% 91%;
     --muted-foreground: 240 3% 46%;
 
     /* Accent colors (deepened — used as the prominent neutral fill for primary actions) */
-    --accent: 40 18% 87%;
+    --accent: 215 16% 87%;
     --accent-foreground: 0 0% 20%;
 
     /* Destructive colors — Apple System Red */
@@ -51,8 +51,8 @@
     --thinking-foreground: 265 80% 98%;
 
     /* Border and input — Apple subtle separator (deepened to match darker surfaces) */
-    --border: 40 15% 86%;
-    --input: 40 15% 86%;
+    --border: 215 14% 87%;
+    --input: 215 14% 87%;
     --ring: 211 100% 50%;
 
     /* Border radius — Apple-like larger corners */

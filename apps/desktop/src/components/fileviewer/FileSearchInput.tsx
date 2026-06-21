@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import * as api from '../../services/api';
 import type { FileEntry } from '@zclaudia/shared';
-import { iconForFile } from './fileIcons';
+import { FileTypeIcon } from './fileIcons';
 
 interface FileSearchInputProps {
   projectRoot: string;
@@ -122,7 +122,6 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
       {results.length > 0 && (
         <div className="max-h-[200px] overflow-y-auto">
           {results.map((entry, idx) => {
-            const EntryIcon = iconForFile(entry.path);
             const { directory, name } = renderFileName(entry.path);
             return (
               <button
@@ -134,7 +133,7 @@ export function FileSearchInput({ projectRoot, backendId, onSelect, onClose }: F
                     : 'text-foreground hover:bg-secondary/80'
                 }`}
               >
-                <EntryIcon className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden="true" />
+                <FileTypeIcon name={name} className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5" />
                 <span className="sr-only">{entry.path}</span>
                 <span className="min-w-0 flex-1 truncate" aria-hidden="true">
                   <span>{directory ? `${directory}/` : ''}</span>

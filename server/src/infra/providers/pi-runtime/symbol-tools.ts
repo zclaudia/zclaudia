@@ -82,6 +82,33 @@ function digestSymbol(text: string): string {
   return fileDigest(text);
 }
 
+function isEscaped(content: string, index: number): boolean {
+  let slashCount = 0;
+  for (let cursor = index - 1; cursor >= 0 && content[cursor] === '\\'; cursor -= 1) {
+    slashCount += 1;
+  }
+  return slashCount % 2 === 1;
+}
+
+function previousToken(content: string, index: number): string | undefined {
+  let cursor = index - 1;
+  while (cursor >= 0 && /\s/.test(content[cursor])) cursor -= 1;
+  if (cursor < 0) return undefined;
+  if (/[A-Za-z_$0-9]/.test(content[cursor])) {
+    let start = cursor;
+    while (start > 0 && /[A-Za-z_$0-9]/.test(content[start - 1])) start -= 1;
+    return content.slice(start, cursor + 1);
+  }
+  return content[cursor];
+}
+
+function canStartRegexLiteral(content: string, index: number): boolean {
+  const previous = previousToken(content, index);
+  if (!previous) return true;
+  if (['return', 'throw', 'case', 'delete', 'typeof', 'void', 'new', 'in', 'of', 'yield', 'await'].includes(previous)) return true;
+  return ['(', '[', '{', '=', ':', ',', ';', '!', '&', '|', '?', '+', '-', '*', '~', '^', '<', '>'].includes(previous);
+}
+
 function buildMatch(
   input: Omit<SymbolMatch, 'text' | 'bodyDigest'>,
   content: string,
@@ -129,8 +156,58 @@ function pythonSymbols(content: string): SymbolMatch[] {
 }
 
 function findOpeningBrace(content: string, startOffset: number, maxOffset: number): number {
-  const brace = content.indexOf('{', startOffset);
-  return brace !== -1 && brace < maxOffset ? brace : -1;
+  let quote: '"' | '\'' | '`' | undefined;
+  let lineComment = false;
+  let blockComment = false;
+  let regex = false;
+  let regexCharClass = false;
+  const cappedMax = Math.min(maxOffset, content.length);
+  for (let index = startOffset; index < cappedMax; index += 1) {
+    const char = content[index];
+    const next = content[index + 1];
+    if (lineComment) {
+      if (char === '\n') lineComment = false;
+      continue;
+    }
+    if (blockComment) {
+      if (char === '*' && next === '/') {
+        blockComment = false;
+        index += 1;
+      }
+      continue;
+    }
+    if (regex) {
+      if (char === '[' && !isEscaped(content, index)) regexCharClass = true;
+      else if (char === ']' && !isEscaped(content, index)) regexCharClass = false;
+      else if (char === '/' && !regexCharClass && !isEscaped(content, index)) regex = false;
+      continue;
+    }
+    if (quote) {
+      if (char === quote && !isEscaped(content, index)) quote = undefined;
+      continue;
+    }
+    if (char === '/' && next === '/') {
+      lineComment = true;
+      index += 1;
+      continue;
+    }
+    if (char === '/' && next === '*') {
+      blockComment = true;
+      index += 1;
+      continue;
+    }
+    if (char === '/' && canStartRegexLiteral(content, index)) {
+      regex = true;
+      regexCharClass = false;
+      continue;
+    }
+    if (char === '"' || char === '\'' || char === '`') {
+      quote = char;
+      continue;
+    }
+    if (char === '{') return index;
+  }
+  return -1;
 }
 
 function findStatementEnd(lines: LineInfo[], startIndex: number): number {
@@ -145,10 +222,11 @@ function findMatchingBrace(content: string, openOffset: number): number {
   let quote: '"' | '\'' | '`' | undefined;
   let lineComment = false;
   let blockComment = false;
+  let regex = false;
+  let regexCharClass = false;
   for (let index = openOffset; index < content.length; index += 1) {
     const char = content[index];
     const next = content[index + 1];
-    const prev = content[index - 1];
     if (lineComment) {
       if (char === '\n') lineComment = false;
       continue;
@@ -160,8 +238,14 @@ function findMatchingBrace(content: string, openOffset: number): number {
       }
       continue;
     }
+    if (regex) {
+      if (char === '[' && !isEscaped(content, index)) regexCharClass = true;
+      else if (char === ']' && !isEscaped(content, index)) regexCharClass = false;
+      else if (char === '/' && !regexCharClass && !isEscaped(content, index)) regex = false;
+      continue;
+    }
     if (quote) {
-      if (char === quote && prev !== '\\') quote = undefined;
+      if (char === quote && !isEscaped(content, index)) quote = undefined;
       continue;
     }
     if (char === '/' && next === '/') {
@@ -172,6 +256,11 @@ function findMatchingBrace(content: string, openOffset: number): number {
     if (char === '/' && next === '*') {
       blockComment = true;
       index += 1;
+      continue;
+    }
+    if (char === '/' && canStartRegexLiteral(content, index)) {
+      regex = true;
+      regexCharClass = false;
       continue;
     }
     if (char === '"' || char === '\'' || char === '`') {
@@ -195,10 +284,10 @@ function lineIndexForOffset(lines: LineInfo[], offset: number): number {
 function jsSymbols(content: string): SymbolMatch[] {
   const lines = splitLines(content);
   const matches: SymbolMatch[] = [];
-  const patterns: Array<{ kind: SymbolKind; regex: RegExp }> = [
+  const patterns: Array<{ kind: SymbolKind; regex: RegExp; limitBraceSearchToStatement?: boolean }> = [
     { kind: 'function', regex: /^\s*(?:export\s+default\s+|export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\b/ },
     { kind: 'class', regex: /^\s*(?:export\s+default\s+|export\s+)?(?:abstract\s+)?class\s+([A-Za-z_$][\w$]*)\b/ },
-    { kind: 'variable', regex: /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/ },
+    { kind: 'variable', regex: /^\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*(?::[^=]+)?=\s*(?:async\s*)?(?:function\b|\([^)]*\)\s*=>|[A-Za-z_$][\w$]*\s*=>)/, limitBraceSearchToStatement: true },
     { kind: 'method', regex: /^\s*(?:(?:public|private|protected|static|async|get|set|readonly|override)\s+)*([A-Za-z_$][\w$]*)\s*\([^;{}]*\)\s*(?::[^{]+)?\{/ },
   ];
   const ignoredMethodNames = new Set(['if', 'for', 'while', 'switch', 'catch', 'function']);
@@ -210,10 +299,13 @@ function jsSymbols(content: string): SymbolMatch[] {
       if (pattern.kind === 'method' && ignoredMethodNames.has(match[1])) continue;
       const indent = indentation(line.text);
       const startIndex = includeDecorators(lines, index, indent);
-      const searchEnd = Math.min(content.length, line.startOffset + 5_000);
+      const statementEndIndex = findStatementEnd(lines, index);
+      const searchEnd = pattern.limitBraceSearchToStatement
+        ? lines[statementEndIndex].endOffsetWithNewline
+        : Math.min(content.length, line.startOffset + 5_000);
       const openBrace = findOpeningBrace(content, line.startOffset, searchEnd);
       const bodyEnd = openBrace === -1 ? -1 : findMatchingBrace(content, openBrace);
-      const endIndex = bodyEnd === -1 ? findStatementEnd(lines, index) : lineIndexForOffset(lines, bodyEnd);
+      const endIndex = bodyEnd === -1 ? statementEndIndex : lineIndexForOffset(lines, bodyEnd);
       matches.push(buildMatch({
         name: match[1],
         qualifiedName: match[1],
@@ -240,7 +332,9 @@ function qualifyNestedSymbols(symbols: SymbolMatch[]): SymbolMatch[] {
         && candidate.indent < symbol.indent)
       .sort((a, b) => a.startOffset - b.startOffset);
     const qualifiedName = [...parents.map(parent => parent.name), symbol.name].join('.');
-    return { ...symbol, qualifiedName };
+    const nearestParent = parents[parents.length - 1];
+    const kind = nearestParent?.kind === 'class' && symbol.kind === 'function' ? 'method' : symbol.kind;
+    return { ...symbol, qualifiedName, kind };
   });
 }
 
@@ -304,6 +398,10 @@ export function createReadSymbolTool(cwd: string, options?: ReadSymbolOptions): 
         symbol: { type: 'string', description: 'Symbol name, e.g. "run", "Client.connect", or "_schedule_chat"' },
       },
       required: ['symbol'],
+      anyOf: [
+        { required: ['file_path'] },
+        { required: ['path'] },
+      ],
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);
@@ -386,6 +484,10 @@ export function createEditSymbolTool(cwd: string, options?: FileMutationToolOpti
         preview_only: { type: 'boolean', default: false },
       },
       required: ['symbol', 'new_body'],
+      anyOf: [
+        { required: ['file_path'] },
+        { required: ['path'] },
+      ],
     } as any,
     execute: async (toolCallId: string, params: unknown) => {
       const args = toolParams(toolCallId, params);

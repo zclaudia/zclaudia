@@ -12,6 +12,25 @@ function getTools(dir: string): Record<string, any> {
 }
 
 describe('ReadSymbol/EditSymbol', () => {
+  it('declares path requirements in both symbol tool schemas', () => {
+    const tools = getTools('/tmp');
+
+    expect(tools.ReadSymbol.parameters).toMatchObject({
+      required: ['symbol'],
+      anyOf: [
+        { required: ['file_path'] },
+        { required: ['path'] },
+      ],
+    });
+    expect(tools.EditSymbol.parameters).toMatchObject({
+      required: ['symbol', 'new_body'],
+      anyOf: [
+        { required: ['file_path'] },
+        { required: ['path'] },
+      ],
+    });
+  });
+
   it('reads a qualified Python method and records an editable snapshot', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'zc-symbol-'));
     writeFileSync(path.join(dir, 'worker.py'), [
@@ -35,7 +54,7 @@ describe('ReadSymbol/EditSymbol', () => {
       ok: true,
       path: 'worker.py',
       symbol: 'Worker.run',
-      kind: 'function',
+      kind: 'method',
       startLine: 2,
       endLine: 3,
       state: {
@@ -87,6 +106,97 @@ describe('ReadSymbol/EditSymbol', () => {
     expect(edit.details.newBodyDigest).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(edit.content[0].text).toContain('Edited client.ts');
     expect(onDisk).toContain('return 2;');
+  });
+
+  it('edits an expression-bodied arrow variable without replacing the following symbol', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-symbol-'));
+    const file = path.join(dir, 'client.ts');
+    writeFileSync(file, [
+      'export const f = () => 1;',
+      '',
+      'export function g() {',
+      '  return 2;',
+      '}',
+      '',
+    ].join('\n'));
+    const tools = getTools(dir);
+
+    const read = await tools.ReadSymbol.execute('rs-arrow', {
+      file_path: 'client.ts',
+      symbol: 'f',
+    });
+    const edit = await tools.EditSymbol.execute('es-arrow', {
+      file_path: 'client.ts',
+      symbol: 'f',
+      expected_body_digest: read.details.bodyDigest,
+      new_body: 'export const f = () => 10;\n',
+    });
+    const onDisk = readFileSync(file, 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(read.details).toMatchObject({ ok: true, startLine: 1, endLine: 1, kind: 'variable' });
+    expect(read.content[0].text).not.toContain('export function g');
+    expect(edit.details).toMatchObject({ ok: true, symbol: 'f', replaced: 1 });
+    expect(onDisk).toBe([
+      'export const f = () => 10;',
+      '',
+      'export function g() {',
+      '  return 2;',
+      '}',
+      '',
+    ].join('\n'));
+  });
+
+  it('ignores braces inside regex literals when reading and editing a TypeScript function', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-symbol-'));
+    const file = path.join(dir, 'client.ts');
+    writeFileSync(file, [
+      'export function matcher(value: string) {',
+      '  if (/}/.test(value)) {',
+      '    return "close";',
+      '  }',
+      '  return "open";',
+      '}',
+      '',
+      'export function next() {',
+      '  return 2;',
+      '}',
+      '',
+    ].join('\n'));
+    const tools = getTools(dir);
+
+    const read = await tools.ReadSymbol.execute('rs-regex', {
+      file_path: 'client.ts',
+      symbol: 'matcher',
+    });
+    const edit = await tools.EditSymbol.execute('es-regex', {
+      file_path: 'client.ts',
+      symbol: 'matcher',
+      expected_body_digest: read.details.bodyDigest,
+      new_body: [
+        'export function matcher(value: string) {',
+        '  return "changed";',
+        '}',
+        '',
+      ].join('\n'),
+    });
+    const onDisk = readFileSync(file, 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(read.details).toMatchObject({ ok: true, startLine: 1, endLine: 6 });
+    expect(read.content[0].text).toContain('5|  return "open";');
+    expect(read.content[0].text).not.toContain('export function next');
+    expect(edit.details).toMatchObject({ ok: true, symbol: 'matcher', replaced: 1 });
+    expect(onDisk).toBe([
+      'export function matcher(value: string) {',
+      '  return "changed";',
+      '}',
+      '',
+      'export function next() {',
+      '  return 2;',
+      '}',
+      '',
+    ].join('\n'));
   });
 
   it('rejects EditSymbol when the expected body digest is stale', async () => {

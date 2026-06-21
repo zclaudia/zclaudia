@@ -1756,9 +1756,40 @@ describe('Edit bridge tool', () => {
 
     rmSync(dir, { recursive: true, force: true });
     expect(multiEdit.parameters.required).toEqual(['file_path', 'edits']);
+    expect(multiEdit.parameters.properties.edits.minItems).toBe(2);
     expect(res.details).toMatchObject({ ok: true, editCount: 2, replaced: 2 });
     expect(res.content[0].text).toContain('Edited f.ts');
     expect(onDisk).toBe('const a = 10;\nconst b = 20;\n');
+  });
+
+  it('rejects invalid MultiEdit edit arrays with MultiEdit-specific guidance', async () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'zc-multiedit-invalid-'));
+    writeFileSync(path.join(dir, 'f.ts'), 'const a = 1;\nconst b = 2;\n');
+    const tools = buildTools(dir, { enabled: ['MultiEdit'] });
+    const multiEdit = tools.find((t: any) => t.name === 'MultiEdit') as any;
+
+    const single = await multiEdit.execute('me-single', {
+      file_path: 'f.ts',
+      edits: [
+        { old_string: 'const a = 1;', new_string: 'const a = 10;' },
+      ],
+    });
+    const malformed = await multiEdit.execute('me-malformed', {
+      file_path: 'f.ts',
+      edits: [
+        { old_string: 'const a = 1;', new_string: 'const a = 10;' },
+        { old_string: 'const b = 2;' },
+      ],
+    });
+    const onDisk = readFileSync(path.join(dir, 'f.ts'), 'utf8');
+
+    rmSync(dir, { recursive: true, force: true });
+    expect(single.details).toMatchObject({ ok: false, error: 'invalid_edits', editCount: 1, minEdits: 2 });
+    expect(single.content[0].text).toContain('MultiEdit requires at least 2 replacements; use Edit for one exact replacement');
+    expect(malformed.details).toMatchObject({ ok: false, error: 'missing_strings', editIndex: 1 });
+    expect(malformed.content[0].text).toContain('MultiEdit edits[1] requires old_string and new_string');
+    expect(malformed.content[0].text).not.toContain('Edit edits must');
+    expect(onDisk).toBe('const a = 1;\nconst b = 2;\n');
   });
 
   it('does not partially write batch edits when a later replacement fails', async () => {

@@ -10,6 +10,7 @@ import { createDebugRoutes } from '../../interfaces/http/debug.js';
 import { createSystemTaskRoutes } from '../../interfaces/http/system-tasks.js';
 import { createWorkspaceRoutes } from '../../interfaces/http/workspace.js';
 import { createGatewayRouter } from '../../interfaces/http/gateway.js';
+import { createWebSearchConfigRoutes } from '../../interfaces/http/web-search.js';
 import type { ProcessSupervisor } from '../../infra/services/process-supervisor.js';
 import type { GatewayState } from '../../infra/gateway/gateway-state.js';
 import { getGatewayClient } from '../../infra/gateway/gateway-instance.js';
@@ -57,6 +58,7 @@ export function registerPlatformRoutes(deps: RegisterPlatformRoutesDeps): void {
   app.use('/api/debug', localOnlyMiddleware, createDebugRoutes(processSupervisor, db, permissionWorkflowResolver));
   app.use('/api', authMiddleware, createSystemTaskRoutes());
   app.use('/api/workspace', authMiddleware, createWorkspaceRoutes());
+  app.use('/api/web-search', authMiddleware, createWebSearchConfigRoutes(db));
 
   app.use('/api/server/gateway', localOnlyMiddleware, createGatewayRouter(
     db,

@@ -30,6 +30,21 @@ describe('truncateContent', () => {
     expect(truncatedText.includes('line 499')).toBe(false);  // tail dropped
   });
 
+  it('ReadSymbol tool: head truncation keeps the symbol digest header', () => {
+    const longText = [
+      '[Symbol src/app.ts#run lines 1-500 digest=sha256:abc]',
+      ...Array.from({ length: 500 }, (_, i) => `${i + 1}|line ${i}`),
+    ].join('\n');
+    const content = [{ type: 'text', text: longText }];
+    const result = truncateContent(content, 'ReadSymbol', 1024);
+
+    expect(result.didTruncate).toBe(true);
+    const truncatedText = (result.content[0] as { text: string }).text;
+    expect(truncatedText.startsWith('[Symbol src/app.ts#run')).toBe(true);
+    expect(truncatedText).toContain('digest=sha256:abc');
+    expect(truncatedText.includes('500|line 499')).toBe(false);
+  });
+
   it('Bash tool: tail truncation — keeps the END', () => {
     const longText = Array.from({ length: 500 }, (_, i) => `line ${i}`).join('\n');
     const content = [{ type: 'text', text: longText }];

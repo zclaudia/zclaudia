@@ -38,6 +38,7 @@ import { createAgentTaskRunner } from './orchestration/agent-task-runner.js';
 import { SessionRepository } from '../domains/sessions/index.js';
 import type { TaskExecutor } from '../domains/tasks/executors/types.js';
 import { ensureSandboxInitialized } from '../infra/providers/pi-runtime/sandbox.js';
+import { EvalTaskRuntime } from '../infra/providers/pi-runtime/eval-task-runtime.js';
 
 export interface BootstrapDeps {
   db: ReturnType<typeof initDatabase>;
@@ -190,9 +191,11 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   }));
   taskExecutorRegistry.register(agentTaskExecutor);
 
-  const commandTaskExecutor = new CommandTaskExecutor(new TaskRepository(db));
+  const backgroundTaskRepo = new TaskRepository(db);
+  const commandTaskExecutor = new CommandTaskExecutor(backgroundTaskRepo);
   taskExecutorRegistry.register(commandTaskExecutor);
   commandTaskExecutor.reconcile();
+  new EvalTaskRuntime(backgroundTaskRepo).reconcile();
 
   pluginEvents.on('run.completed', (event: any) => {
     try {

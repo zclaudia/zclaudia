@@ -1,5 +1,5 @@
 import { spawn, type ChildProcess } from 'child_process';
-import { mkdirSync, openSync, closeSync, createWriteStream } from 'fs';
+import { mkdirSync, openSync, closeSync, createWriteStream, readFileSync } from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { TaskRecord, TaskStatus } from '@zclaudia/shared/core/task';
@@ -109,7 +109,7 @@ export class CommandTaskExecutor implements TaskExecutor {
    * child's stdio is piped to this process, so output stops if the server dies;
    * reconcile() then settles the task by pid liveness as usual.
    */
-  adopt(task: TaskRecord, child: ChildProcess, initialOutput: string): TaskExecutorUpdate {
+  adopt(task: TaskRecord, child: ChildProcess, initialOutput: string, initialOutputPath?: string): TaskExecutorUpdate {
     const meta = (task.metadata ?? {}) as { command?: unknown };
     const command = typeof meta.command === 'string' ? meta.command : '';
     const logPath = commandTaskLogPath(task.id);
@@ -118,7 +118,15 @@ export class CommandTaskExecutor implements TaskExecutor {
     stream.on('error', (err) => {
       console.warn(`[CommandTaskExecutor] adopted task ${task.id} log stream error:`, err.message);
     });
-    if (initialOutput) stream.write(initialOutput);
+    if (initialOutputPath) {
+      try {
+        stream.write(readFileSync(initialOutputPath));
+      } catch {
+        if (initialOutput) stream.write(initialOutput);
+      }
+    } else if (initialOutput) {
+      stream.write(initialOutput);
+    }
     child.stdout?.on('data', (chunk) => stream.write(chunk));
     child.stderr?.on('data', (chunk) => stream.write(chunk));
     const closeStream = () => { try { stream.end(); } catch { /* already closed */ } };

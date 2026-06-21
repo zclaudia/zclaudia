@@ -31,7 +31,7 @@ const EDIT_FLOOD_THRESHOLD = 4;
  * Tools whose output is more useful from the head (file reads, listings, search hits).
  * Bash and unknown tools default to tail (errors/results usually at the end).
  */
-const HEAD_TRUNC_TOOLS = new Set<string>(['read', 'grep', 'glob', 'ls']);
+const HEAD_TRUNC_TOOLS = new Set<string>(['read', 'readsymbol', 'grep', 'glob', 'ls']);
 
 /** Reserve bytes per block for the appended truncation marker. Conservative upper bound. */
 const TRUNC_MARKER_OVERHEAD_BYTES = 40;

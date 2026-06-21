@@ -14,6 +14,7 @@ import type { WorkspaceSkillInfo } from '../../services/api/workspace-skills';
 import { downscaleImageFile } from '../attachments/downscale-image';
 import { SlashMenu, type SlashSuggestion } from './SlashMenu';
 import { PinnedSkillChips } from './PinnedSkillChips';
+import { SkillTokenHighlighter } from './SkillTokenHighlighter';
 
 export interface Attachment {
   id: string;
@@ -255,6 +256,16 @@ export function MessageInput({
       cancelled = true;
     };
   }, []);
+
+  // Ids of currently-known skills — used to decide which `/name` tokens in the
+  // textarea get highlighted (only real skills, not arbitrary `/path` text).
+  const skillIds = useMemo(
+    () => new Set(workspaceSkills.map((s) => s.id)),
+    [workspaceSkills],
+  );
+  // Full command strings (e.g. `/clear`, `/commit-commands:commit`) for the
+  // same purpose — commands are highlighted in a different color than skills.
+  const commandSet = useMemo(() => new Set(commands.map((c) => c.command)), [commands]);
 
   // Pinned skill refs on the active agent profile. Empty when there is no
   // profile (or before it loads). These are the source of truth for pin state;
@@ -998,7 +1009,16 @@ export function MessageInput({
       {isMobile ? (
         /* Mobile: card-style two-row layout — textarea on top, buttons below */
         <div className="bg-input border border-border rounded-2xl px-3 pt-3 pb-2 mb-1">
-          <textarea
+          <div className="relative">
+            {/* Highlight overlay (transparent glyphs, marks line up under the textarea). */}
+            <SkillTokenHighlighter
+              value={value}
+              skillIds={skillIds}
+              commandSet={commandSet}
+              className="pointer-events-none absolute inset-0 w-full resize-none min-h-[1.5rem] overflow-y-auto border-0 p-0 whitespace-pre-wrap break-words"
+              style={{ fontSize: 'var(--chat-font-input, 0.875rem)', maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px` }}
+            />
+            <textarea
             data-testid="message-input"
             ref={textareaRef}
             value={value}
@@ -1025,9 +1045,10 @@ export function MessageInput({
             autoCapitalize="off"
             autoComplete="off"
             rows={1}
-            className="w-full bg-transparent text-foreground placeholder-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed resize-none min-h-[1.5rem] overflow-y-auto"
+            className="relative w-full bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed resize-none min-h-[1.5rem] overflow-y-auto border-0 p-0"
             style={{ fontSize: 'var(--chat-font-input, 0.875rem)', maxHeight: `${Math.max(120, availableViewportHeight * 0.3)}px` }}
           />
+          </div>
           <div className="flex items-center gap-2 mt-2">
             {/* Attachment button */}
             <button
@@ -1078,7 +1099,19 @@ export function MessageInput({
             data-testid="composer-box"
             className="flex flex-col rounded-2xl border border-border bg-input px-4 pt-3 pb-2 transition-colors duration-200 focus-within:border-primary/60 focus-within:shadow-apple-md"
           >
-            <textarea
+            <div className="relative">
+              <SkillTokenHighlighter
+                value={value}
+                skillIds={skillIds}
+                commandSet={commandSet}
+                className="pointer-events-none absolute inset-0 w-full resize-none overflow-auto border-0 px-0 py-1 pr-2 leading-6 whitespace-pre-wrap break-words"
+                style={{
+                  fontSize: 'var(--chat-font-input, 0.875rem)',
+                  minHeight: `${expandedInputHeight}px`,
+                  maxHeight: `${expandedInputMaxHeight}px`,
+                }}
+              />
+              <textarea
               data-testid="message-input"
               ref={textareaRef}
               value={value}
@@ -1105,13 +1138,14 @@ export function MessageInput({
               autoCapitalize="off"
               autoComplete="off"
               rows={1}
-              className="w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 pr-2 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative w-full resize-none overflow-auto border-0 bg-transparent px-0 py-1 pr-2 text-transparent caret-foreground leading-6 placeholder:text-muted-foreground/60 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 fontSize: 'var(--chat-font-input, 0.875rem)',
                 minHeight: `${expandedInputHeight}px`,
                 maxHeight: `${expandedInputMaxHeight}px`,
               }}
             />
+            </div>
 
             <div className="mt-2 flex items-center gap-2">
               <button
@@ -1191,6 +1225,13 @@ export function MessageInput({
 
             {/* Text input */}
             <div className="flex-1 relative">
+              <SkillTokenHighlighter
+                value={value}
+                skillIds={skillIds}
+                commandSet={commandSet}
+                className="pointer-events-none absolute inset-0 block h-6 w-full resize-none overflow-hidden border-0 p-0 leading-6 whitespace-pre-wrap break-words"
+                style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
+              />
               <textarea
                 data-testid="message-input"
                 ref={textareaRef}
@@ -1218,7 +1259,7 @@ export function MessageInput({
                 autoCapitalize="off"
                 autoComplete="off"
                 rows={1}
-                className="block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-foreground leading-6 placeholder-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                className="relative block h-6 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-transparent caret-foreground leading-6 placeholder:text-muted-foreground/60 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                 style={{ fontSize: 'var(--chat-font-input, 0.875rem)' }}
               />
             </div>
