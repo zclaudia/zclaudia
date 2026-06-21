@@ -396,3 +396,30 @@ describe('storage/db', () => {
     });
   });
 });
+
+describe('migration 023: session fork lineage', () => {
+  it('023: sessions has fork lineage columns with ON DELETE SET NULL', async () => {
+    const { default: Database } = await vi.importActual<typeof import('better-sqlite3')>('better-sqlite3');
+    const { applyMigrations } = await vi.importActual<typeof import('../migrations/index.js')>('../migrations/index.js');
+
+    const db = new Database(':memory:');
+    db.pragma('foreign_keys = ON');
+    applyMigrations(db);
+
+    const cols = (db.prepare(`PRAGMA table_info(sessions)`).all() as Array<{ name: string }>).map((c) => c.name);
+    expect(cols).toContain('forked_from_session_id');
+    expect(cols).toContain('fork_entry_id');
+
+    db.prepare(`INSERT INTO llm_profiles (id, name, provider_type, created_at, updated_at) VALUES ('l1','default','anthropic',1,1)`).run();
+    db.prepare(`INSERT INTO projects (id, name, created_at, updated_at) VALUES ('p1','p',1,1)`).run();
+    db.prepare(`INSERT INTO agent_profiles (id, name, llm_profile_id, created_at, updated_at) VALUES ('a1','a','l1',1,1)`).run();
+    db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, type, created_at, updated_at) VALUES ('parent','p1','a1','regular',1,1)`).run();
+    db.prepare(`INSERT INTO sessions (id, project_id, agent_profile_id, type, forked_from_session_id, fork_entry_id, created_at, updated_at) VALUES ('child','p1','a1','regular','parent','e1',1,1)`).run();
+
+    db.prepare(`DELETE FROM sessions WHERE id = 'parent'`).run();
+    const child = db.prepare(`SELECT forked_from_session_id AS f FROM sessions WHERE id = 'child'`).get() as { f: string | null };
+    expect(child).toBeTruthy();
+    expect(child.f).toBeNull();
+    db.close();
+  });
+});
