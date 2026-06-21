@@ -36,13 +36,27 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
     arr.sort((a, b) => (Number(b.onActivePath) - Number(a.onActivePath)) || a.timestamp.localeCompare(b.timestamp));
   }
 
-  const renderRootOf = (sessionId: string): GraphNode | undefined => {
+  // nodes grouped by session (built once; avoids filter-in-loop).
+  const nodesBySession = new Map<string, GraphNode[]>();
+  for (const n of graph.nodes) {
+    const arr = nodesBySession.get(n.sessionId) ?? [];
+    arr.push(n);
+    nodesBySession.set(n.sessionId, arr);
+  }
+
+  // Render roots for a session. Forked child → its forkBase only. Family root →
+  // the isRoot node; if absent (truncated), EVERY node whose parent was cut away
+  // becomes its own root so no subtree is silently dropped.
+  const renderRootsOf = (sessionId: string): GraphNode[] => {
     const lane = laneBySession.get(sessionId);
-    const inSession = graph.nodes.filter((n) => n.sessionId === sessionId);
+    const inSession = nodesBySession.get(sessionId) ?? [];
     if (lane?.forkedFromSessionId && lane.forkEntryId) {
-      return inSession.find((n) => n.isForkBase) ?? inSession.find((n) => n.entryId === lane.forkEntryId);
+      const fb = inSession.find((n) => n.isForkBase) ?? inSession.find((n) => n.entryId === lane.forkEntryId);
+      return fb ? [fb] : [];
     }
-    return inSession.find((n) => n.isRoot) ?? inSession.find((n) => !n.parentNodeId || !nodeById.has(n.parentNodeId));
+    const explicit = inSession.find((n) => n.isRoot);
+    if (explicit) return [explicit];
+    return inSession.filter((n) => !n.parentNodeId || !nodeById.has(n.parentNodeId));
   };
 
   const depthByNodeId = new Map<string, number>();
@@ -52,39 +66,49 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
   const sessionsInOrder = [...graph.sessions].sort((a, b) => a.laneOrder - b.laneOrder);
 
   for (const lane of sessionsInOrder) {
-    const root = renderRootOf(lane.id);
-    if (!root) continue;
-    let rootDepth = 0;
-    if (lane.forkedFromSessionId && lane.forkEntryId) {
-      const parentForkNodeId = `${lane.forkedFromSessionId}:${lane.forkEntryId}`;
-      rootDepth = depthByNodeId.get(parentForkNodeId) ?? 0;
-    }
-    let nextSublane = 1;
+    const roots = renderRootsOf(lane.id);
+    if (roots.length === 0) continue;
+    let nextSublane = 1; // monotonic per session → sub-lane x never collides
 
-    const stack: Array<{ node: GraphNode; depth: number; sublane: number }> = [{ node: root, depth: rootDepth, sublane: 0 }];
-    while (stack.length) {
-      const { node, depth, sublane } = stack.pop()!;
-      if (placed.has(node.nodeId)) continue;
-      depthByNodeId.set(node.nodeId, depth);
-      placed.set(node.nodeId, {
-        nodeId: node.nodeId, sessionId: node.sessionId,
-        x: baseX(lane.id) + sublane * SUBLANE_GAP, y: MARGIN_TOP + depth * ROW_GAP, node,
-      });
-      const kids = childrenByParent.get(node.nodeId) ?? [];
-      let degraded = 0;
-      const frames: Array<{ node: GraphNode; depth: number; sublane: number }> = [];
-      kids.forEach((kid, i) => {
-        if (i === 0) { frames.push({ node: kid, depth: depth + 1, sublane }); return; }
-        const sl = nextSublane++;
-        if (sl >= MAX_SUBLANES) { degraded++; return; }
-        frames.push({ node: kid, depth: depth + 1, sublane: sl });
-      });
-      if (degraded > 0) {
-        const self = placed.get(node.nodeId)!;
-        badges.push({ branchNodeId: node.nodeId, x: self.x, y: self.y, count: degraded });
+    roots.forEach((root, rootIdx) => {
+      let rootDepth = 0;
+      let rootSublane = 0;
+      if (lane.forkedFromSessionId && lane.forkEntryId) {
+        // If the parent fork point was truncated away it isn't placed yet, so this
+        // misses and the child band silently starts at depth 0 (and the fork edge is
+        // dropped below). Intentional safe degrade for truncated graphs.
+        const parentForkNodeId = `${lane.forkedFromSessionId}:${lane.forkEntryId}`;
+        rootDepth = depthByNodeId.get(parentForkNodeId) ?? 0;
+      } else if (rootIdx > 0) {
+        rootSublane = nextSublane++; // extra dangling root → its own dogleg column
       }
-      for (let i = frames.length - 1; i >= 0; i--) stack.push(frames[i]);
-    }
+
+      const stack: Array<{ node: GraphNode; depth: number; sublane: number }> = [{ node: root, depth: rootDepth, sublane: rootSublane }];
+      while (stack.length) {
+        const { node, depth, sublane } = stack.pop()!;
+        if (placed.has(node.nodeId)) continue;
+        depthByNodeId.set(node.nodeId, depth);
+        placed.set(node.nodeId, {
+          nodeId: node.nodeId, sessionId: node.sessionId,
+          x: baseX(lane.id) + sublane * SUBLANE_GAP, y: MARGIN_TOP + depth * ROW_GAP, node,
+        });
+        const kids = childrenByParent.get(node.nodeId) ?? [];
+        let doglegCount = 0; // per-branch-point cap (NOT cumulative across the session)
+        let degraded = 0;
+        const frames: Array<{ node: GraphNode; depth: number; sublane: number }> = [];
+        kids.forEach((kid, i) => {
+          if (i === 0) { frames.push({ node: kid, depth: depth + 1, sublane }); return; }
+          doglegCount++;
+          if (doglegCount >= MAX_SUBLANES) { degraded++; return; }
+          frames.push({ node: kid, depth: depth + 1, sublane: nextSublane++ });
+        });
+        if (degraded > 0) {
+          const self = placed.get(node.nodeId)!;
+          badges.push({ branchNodeId: node.nodeId, x: self.x, y: self.y, count: degraded });
+        }
+        for (let i = frames.length - 1; i >= 0; i--) stack.push(frames[i]);
+      }
+    });
   }
 
   const edges: LayoutEdge[] = [];

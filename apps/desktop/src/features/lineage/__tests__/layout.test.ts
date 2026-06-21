@@ -121,3 +121,38 @@ describe('computeLayout — intra-session branches', () => {
     expect(badge?.count).toBe(3);
   });
 });
+
+describe('computeLayout — truncation & multi-branch robustness', () => {
+  it('places all dangling-root siblings when their shared parent was truncated (I1)', () => {
+    const DANGLING: ContextGraph = {
+      rootSessionId: 'S0', focusSessionId: 'S0', truncated: true, forkEdges: [],
+      sessions: [{ id: 'S0', name: 'main', forkedFromSessionId: null, forkEntryId: null, createdAt: 1, archived: false, laneOrder: 0 }],
+      nodes: [
+        node({ nodeId: 'S0:a', sessionId: 'S0', entryId: 'a', parentNodeId: 'S0:gone', timestamp: '2026-01-01T00:00:00Z' }),
+        node({ nodeId: 'S0:b', sessionId: 'S0', entryId: 'b', parentNodeId: 'S0:gone', onActivePath: false, timestamp: '2026-01-02T00:00:00Z' }),
+      ],
+    };
+    const ids = computeLayout(DANGLING).nodes.map((n) => n.nodeId).sort();
+    expect(ids).toEqual(['S0:a', 'S0:b']);
+  });
+
+  it('caps doglegs per branch point, not cumulatively across the session (I2)', () => {
+    const G: ContextGraph = {
+      rootSessionId: 'S0', focusSessionId: 'S0', truncated: false, forkEdges: [],
+      sessions: [{ id: 'S0', name: 'main', forkedFromSessionId: null, forkEntryId: null, createdAt: 1, archived: false, laneOrder: 0 }],
+      nodes: [
+        node({ nodeId: 'S0:r', sessionId: 'S0', entryId: 'r', isRoot: true }),
+        node({ nodeId: 'S0:bp1', sessionId: 'S0', entryId: 'bp1', isBranchPoint: true, parentNodeId: 'S0:r' }),
+        node({ nodeId: 'S0:bp1t0', sessionId: 'S0', entryId: 'bp1t0', isBranchTip: true, onActivePath: false, parentNodeId: 'S0:bp1', timestamp: '2026-01-02T00:00:00Z' }),
+        node({ nodeId: 'S0:bp1t1', sessionId: 'S0', entryId: 'bp1t1', isBranchTip: true, onActivePath: false, parentNodeId: 'S0:bp1', timestamp: '2026-01-03T00:00:00Z' }),
+        node({ nodeId: 'S0:bp2', sessionId: 'S0', entryId: 'bp2', isBranchPoint: true, parentNodeId: 'S0:bp1' }),
+        node({ nodeId: 'S0:active', sessionId: 'S0', entryId: 'active', entryType: 'leaf', isActiveLeaf: true, parentNodeId: 'S0:bp2' }),
+        node({ nodeId: 'S0:bp2t0', sessionId: 'S0', entryId: 'bp2t0', isBranchTip: true, onActivePath: false, parentNodeId: 'S0:bp2', timestamp: '2026-01-02T00:00:00Z' }),
+      ],
+    };
+    const m = computeLayout(G);
+    const ids = new Set(m.nodes.map((n) => n.nodeId));
+    expect(ids.has('S0:bp2t0')).toBe(true); // bp1 used doglegs, but bp2's lone extra child must still render
+    expect(m.badges.find((b) => b.branchNodeId === 'S0:bp2')).toBeUndefined();
+  });
+});
