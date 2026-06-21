@@ -21,7 +21,8 @@ function createTestDb(): Database.Database {
       content TEXT NOT NULL,
       metadata TEXT,
       created_at INTEGER NOT NULL,
-      offset INTEGER
+      offset INTEGER,
+      tree_entry_id TEXT
     );
   `);
 

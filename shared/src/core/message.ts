@@ -24,6 +24,8 @@ export interface Message {
   metadata?: MessageMetadata;
   createdAt: number;
   offset?: number;  // Per-session sequential message number (for gap detection)
+  /** Tree entry id this UI row projects from. Stable cross-reference for fork/branch targeting (SP-A). */
+  treeEntryId?: string;
 }
 
 export type ContentBlock =

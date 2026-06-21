@@ -23,6 +23,8 @@ import { migration as m_020_backfill_message_offset } from './020_backfill_messa
 import { migration as m_021_session_entries } from './021_session_entries.js';
 import { migration as m_022_drop_session_compactions } from './022_drop_session_compactions.js';
 import { migration as m_023_web_search_config } from './023_web_search_config.js';
+import { migration as m_024_session_fork_lineage } from './024_session_fork_lineage.js';
+import { migration as m_025_message_tree_entry_id } from './025_message_tree_entry_id.js';
 
 export type { Migration };
 
@@ -50,6 +52,8 @@ export const migrations: Migration[] = [
   m_021_session_entries,
   m_022_drop_session_compactions,
   m_023_web_search_config,
+  m_024_session_fork_lineage,
+  m_025_message_tree_entry_id,
 ];
 
 /**

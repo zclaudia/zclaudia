@@ -10,6 +10,7 @@ import { SessionHeader } from './SessionHeader';
 import { BackgroundTaskPanel } from '../../components/BackgroundTaskPanel';
 import { DraftLockPrompt } from '../../components/draft/DraftLockPrompt';
 import { TaskCardStrip } from '../supervision/components/TaskCardStrip';
+import { forkSession, branchSession } from '../../services/api';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
 import { useComposerStore, type SessionDraft } from '../../stores/composerStore';
 import { useServerStore } from '../../stores/serverStore';
@@ -22,13 +23,17 @@ import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChatSession } from '../../hooks/chat/useChatSession';
 import { useSendMessage } from '../../hooks/chat/useSendMessage';
 import { useCommandHandler } from '../../hooks/chat/useCommandHandler';
-import { useMessagePagination } from '../../hooks/chat/useMessagePagination';
+import { useMessagePagination, restoreToolCalls } from '../../hooks/chat/useMessagePagination';
 import { useSessionActions } from '../../hooks/chat/useSessionActions';
 import { usePlanStatus } from '../../hooks/chat/usePlanStatus';
 import { useKeyboardShortcuts } from '../../hooks/chat/useKeyboardShortcuts';
 import { useMobileViewport } from '../../hooks/chat/useMobileViewport';
 import { useSessionRoute } from '../../hooks/chat/useSessionRoute';
 import type { ClientMessage } from '@zclaudia/shared';
+import { useProjectStore } from '../../stores/projectStore';
+import { useToastStore } from '../../stores/toastStore';
+import { useChatMessageStore } from '../../stores/chatMessageStore';
+import * as api from '../../services/api';
 
 interface ChatInterfaceProps {
   sessionId: string;
@@ -165,6 +170,52 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
 
   const poppedOutLabel = poppedOutSessions.get(sessionId);
 
+  // ── SP-A fork/branch handlers ──
+
+  const handleFork = useCallback(async (treeEntryId: string) => {
+    const name = window.prompt('Name for the forked session (leave blank for auto):')?.trim() || undefined;
+    try {
+      const newSession = await forkSession(sessionId, treeEntryId, name);
+      // Register the new session in the project store and switch to it
+      useProjectStore.getState().addSession(newSession);
+      useProjectStore.getState().selectSession(newSession.id, newSession.projectId);
+      useToastStore.getState().add({
+        title: 'Session forked',
+        message: newSession.name || 'New session created from this point',
+        type: 'success',
+        sessionId: newSession.id,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      useToastStore.getState().add({ title: 'Fork failed', message: msg, type: 'error', icon: 'error' });
+      console.error('[ChatInterface] fork failed:', err);
+    }
+  }, [sessionId]);
+
+  const handleBranch = useCallback(async (treeEntryId: string) => {
+    const confirmed = window.confirm(
+      'Branch from here (rewind)?\n\nThis rewinds the conversation to this point and rewrites the timeline. The old branch is kept and can be returned to.'
+    );
+    if (!confirmed) return;
+    try {
+      await branchSession(sessionId, treeEntryId);
+      // Reload messages for this session (full replace) — mirrors the initial-load path in useMessagePagination
+      const result = await api.getSessionMessages(sessionId, { limit: 50 });
+      const restoredMessages = restoreToolCalls(result.messages);
+      useChatMessageStore.getState().setMessages(sessionId, restoredMessages, result.pagination);
+      useToastStore.getState().add({
+        title: 'Session rewound',
+        message: 'The conversation has been branched from this point.',
+        type: 'success',
+        sessionId,
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      useToastStore.getState().add({ title: 'Branch failed', message: msg, type: 'error', icon: 'error' });
+      console.error('[ChatInterface] branch failed:', err);
+    }
+  }, [sessionId]);
+
   // Brand-new session with no messages and nothing running: center the composer
   // in the viewport (Cursor-style) instead of pinning it to the bottom.
   const isEmptySession =
@@ -294,6 +345,8 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
         onPermissionDecision={handlePermissionDecision}
         fileReferenceRoot={fileReferenceRoot}
         fileReferenceBackendId={fileReferenceBackendId}
+        onFork={handleFork}
+        onBranch={handleBranch}
         collapsed={isEmptySession}
       />
 

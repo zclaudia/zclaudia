@@ -151,7 +151,9 @@ function createDb(): Database.Database {
       is_read_only INTEGER,
       last_run_status TEXT,
       updated_at INTEGER,
-      archived_at INTEGER
+      archived_at INTEGER,
+      forked_from_session_id TEXT,
+      fork_entry_id TEXT
     );
 
     CREATE TABLE messages (
@@ -161,7 +163,8 @@ function createDb(): Database.Database {
       content TEXT NOT NULL,
       metadata TEXT,
       created_at INTEGER NOT NULL,
-      offset INTEGER
+      offset INTEGER,
+      tree_entry_id TEXT
     );
 
     CREATE TABLE IF NOT EXISTS permission_memories (

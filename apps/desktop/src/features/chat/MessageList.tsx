@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Brain, ChevronRight, Image, Copy, Check, Terminal } from 'lucide-react';
+import { Brain, ChevronRight, Image, Copy, Check, Terminal, MoreHorizontal, GitFork, GitBranch } from 'lucide-react';
 import { ToolCallList } from './tool-call/ToolCallList';
 import { FilePushCard } from './FilePushNotification';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -145,6 +145,13 @@ interface MessageListProps {
   fileReferenceRoot?: string;
   /** Backend that owns the project root — used for cross-gateway file lookups. */
   fileReferenceBackendId?: string | null;
+  /**
+   * SP-A fork/branch callbacks. Both are gated on `message.treeEntryId` being set.
+   * onFork: copy history up to this message into a new session.
+   * onBranch: rewind this session to this message (replaces timeline).
+   */
+  onFork?: (treeEntryId: string) => void;
+  onBranch?: (treeEntryId: string) => void;
 }
 
 const VIRTUALIZE_THRESHOLD = 80;
@@ -185,6 +192,8 @@ export const MessageList = memo(function MessageList({
   resendDisabled = false,
   fileReferenceRoot,
   fileReferenceBackendId,
+  onFork,
+  onBranch,
 }: MessageListProps) {
   const fileRefContextValue = useMemo<FileRefContextValue>(
     () => ({ projectRoot: fileReferenceRoot, backendId: fileReferenceBackendId }),
@@ -375,10 +384,12 @@ export const MessageList = memo(function MessageList({
           showResend={message.id === resendTargetMessageId}
           onResend={message.id === resendTargetMessageId ? onResendTarget : undefined}
           resendDisabled={resendDisabled}
+          onFork={onFork}
+          onBranch={onBranch}
         />
       </div>
     );
-  }, [filePushItems, filteredMessages.length, highlightedMessageId, lastAssistantIndex, streamingContentBlocks, streamingToolCalls, resendTargetMessageId, onResendTarget, resendDisabled]);
+  }, [filePushItems, filteredMessages.length, highlightedMessageId, lastAssistantIndex, streamingContentBlocks, streamingToolCalls, resendTargetMessageId, onResendTarget, resendDisabled, onFork, onBranch]);
 
   const virtualWindow = useMemo(() => {
     if (!shouldVirtualize) {
@@ -780,13 +791,76 @@ const SegmentedContent = memo(function SegmentedContent({
   );
 });
 
-const MessageItem = memo(function MessageItem({ message, streamingContentBlocks, streamingToolCalls, showResend, onResend, resendDisabled }: {
+/**
+ * Small floating action menu shown on hover for messages that carry a `treeEntryId`.
+ * Provides "Fork into new session" and "Branch from here (rewind)" SP-A actions.
+ */
+function MessageActionsMenu({
+  treeEntryId,
+  onFork,
+  onBranch,
+}: {
+  treeEntryId: string;
+  onFork: (treeEntryId: string) => void;
+  onBranch: (treeEntryId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  return (
+    <div ref={menuRef} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className="flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors"
+        title="Message actions"
+        aria-label="Message actions"
+      >
+        <MoreHorizontal size={14} strokeWidth={1.5} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm">
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onFork(treeEntryId); }}
+          >
+            <GitFork size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />
+            <span>Fork into new session</span>
+          </button>
+          <button
+            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); onBranch(treeEntryId); }}
+          >
+            <GitBranch size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />
+            <span>Branch from here (rewind)</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const MessageItem = memo(function MessageItem({ message, streamingContentBlocks, streamingToolCalls, showResend, onResend, resendDisabled, onFork, onBranch }: {
   message: MessageWithToolCalls;
   streamingContentBlocks?: ContentBlock[];
   streamingToolCalls?: ToolCallState[];
   showResend?: boolean;
   onResend?: () => void;
   resendDisabled?: boolean;
+  onFork?: (treeEntryId: string) => void;
+  onBranch?: (treeEntryId: string) => void;
 }) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
@@ -817,6 +891,12 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
   const metadataThinkingBlocks = !isUser && !isSystem ? message.metadata?.thinkingBlocks : undefined;
   const hasMetadataThinking = Boolean(metadataThinkingBlocks && metadataThinkingBlocks.length > 0);
 
+  // Hover state for the message actions menu
+  const [hovered, setHovered] = useState(false);
+
+  // Show the actions menu when the message has a treeEntryId and callbacks are provided
+  const showActionsMenu = Boolean(message.treeEntryId && onFork && onBranch);
+
   if (useSegmented) {
     // Segmented rendering: streaming blocks take priority over finalized blocks
     const blocks = streamingContentBlocks || message.contentBlocks!;
@@ -829,8 +909,20 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
     return (
       <div
         data-role={message.role}
-        className="flex flex-col items-start min-w-0 max-w-full"
+        className="relative flex flex-col items-start min-w-0 max-w-full group/msgitem"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
       >
+        {/* Message actions menu — top-right corner on hover */}
+        {showActionsMenu && hovered && (
+          <div className="absolute top-0 right-0 z-10">
+            <MessageActionsMenu
+              treeEntryId={message.treeEntryId!}
+              onFork={onFork!}
+              onBranch={onBranch!}
+            />
+          </div>
+        )}
         {hasMetadataThinking && (
           <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
             <ThinkingBlocksCard blocks={metadataThinkingBlocks!} />
@@ -856,10 +948,23 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
   return (
     <div
       data-role={message.role}
-      className={`flex flex-col min-w-0 ${isUser ? 'items-end' : 'items-start'} ${
+      className={`relative flex flex-col min-w-0 ${isUser ? 'items-end' : 'items-start'} ${
         isSystem ? 'opacity-60' : ''
       }`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
+      {/* Message actions menu — top-right corner on hover */}
+      {showActionsMenu && hovered && (
+        <div className="absolute top-0 right-0 z-10">
+          <MessageActionsMenu
+            treeEntryId={message.treeEntryId!}
+            onFork={onFork!}
+            onBranch={onBranch!}
+          />
+        </div>
+      )}
+
       {/* Structured thinking blocks from metadata (pi-runtime) */}
       {hasMetadataThinking && (
         <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">

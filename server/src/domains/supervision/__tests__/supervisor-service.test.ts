@@ -175,6 +175,8 @@ function createTestDb(): Database.Database {
       plan_status TEXT,
       is_read_only INTEGER DEFAULT 0,
       last_run_status TEXT,
+      forked_from_session_id TEXT,
+      fork_entry_id TEXT,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
@@ -188,6 +190,7 @@ function createTestDb(): Database.Database {
       metadata TEXT,
       created_at INTEGER NOT NULL,
       offset INTEGER,
+      tree_entry_id TEXT,
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
     );
 
