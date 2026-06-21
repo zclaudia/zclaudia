@@ -1787,4 +1787,121 @@ internal reasoning zclaudia plan
       ]);
     });
   });
+
+  describe('POST /api/sessions/:id/branch — run-active + validation guards', () => {
+    beforeEach(() => {
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run('s1', 'project-1', 'Test Session', now, now);
+    });
+
+    it('returns 409 SESSION_RUNNING when the session has an active run', async () => {
+      activeRuns.set('run-1', { sessionId: 's1', phase: 'running', sessionType: 'regular' });
+
+      const res = await request(app)
+        .post('/api/sessions/s1/branch')
+        .send({ treeEntryId: 'entry-abc' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('SESSION_RUNNING');
+    });
+
+    it('returns 409 SESSION_RUNNING even for a background run', async () => {
+      activeRuns.set('run-bg', { sessionId: 's1', phase: 'running', sessionType: 'background' });
+
+      const res = await request(app)
+        .post('/api/sessions/s1/branch')
+        .send({ treeEntryId: 'entry-abc' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('SESSION_RUNNING');
+    });
+
+    it('returns 400 VALIDATION_ERROR when treeEntryId is missing', async () => {
+      const res = await request(app)
+        .post('/api/sessions/s1/branch')
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 400 VALIDATION_ERROR when body is empty', async () => {
+      const res = await request(app)
+        .post('/api/sessions/s1/branch')
+        .send('');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('POST /api/sessions/:id/fork — run-active + validation guards', () => {
+    beforeEach(() => {
+      const now = Date.now();
+      db.prepare(`
+        INSERT INTO sessions (id, project_id, name, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run('s1', 'project-1', 'Test Session', now, now);
+    });
+
+    it('returns 409 SESSION_RUNNING when the session has an active run', async () => {
+      activeRuns.set('run-1', { sessionId: 's1', phase: 'running', sessionType: 'regular' });
+
+      const res = await request(app)
+        .post('/api/sessions/s1/fork')
+        .send({ treeEntryId: 'entry-abc' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('SESSION_RUNNING');
+    });
+
+    it('returns 409 SESSION_RUNNING for non-terminal phases (awaiting_permission)', async () => {
+      activeRuns.set('run-perm', { sessionId: 's1', phase: 'awaiting_permission', sessionType: 'regular' });
+
+      const res = await request(app)
+        .post('/api/sessions/s1/fork')
+        .send({ treeEntryId: 'entry-abc' });
+
+      expect(res.status).toBe(409);
+      expect(res.body.error.code).toBe('SESSION_RUNNING');
+    });
+
+    it('returns 400 VALIDATION_ERROR when treeEntryId is missing', async () => {
+      const res = await request(app)
+        .post('/api/sessions/s1/fork')
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(res.body.success).toBe(false);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 400 VALIDATION_ERROR when body is empty', async () => {
+      const res = await request(app)
+        .post('/api/sessions/s1/fork')
+        .send('');
+
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('does NOT return 409 when the run for the session is in a terminal phase', async () => {
+      // A completed run should not block fork/branch — only non-terminal phases do.
+      activeRuns.set('run-done', { sessionId: 's1', phase: 'completed', sessionType: 'regular' });
+
+      const res = await request(app)
+        .post('/api/sessions/s1/fork')
+        .send({ treeEntryId: 'entry-xyz' });
+
+      // Will fail (404 NOT_FOUND or 400 INVALID_ENTRY) since the entry doesn't exist,
+      // but it should NOT be 409 SESSION_RUNNING.
+      expect(res.status).not.toBe(409);
+    });
+  });
 });

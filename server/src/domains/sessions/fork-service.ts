@@ -47,7 +47,7 @@ export async function forkSession(db: Database, input: ForkInput, deps: ForkDeps
     sortOrder,
     forkedFromSessionId: source.id,
     forkEntryId: input.treeEntryId,
-  } as Omit<Session, 'id' | 'createdAt' | 'updatedAt'>);
+  });
   const newSessionId = params[0] as string;
 
   // Tx 1: create the new session row + copy the source path (sets the new leaf).
