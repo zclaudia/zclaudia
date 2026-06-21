@@ -103,6 +103,7 @@ export function ChatInputArea({
   const fileViewerPanelActive = usePanelIsActive('file-viewer');
   const terminalPanelActive = usePanelIsActive('terminal');
   const changesPanelActive = usePanelIsActive('session-changes');
+  const lineagePanelActive = usePanelIsActive('lineage');
 
   // Tool panel open/close handlers — shared by the mobile toolbar and the desktop
   // right-sidebar pinned tab strip (published to the store below).
@@ -137,6 +138,15 @@ export function ChatInputArea({
       activatePanel('session-changes');
     }
   }, [changesPanelActive]);
+  const openLineageTool = useCallback(() => {
+    const store = usePluginStore.getState();
+    if (lineagePanelActive) {
+      store.updatePanelVisibility('lineage', false);
+    } else {
+      store.updatePanelVisibility('lineage', true);
+      activatePanel('lineage');
+    }
+  }, [lineagePanelActive]);
   const openTerminalTool = useCallback(() => {
     if (!terminalProjectId) return;
     const open = isDrawerOpen(terminalProjectId);
@@ -170,8 +180,11 @@ export function ChatInputArea({
     if (!disabledBuiltinPanels.includes('terminal') && terminalSupported && terminalProjectId) {
       tools.push({ id: 'terminal', label: 'Terminal', iconKey: 'terminal', isActive: isDrawerOpen(terminalProjectId) && terminalPanelActive, onClick: openTerminalTool });
     }
+    if (!disabledBuiltinPanels.includes('lineage') && currentSession) {
+      tools.push({ id: 'lineage', label: 'Lineage', iconKey: 'lineage', isActive: lineagePanelActive, onClick: openLineageTool });
+    }
     return tools;
-  }, [disabledBuiltinPanels, draftPanelActive, draftExists, fileViewerPanelActive, changesPanelActive, terminalPanelActive, terminalSupported, terminalProjectId, isDrawerOpen, currentProject?.rootPath, currentSession, openDraftTool, openFilesTool, openChangesTool, openTerminalTool]);
+  }, [disabledBuiltinPanels, draftPanelActive, draftExists, fileViewerPanelActive, changesPanelActive, terminalPanelActive, lineagePanelActive, terminalSupported, terminalProjectId, isDrawerOpen, currentProject?.rootPath, currentSession, openDraftTool, openFilesTool, openChangesTool, openTerminalTool, openLineageTool]);
 
   // Publish to the right-sidebar pinned strip (desktop only; mobile renders inline below).
   const setSessionTools = useSessionToolsStore((s) => s.setTools);

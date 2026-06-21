@@ -12,7 +12,7 @@ export interface SessionTool {
   /** Matches the panel id (e.g. 'terminal', 'session-changes') for active/content sync. */
   id: string;
   label: string;
-  iconKey: 'draft' | 'file' | 'changes' | 'terminal';
+  iconKey: 'draft' | 'file' | 'changes' | 'terminal' | 'lineage';
   isActive: boolean;
   hasBadge?: boolean;
   onClick: () => void;

@@ -23,6 +23,9 @@ vi.mock('../../features/changes/ChangesPanel', () => ({
 vi.mock('../../features/memory/MemoryPanel', () => ({
   MemoryPanel: () => null,
 }));
+vi.mock('../../features/lineage/LineagePanel', () => ({
+  LineagePanel: () => null,
+}));
 vi.mock('../../stores/terminalStore', () => ({
   useTerminalStore: { getState: () => ({ drawerOpen: {}, setDrawerOpen: vi.fn() }) },
 }));
@@ -48,7 +51,7 @@ describe('initBuiltinPanels', () => {
     const { initBuiltinPanels } = await import('../builtinPanels');
     initBuiltinPanels();
 
-    expect(registerSpy).toHaveBeenCalledTimes(6);
+    expect(registerSpy).toHaveBeenCalledTimes(7);
     expect(registerSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'terminal', pluginId: 'com.claudia.terminal' })
     );
@@ -81,5 +84,22 @@ describe('initBuiltinPanels', () => {
         expect.objectContaining({ id, defaultPlacement: 'right' }),
       );
     }
+  });
+
+  it('registers the lineage panel for desktop', async () => {
+    const registerSpy = vi.fn();
+    usePluginStore.setState({ registerPanel: registerSpy } as any);
+
+    const { initBuiltinPanels } = await import('../builtinPanels');
+    initBuiltinPanels();
+
+    expect(registerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'lineage',
+        pluginId: 'com.claudia.lineage',
+        platforms: ['desktop'],
+        component: expect.any(Function),
+      }),
+    );
   });
 });

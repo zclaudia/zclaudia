@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, type LucideIcon } from 'lucide-react';
+import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, GitFork, type LucideIcon } from 'lucide-react';
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
 import { usePluginStore } from '../stores/pluginStore';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
@@ -13,6 +13,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
   file: FileText,
   changes: FileDiff,
   terminal: TerminalIcon,
+  lineage: GitFork,
 };
 
 interface RightSidebarProps {

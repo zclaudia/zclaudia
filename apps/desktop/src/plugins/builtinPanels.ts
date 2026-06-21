@@ -14,6 +14,7 @@ import { DraftPanel } from '../components/draft/DraftPanel';
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel';
 import { ChangesPanel } from '../features/changes/ChangesPanel';
 import { MemoryPanel } from '../features/memory/MemoryPanel';
+import { LineagePanel } from '../features/lineage/LineagePanel';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useFileViewerStore } from '../stores/fileViewerStore';
 import { useDraftEditorStore } from '../stores/draftEditorStore';
@@ -139,6 +140,23 @@ export function initBuiltinPanels() {
     visible: false,
     onClose: () => {
       usePluginStore.getState().updatePanelVisibility('notifications', false);
+    },
+  });
+
+  registerPanel({
+    id: 'lineage',
+    pluginId: 'com.claudia.lineage',
+    type: 'panel',
+    label: 'Lineage',
+    icon: 'GitFork',
+    component: LineagePanel,
+    order: 6,
+    platforms: ['desktop'],
+    defaultPlacement: 'right',
+    alwaysMount: false,
+    visible: false,
+    onClose: () => {
+      usePluginStore.getState().updatePanelVisibility('lineage', false);
     },
   });
 
