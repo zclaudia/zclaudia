@@ -47,6 +47,13 @@ function detectLanguage(filePath: string): string {
   return EXT_TO_LANG[ext] || 'text';
 }
 
+/** Splits a relative path into directory segments + filename for breadcrumb display. */
+function breadcrumbSegments(relativePath: string): { dirs: string[]; file: string } {
+  const parts = relativePath.split('/').filter(Boolean);
+  const file = parts.pop() ?? relativePath;
+  return { dirs: parts, file };
+}
+
 interface FileViewerPanelProps {
   projectRoot: string;
 }
@@ -357,19 +364,20 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
       {/* File path indicator */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-background/95 flex-shrink-0 min-w-0">
         {headerIcon}
-        <span className={`text-xs font-mono truncate ${filePath ? 'text-foreground' : 'text-muted-foreground'}`} title={filePath || ''}>
-          {filePath || 'No file selected'}
-        </span>
-        {filePath && (
-          <span className="hidden sm:inline text-[11px] text-muted-foreground truncate">
-            {projectRoot}
+        {filePath ? (
+          <span
+            className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
+            title={filePath}
+          >
+            {breadcrumbSegments(filePath).dirs.map((dir, i) => (
+              <span key={i} className="flex items-center gap-1 text-muted-foreground/80">
+                <span className="truncate">{dir}</span>
+                <span aria-hidden="true" className="text-muted-foreground/40">/</span>
+              </span>
+            ))}
+            <span className="truncate text-foreground">{breadcrumbSegments(filePath).file}</span>
           </span>
-        )}
-        {filePath && lang && lang !== 'text' && (
-          <span className="ml-auto hidden shrink-0 rounded bg-secondary/60 px-1.5 py-0.5 text-[10px] capitalize text-muted-foreground sm:inline">
-            {lang}
-          </span>
-        )}
+        ) : null}
         {!isMobile && (
           <button
             type="button"

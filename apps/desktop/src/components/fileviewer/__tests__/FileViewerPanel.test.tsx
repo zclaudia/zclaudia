@@ -110,10 +110,15 @@ describe('FileViewerPanel', () => {
     expect(screen.getByText('No file selected')).toBeInTheDocument();
   });
 
-  it('shows file path when a file is open', () => {
-    mockFileViewerState.filePath = 'src/index.ts';
+  it('shows the file path as a breadcrumb when a file is open', () => {
+    mockFileViewerState.filePath = 'server/src/index.ts';
     render(<FileViewerPanel projectRoot="/project" />);
-    expect(screen.getByText('src/index.ts')).toBeInTheDocument();
+    // filename is emphasized as its own element
+    expect(screen.getByText('index.ts')).toBeInTheDocument();
+    // a parent directory segment renders
+    expect(screen.getByText('server')).toBeInTheDocument();
+    // full relative path is preserved for hover/title
+    expect(screen.getByTitle('server/src/index.ts')).toBeInTheDocument();
   });
 
   it('shows loading state', () => {
