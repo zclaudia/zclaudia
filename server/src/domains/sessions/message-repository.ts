@@ -9,6 +9,7 @@ export interface StoredSessionMessage {
   metadata: string | null;
   createdAt: number;
   offset: number | null;
+  treeEntryId?: string;
 }
 
 export interface SessionMessageListOptions {
@@ -40,6 +41,7 @@ export class SessionMessageRepository {
       metadata: row.metadata ?? null,
       createdAt: row.createdAt,
       offset: row.offset ?? null,
+      treeEntryId: row.treeEntryId ?? undefined,
     };
   }
 
@@ -85,7 +87,7 @@ export class SessionMessageRepository {
       const maxOffset = target.offset + afterCount;
 
       query = `
-        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset
+        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset, tree_entry_id as treeEntryId
         FROM messages
         WHERE session_id = ? AND offset BETWEEN ? AND ?
         ORDER BY offset ASC
@@ -93,7 +95,7 @@ export class SessionMessageRepository {
       params = [sessionId, minOffset, maxOffset];
     } else if (afterOffset != null) {
       query = `
-        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset
+        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset, tree_entry_id as treeEntryId
         FROM messages
         WHERE session_id = ? AND offset > ?
         ORDER BY offset ASC
@@ -102,7 +104,7 @@ export class SessionMessageRepository {
       params = [sessionId, afterOffset, limit];
     } else if (before) {
       query = `
-        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset
+        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset, tree_entry_id as treeEntryId
         FROM messages
         WHERE session_id = ? AND created_at < ?
         ORDER BY created_at DESC
@@ -111,7 +113,7 @@ export class SessionMessageRepository {
       params = [sessionId, before, limit];
     } else if (after) {
       query = `
-        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset
+        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset, tree_entry_id as treeEntryId
         FROM messages
         WHERE session_id = ? AND created_at > ?
         ORDER BY created_at ASC
@@ -120,7 +122,7 @@ export class SessionMessageRepository {
       params = [sessionId, after, limit];
     } else {
       query = `
-        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset
+        SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset, tree_entry_id as treeEntryId
         FROM messages
         WHERE session_id = ?
         ORDER BY created_at DESC
@@ -147,7 +149,7 @@ export class SessionMessageRepository {
     );
 
     const row = this.db.prepare(`
-      SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset
+      SELECT id, session_id as sessionId, role, content, metadata, created_at as createdAt, offset, tree_entry_id as treeEntryId
       FROM messages
       WHERE id = ?
     `).get(input.id);

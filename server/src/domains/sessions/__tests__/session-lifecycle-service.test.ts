@@ -29,6 +29,8 @@ function createTestDb(): Database.Database {
       plan_status TEXT,
       is_read_only INTEGER DEFAULT 0,
       last_run_status TEXT,
+      forked_from_session_id TEXT,
+      fork_entry_id TEXT,
       sort_order INTEGER DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL

@@ -174,10 +174,10 @@ describe('SessionRepository', () => {
 
       // params: [id, projectId, name, agentProfileId, sdkSessionId, type, parentSessionId,
       // workingDirectory, sortOrder, projectRole, taskId, planStatus, isReadOnly,
-      // lastRunStatus, createdAt, updatedAt]
-      expect(params[14]).toBeGreaterThanOrEqual(before);
-      expect(params[14]).toBeLessThanOrEqual(after);
-      expect(params[15]).toBe(params[14]); // createdAt === updatedAt
+      // lastRunStatus, forkedFromSessionId, forkEntryId, createdAt, updatedAt]
+      expect(params[16]).toBeGreaterThanOrEqual(before);
+      expect(params[16]).toBeLessThanOrEqual(after);
+      expect(params[17]).toBe(params[16]); // createdAt === updatedAt
     });
   });
 

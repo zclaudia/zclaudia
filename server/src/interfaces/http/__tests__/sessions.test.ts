@@ -56,6 +56,8 @@ function createTestDb(): Database.Database {
       plan_status TEXT,
       is_read_only INTEGER DEFAULT 0,
       last_run_status TEXT,
+      forked_from_session_id TEXT,
+      fork_entry_id TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL,
       updated_at INTEGER NOT NULL,
@@ -70,6 +72,7 @@ function createTestDb(): Database.Database {
       metadata TEXT,
       created_at INTEGER NOT NULL,
       offset INTEGER,
+      tree_entry_id TEXT,
       FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
     );
     CREATE INDEX IF NOT EXISTS idx_messages_session_offset ON messages(session_id, offset);

@@ -34,6 +34,8 @@ export class SessionRepository extends BaseRepository<
       lastRunStatus: row.last_run_status || undefined,
       autoTitle: row.auto_title || undefined,
       autoTitleMsgCount: row.auto_title_msg_count ?? undefined,
+      forkedFromSessionId: row.forked_from_session_id || undefined,
+      forkEntryId: row.fork_entry_id || undefined,
     };
   }
 
@@ -67,9 +69,10 @@ export class SessionRepository extends BaseRepository<
           id, project_id, name, agent_profile_id, sdk_session_id, type,
           parent_session_id, working_directory, sort_order,
           project_role, task_id, plan_status, is_read_only, last_run_status,
+          forked_from_session_id, fork_entry_id,
           created_at, updated_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -86,6 +89,8 @@ export class SessionRepository extends BaseRepository<
         data.planStatus || null,
         data.isReadOnly ? 1 : 0,
         data.lastRunStatus || null,
+        (data as any).forkedFromSessionId || null,
+        (data as any).forkEntryId || null,
         now,
         now,
       ],
