@@ -446,7 +446,7 @@ describe('MessageInput', () => {
 
       expect(screen.getByText('/release-notes')).toBeInTheDocument();
       expect(screen.getByText('<ticket> <title>')).toBeInTheDocument();
-      expect(screen.getByText('skill · 3')).toBeInTheDocument();
+      expect(screen.getByText('×3')).toBeInTheDocument();
       expect(screen.getByText('workspace')).toBeInTheDocument();
       expect(screen.getByText('fork')).toBeInTheDocument();
       expect(screen.queryByText('/model-only')).not.toBeInTheDocument();
