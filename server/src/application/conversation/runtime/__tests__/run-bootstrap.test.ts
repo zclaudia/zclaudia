@@ -68,7 +68,8 @@ function createDb(providerType: string, options: CreateDbOptions = {}): Database
       content TEXT NOT NULL,
       metadata TEXT,
       created_at INTEGER NOT NULL,
-      offset INTEGER
+      offset INTEGER,
+      tree_entry_id TEXT
     );
 
     CREATE TABLE permission_memories (
@@ -485,5 +486,24 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
 
     expect(row.content).toBe('no files');
     expect(row.metadata).toBeNull();
+  });
+});
+
+describe('initializeRunBootstrap dual-write — messages.tree_entry_id', () => {
+  it('populates tree_entry_id on the user messages row to match the session_entries id', () => {
+    const { result, db } = bootstrapWithDb('zclaudia', 'default', 'hello world');
+    expect(result?.userMessageId).toBeDefined();
+
+    const msgRow = db.prepare(
+      `SELECT tree_entry_id AS t FROM messages WHERE id = ?`
+    ).get(result!.userMessageId!) as { t: string | null };
+
+    const entry = db.prepare(
+      `SELECT id FROM session_entries WHERE session_id = ? AND type = 'message' ORDER BY rowid ASC LIMIT 1`
+    ).get('session-1') as { id: string } | undefined;
+
+    expect(entry).toBeDefined();
+    expect(msgRow.t).not.toBeNull();
+    expect(msgRow.t).toBe(entry!.id);
   });
 });

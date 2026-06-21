@@ -296,12 +296,13 @@ export function upsertAssistantMessage(
     }
 
     if (willAppendTree) {
-      appendMessagesToTree(run.db, run.sessionId, buildAssistantTurnMessages({
+      const entryIds = appendMessagesToTree(run.db, run.sessionId, buildAssistantTurnMessages({
         fullContent: run.fullContent,
         thinkingBlocks: run.thinkingBlocks,
         collectedToolCalls: run.collectedToolCalls,
         usage: options?.usage,
       }));
+      run.db.prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`).run(entryIds[0], run.assistantMessageId);
     }
   })();
   if (willAppendTree) run.treeTurnAppended = true;

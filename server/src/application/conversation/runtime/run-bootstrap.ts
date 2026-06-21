@@ -281,7 +281,8 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
         Date.now(),
         userOffset,
       );
-      appendMessagesToTree(db, message.sessionId, [buildUserMessage(parsedInput.text, parsedInput.attachments)]);
+      const entryIds = appendMessagesToTree(db, message.sessionId, [buildUserMessage(parsedInput.text, parsedInput.attachments)]);
+      db.prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`).run(entryIds[0], userMessageId);
     })();
   }
 
