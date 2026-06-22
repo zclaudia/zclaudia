@@ -53,12 +53,12 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
         if (saved) {
           idToUse = saved.id;
         } else {
-          setSignInError('登录前保存 Profile 失败，请先修正表单错误。');
+          setSignInError('Failed to save the profile before signing in. Please fix the form errors first.');
           return;
         }
       } catch (err) {
         console.error('[CodexOAuthSection] onBeforeSignIn threw', err);
-        setSignInError(err instanceof Error ? err.message : '登录前保存 Profile 失败，请稍后重试。');
+        setSignInError(err instanceof Error ? err.message : 'Failed to save the profile before signing in. Please try again later.');
         return;
       } finally {
         setSignInPending(false);

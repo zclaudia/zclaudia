@@ -630,7 +630,7 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
 
           {simResult && simResult.pendingPiAgent && (
             <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg text-xs text-blue-700 dark:text-blue-300">
-              AI Review 等待 pi-agent runtime 接入。pi-agent 集成后 simulator 会调度真实的 zclaudia runtime 返回评审结果。
+              AI Review is waiting for the pi-agent runtime to be wired up. Once pi-agent is integrated, the simulator will dispatch the real zclaudia runtime and return review results.
             </div>
           )}
 

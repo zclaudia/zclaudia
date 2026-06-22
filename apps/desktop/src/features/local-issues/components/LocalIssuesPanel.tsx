@@ -119,7 +119,7 @@ export function LocalIssuesPanel({ projectId, selectedIssueId, onSelectIssue }: 
                 : 'border-border text-muted-foreground hover:bg-muted'
             }`}
           >
-            可动工
+            Actionable
           </button>
         </div>
         <button

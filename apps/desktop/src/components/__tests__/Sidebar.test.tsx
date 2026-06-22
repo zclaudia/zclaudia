@@ -611,7 +611,7 @@ describe('Sidebar', () => {
     fireEvent.click(newProjectBtn);
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain('还没有可用的 Agent');
+      expect(document.body.textContent).toContain('No agent available yet');
     });
     expect(refresh).toHaveBeenCalled();
     expect(container.querySelector('input[placeholder="Project name"]')).toBeFalsy();
@@ -677,7 +677,7 @@ describe('Sidebar', () => {
     });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain('还没有可用的 Agent');
+      expect(document.body.textContent).toContain('No agent available yet');
     });
     expect(api.createProject).not.toHaveBeenCalled();
   });
@@ -953,7 +953,7 @@ describe('Sidebar', () => {
     });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain('还没有可用的 Agent');
+      expect(document.body.textContent).toContain('No agent available yet');
     });
     expect(api.createSession).not.toHaveBeenCalled();
   });
@@ -982,7 +982,7 @@ describe('Sidebar', () => {
     });
 
     await waitFor(() => {
-      expect(document.body.textContent).toContain('模型 Provider 还缺少 API Key');
+      expect(document.body.textContent).toContain('The model provider is missing an API key');
     });
     expect(selectionMocks.selectSession).not.toHaveBeenCalledWith('new-sess');
   });

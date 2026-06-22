@@ -23,13 +23,13 @@ function describeCodexOAuthError(code: string | undefined): string | undefined {
   switch (code) {
     case 'NOT_AUTHENTICATED':
     case 'REFRESH_FAILED_TERMINAL':
-      return 'Codex 凭证已失效，请在设置中重新登录。';
+      return 'Your Codex credentials are no longer valid. Please sign in again in Settings.';
     case 'REFRESH_FAILED_TRANSIENT':
-      return '网络异常，请稍后重试。';
+      return 'Network error. Please try again later.';
     case 'RESPONSE_ENDPOINT_REJECTED':
-      return '当前 ChatGPT 订阅不支持该模型，请检查 plan 或更换模型。';
+      return "Your current ChatGPT subscription doesn't support this model. Check your plan or pick another model.";
     case 'OAUTH_PORT_CONFLICT':
-      return '端口 1455 被占用，请关闭其他正在进行登录的进程后再试。';
+      return 'Port 1455 is in use. Close any other in-progress login and try again.';
     default:
       return undefined;
   }
@@ -155,7 +155,7 @@ export function handleRunMessage(msg: ServerMessage, ctx: MessageDispatchContext
           if (codexToast) {
             useToastStore.getState().add({
               type: 'error',
-              title: 'Codex 认证错误',
+              title: 'Codex authentication error',
               message: codexToast,
               sessionId: failedSession,
               serverId,

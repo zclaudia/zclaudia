@@ -78,7 +78,7 @@ export function WorktreeSelector({
   const ref = useRef<HTMLDivElement>(null);
   const branchInputRef = useRef<HTMLInputElement>(null);
 
-  // 外部点击关闭
+  // Close on outside click
   useEffect(() => {
     if (!isOpen) return;
     const handler = (e: MouseEvent) => {
@@ -94,7 +94,7 @@ export function WorktreeSelector({
     return () => document.removeEventListener('mousedown', handler);
   }, [isOpen]);
 
-  // 显示创建表单时自动聚焦
+  // Auto-focus when the create form is shown
   useEffect(() => {
     if (creating) branchInputRef.current?.focus();
   }, [creating]);
@@ -207,7 +207,7 @@ export function WorktreeSelector({
             Worktree
           </div>
 
-          {/* Root (默认) */}
+          {/* Root (default) */}
           <button
             onClick={() => handleSelect('')}
             className={[
@@ -258,7 +258,7 @@ export function WorktreeSelector({
             );
           })}
 
-          {/* 创建新 worktree */}
+          {/* Create new worktree */}
           <div className="border-t border-border mt-1">
             {!creating ? (
               <button

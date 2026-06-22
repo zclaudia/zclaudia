@@ -34,7 +34,7 @@ export function LineagePanel() {
       if (reqIdRef.current === myReq) setGraph(next);
     } catch {
       if (reqIdRef.current === myReq) {
-        useToastStore.getState().add({ type: 'error', title: '该会话谱系已不可用' });
+        useToastStore.getState().add({ type: 'error', title: 'Lineage for this session is unavailable' });
         setGraph(null);
       }
     } finally {
@@ -84,7 +84,7 @@ export function LineagePanel() {
         {graph && isLinear && <LineageEmptyState />}
         {graph?.truncated && (
           <div className="px-3 py-2 text-[11px] text-muted-foreground">
-            已截断，部分较早节点未显示。
+            Truncated — some earlier nodes are not shown.
           </div>
         )}
       </div>

@@ -39,20 +39,20 @@ export function CodexOAuthCard({
   }, [profile.oauthCredentials]);
 
   const flowHint = isTauri && isCurrentLocalServer
-    ? '使用本机浏览器登录'
-    : '使用 Device Code 流程登录（在 auth.openai.com/codex/device 输入代码）';
+    ? 'Sign in using this machine’s browser'
+    : 'Sign in with the device code flow (enter the code at auth.openai.com/codex/device)';
 
   if (status === 'not_authenticated') {
     return (
       <div className="rounded-lg border border-border bg-secondary/50 p-4">
-        <div className="mb-2 text-sm text-muted-foreground">未登录 ChatGPT</div>
+        <div className="mb-2 text-sm text-muted-foreground">Not signed in to ChatGPT</div>
         <button
           type="button"
           onClick={onSignIn}
           disabled={inFlight}
           className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
         >
-          {inFlight ? '登录中…' : 'Sign in with ChatGPT'}
+          {inFlight ? 'Signing in…' : 'Sign in with ChatGPT'}
         </button>
         <div className="mt-2 text-xs text-muted-foreground">{flowHint}</div>
       </div>
@@ -62,14 +62,14 @@ export function CodexOAuthCard({
   if (status === 'needs_reauth') {
     return (
       <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-4">
-        <div className="mb-2 text-sm text-destructive">凭证已失效，请重新登录</div>
+        <div className="mb-2 text-sm text-destructive">Credentials expired. Please sign in again.</div>
         <button
           type="button"
           onClick={onSignIn}
           disabled={inFlight}
           className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-700 disabled:opacity-50"
         >
-          {inFlight ? '登录中…' : 'Sign in again'}
+          {inFlight ? 'Signing in…' : 'Sign in again'}
         </button>
       </div>
     );
@@ -79,10 +79,10 @@ export function CodexOAuthCard({
   return (
     <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
       <div className="text-sm text-emerald-700 dark:text-emerald-400">
-        已登录账户：<code className="font-mono text-xs">{maskAccountId(creds.accountId)}</code>
+        Signed in as <code className="font-mono text-xs">{maskAccountId(creds.accountId)}</code>
       </div>
       <div className="mt-1 text-xs text-muted-foreground">
-        Token 还剩 {formatExpiry(creds.expires)}
+        Token expires in {formatExpiry(creds.expires)}
       </div>
       <div className="mt-3 flex gap-2">
         <button
@@ -91,7 +91,7 @@ export function CodexOAuthCard({
           disabled={inFlight}
           className="rounded-lg border border-emerald-500/50 px-3 py-1.5 text-xs text-emerald-700 hover:bg-emerald-500/10 disabled:opacity-50 dark:text-emerald-400"
         >
-          重新登录
+          Sign in again
         </button>
         <button
           type="button"
@@ -99,7 +99,7 @@ export function CodexOAuthCard({
           disabled={inFlight}
           className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
         >
-          登出
+          Sign out
         </button>
       </div>
     </div>

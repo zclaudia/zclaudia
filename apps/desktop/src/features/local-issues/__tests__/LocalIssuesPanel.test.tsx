@@ -82,9 +82,9 @@ describe('LocalIssuesPanel - attachment count batching', () => {
 });
 
 describe('LocalIssuesPanel - actionable filter', () => {
-  it('renders a "可动工" filter chip', () => {
+  it('renders an "Actionable" filter chip', () => {
     render(<LocalIssuesPanel projectId="proj-1" selectedIssueId={null} onSelectIssue={() => {}} />);
-    expect(screen.getByRole('button', { name: /可动工/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Actionable/i })).toBeInTheDocument();
   });
 
   it('filters to actionable issues when the chip is active', () => {
@@ -96,7 +96,7 @@ describe('LocalIssuesPanel - actionable filter', () => {
     expect(screen.getByText('Regular bug')).toBeInTheDocument();
     expect(screen.getByText('Saved plan')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /可动工/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Actionable/i }));
 
     expect(screen.queryByText('Regular bug')).not.toBeInTheDocument();
     expect(screen.getByText('Saved plan')).toBeInTheDocument();

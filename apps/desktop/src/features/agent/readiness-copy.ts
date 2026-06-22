@@ -12,27 +12,27 @@ export function readinessGuidance(reason: AgentReadinessReason | undefined): Rea
   switch (reason) {
     case 'no_agent':
       return {
-        title: '还没有可用的 Agent',
-        body: '你还没有配置 Agent。先创建一个 Agent 才能开始。',
+        title: 'No agent available yet',
+        body: "You haven't configured an agent yet. Create one to get started.",
         settingsTab: 'agents',
       };
     case 'no_llm_profile':
       return {
-        title: '还没有可用的 Agent',
-        body: 'Agent 还没有关联可用的模型 Provider。去配置一个。',
+        title: 'No agent available yet',
+        body: 'This agent has no model provider linked. Configure one to continue.',
         settingsTab: 'providers',
       };
     case 'no_model':
       return {
-        title: '还没有可用的 Agent',
-        body: 'Agent 选用的模型未配置，或不在该 Provider 提供的模型列表中。去 Agent 设置里改用一个可用的模型。',
+        title: 'No agent available yet',
+        body: "The agent's selected model isn't configured, or isn't in the list of models offered by its provider. Pick an available model in the agent settings.",
         settingsTab: 'agents',
       };
     case 'no_credential':
     default:
       return {
-        title: '还没有可用的 Agent',
-        body: '模型 Provider 还缺少 API Key（或登录凭据）。补上后即可使用。',
+        title: 'No agent available yet',
+        body: 'The model provider is missing an API key (or login credentials). Add one to continue.',
         settingsTab: 'providers',
       };
   }

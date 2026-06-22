@@ -15,10 +15,10 @@ export function renderExecutionPlanMarkdown(
 ): string {
   const verification = plan.verification.length > 0
     ? plan.verification.map((item) => `- ${item.label}${item.required ? ' (required)' : ''}${item.command ? ` — \`${item.command}\`` : ''}`).join('\n')
-    : '- 暂无结构化验证项';
+    : '- No structured verification items yet';
   const phases = plan.phases && plan.phases.length > 0
     ? plan.phases.map((phase) => `- ${phase.title}: ${phase.summary}`).join('\n')
-    : '- 当前按单阶段执行';
+    : '- Currently running as a single phase';
   return [
     '# Execution Plan',
     '',
@@ -48,7 +48,7 @@ export function renderExecutionPlanMarkdown(
     '',
     '## Risks Before Start',
     '',
-    '- 待补充',
+    '- To be determined',
     '',
   ].join('\n');
 }
@@ -60,7 +60,7 @@ export function renderTasksMarkdown(change: ProjectChange, tasks: SupervisionTas
       '',
       `> Change: ${change.title}`,
       '',
-      '当前还没有生成任务。',
+      'No tasks have been generated yet.',
       '',
     ].join('\n');
   }

@@ -16,14 +16,14 @@ describe('AgentRequiredDialog', () => {
   it('primary button calls onConfigure with the mapped settings tab', () => {
     const onConfigure = vi.fn();
     render(<AgentRequiredDialog open reason="no_agent" onClose={() => {}} onConfigure={onConfigure} />);
-    fireEvent.click(screen.getByText('去配置 →'));
+    fireEvent.click(screen.getByText('Configure →'));
     expect(onConfigure).toHaveBeenCalledWith('agents');
   });
 
   it('secondary button calls onClose', () => {
     const onClose = vi.fn();
     render(<AgentRequiredDialog open reason="no_agent" onClose={onClose} onConfigure={() => {}} />);
-    fireEvent.click(screen.getByText('取消'));
+    fireEvent.click(screen.getByText('Cancel'));
     expect(onClose).toHaveBeenCalled();
   });
 });

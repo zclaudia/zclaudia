@@ -40,7 +40,7 @@ describe('CodexOAuthSection', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
 
     await waitFor(() => {
-      expect(screen.getByText('登录前保存 Profile 失败，请先修正表单错误。')).toBeInTheDocument();
+      expect(screen.getByText('Failed to save the profile before signing in. Please fix the form errors first.')).toBeInTheDocument();
     });
     expect(startCodexOAuth).not.toHaveBeenCalled();
   });

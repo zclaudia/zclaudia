@@ -134,8 +134,8 @@ export function useSendMessage({
     if (!isConnected) {
       useToastStore.getState().add({
         type: 'error',
-        title: '后端未连接',
-        message: '无法发送消息：远程后端未连接。请稍后重试。',
+        title: 'Backend not connected',
+        message: 'Cannot send message: the remote backend is not connected. Please try again later.',
       });
       return;
     }

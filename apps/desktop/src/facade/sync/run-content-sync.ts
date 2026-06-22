@@ -39,7 +39,7 @@ export function syncContentPatch(event: Extract<BackendFacadeEvent, { type: 'con
 export function syncContentPatchFailure(event: Extract<BackendFacadeEvent, { type: 'content_patch_failed' }>): void {
   useToastStore.getState().add({
     type: 'error',
-    title: '消息同步失败',
+    title: 'Message sync failed',
     message: event.error,
     sessionId: event.sessionId,
     serverId: event.backendId,

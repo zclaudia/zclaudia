@@ -215,11 +215,11 @@ export function useCommandHandler({
       throw new Error('Worktree switching is locked during Supervisor planning mode.');
     }
     const previousWorkingDirectory = currentSession?.workingDirectory;
-    // 乐观更新 projectStore（立即反映在 UI）
+    // Optimistically update projectStore (reflected in the UI immediately)
     useProjectStore.getState().updateSession(sessionId, {
       workingDirectory: worktreePath || undefined,
     });
-    // 持久化到 DB
+    // Persist to DB
     try {
       const updatedSession = await api.updateSessionWorkingDirectory(sessionId, worktreePath);
       useProjectStore.getState().updateSession(sessionId, updatedSession);

@@ -35,8 +35,8 @@ export function syncBackendLifecycle(event: Extract<BackendFacadeEvent, { type: 
   if (event.error && !isTransient && event.state !== 'ready' && hasActiveRunsForBackend(event.backendId)) {
     useToastStore.getState().add({
       type: 'error',
-      title: '远程连接已中断',
-      message: `Backend ${event.backendId} 连接断开，正在等待恢复${event.error ? `: ${event.error}` : ''}`,
+      title: 'Remote connection lost',
+      message: `Backend ${event.backendId} disconnected, waiting to reconnect${event.error ? `: ${event.error}` : ''}`,
     });
   }
 }

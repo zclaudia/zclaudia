@@ -177,7 +177,7 @@ describe('useBackendFacade run_event forwarding', () => {
 
     expect(useToastStore.getState().toasts[0]).toMatchObject({
       type: 'error',
-      title: '消息同步失败',
+      title: 'Message sync failed',
       message: 'catch-up query failed',
     });
   });
@@ -356,8 +356,8 @@ describe('useBackendFacade run_event forwarding', () => {
     expect(Array.from(useSessionsStore.getState().activeSessionIdsByBackend.get('remote-1') ?? [])).toEqual(['session-1']);
     expect(useToastStore.getState().toasts.at(-1)).toMatchObject({
       type: 'error',
-      title: '远程连接已中断',
-      message: expect.stringContaining('正在等待恢复'),
+      title: 'Remote connection lost',
+      message: expect.stringContaining('waiting to reconnect'),
     });
   });
 
