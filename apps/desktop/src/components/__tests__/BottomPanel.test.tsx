@@ -493,20 +493,13 @@ describe('BottomPanel', () => {
     expect(screen.getByText('File')).toBeInTheDocument();
   });
 
-  it('shows "Move to right sidebar" button on desktop when a panel is active', () => {
+  it('does not render a "Move to right sidebar" control', () => {
+    // Render the desktop/height-0 branch with a visible, active panel —
+    // the exact state where the move-to-right button used to render.
     registerTerminalPanel(true);
     useBottomPanelStore.setState({ activeTab: 'terminal' });
 
     render(<BottomPanel projectId="p1" projectRoot="/test" />);
-    expect(screen.getByTitle('Move to right sidebar')).toBeInTheDocument();
-  });
-
-  it('clicking "Move to right sidebar" updates placement to right', () => {
-    registerTerminalPanel(true);
-    useBottomPanelStore.setState({ activeTab: 'terminal' });
-
-    render(<BottomPanel projectId="p1" projectRoot="/test" />);
-    fireEvent.click(screen.getByTitle('Move to right sidebar'));
-    expect(usePluginStore.getState().panelPlacements.terminal).toBe('right');
+    expect(screen.queryByTitle('Move to right sidebar')).toBeNull();
   });
 });

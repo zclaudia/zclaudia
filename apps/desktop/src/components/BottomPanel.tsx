@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
 import { usePluginStore } from '../stores/pluginStore';
-import { useRightSidebarStore } from '../stores/rightSidebarStore';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useAndroidBack } from '../hooks/useAndroidBack';
 import { PanelActions, PanelContent } from './panels/PanelRenderer';
@@ -20,8 +19,6 @@ interface BottomPanelProps {
 
 export function BottomPanel({ projectId, projectRoot, workingDirectory }: BottomPanelProps) {
   const isMobile = useIsMobile();
-  const setPanelPlacement = usePluginStore((s) => s.setPanelPlacement);
-  const setRightSidebarTab = useRightSidebarStore((s) => s.setActiveTab);
   const activeTab = useBottomPanelStore((s) => s.activeTab);
   const setActiveTab = useBottomPanelStore((s) => s.setActiveTab);
   const {
@@ -109,13 +106,6 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
     });
   };
 
-  const handleMoveToRight = () => {
-    if (!activePanel) return;
-    setPanelPlacement(activePanel.id, 'right');
-    // Activate this panel as the right sidebar's active tab so it stays in focus.
-    setRightSidebarTab(activePanel.id);
-  };
-
   if (!isOpen && !hasAlwaysMount) return null;
 
   // ── Mobile: full-screen overlay ────────────────────────────────────────────
@@ -174,7 +164,10 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
     );
   }
 
-  // ── Desktop: resizable bottom panel ──────────────────────────��─────────────
+  // Hidden mount-keeper: this component renders on mobile only (see
+  // SessionChatLayout). The mobile overlay above handles the visible case; this
+  // height-0 container stays mounted so alwaysMount panels (terminal xterm)
+  // keep their state while the overlay is closed.
   return (
     <div
       ref={containerRef}
@@ -217,20 +210,6 @@ export function BottomPanel({ projectId, projectRoot, workingDirectory }: Bottom
         {/* Tab-specific actions */}
         <div className="flex items-center gap-0.5" onMouseDown={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
           {activePanel && <PanelActions panel={activePanel} projectId={projectId} />}
-
-          {/* Move to right sidebar (desktop only) */}
-          {activePanel && (
-            <button
-              onClick={handleMoveToRight}
-              className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground flex-shrink-0"
-              title="Move to right sidebar"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M4 12h16m0 0l-4-4m4 4l-4 4M4 4v16" />
-              </svg>
-            </button>
-          )}
 
           {/* Close button */}
           <button
