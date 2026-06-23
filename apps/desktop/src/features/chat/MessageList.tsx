@@ -386,6 +386,7 @@ export const MessageList = memo(function MessageList({
           resendDisabled={resendDisabled}
           onFork={onFork}
           onBranch={onBranch}
+          isLeaf={index === filteredMessages.length - 1}
         />
       </div>
     );
@@ -800,12 +801,15 @@ function MessageActionsMenu({
   onFork,
   onBranch,
   anchor = 'right',
+  canBranch = true,
 }: {
   treeEntryId: string;
   onFork: (treeEntryId: string) => void;
   onBranch: (treeEntryId: string) => void;
   /** Which edge of the trigger the dropdown aligns to. 'left' opens rightward, 'right' opens leftward. */
   anchor?: 'left' | 'right';
+  /** False for the current leaf (latest message), where a rewind would be a no-op. */
+  canBranch?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -843,8 +847,10 @@ function MessageActionsMenu({
             <span>Fork into new session</span>
           </button>
           <button
-            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
-            onClick={(e) => { e.stopPropagation(); setOpen(false); onBranch(treeEntryId); }}
+            disabled={!canBranch}
+            title={canBranch ? undefined : 'Already at the latest point — branch from an earlier message'}
+            className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+            onClick={(e) => { e.stopPropagation(); if (!canBranch) return; setOpen(false); onBranch(treeEntryId); }}
           >
             <GitBranch size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />
             <span>Branch from here (rewind)</span>
@@ -855,7 +861,7 @@ function MessageActionsMenu({
   );
 }
 
-const MessageItem = memo(function MessageItem({ message, streamingContentBlocks, streamingToolCalls, showResend, onResend, resendDisabled, onFork, onBranch }: {
+const MessageItem = memo(function MessageItem({ message, streamingContentBlocks, streamingToolCalls, showResend, onResend, resendDisabled, onFork, onBranch, isLeaf }: {
   message: MessageWithToolCalls;
   streamingContentBlocks?: ContentBlock[];
   streamingToolCalls?: ToolCallState[];
@@ -864,6 +870,8 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
   resendDisabled?: boolean;
   onFork?: (treeEntryId: string) => void;
   onBranch?: (treeEntryId: string) => void;
+  /** True when this is the latest message (current leaf) — a rewind here is a no-op. */
+  isLeaf?: boolean;
 }) {
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
@@ -934,7 +942,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         <div className="mt-1 flex items-center gap-2 px-3">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
           {showActionsMenu && hovered && (
-            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor="left" />
+            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor="left" canBranch={!isLeaf} />
           )}
         </div>
       </div>
@@ -999,7 +1007,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         <div className="mt-1 flex items-center gap-2">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
           {showActionsMenu && hovered && (
-            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor={isUser ? 'right' : 'left'} />
+            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor={isUser ? 'right' : 'left'} canBranch={!isLeaf} />
           )}
         </div>
       </div>

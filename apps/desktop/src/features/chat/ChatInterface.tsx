@@ -193,10 +193,11 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   }, [sessionId]);
 
   const handleBranch = useCallback(async (treeEntryId: string) => {
-    const confirmed = window.confirm(
-      'Branch from here (rewind)?\n\nThis rewinds the conversation to this point and rewrites the timeline. The old branch is kept and can be returned to.'
-    );
-    if (!confirmed) return;
+    // NOTE: no window.confirm here — in the webview it returns falsy without showing
+    // a dialog, which silently blocked the whole action (no API call, no toast).
+    // Branch is reversible (the old tip is kept in the tree and shown in the Lineage
+    // panel) and the menu item is labelled "(rewind)", so we execute directly and
+    // report the outcome via toast.
     try {
       await branchSession(sessionId, treeEntryId);
       // Reload messages for this session (full replace) — mirrors the initial-load path in useMessagePagination
