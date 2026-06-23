@@ -799,10 +799,13 @@ function MessageActionsMenu({
   treeEntryId,
   onFork,
   onBranch,
+  anchor = 'right',
 }: {
   treeEntryId: string;
   onFork: (treeEntryId: string) => void;
   onBranch: (treeEntryId: string) => void;
+  /** Which edge of the trigger the dropdown aligns to. 'left' opens rightward, 'right' opens leftward. */
+  anchor?: 'left' | 'right';
 }) {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -831,7 +834,7 @@ function MessageActionsMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 bottom-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm">
+        <div className={`absolute ${anchor === 'left' ? 'left-0' : 'right-0'} bottom-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm`}>
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
             onClick={(e) => { e.stopPropagation(); setOpen(false); onFork(treeEntryId); }}
@@ -931,7 +934,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         <div className="mt-1 flex items-center gap-2 px-3">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
           {showActionsMenu && hovered && (
-            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} />
+            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor="left" />
           )}
         </div>
       </div>
@@ -996,7 +999,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         <div className="mt-1 flex items-center gap-2">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
           {showActionsMenu && hovered && (
-            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} />
+            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor={isUser ? 'right' : 'left'} />
           )}
         </div>
       </div>
