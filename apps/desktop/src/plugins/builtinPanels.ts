@@ -136,6 +136,7 @@ export function initBuiltinPanels() {
     component: NotificationsPanel,
     order: 5,
     platforms: ['desktop', 'mobile'],
+    defaultPlacement: 'right',
     alwaysMount: false,
     visible: false,
     onClose: () => {

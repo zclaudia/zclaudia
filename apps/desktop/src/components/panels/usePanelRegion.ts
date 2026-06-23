@@ -41,7 +41,7 @@ export function usePanelRegion({
     // Mobile renders panels through BottomPanel overlay regardless of desktop placement.
     if (isMobile) return region === 'bottom';
 
-    const placement = panelPlacements[panel.id] ?? panel.defaultPlacement ?? 'bottom';
+    const placement = panelPlacements[panel.id] ?? panel.defaultPlacement ?? 'right';
     return region === 'right' ? placement === 'right' : placement !== 'right';
   });
 

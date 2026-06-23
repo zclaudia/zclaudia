@@ -11,6 +11,7 @@ import {
   selectPluginSettingsTabs,
   normalizeDisabledBuiltinPanels,
   migratePanelPlacements,
+  getEffectivePlacement,
   type InstalledPlugin,
   type UIExtension,
 } from '../pluginStore';
@@ -339,6 +340,16 @@ describe('PluginStore', () => {
       usePluginStore.getState().registerSettingsTab(tab);
       usePluginStore.getState().unregisterSettingsTab('tab-1');
       expect(usePluginStore.getState().settingsTabs).toHaveLength(0);
+    });
+  });
+
+  describe('getEffectivePlacement fallback', () => {
+    it('falls back to right when a panel has no placement override or default', () => {
+      usePluginStore.setState({
+        panels: [{ id: 'noplace', pluginId: 'com.test.noplace', type: 'panel', label: 'X', order: 0 }],
+        panelPlacements: {},
+      });
+      expect(getEffectivePlacement(usePluginStore.getState(), 'noplace')).toBe('right');
     });
   });
 });

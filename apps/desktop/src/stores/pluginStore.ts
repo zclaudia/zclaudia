@@ -357,5 +357,5 @@ export function getEffectivePlacement(
   const override = state.panelPlacements[panelId];
   if (override) return override;
   const panel = state.panels.find((p) => p.id === panelId);
-  return panel?.defaultPlacement ?? 'bottom';
+  return panel?.defaultPlacement ?? 'right';
 }

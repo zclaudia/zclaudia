@@ -106,6 +106,7 @@ describe('RightSidebar', () => {
       type: 'panel',
       label: 'Bottom Only',
       component: () => <div data-testid="bottom-only">Bottom</div>,
+      defaultPlacement: 'bottom',
       visible: true,
       order: 0,
     });

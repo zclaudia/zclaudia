@@ -63,6 +63,7 @@ function registerTerminalPanel(visible: boolean) {
     actions: TerminalActions,
     order: 0,
     platforms: ['desktop', 'mobile'],
+    defaultPlacement: 'bottom',
     alwaysMount: true,
     visible,
     onClose: mockTerminalOnClose,
@@ -80,6 +81,7 @@ function registerFileViewerPanel(visible = true) {
     actions: FileViewerActions,
     order: 1,
     platforms: ['desktop', 'mobile'],
+    defaultPlacement: 'bottom',
     visible,
     onClose: mockFileViewerOnClose,
   });
@@ -92,6 +94,7 @@ function registerPluginPanel(id: string, label: string) {
     type: 'panel',
     label,
     order: 50,
+    defaultPlacement: 'bottom',
     iframeUrl: `/api/plugins/${id}/frontend/index.html`,
   });
 }
@@ -345,6 +348,7 @@ describe('BottomPanel', () => {
       label: 'Desktop Only',
       component: () => <div data-testid="desktop-only">Desktop</div>,
       platforms: ['desktop'],
+      defaultPlacement: 'bottom',
       order: 0,
     });
 

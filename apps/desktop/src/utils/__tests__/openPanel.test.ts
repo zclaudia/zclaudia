@@ -47,10 +47,11 @@ describe('openPanel utility', () => {
       expect(useRightSidebarStore.getState().activeTab).toBe('foo');
     });
 
-    it('defaults to bottom when no defaultPlacement is set', () => {
+    it('defaults to right when no defaultPlacement is set', () => {
       registerPanel('foo');
       activatePanel('foo');
-      expect(useBottomPanelStore.getState().activeTab).toBe('foo');
+      expect(useRightSidebarStore.getState().activeTab).toBe('foo');
+      expect(useBottomPanelStore.getState().activeTab).toBe('');
     });
 
     it('routes right-placed panels to the bottom store on mobile', () => {
