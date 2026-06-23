@@ -11,13 +11,14 @@ interface RightSidebarEmptyStateProps {
 }
 
 /** Static subtitle per tool iconKey. The 'changes' tile is dynamic (count) and
- *  handled in render, so it is intentionally absent here. */
-const SUBTITLES: Record<string, string> = {
+ *  handled in render, so it is intentionally absent here. The `satisfies` clause
+ *  makes the compiler flag drift if a new iconKey is added to the union. */
+const SUBTITLES = {
   draft: '编辑草稿',
   file: '浏览工作目录',
   terminal: '运行命令',
   lineage: '会话分支图',
-};
+} satisfies Record<Exclude<SessionTool['iconKey'], 'changes'>, string>;
 
 /**
  * Default content for the right sidebar when it is expanded (pinned tools exist)
