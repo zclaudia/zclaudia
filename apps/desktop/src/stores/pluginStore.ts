@@ -348,7 +348,7 @@ export const selectPluginNotchTabs = (state: PluginStoreState): PluginNotchTab[]
 
 /**
  * Resolve effective placement for a panel.
- * Priority: user override → panel default → 'bottom'.
+ * Priority: user override → panel default → 'right'.
  */
 export function getEffectivePlacement(
   state: PluginStoreState,
