@@ -10,6 +10,7 @@ import {
   selectPluginPanels,
   selectPluginSettingsTabs,
   normalizeDisabledBuiltinPanels,
+  migratePanelPlacements,
   type InstalledPlugin,
   type UIExtension,
 } from '../pluginStore';
@@ -228,6 +229,19 @@ describe('PluginStore', () => {
         'terminal',
         'notifications',
       ]);
+    });
+  });
+
+  describe('migratePanelPlacements (bottom → right)', () => {
+    it('rewrites bottom overrides to right', () => {
+      expect(migratePanelPlacements({ terminal: 'bottom', memory: 'right' })).toEqual({
+        terminal: 'right',
+        memory: 'right',
+      });
+    });
+
+    it('returns an empty object for undefined input', () => {
+      expect(migratePanelPlacements(undefined)).toEqual({});
     });
   });
 

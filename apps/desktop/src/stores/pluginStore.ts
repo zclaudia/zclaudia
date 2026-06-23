@@ -15,11 +15,6 @@ const BUILTIN_PANEL_ID_ALIASES: Record<string, string> = {
   'agent-feed': 'notifications',
 };
 
-export function normalizeDisabledBuiltinPanels(panelIds: string[] | undefined): string[] {
-  if (!Array.isArray(panelIds)) return [];
-  return Array.from(new Set(panelIds.map((id) => BUILTIN_PANEL_ID_ALIASES[id] ?? id)));
-}
-
 // ============================================
 // Types
 // ============================================
@@ -37,6 +32,27 @@ export interface InstalledPlugin {
 }
 
 export type PanelPlacement = 'bottom' | 'right';
+
+export function normalizeDisabledBuiltinPanels(panelIds: string[] | undefined): string[] {
+  if (!Array.isArray(panelIds)) return [];
+  return Array.from(new Set(panelIds.map((id) => BUILTIN_PANEL_ID_ALIASES[id] ?? id)));
+}
+
+/**
+ * Bottom placement is deprecated on desktop. Mobile ignores placement entirely
+ * (every panel renders through the BottomPanel overlay), so it is safe to
+ * collapse all persisted 'bottom' overrides to 'right' on rehydrate.
+ */
+export function migratePanelPlacements(
+  placements: Record<string, PanelPlacement> | undefined,
+): Record<string, PanelPlacement> {
+  if (!placements) return {};
+  const migrated: Record<string, PanelPlacement> = {};
+  for (const [id, placement] of Object.entries(placements)) {
+    migrated[id] = placement === 'bottom' ? 'right' : placement;
+  }
+  return migrated;
+}
 
 export interface UIExtension {
   id: string;
@@ -304,7 +320,7 @@ export const usePluginStore = create<PluginStoreState>()(
           // Only restore user preferences — ignore stale plugins from old localStorage data
           settings: persisted.settings ?? currentState.settings,
           disabledBuiltinPanels: normalizeDisabledBuiltinPanels(persisted.disabledBuiltinPanels),
-          panelPlacements: persisted.panelPlacements ?? currentState.panelPlacements,
+          panelPlacements: migratePanelPlacements(persisted.panelPlacements),
         };
       },
     }
