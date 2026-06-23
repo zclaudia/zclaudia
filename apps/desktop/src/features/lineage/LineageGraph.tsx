@@ -29,7 +29,8 @@ function NodeShape({ ln }: { ln: LayoutNode }) {
 
 export function LineageGraph({ model, onNodeClick, laneColorOf }: Props) {
   return (
-    <svg viewBox={`0 0 ${model.width} ${model.height}`} width="100%" role="img" aria-label="Session lineage graph">
+    <svg viewBox={`0 0 ${model.width} ${model.height}`} width={model.width} height={model.height}
+         style={{ flexShrink: 0 }} role="img" aria-label="Session lineage graph">
       {model.edges.map((e) => (
         <g key={e.id} opacity={e.dimmed ? 0.45 : 1}>
           <path
