@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, GitFork, type LucideIcon } from 'lucide-react';
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
 import { usePluginStore } from '../stores/pluginStore';
 import { useSessionToolsStore } from '../stores/sessionToolsStore';
@@ -17,14 +16,7 @@ import {
   type PanelPayload,
 } from './split/dragSplit';
 import { getTerminalScopeKey } from '../stores/terminalStore';
-
-const TOOL_ICONS: Record<string, LucideIcon> = {
-  draft: FileEdit,
-  file: FileText,
-  changes: FileDiff,
-  terminal: TerminalIcon,
-  lineage: GitFork,
-};
+import { TOOL_ICONS } from './rightSidebarToolIcons';
 
 interface RightSidebarProps {
   projectId: string | undefined;
