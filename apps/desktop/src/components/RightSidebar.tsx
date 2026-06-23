@@ -17,6 +17,7 @@ import {
 } from './split/dragSplit';
 import { getTerminalScopeKey } from '../stores/terminalStore';
 import { TOOL_ICONS } from './rightSidebarToolIcons';
+import { RightSidebarEmptyState } from './RightSidebarEmptyState';
 
 interface RightSidebarProps {
   projectId: string | undefined;
@@ -331,11 +332,18 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
                 indicator lives here. */}
           </>
         ) : (
-          mountedPanels.map((panel) => (
-            <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id && expanded ? '' : 'invisible'}`}>
-              <PanelContent panel={panel} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
-            </div>
-          ))
+          <>
+            {mountedPanels.map((panel) => (
+              <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id && expanded ? '' : 'invisible'}`}>
+                <PanelContent panel={panel} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+              </div>
+            ))}
+            {expanded && !activePanel && (
+              <div className="absolute inset-0">
+                <RightSidebarEmptyState projectId={projectId} projectRoot={projectRoot} />
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

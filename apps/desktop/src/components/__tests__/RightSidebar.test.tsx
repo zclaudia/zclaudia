@@ -14,6 +14,10 @@ vi.mock('../../hooks/useMediaQuery', () => ({
   useIsMobile: vi.fn().mockReturnValue(false),
 }));
 
+vi.mock('../RightSidebarEmptyState', () => ({
+  RightSidebarEmptyState: () => <div data-testid="empty-state" />,
+}));
+
 import { RightSidebar } from '../RightSidebar';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 
@@ -179,6 +183,24 @@ describe('RightSidebar', () => {
     const wrapper = container.firstChild as HTMLElement;
     expect(wrapper.style.width).toBe('30%');
     expect(wrapper.style.minWidth).toBe('240px');
+  });
+
+  it('shows the empty state when pinned tools exist but no panel is active', () => {
+    useSessionToolsStore.setState({
+      tools: [{ id: 'terminal', label: 'Terminal', iconKey: 'terminal', isActive: false, onClick: vi.fn() }],
+    });
+    render(<RightSidebar projectId="p1" projectRoot="/test" />);
+    expect(screen.getByTestId('empty-state')).toBeInTheDocument();
+  });
+
+  it('does not show the empty state when a panel is active', () => {
+    registerRightTerminal(true);
+    useRightSidebarStore.setState({ activeTab: 'terminal' });
+    useSessionToolsStore.setState({
+      tools: [{ id: 'terminal', label: 'Terminal', iconKey: 'terminal', isActive: true, onClick: vi.fn() }],
+    });
+    render(<RightSidebar projectId="p1" projectRoot="/test" />);
+    expect(screen.queryByTestId('empty-state')).toBeNull();
   });
 });
 
