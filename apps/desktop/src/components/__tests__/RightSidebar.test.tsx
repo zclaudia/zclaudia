@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useSessionToolsStore } from '../../stores/sessionToolsStore';
-import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 
 vi.mock('../PluginPanelRenderer', () => ({
   PluginPanelRenderer: ({ activePluginPanelId }: any) => <div data-testid="plugin-panel">Plugin:{activePluginPanelId}</div>,
@@ -60,7 +59,6 @@ describe('RightSidebar', () => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
     useRightSidebarStore.setState({ widthFraction: 0.26, activeTab: null, collapsed: false, unread: false });
     useSessionToolsStore.setState({ tools: [] });
-    useBottomPanelStore.setState({ activeTab: '' });
     onCloseSpy.mockClear();
     (useIsMobile as any).mockReturnValue(false);
   });
