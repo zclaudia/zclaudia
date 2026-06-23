@@ -49,10 +49,13 @@ export function LineageGraph({ model, onNodeClick, laneColorOf }: Props) {
         <text key={`b:${b.branchNodeId}`} x={b.x + 12} y={b.y - 8} fontSize={9} fill="hsl(var(--muted-foreground))">+{b.count} tip</text>
       ))}
       {model.nodes.map((ln) => {
-        const jumpable = isJumpable(ln.node);
+        // Archived (dead) lanes are shown for context but not navigable.
+        const jumpable = isJumpable(ln.node) && !ln.archived;
         const color = laneColorOf ? laneColorOf(ln.sessionId) : 'hsl(var(--primary))';
         return (
-          <g key={ln.nodeId} data-testid={`lineage-node-${ln.nodeId}`} style={{ color, cursor: jumpable ? 'pointer' : 'default' }}
+          <g key={ln.nodeId} data-testid={`lineage-node-${ln.nodeId}`}
+             style={{ color, cursor: jumpable ? 'pointer' : 'default' }}
+             opacity={ln.archived ? 0.4 : 1}
              onClick={jumpable ? () => onNodeClick(ln.node) : undefined}>
             <NodeShape ln={ln} />
           </g>
@@ -60,7 +63,10 @@ export function LineageGraph({ model, onNodeClick, laneColorOf }: Props) {
       })}
       {model.laneLabels.map((l) => (
         <text key={`l:${l.sessionId}`} x={l.x} y={16} fontSize={10} textAnchor="middle"
-              fill="hsl(var(--muted-foreground))" opacity={l.archived ? 0.5 : 1}>{l.name ?? l.sessionId.slice(0, 6)}</text>
+              fill="hsl(var(--muted-foreground))" opacity={l.archived ? 0.5 : 1}
+              style={l.archived ? { textDecoration: 'line-through' } : undefined}>
+          {(l.name ?? l.sessionId.slice(0, 6)) + (l.archived ? ' (dead)' : '')}
+        </text>
       ))}
     </svg>
   );

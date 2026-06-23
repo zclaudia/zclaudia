@@ -156,3 +156,16 @@ describe('computeLayout — truncation & multi-branch robustness', () => {
     expect(m.badges.find((b) => b.branchNodeId === 'S0:bp2')).toBeUndefined();
   });
 });
+
+describe('computeLayout — archived lanes', () => {
+  it('marks nodes in an archived session as archived', () => {
+    const G: ContextGraph = {
+      rootSessionId: 'S0', focusSessionId: 'S0', truncated: false, forkEdges: [],
+      sessions: [{ id: 'S0', name: 'old', forkedFromSessionId: null, forkEntryId: null, createdAt: 1, archived: true, laneOrder: 0 }],
+      nodes: [node({ nodeId: 'S0:r', sessionId: 'S0', entryId: 'r', isRoot: true })],
+    };
+    const m = computeLayout(G);
+    expect(m.nodes[0].archived).toBe(true);
+    expect(m.laneLabels[0].archived).toBe(true);
+  });
+});

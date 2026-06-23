@@ -1,6 +1,6 @@
 import type { ContextGraph, GraphNode } from '@zclaudia/shared';
 
-export interface LayoutNode { nodeId: string; sessionId: string; x: number; y: number; node: GraphNode; }
+export interface LayoutNode { nodeId: string; sessionId: string; x: number; y: number; node: GraphNode; archived: boolean; }
 export interface LayoutEdge {
   id: string; kind: 'message' | 'fork';
   fromX: number; fromY: number; toX: number; toY: number;
@@ -91,6 +91,7 @@ export function computeLayout(graph: ContextGraph): LayoutModel {
         placed.set(node.nodeId, {
           nodeId: node.nodeId, sessionId: node.sessionId,
           x: baseX(lane.id) + sublane * SUBLANE_GAP, y: MARGIN_TOP + depth * ROW_GAP, node,
+          archived: lane.archived,
         });
         const kids = childrenByParent.get(node.nodeId) ?? [];
         let doglegCount = 0; // per-branch-point cap (NOT cumulative across the session)
