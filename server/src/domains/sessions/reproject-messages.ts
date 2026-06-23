@@ -27,15 +27,25 @@ export function writeProjectedMessages(db: Database, sessionId: string, rows: Pr
     INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset, tree_entry_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
   `);
-  const now = Date.now();
+  const baseNow = Date.now();
+  let prevCreatedAt = -Infinity;
   rows.forEach((row, i) => {
+    // Preserve each message's original time, but guarantee created_at strictly
+    // increases along the path (root → leaf). A fork/branch projects the whole
+    // path in one tick; without this every row would share one created_at and the
+    // UI's created_at-ordered initial load would scramble the message order.
+    const parsed = row.timestamp ? Date.parse(row.timestamp) : NaN;
+    let createdAt = Number.isFinite(parsed) ? parsed : baseNow + i;
+    if (createdAt <= prevCreatedAt) createdAt = prevCreatedAt + 1;
+    prevCreatedAt = createdAt;
+
     const id = newId();
     const metadataJson = row.metadata ? JSON.stringify(row.metadata) : null;
-    insert.run(id, sessionId, row.role, row.content, metadataJson, now, i + 1, row.entryId);
+    insert.run(id, sessionId, row.role, row.content, metadataJson, createdAt, i + 1, row.entryId);
     if (row.metadata) {
       const rowid = (db.prepare(`SELECT rowid FROM messages WHERE id = ?`).get(id) as { rowid: number } | undefined)?.rowid;
       if (rowid != null) {
-        extractAndIndexMetadata(db, id, rowid, sessionId, row.metadata as Parameters<typeof extractAndIndexMetadata>[4], now);
+        extractAndIndexMetadata(db, id, rowid, sessionId, row.metadata as Parameters<typeof extractAndIndexMetadata>[4], createdAt);
       }
     }
   });

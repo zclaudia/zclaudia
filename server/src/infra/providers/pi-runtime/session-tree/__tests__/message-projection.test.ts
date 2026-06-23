@@ -9,7 +9,7 @@ function mEntry(id: string, parentId: string | null, message: unknown): SessionT
 describe('projectEntriesToMessageRows', () => {
   it('projects a user message entry to a user row', () => {
     const rows = projectEntriesToMessageRows([mEntry('e1', null, { role: 'user', content: 'hi' })]);
-    expect(rows).toEqual([{ entryId: 'e1', role: 'user', content: 'hi', metadata: undefined }]);
+    expect(rows).toEqual([{ entryId: 'e1', timestamp: '2026-06-20T00:00:00.000Z', role: 'user', content: 'hi', metadata: undefined }]);
   });
 
   it('collapses assistant + trailing toolResults into one assistant row with metadata', () => {
@@ -42,6 +42,6 @@ describe('projectEntriesToMessageRows', () => {
   it('skips non-message entries (e.g. compaction)', () => {
     const compaction = { type: 'compaction', id: 'c1', parentId: 'e1', timestamp: '2026-06-20T00:00:01.000Z', summary: 'S', firstKeptEntryId: 'e1', tokensBefore: 1 } as SessionTreeEntry;
     const rows = projectEntriesToMessageRows([compaction, mEntry('e4', 'c1', { role: 'user', content: 'next' })]);
-    expect(rows).toEqual([{ entryId: 'e4', role: 'user', content: 'next', metadata: undefined }]);
+    expect(rows).toEqual([{ entryId: 'e4', timestamp: '2026-06-20T00:00:00.000Z', role: 'user', content: 'next', metadata: undefined }]);
   });
 });

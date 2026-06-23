@@ -3,6 +3,8 @@ import type { SessionTreeEntry, MessageEntry } from '@earendil-works/pi-agent-co
 export interface ProjectedMessageRow {
   /** Source tree entry id (the assistant/user message entry). Stored on the messages row for the two-way link. */
   entryId: string;
+  /** Source entry ISO timestamp — carried so the projection preserves per-message times (and ordering). */
+  timestamp: string;
   role: 'user' | 'assistant';
   content: string;
   metadata?: {
@@ -34,7 +36,7 @@ export function projectEntriesToMessageRows(entries: SessionTreeEntry[]): Projec
       const content = typeof message.content === 'string'
         ? message.content
         : (message.content.find((b: any) => b.type === 'text')?.text ?? '');
-      rows.push({ entryId: entry.id, role: 'user', content, metadata: undefined });
+      rows.push({ entryId: entry.id, timestamp: entry.timestamp, role: 'user', content, metadata: undefined });
       continue;
     }
     if (message.role === 'assistant') {
@@ -67,7 +69,7 @@ export function projectEntriesToMessageRows(entries: SessionTreeEntry[]): Projec
           }
         : undefined;
 
-      rows.push({ entryId: entry.id, role: 'assistant', content: text, metadata });
+      rows.push({ entryId: entry.id, timestamp: entry.timestamp, role: 'assistant', content: text, metadata });
       while (i + 1 < entries.length && isMessageEntry(entries[i + 1]) && (entries[i + 1] as any).message.role === 'toolResult') {
         i++;
       }

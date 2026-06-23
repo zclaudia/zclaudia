@@ -50,3 +50,29 @@ it('clears prior messages before reprojecting (branch rewrite)', async () => {
   expect(ids.find((r) => r.id === 'stale')).toBeUndefined();
   db.close();
 });
+
+it('assigns strictly increasing created_at in path order so created_at-ordered queries match offset order', async () => {
+  // Reproduces the fork ordering bug: when every projected row shares one created_at,
+  // the UI initial load (ORDER BY created_at DESC, then reversed) puts the first
+  // message at the bottom. created_at must increase with offset (root → leaf).
+  const db = new Database(':memory:');
+  applyMigrations(db);
+  seedSession(db);
+  insertEntry(db, 's', 'e1', null, { role: 'user', content: 'first' });
+  insertEntry(db, 's', 'e2', 'e1', { role: 'assistant', content: [{ type: 'text', text: 'second' }] });
+  insertEntry(db, 's', 'e3', 'e2', { role: 'user', content: 'third' });
+
+  await reproject(db, 's');
+
+  const byOffset = db.prepare(`SELECT created_at AS c, offset AS o FROM messages WHERE session_id='s' ORDER BY offset ASC`)
+    .all() as Array<{ c: number; o: number }>;
+  expect(byOffset.map((r) => r.o)).toEqual([1, 2, 3]);
+  expect(byOffset[0].c).toBeLessThan(byOffset[1].c);
+  expect(byOffset[1].c).toBeLessThan(byOffset[2].c);
+
+  // UI initial load: newest-first by created_at, then reversed for display → must be root→leaf.
+  const displayed = (db.prepare(`SELECT offset AS o FROM messages WHERE session_id='s' ORDER BY created_at DESC`)
+    .all() as Array<{ o: number }>).map((r) => r.o).reverse();
+  expect(displayed).toEqual([1, 2, 3]);
+  db.close();
+});
