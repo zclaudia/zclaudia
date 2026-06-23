@@ -136,22 +136,12 @@ describe('RightSidebar', () => {
     expect(useRightSidebarStore.getState().activeTab).toBe('file-viewer');
   });
 
-  it('shows "Move to bottom panel" button when a panel is active', () => {
+  it('does not render a "Move to bottom panel" control', () => {
     registerRightTerminal(true);
     useRightSidebarStore.setState({ activeTab: 'terminal' });
 
     render(<RightSidebar projectId="p1" projectRoot="/test" />);
-    expect(screen.getByTitle('Move to bottom panel')).toBeInTheDocument();
-  });
-
-  it('clicking "Move to bottom panel" updates placement and bottom active tab', () => {
-    registerRightTerminal(true);
-    useRightSidebarStore.setState({ activeTab: 'terminal' });
-
-    render(<RightSidebar projectId="p1" projectRoot="/test" />);
-    fireEvent.click(screen.getByTitle('Move to bottom panel'));
-    expect(usePluginStore.getState().panelPlacements.terminal).toBe('bottom');
-    expect(useBottomPanelStore.getState().activeTab).toBe('terminal');
+    expect(screen.queryByTitle('Move to bottom panel')).toBeNull();
   });
 
   it('close button calls each visible panel onClose', () => {

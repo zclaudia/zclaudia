@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef } from 'react';
 import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, GitFork, type LucideIcon } from 'lucide-react';
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
 import { usePluginStore } from '../stores/pluginStore';
-import { useBottomPanelStore } from '../stores/bottomPanelStore';
 import { useSessionToolsStore } from '../stores/sessionToolsStore';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { PanelActions, PanelContent } from './panels/PanelRenderer';
@@ -33,13 +32,11 @@ interface RightSidebarProps {
  */
 export function RightSidebar({ projectId, projectRoot, workingDirectory }: RightSidebarProps) {
   const isMobile = useIsMobile();
-  const setPanelPlacement = usePluginStore((s) => s.setPanelPlacement);
   const widthFraction = useRightSidebarStore((s) => s.widthFraction);
   const activeTab = useRightSidebarStore((s) => s.activeTab);
   const collapsed = useRightSidebarStore((s) => s.collapsed);
   const setActiveTab = useRightSidebarStore((s) => s.setActiveTab);
   const setWidthFraction = useRightSidebarStore((s) => s.setWidthFraction);
-  const setBottomPanelTab = useBottomPanelStore((s) => s.setActiveTab);
   // Pinned tool tabs (Draft / Files / Changes / Terminal), published by the composer.
   const pinnedTools = useSessionToolsStore((s) => s.tools);
   const {
@@ -113,13 +110,6 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
         updatePanelVisibility(p.id, false);
       }
     });
-  };
-
-  const handleMoveToBottom = () => {
-    if (!activePanel) return;
-    setPanelPlacement(activePanel.id, 'bottom');
-    // Make the panel visible on the bottom side too — preserve continuity
-    setBottomPanelTab(activePanel.id);
   };
 
   if (isMobile) return null;
@@ -208,20 +198,6 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
 
         <div className="flex items-center gap-0.5 flex-shrink-0">
           {activePanel && <PanelActions panel={activePanel} projectId={projectId} />}
-
-          {/* Move to bottom */}
-          {activePanel && (
-            <button
-              onClick={handleMoveToBottom}
-              className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-              title="Move to bottom panel"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M12 4v16m0 0l-4-4m4 4l4-4M4 20h16" />
-              </svg>
-            </button>
-          )}
 
           <button
             onClick={handleClose}
