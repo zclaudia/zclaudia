@@ -76,6 +76,15 @@ vi.mock('../../../stores/bottomPanelStore', () => ({
   },
 }));
 
+// Terminal is placed in the right sidebar (defaultPlacement: 'right'), so
+// activatePanel('terminal') routes here on desktop. Reuse mockSetActiveTab so
+// the activation assertion below reflects the real right-sidebar routing.
+vi.mock('../../../stores/rightSidebarStore', () => ({
+  useRightSidebarStore: {
+    getState: () => ({ setActiveTab: mockSetActiveTab, markUnread: vi.fn() }),
+  },
+}));
+
 // Simplify markdown rendering
 vi.mock('react-markdown', () => ({
   default: ({ children, components }: { children: string; components?: Record<string, any> }) => {
