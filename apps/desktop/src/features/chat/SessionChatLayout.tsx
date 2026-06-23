@@ -9,6 +9,7 @@ import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useServerStore } from '../../stores/serverStore';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 interface SessionChatLayoutProps {
   sessionId: string;
@@ -78,8 +79,11 @@ export function SessionChatLayout({
     }
   }, [projectId, activeServerId]);
 
+  const isMobile = useIsMobile();
   const bottomPanel = useMemo(() => {
     if (poppedOutLabel) return undefined;
+    // BottomPanel is the panel host on mobile only; desktop uses RightSidebar.
+    if (!isMobile) return undefined;
     return (
       <BottomPanel
         projectId={projectId}
@@ -87,7 +91,7 @@ export function SessionChatLayout({
         workingDirectory={workingDirectory}
       />
     );
-  }, [poppedOutLabel, projectId, projectRoot, workingDirectory]);
+  }, [poppedOutLabel, isMobile, projectId, projectRoot, workingDirectory]);
 
   return (
     <div className="flex flex-row h-full min-w-0 bg-background">
