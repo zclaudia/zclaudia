@@ -73,7 +73,7 @@ export interface ProjectListItemProps {
   onOpenContextMenu: (e: React.MouseEvent, type: 'project', id: string) => void;
   onCloseContextMenu: () => void;
   onSettingsProject: (id: string) => void;
-  onDeleteProject: (id: string) => void;
+  onDeleteProject: (id: string, name?: string) => void;
   // New session
   isCreatingSession: boolean;
   newSessionName: string;

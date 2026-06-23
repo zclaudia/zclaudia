@@ -109,6 +109,14 @@ const mockTerminalStore = {
 const mockBottomPanelStore = {
   setActiveTab: vi.fn(),
 };
+const mockRightSidebarStore = {
+  activeTab: null as string | null,
+  setActiveTab: vi.fn((panelId: string) => {
+    mockRightSidebarStore.activeTab = panelId;
+  }),
+  markUnread: vi.fn(),
+};
+const mockGetEffectivePlacement = vi.fn(() => 'bottom');
 
 const mockPluginStore = {
   setPlugins: vi.fn(),
@@ -173,8 +181,12 @@ vi.mock('../../stores/terminalStore', () => ({
 vi.mock('../../stores/bottomPanelStore', () => ({
   useBottomPanelStore: { getState: () => mockBottomPanelStore },
 }));
+vi.mock('../../stores/rightSidebarStore', () => ({
+  useRightSidebarStore: { getState: () => mockRightSidebarStore },
+}));
 vi.mock('../../stores/pluginStore', () => ({
   usePluginStore: { getState: () => mockPluginStore },
+  getEffectivePlacement: (...args: any[]) => mockGetEffectivePlacement(...args),
 }));
 vi.mock('../../stores/filePushStore', () => ({
   useFilePushStore: { getState: () => mockFilePushStore },
@@ -231,6 +243,8 @@ describe('handleServerMessage', () => {
     mockProjectStore.sessions = [];
     mockServerStore.activeServerId = 'server-1';
     mockPermissionStore.aiReviewResults = {};
+    mockRightSidebarStore.activeTab = null;
+    mockGetEffectivePlacement.mockReturnValue('bottom');
     useNotificationFeedStore.setState({ items: [], unreadCount: 0, hasMore: false, loading: false, hydrated: false });
     useToastStore.setState({ toasts: [] });
     // Delta buffer flushes on rAF in production; make rAF synchronous in tests
@@ -1389,6 +1403,13 @@ describe('handleServerMessage', () => {
     it('handles plugin_show_panel on desktop', () => {
       handleServerMessage({ type: 'plugin_show_panel', panelId: 'pan1' }, makeCtx());
       expect(mockBottomPanelStore.setActiveTab).toHaveBeenCalledWith('pan1');
+    });
+
+    it('routes plugin_show_panel to the right sidebar when placed right', () => {
+      mockGetEffectivePlacement.mockReturnValueOnce('right');
+      handleServerMessage({ type: 'plugin_show_panel', panelId: 'pan1' }, makeCtx());
+      expect(mockRightSidebarStore.setActiveTab).toHaveBeenCalledWith('pan1');
+      expect(mockBottomPanelStore.setActiveTab).not.toHaveBeenCalledWith('pan1');
     });
 
     it('registers plugin panel regardless of viewport (platform filtering is in BottomPanel)', () => {

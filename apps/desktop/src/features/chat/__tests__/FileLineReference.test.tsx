@@ -13,11 +13,9 @@ vi.mock('../../../stores/fileViewerStore', () => ({
   useFileViewerStore: (selector: any) => selector({ openFile: mockOpenFile }),
 }));
 
-const mockSetActiveTab = vi.fn();
-vi.mock('../../../stores/bottomPanelStore', () => ({
-  useBottomPanelStore: {
-    getState: () => ({ setActiveTab: mockSetActiveTab }),
-  },
+const mockActivatePanel = vi.fn();
+vi.mock('../../../utils/openPanel', () => ({
+  activatePanel: (...args: unknown[]) => mockActivatePanel(...args),
 }));
 
 const mockToastAdd = vi.fn();
@@ -135,7 +133,7 @@ describe('FileLineReference', () => {
     await waitFor(() => {
       expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', 42, undefined);
     });
-    expect(mockSetActiveTab).toHaveBeenCalledWith('file-viewer');
+    expect(mockActivatePanel).toHaveBeenCalledWith('file-viewer');
     // searches by basename, not full path
     expect(mockListDirectory).toHaveBeenCalledWith({
       projectRoot: '/repo',
@@ -173,7 +171,7 @@ describe('FileLineReference', () => {
     await waitFor(() => {
       expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/foo.ts', undefined, undefined);
     });
-    expect(mockSetActiveTab).toHaveBeenCalledWith('file-viewer');
+    expect(mockActivatePanel).toHaveBeenCalledWith('file-viewer');
   });
 
   it('matches a partial path by suffix (app/Foo.tsx → apps/desktop/src/app/Foo.tsx)', async () => {

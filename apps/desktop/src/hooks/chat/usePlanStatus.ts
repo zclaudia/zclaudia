@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import * as api from '../../services/api';
+import { confirm } from '../../stores/confirmDialogStore';
 import type { MessageRole, Session } from '@zclaudia/shared';
 
 interface UsePlanStatusParams {
@@ -65,7 +66,12 @@ export function usePlanStatus({
   const handleDiscardPlan = useCallback(async () => {
     const taskId = currentSession?.taskId;
     if (!taskId || discardPlanLoading) return;
-    const ok = window.confirm('Discard current plan and cancel this task?');
+    const ok = await confirm({
+      title: 'Discard plan?',
+      message: 'Discard the current plan and cancel this task? This cannot be undone.',
+      confirmLabel: 'Discard',
+      destructive: true,
+    });
     if (!ok) return;
     try {
       setDiscardPlanLoading(true);

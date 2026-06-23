@@ -1,7 +1,7 @@
 import { useFileViewerStore } from '../../stores/fileViewerStore';
-import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useToastStore } from '../../stores/toastStore';
 import * as api from '../../services/api';
+import { activatePanel } from '../../utils/openPanel';
 
 /**
  * Matches inline-code content of the form `path/to/file.ext:N` or
@@ -79,7 +79,7 @@ export function FileLineReference({ text, projectRoot, backendId }: Props) {
     const { pathOrName, start, end } = parsed;
     const openResolved = (relativePath: string) => {
       openFile(projectRoot, relativePath, start, end);
-      useBottomPanelStore.getState().setActiveTab('file-viewer');
+      activatePanel('file-viewer');
     };
 
     const basename = pathOrName.split('/').pop() ?? pathOrName;

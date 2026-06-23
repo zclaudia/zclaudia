@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { activatePanel, deactivatePanel, usePanelIsActive } from '../openPanel';
+import { activatePanel, deactivatePanel, isPanelActive, usePanelIsActive } from '../openPanel';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
@@ -105,6 +105,27 @@ describe('openPanel utility', () => {
       deactivatePanel('foo');
       // rightSidebar collapses naturally via panel visibility, activeTab preserved
       expect(useRightSidebarStore.getState().activeTab).toBe('foo');
+    });
+  });
+
+  describe('isPanelActive', () => {
+    it('uses bottom active tab for bottom-placed panels', () => {
+      registerPanel('foo', 'bottom');
+      useBottomPanelStore.setState({ activeTab: 'foo' });
+      expect(isPanelActive('foo')).toBe(true);
+    });
+
+    it('uses right sidebar active tab for right-placed panels', () => {
+      registerPanel('foo', 'right');
+      useRightSidebarStore.setState({ activeTab: 'foo' });
+      expect(isPanelActive('foo')).toBe(true);
+      expect(useBottomPanelStore.getState().activeTab).toBe('');
+    });
+
+    it('returns false when the panel is hidden', () => {
+      registerPanel('foo', 'right', false);
+      useRightSidebarStore.setState({ activeTab: 'foo' });
+      expect(isPanelActive('foo')).toBe(false);
     });
   });
 

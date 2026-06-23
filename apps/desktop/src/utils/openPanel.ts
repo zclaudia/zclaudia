@@ -36,6 +36,26 @@ export function activatePanel(panelId: string): void {
 }
 
 /**
+ * Non-reactive check for event handlers and stores that need the same
+ * placement-aware active-tab semantics as usePanelIsActive().
+ */
+export function isPanelActive(panelId: string): boolean {
+  const pluginState = usePluginStore.getState();
+  const panel = pluginState.panels.find((p) => p.id === panelId);
+  if (!panel) return false;
+
+  const platform = isMobileViewport() ? 'mobile' : 'desktop';
+  if (!(panel.platforms ?? ['desktop']).includes(platform)) return false;
+  if (pluginState.disabledBuiltinPanels.includes(panelId)) return false;
+  if (panel.visible === false) return false;
+
+  const placement = viewportPlacement(panelId);
+  return placement === 'right'
+    ? useRightSidebarStore.getState().activeTab === panelId
+    : useBottomPanelStore.getState().activeTab === panelId;
+}
+
+/**
  * Clear active-tab state for a panel that's being closed.
  *
  * Bottom: if this panel was the active tab, reset to empty.

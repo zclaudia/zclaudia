@@ -299,7 +299,7 @@ export function ProjectListItem({
                   Settings
                 </button>
                 <button
-                  onClick={() => onDeleteProject(project.id)}
+                  onClick={() => onDeleteProject(project.id, project.name)}
                   className={`${menuItemClass} text-destructive`}
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

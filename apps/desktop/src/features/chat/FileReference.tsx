@@ -5,9 +5,9 @@ import {
   pushTextWithInlineMarkdownIcons,
   TextWithInlineMarkdownIcons,
 } from '../../components/markdown/InlineMarkdownIcons';
-import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { useProjectStore } from '../../stores/projectStore';
+import { activatePanel } from '../../utils/openPanel';
 
 /**
  * Regex to match @file references in text.
@@ -47,7 +47,7 @@ export function TextWithFileRefs({
     const project = Object.values(projects).find((p) => p.rootPath);
     if (project?.rootPath) {
       openFile(project.rootPath, filePath);
-      useBottomPanelStore.getState().setActiveTab('file-viewer');
+      activatePanel('file-viewer');
     }
   };
 

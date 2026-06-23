@@ -34,6 +34,7 @@ import * as api from '../../services/api';
 import type { GitWorktree } from '@zclaudia/shared';
 import type { WorktreeGroup } from './worktreeGrouping';
 import { runWithToast } from '../git/runWithToast';
+import { confirm } from '../../stores/confirmDialogStore';
 
 function agentReadinessReasonFromDetails(details: unknown): AgentReadinessReason | undefined {
   if (!details || typeof details !== 'object') return undefined;
@@ -325,9 +326,12 @@ export function Sidebar({
 
   const handleDeleteWorktree = useCallback(async (projectId: string, worktreePath: string, branchName?: string) => {
     const label = branchName || worktreePath;
-    const confirmed = window.confirm(
-      `Remove worktree at "${worktreePath}"? This deletes the directory and the local branch "${label}".`,
-    );
+    const confirmed = await confirm({
+      title: 'Remove worktree?',
+      message: `This deletes the directory at "${worktreePath}" and the local branch "${label}". This cannot be undone.`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
     if (!confirmed) return;
 
     const result = await runWithToast(`Remove worktree '${label}'`, projectId, () =>

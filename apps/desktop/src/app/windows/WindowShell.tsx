@@ -1,5 +1,6 @@
 import { Suspense, type ReactNode } from 'react';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { ConnectionProvider } from '../../contexts/ConnectionContext';
 import { ThemeProvider } from '../../contexts/ThemeContext';
 
@@ -29,7 +30,15 @@ export function WindowShell({
   withTheme = true,
   connection,
 }: WindowShellProps) {
-  let content = <Suspense fallback={<LazyFallback />}>{children}</Suspense>;
+  // ConfirmDialog is a sibling of children (outside Suspense, inside every
+  // provider) so the in-app confirm()/promptText() primitive works in this and
+  // every popped-out standalone window.
+  let content = (
+    <>
+      <Suspense fallback={<LazyFallback />}>{children}</Suspense>
+      <ConfirmDialog />
+    </>
+  );
 
   if (connection) {
     const connectionProps = connection === true ? {} : connection;

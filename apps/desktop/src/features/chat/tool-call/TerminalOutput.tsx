@@ -1,10 +1,10 @@
 import { useState, useMemo } from 'react';
 import { useTerminalStore } from '../../../stores/terminalStore';
-import { useBottomPanelStore } from '../../../stores/bottomPanelStore';
 import { useProjectStore } from '../../../stores/projectStore';
 import { useSelectionStore } from '../../../stores/selectionStore';
 import { useConnection } from '../../../contexts/ConnectionContext';
 import { useServerStore } from '../../../stores/serverStore';
+import { activatePanel } from '../../../utils/openPanel';
 import { ansiToHtml } from './toolFormatters';
 
 // Max lines to show before collapsing terminal output
@@ -31,7 +31,7 @@ function RunInTerminalButton({ command }: { command: string }) {
           store.openTerminal(session.projectId);
         }
         store.setDrawerOpen(session.projectId, true);
-        useBottomPanelStore.getState().setActiveTab('terminal');
+        activatePanel('terminal');
 
         const terminalId = useTerminalStore.getState().getTerminalId(session.projectId);
         if (terminalId) {

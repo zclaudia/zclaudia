@@ -3,6 +3,7 @@ import { Archive, RefreshCw, Trash2 } from 'lucide-react';
 import * as api from '../../../services/api';
 import { useGitStore, selectStash } from '../store';
 import { runWithToast } from '../runWithToast';
+import { confirm } from '../../../stores/confirmDialogStore';
 
 interface GitStashViewProps {
   projectId: string;
@@ -67,7 +68,13 @@ export function GitStashView({ projectId, worktreePath, onAfterMutation }: GitSt
   };
 
   const handleDrop = async (index: number) => {
-    if (!window.confirm(`Drop stash@{${index}}? This cannot be undone.`)) return;
+    const confirmed = await confirm({
+      title: 'Drop stash?',
+      message: `Drop stash@{${index}}? This cannot be undone.`,
+      confirmLabel: 'Drop',
+      destructive: true,
+    });
+    if (!confirmed) return;
     const ok = await runWithToast(`Drop stash@{${index}}`, projectId, () =>
       api.dropGitStash(projectId, worktreePath, index),
     );

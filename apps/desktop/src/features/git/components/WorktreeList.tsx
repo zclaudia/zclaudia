@@ -4,6 +4,7 @@ import type { GitWorktree } from '@zclaudia/shared';
 import * as api from '../../../services/api';
 import { useGitStore, selectStatus } from '../store';
 import { runWithToast } from '../runWithToast';
+import { confirm } from '../../../stores/confirmDialogStore';
 
 interface WorktreeListProps {
   projectId: string;
@@ -45,9 +46,12 @@ export function WorktreeList({
   const handleDelete = async (wt: GitWorktree) => {
     if (wt.managedBy === 'supervisor') return;
     if (wt.isMain) return;
-    const confirmed = window.confirm(
-      `Remove worktree at "${wt.path}"? This deletes the directory and the local branch "${wt.branch}".`,
-    );
+    const confirmed = await confirm({
+      title: 'Remove worktree?',
+      message: `This deletes the directory at "${wt.path}" and the local branch "${wt.branch}". This cannot be undone.`,
+      confirmLabel: 'Remove',
+      destructive: true,
+    });
     if (!confirmed) return;
     const result = await runWithToast(`Remove worktree '${wt.branch}'`, projectId, () =>
       api.deleteProjectWorktree(projectId, wt.path),

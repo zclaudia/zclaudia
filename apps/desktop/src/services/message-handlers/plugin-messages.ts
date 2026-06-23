@@ -3,9 +3,9 @@
  */
 import type { ServerMessage } from '@zclaudia/shared';
 import { usePluginStore } from '../../stores/pluginStore';
-import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { resolveCanonicalBackendId, resolveLocalBackendId } from '../../utils/controlPlane';
 import { parseBackendId } from '../../stores/gatewayStore';
+import { activatePanel } from '../../utils/openPanel';
 
 function resolveOwnerBackendId(backendId: string | null, serverId: string): string {
   const rawBackendId = backendId || parseBackendId(serverId) || serverId;
@@ -112,7 +112,7 @@ export function handlePluginMessage(
 
     case 'plugin_show_panel':
       usePluginStore.getState().updatePanelVisibility(msg.panelId, true);
-      useBottomPanelStore.getState().setActiveTab(msg.panelId);
+      activatePanel(msg.panelId);
       return true;
 
     case 'plugin_panel_registered':

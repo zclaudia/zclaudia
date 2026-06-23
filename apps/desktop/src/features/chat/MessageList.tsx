@@ -23,12 +23,12 @@ import {
   tryParseMessageInput,
 } from '../../utils/messageContent';
 import { useTerminalStore } from '../../stores/terminalStore';
-import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useServerStore } from '../../stores/serverStore';
 import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from './FileReference';
 import { FileLineReference, INLINE_FILE_REF_REGEX } from './FileLineReference';
+import { activatePanel } from '../../utils/openPanel';
 
 interface FileRefContextValue {
   projectRoot?: string;
@@ -510,7 +510,7 @@ function CodeBlock({
       store.openTerminal(session.projectId);
     }
     store.setDrawerOpen(session.projectId, true);
-    useBottomPanelStore.getState().setActiveTab('terminal');
+    activatePanel('terminal');
 
     const terminalId = useTerminalStore.getState().getTerminalId(session.projectId);
     if (terminalId) {

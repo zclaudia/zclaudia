@@ -7,11 +7,9 @@ vi.mock('../../../stores/fileViewerStore', () => ({
   useFileViewerStore: (selector: any) => selector({ openFile: mockOpenFile }),
 }));
 
-const mockSetActiveTab = vi.fn();
-vi.mock('../../../stores/bottomPanelStore', () => ({
-  useBottomPanelStore: {
-    getState: () => ({ setActiveTab: mockSetActiveTab }),
-  },
+const mockActivatePanel = vi.fn();
+vi.mock('../../../utils/openPanel', () => ({
+  activatePanel: (...args: unknown[]) => mockActivatePanel(...args),
 }));
 
 const mockProjects: Record<string, any> = {
@@ -45,7 +43,7 @@ describe('TextWithFileRefs', () => {
     render(<TextWithFileRefs text="See @src/utils/helpers.ts here" />);
     fireEvent.click(screen.getByRole('button'));
     expect(mockOpenFile).toHaveBeenCalledWith('/project/root', 'src/utils/helpers.ts');
-    expect(mockSetActiveTab).toHaveBeenCalledWith('file-viewer');
+    expect(mockActivatePanel).toHaveBeenCalledWith('file-viewer');
   });
 
   it('handles multiple file references', () => {

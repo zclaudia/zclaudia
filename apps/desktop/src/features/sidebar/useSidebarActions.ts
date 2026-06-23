@@ -8,6 +8,7 @@ import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import type { Project, Session } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { ApiError } from '../../services/api';
+import { confirm } from '../../stores/confirmDialogStore';
 import { reorderProjects } from '../../services/api/projects';
 import { reorderSessions } from '../../services/api/sessions';
 
@@ -130,8 +131,20 @@ export function useSidebarActions({
     }
   }, [isConnected, newSessionName, newSessionAgentProfileId, addSession, selectSession, setNewSessionName, setNewSessionAgentProfileId, setCreatingSessionForProject, onAgentNotReady]);
 
-  const handleDeleteProject = useCallback(async (projectId: string) => {
+  const handleDeleteProject = useCallback(async (projectId: string, projectName?: string) => {
     if (!isConnected) return;
+    // Explicit confirmation — deleting a project also removes all of its sessions
+    // and is irreversible. (Previously this fired with no prompt at all.)
+    const ok = await confirm({
+      title: 'Delete project?',
+      message: `Delete ${projectName ? `"${projectName}"` : 'this project'} and all of its sessions? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!ok) {
+      setContextMenuProject(null);
+      return;
+    }
     try {
       await api.deleteProject(projectId);
       deleteProject(projectId);

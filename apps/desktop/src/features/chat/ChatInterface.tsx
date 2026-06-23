@@ -33,6 +33,7 @@ import type { ClientMessage } from '@zclaudia/shared';
 import { useProjectStore } from '../../stores/projectStore';
 import { useToastStore } from '../../stores/toastStore';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
+import { promptText } from '../../stores/confirmDialogStore';
 import * as api from '../../services/api';
 
 interface ChatInterfaceProps {
@@ -173,7 +174,17 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   // ── SP-A fork/branch handlers ──
 
   const handleFork = useCallback(async (treeEntryId: string) => {
-    const name = window.prompt('Name for the forked session (leave blank for auto):')?.trim() || undefined;
+    // NOTE: not window.prompt — in the webview it returns null without showing a
+    // dialog, so the name field was silently dead (every fork was auto-named).
+    // promptText renders an in-app input; null means the user cancelled.
+    const input = await promptText({
+      title: 'Fork session',
+      message: 'Name for the forked session (leave blank for auto):',
+      placeholder: 'New session name',
+      confirmLabel: 'Fork',
+    });
+    if (input === null) return;
+    const name = input.trim() || undefined;
     try {
       const newSession = await forkSession(sessionId, treeEntryId, name);
       // Register the new session in the project store and switch to it

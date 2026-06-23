@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { useTerminalStore } from '../../stores/terminalStore';
-import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { usePluginStore } from '../../stores/pluginStore';
+import { activatePanel, isPanelActive } from '../../utils/openPanel';
 
 interface UseKeyboardShortcutsOptions {
   projectId: string | undefined;
@@ -16,17 +16,16 @@ export function useKeyboardShortcuts({ projectId, projectRoot }: UseKeyboardShor
       if (e.ctrlKey && e.key === '`' && projectId && !usePluginStore.getState().disabledBuiltinPanels.includes('terminal')) {
         e.preventDefault();
         const store = useTerminalStore.getState();
-        const bpStore = useBottomPanelStore.getState();
-        if (store.isDrawerOpen(projectId) && bpStore.activeTab === 'terminal') {
+        if (store.isDrawerOpen(projectId) && isPanelActive('terminal')) {
           store.setDrawerOpen(projectId, false);
         } else if (store.isDrawerOpen(projectId)) {
-          bpStore.setActiveTab('terminal');
+          activatePanel('terminal');
         } else {
           if (!store.getTerminalId(projectId)) {
             store.openTerminal(projectId);
           }
           store.setDrawerOpen(projectId, true);
-          bpStore.setActiveTab('terminal');
+          activatePanel('terminal');
         }
       }
     };
@@ -44,7 +43,7 @@ export function useKeyboardShortcuts({ projectId, projectRoot }: UseKeyboardShor
           store.togglePanel();
         }
         store.setSearchOpen(true);
-        useBottomPanelStore.getState().setActiveTab('file-viewer');
+        activatePanel('file-viewer');
       }
     };
     window.addEventListener('keydown', handler);
