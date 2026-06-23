@@ -320,7 +320,7 @@ export const usePluginStore = create<PluginStoreState>()(
           // Only restore user preferences — ignore stale plugins from old localStorage data
           settings: persisted.settings ?? currentState.settings,
           disabledBuiltinPanels: normalizeDisabledBuiltinPanels(persisted.disabledBuiltinPanels),
-          panelPlacements: migratePanelPlacements(persisted.panelPlacements),
+          panelPlacements: migratePanelPlacements(persisted.panelPlacements ?? currentState.panelPlacements),
         };
       },
     }
