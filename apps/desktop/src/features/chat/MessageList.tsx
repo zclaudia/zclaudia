@@ -521,7 +521,7 @@ function CodeBlock({
   const codeStyle = isDarkTheme(resolvedTheme) ? oneDark : oneLight;
 
   return (
-    <div className="rounded-lg overflow-hidden border border-border max-w-full">
+    <div className="not-prose rounded-lg overflow-hidden border border-border max-w-full">
       {/* Header bar - like GPT style */}
       <div className="flex items-center justify-between px-4 py-2 bg-secondary border-b border-border">
         <span className="text-xs text-muted-foreground font-medium">{language}</span>
@@ -831,7 +831,7 @@ function MessageActionsMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm">
+        <div className="absolute right-0 bottom-7 z-50 min-w-[200px] rounded-lg border border-border bg-popover shadow-md py-1 text-sm">
           <button
             className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-muted/60 transition-colors"
             onClick={(e) => { e.stopPropagation(); setOpen(false); onFork(treeEntryId); }}
@@ -913,16 +913,6 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        {/* Message actions menu — top-right corner on hover */}
-        {showActionsMenu && hovered && (
-          <div className="absolute top-0 right-0 z-10">
-            <MessageActionsMenu
-              treeEntryId={message.treeEntryId!}
-              onFork={onFork!}
-              onBranch={onBranch!}
-            />
-          </div>
-        )}
         {hasMetadataThinking && (
           <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
             <ThinkingBlocksCard blocks={metadataThinkingBlocks!} />
@@ -938,8 +928,11 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
           toolCalls={toolCalls}
           isStreaming={Boolean(streamingContentBlocks)}
         />
-        <div className="mt-1 text-xs opacity-50 px-3">
-          {formatMessageTimestamp(message.createdAt)}
+        <div className="mt-1 flex items-center gap-2 px-3">
+          <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
+          {showActionsMenu && hovered && (
+            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} />
+          )}
         </div>
       </div>
     );
@@ -954,17 +947,6 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {/* Message actions menu — top-right corner on hover */}
-      {showActionsMenu && hovered && (
-        <div className="absolute top-0 right-0 z-10">
-          <MessageActionsMenu
-            treeEntryId={message.treeEntryId!}
-            onFork={onFork!}
-            onBranch={onBranch!}
-          />
-        </div>
-      )}
-
       {/* Structured thinking blocks from metadata (pi-runtime) */}
       {hasMetadataThinking && (
         <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
@@ -1011,8 +993,11 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         ) : (
           <AssistantContent content={mainContent} />
         )}
-        <div className="mt-1 text-xs opacity-50">
-          {formatMessageTimestamp(message.createdAt)}
+        <div className="mt-1 flex items-center gap-2">
+          <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
+          {showActionsMenu && hovered && (
+            <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} />
+          )}
         </div>
       </div>
       {isUser && showResend && onResend && (
