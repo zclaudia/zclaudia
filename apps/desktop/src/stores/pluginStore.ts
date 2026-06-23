@@ -69,7 +69,7 @@ export interface UIExtension {
   visible?: boolean;       // For alwaysMount panels: controls tab visibility without unmounting
   actions?: unknown;       // React component for tab-specific action buttons
   onClose?: () => void;    // Called when user closes this panel
-  defaultPlacement?: PanelPlacement; // Where panel appears by default (desktop). Defaults to 'bottom'
+  defaultPlacement?: PanelPlacement; // Where panel appears by default (desktop). Defaults to 'right'
 }
 
 export interface PluginNotchTab {
