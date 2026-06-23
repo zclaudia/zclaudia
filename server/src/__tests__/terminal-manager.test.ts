@@ -24,8 +24,55 @@ vi.mock('child_process', () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
 }));
 
-import { TerminalManager } from '../terminal-manager.js';
+import { TerminalManager, isProtectedTccDir } from '../terminal-manager.js';
 import * as pty from 'node-pty';
+
+describe('isProtectedTccDir', () => {
+  const originalPlatform = process.platform;
+  const originalHome = process.env.HOME;
+
+  afterEach(() => {
+    Object.defineProperty(process, 'platform', { value: originalPlatform });
+    if (originalHome !== undefined) process.env.HOME = originalHome;
+    else delete process.env.HOME;
+  });
+
+  function asDarwin(home: string) {
+    Object.defineProperty(process, 'platform', { value: 'darwin' });
+    process.env.HOME = home;
+  }
+
+  it('returns true for ~/Desktop, ~/Documents, ~/Downloads and their descendants', () => {
+    asDarwin('/Users/test');
+    for (const base of ['Desktop', 'Documents', 'Downloads']) {
+      expect(isProtectedTccDir(`/Users/test/${base}`)).toBe(true);
+      expect(isProtectedTccDir(`/Users/test/${base}/proj`)).toBe(true);
+      expect(isProtectedTccDir(`/Users/test/${base}/a/b/c`)).toBe(true);
+      // trailing slash tolerated
+      expect(isProtectedTccDir(`/Users/test/${base}/`)).toBe(true);
+    }
+  });
+
+  it('is case-insensitive on the protected folder name', () => {
+    asDarwin('/Users/test');
+    expect(isProtectedTccDir('/Users/test/desktop')).toBe(true);
+    expect(isProtectedTccDir('/Users/test/DOCUMENTS/x')).toBe(true);
+  });
+
+  it('returns false for non-protected dirs and paths outside $HOME', () => {
+    asDarwin('/Users/test');
+    expect(isProtectedTccDir('/Users/test/Code/proj')).toBe(false);
+    expect(isProtectedTccDir('/Users/test/DesktopX')).toBe(false); // not the Desktop folder
+    expect(isProtectedTccDir('/tmp')).toBe(false);
+    expect(isProtectedTccDir('/home/test/project')).toBe(false);
+  });
+
+  it('returns false on non-darwin platforms regardless of path', () => {
+    Object.defineProperty(process, 'platform', { value: 'linux' });
+    process.env.HOME = '/home/test';
+    expect(isProtectedTccDir('/home/test/Desktop/proj')).toBe(false);
+  });
+});
 
 describe('TerminalManager', () => {
   let manager: TerminalManager;
@@ -48,10 +95,11 @@ describe('TerminalManager', () => {
   });
 
   describe('create', () => {
-    it('spawns a PTY at $HOME then cd to target cwd', () => {
-      manager.create('term-1', 'client-1', '/home/test', 80, 24);
+    it('spawns a PTY directly at a non-protected cwd without cd', () => {
+      // A normal project dir (not under ~/{Desktop,Documents,Downloads}) is
+      // used directly as the spawn cwd — no $HOME fallback, no cd.
+      manager.create('term-1', 'client-1', '/home/test/project', 80, 24);
 
-      // PTY is spawned at $HOME (safe cwd), not the target cwd
       expect(pty.spawn).toHaveBeenCalledWith(
         expect.any(String),
         [],
@@ -59,11 +107,36 @@ describe('TerminalManager', () => {
           name: 'xterm-256color',
           cols: 80,
           rows: 24,
-          cwd: process.env.HOME || '/',
+          cwd: '/home/test/project',
         }),
       );
-      // Then cd to the target directory
-      expect(mockPtyWrite).toHaveBeenCalledWith(expect.stringContaining('/home/test'));
+      // No cd should be written: the shell already started in the target dir.
+      expect(mockPtyWrite).not.toHaveBeenCalledWith(expect.stringContaining('cd '));
+    });
+
+    it('falls back to $HOME + cd for macOS TCC-protected directories', () => {
+      const originalPlatform = process.platform;
+      const originalHome = process.env.HOME;
+      Object.defineProperty(process, 'platform', { value: 'darwin' });
+      process.env.HOME = '/Users/test';
+
+      try {
+        manager.create('term-1', 'client-1', '/Users/test/Desktop/proj', 80, 24);
+
+        // Spawns at $HOME (protected dirs block a direct spawn via a TCC prompt)
+        expect(pty.spawn).toHaveBeenCalledWith(
+          expect.any(String),
+          [],
+          expect.objectContaining({
+            cwd: '/Users/test',
+          }),
+        );
+        // Then cd into the actual target dir
+        expect(mockPtyWrite).toHaveBeenCalledWith(expect.stringContaining('/Users/test/Desktop/proj'));
+      } finally {
+        Object.defineProperty(process, 'platform', { value: originalPlatform });
+        if (originalHome !== undefined) process.env.HOME = originalHome;
+      }
     });
 
     it('sends terminal_output when PTY emits data', () => {

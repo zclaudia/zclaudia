@@ -7,6 +7,51 @@ const SCROLLBACK_MAX_BYTES = 64 * 1024; // 64KB scrollback buffer
 const SCROLLBACK_MAX_CHUNKS = 2000;
 
 /**
+ * Directories macOS TCC guards. A process that spawns with one of these (or a
+ * path beneath it) as its cwd triggers a system authorization prompt that
+ * blocks the spawn — lethal for an interactive PTY. See `resolveSpawnCwd`.
+ */
+const TCC_PROTECTED_DIRS = ['Desktop', 'Documents', 'Downloads'];
+
+/**
+ * Whether `targetCwd` is a macOS TCC-protected directory.
+ *
+ * Only first-level children of $HOME are protected: ~/Desktop, ~/Documents,
+ * ~/Downloads (and anything nested under them). Deeper paths such as
+ * ~/Code/... or absolute paths outside $HOME are NOT guarded.
+ */
+export function isProtectedTccDir(targetCwd: string): boolean {
+  if (process.platform !== 'darwin') return false;
+  const home = process.env.HOME;
+  if (!home) return false;
+  // Normalize for comparison: resolve ".."/"." and drop a trailing slash.
+  const resolved = targetCwd.replace(/\/+$/, '');
+  if (!resolved.toLowerCase().startsWith(home.toLowerCase() + '/')) return false;
+  const firstSegment = resolved.slice(home.length + 1).split('/')[0];
+  if (!firstSegment) return false; // path was exactly $HOME/ — nothing under it
+  return TCC_PROTECTED_DIRS.some(d => firstSegment.toLowerCase() === d.toLowerCase());
+}
+
+/**
+ * Decide the cwd to pass to pty.spawn().
+ *
+ * Most project directories can be used directly as the spawn cwd — the shell
+ * lands where the user expects, with no `cd` flicker. The exception is macOS's
+ * TCC-protected folders (~/Desktop, ~/Documents, ~/Downloads): spawning there
+ * raises a system permission prompt that blocks the PTY. For those, we fall
+ * back to the proven "spawn at $HOME, then cd" approach, which works because
+ * TCC checks the cwd at spawn/exec time; once the shell has successfully exec'd
+ * from a safe cwd, a subsequent `cd` into a protected dir is a runtime shell
+ * command that no longer trips the launch-time check.
+ */
+function resolveSpawnCwd(targetCwd: string): { spawnCwd: string; needsCd: boolean } {
+  if (isProtectedTccDir(targetCwd)) {
+    return { spawnCwd: process.env.HOME || '/', needsCd: true };
+  }
+  return { spawnCwd: targetCwd, needsCd: false };
+}
+
+/**
  * Detect available shell for the current platform.
  *
  * - Linux / macOS: use $SHELL or fallback to 'bash'
@@ -64,29 +109,29 @@ export class TerminalManager {
     }
 
     const shell = detectShell();
-    // Always spawn at $HOME to avoid macOS TCC permission dialogs
-    // (accessing Desktop/Documents/Downloads triggers a system prompt that blocks pty.spawn).
-    // Then cd to the target directory — if that fails, the user sees a normal shell error.
-    const safeCwd = process.env.HOME || '/';
-    console.log(`[Terminal] Spawning: shell=${shell}, safeCwd=${safeCwd}, targetCwd=${cwd}, cols=${cols}, rows=${rows}`);
+    // Spawn directly at the target cwd when it's safe to do so. Only macOS
+    // TCC-protected folders (~/{Desktop,Documents,Downloads}) need the "spawn at
+    // $HOME then cd" fallback; see resolveSpawnCwd for the full rationale.
+    const { spawnCwd, needsCd } = resolveSpawnCwd(cwd);
+    console.log(`[Terminal] Spawning: shell=${shell}, spawnCwd=${spawnCwd}, targetCwd=${cwd}, needsCd=${needsCd}, cols=${cols}, rows=${rows}`);
     let ptyProcess: pty.IPty;
     try {
       ptyProcess = pty.spawn(shell, [], {
         name: 'xterm-256color',
         cols,
         rows,
-        cwd: safeCwd,
+        cwd: spawnCwd,
         env: process.env as Record<string, string>,
       });
     } catch (err) {
-      console.error(`[Terminal] pty.spawn failed: shell=${shell}, cwd=${safeCwd}, PATH=${process.env.PATH?.substring(0, 200)}`);
+      console.error(`[Terminal] pty.spawn failed: shell=${shell}, cwd=${spawnCwd}, PATH=${process.env.PATH?.substring(0, 200)}`);
       throw err;
     }
 
-    // cd to the target directory after shell starts (non-blocking, graceful failure)
-    if (cwd && cwd !== safeCwd) {
-      // Use printf to avoid echoing the cd command in the terminal,
-      // and clear the line so the user only sees the prompt at the target dir.
+    // For TCC-protected dirs only: the shell spawned at $HOME, so cd it to the
+    // target now (non-blocking; if it fails the user sees a normal shell error).
+    if (needsCd) {
+      // `clear` wipes the cd line so the user only sees the prompt at the target dir.
       ptyProcess.write(`cd ${this.shellEscape(cwd)} && clear\n`);
     }
 
