@@ -14,10 +14,10 @@ interface RightSidebarEmptyStateProps {
  *  handled in render, so it is intentionally absent here. The `satisfies` clause
  *  makes the compiler flag drift if a new iconKey is added to the union. */
 const SUBTITLES = {
-  draft: '编辑草稿',
-  file: '浏览工作目录',
-  terminal: '运行命令',
-  lineage: '会话分支图',
+  draft: 'Edit draft',
+  file: 'Browse working directory',
+  terminal: 'Run commands',
+  lineage: 'Session branch graph',
 } satisfies Record<Exclude<SessionTool['iconKey'], 'changes'>, string>;
 
 /**
@@ -44,7 +44,9 @@ export function RightSidebarEmptyState({ projectId, projectRoot }: RightSidebarE
 
   const subtitleFor = (tool: SessionTool): string | undefined => {
     if (tool.iconKey === 'changes') {
-      return changedCount > 0 ? `${changedCount} 个文件待查看` : '查看本次会话改动';
+      return changedCount > 0
+        ? `${changedCount} file${changedCount === 1 ? '' : 's'} to review`
+        : 'View session changes';
     }
     return SUBTITLES[tool.iconKey];
   };

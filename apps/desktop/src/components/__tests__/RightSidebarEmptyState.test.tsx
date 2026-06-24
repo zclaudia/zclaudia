@@ -85,13 +85,13 @@ describe('RightSidebarEmptyState', () => {
   it('shows the changes count when there are changes', () => {
     changesMock.mockReturnValue([{}, {}, {}]);
     renderEmpty();
-    expect(screen.getByText('3 个文件待查看')).toBeInTheDocument();
+    expect(screen.getByText('3 files to review')).toBeInTheDocument();
   });
 
   it('hides the changes count and uses the static subtitle at zero', () => {
     renderEmpty();
-    expect(screen.queryByText(/个文件待查看/)).toBeNull();
-    expect(screen.getByText('查看本次会话改动')).toBeInTheDocument();
+    expect(screen.queryByText(/to review/)).toBeNull();
+    expect(screen.getByText('View session changes')).toBeInTheDocument();
   });
 
   it('moves the changes tile to the front when there are changes', () => {
