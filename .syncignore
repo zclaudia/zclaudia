@@ -1,0 +1,92 @@
+# VCS
+.git/
+.worktrees/
+
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Env / local config
+.env
+.env.local
+.env.*.local
+.mcp.json
+
+# Build outputs
+dist/
+build/
+bundle/
+.output/
+target/
+.turbo/
+
+# Vite / test caches
+.cache/
+.vite/
+.vitest/
+.vitest-*/
+.nyc_output/
+coverage/
+
+# Tauri generated/native outputs
+apps/desktop/src-tauri/target/
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/binaries/
+
+# Test reports
+playwright-report/
+test-results/
+apps/desktop/test-results-full/
+.playwright-mcp/
+
+# Runtime/local app data
+server/data/
+.zclaudia/
+.supervision/
+.opencode/
+.superpowers/
+.3rd-party/
+/plugins/
+
+# Generated docs / local summaries
+docs/superpowers/
+ARCHITECTURE_REFACTORING_SUMMARY.md
+E2E_TESTS_SUMMARY.md
+
+# Logs / temp / db
+*.log
+npm-debug.log*
+pnpm-debug.log*
+*.tmp
+*.temp
+*.bak
+*.tgz
+*.db
+*.db-journal
+*.sqlite
+*.sqlite-journal
+
+# Profiling dumps
+*.cpuprofile
+*.heapsnapshot
+
+# Secrets / signing
+*.keystore
+*.jks
+
+# IDE / OS
+.vscode/
+.idea/
+.cursor/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+*~
+.DS_Store
+*.DS_Store
+Thumbs.db
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
