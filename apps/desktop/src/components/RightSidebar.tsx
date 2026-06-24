@@ -3,9 +3,20 @@ import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, GitFork, type L
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
 import { usePluginStore } from '../stores/pluginStore';
 import { useSessionToolsStore } from '../stores/sessionToolsStore';
+import { useServerStore } from '../stores/serverStore';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { PanelActions, PanelContent } from './panels/PanelRenderer';
 import { usePanelRegion } from './panels/usePanelRegion';
+import { useSplitLayoutStore, isSplitLayout } from '../stores/splitLayoutStore';
+import { SplitLayoutView } from './split/SplitLayoutView';
+import {
+  useDragSplitStore,
+  resolvePointerToPane,
+  dropZoneToDir,
+  canDrop,
+  type PanelPayload,
+} from './split/dragSplit';
+import { getTerminalScopeKey } from '../stores/terminalStore';
 
 const TOOL_ICONS: Record<string, LucideIcon> = {
   draft: FileEdit,
@@ -112,14 +123,109 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
     });
   };
 
-  if (isMobile) return null;
+  // --- Split layout integration ----------------------------------------------
+  // The layout tree lives in splitLayoutStore. When it is a group, we render the
+  // tree (SplitLayoutView) instead of the single-panel overlap layer. The tree is
+  // lazily seeded with a single pane the first time a panel becomes visible.
   const hasPinned = pinnedTools.length > 0;
-  if (!isOpen && !hasAlwaysMount && !hasPinned) return null;
-
   // `collapsed` hides the sidebar without unmounting — alwaysMount panels (terminal
-  // xterm) keep their state while the user has it tucked away. Pinned tool tabs keep
-  // the sidebar renderable even before any panel content has been opened.
+  // xterm) keep their state while the user has it tucked away. Computed before the
+  // early returns so the split hooks below can depend on it.
   const expanded = !collapsed && (isOpen || hasPinned);
+
+  const splitRoot = useSplitLayoutStore((s) => s.root);
+  const splitContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Seed a single-pane tree when a panel is visible and no tree exists yet.
+    if (!expanded) return;
+    if (splitRoot || !effectiveTab) return;
+    useSplitLayoutStore.getState().initSingle(effectiveTab);
+  }, [expanded, splitRoot, effectiveTab]);
+
+  const activeServerId = useServerStore((s) => s.activeServerId);
+
+  /** Build the drag payload for a panel tab (terminal carries its scope key). */
+  const buildPayload = useCallback(
+    (panelId: string): PanelPayload => {
+      if (panelId === 'terminal' && projectId) {
+        return { panelId, instanceKey: getTerminalScopeKey(projectId, activeServerId) };
+      }
+      return { panelId };
+    },
+    [projectId, activeServerId],
+  );
+
+  const onPanelTabPointerDown = useCallback(
+    (panelId: string, e: React.PointerEvent) => {
+      // Only start a drag on a primary-button press; let a plain click switch tabs.
+      if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
+      useDragSplitStore.getState().startDrag(buildPayload(panelId));
+    },
+    [buildPayload],
+  );
+
+  /** Track hover zone while a drag is over the content area. */
+  const onContentPointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      const { active } = useDragSplitStore.getState();
+      if (!active) return;
+      const hit = resolvePointerToPane(
+        splitContentRef.current,
+        useSplitLayoutStore.getState().root,
+        e.clientX,
+        e.clientY,
+        active,
+      );
+      useDragSplitStore.getState().setHover(hit?.paneId ?? null, hit?.zone ?? null, hit?.disabled ?? new Set());
+    },
+    [],
+  );
+
+  /** On drop: split or replace per the resolved zone; always end the drag. */
+  const onContentPointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      const { active } = useDragSplitStore.getState();
+      if (!active) {
+        return;
+      }
+      const hit = resolvePointerToPane(
+        splitContentRef.current,
+        useSplitLayoutStore.getState().root,
+        e.clientX,
+        e.clientY,
+        active,
+      );
+      if (hit) {
+        const { panelId, instanceKey } = active;
+        const splitInfo = dropZoneToDir(hit.zone);
+        if (splitInfo) {
+          const ok = canDrop(
+            useSplitLayoutStore.getState().root,
+            hit.paneId,
+            hit.zone,
+            active,
+          ).allowed;
+          if (ok) {
+            useSplitLayoutStore.getState().split(hit.paneId, splitInfo.dir, panelId, instanceKey);
+          }
+        } else {
+          // center → replace the pane's panel
+          useSplitLayoutStore.getState().replacePane(hit.paneId, panelId, instanceKey);
+        }
+      }
+      useDragSplitStore.getState().endDrag();
+    },
+    [],
+  );
+
+  // End any in-flight drag if the sidebar collapses.
+  useEffect(() => {
+    if (!expanded) useDragSplitStore.getState().endDrag();
+  }, [expanded]);
+
+  if (isMobile) return null;
+  if (!isOpen && !hasAlwaysMount && !hasPinned) return null;
 
   return (
     <div
@@ -178,11 +284,13 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
               <button
                 key={panel.id}
                 onClick={() => setActiveTab(panel.id)}
-                className={`px-2 py-0.5 rounded-md text-xs font-medium ${
+                onPointerDown={(e) => onPanelTabPointerDown(panel.id, e)}
+                className={`px-2 py-0.5 rounded-md text-xs font-medium cursor-grab active:cursor-grabbing ${
                   effectiveTab === panel.id
                     ? 'bg-secondary text-foreground'
                     : 'text-muted-foreground hover:text-foreground'
                 }`}
+                title={`Drag ${panel.label} to split, or click to switch`}
               >
                 {panel.label}
               </button>
@@ -211,13 +319,32 @@ export function RightSidebar({ projectId, projectRoot, workingDirectory }: Right
         </div>
       </div>
 
-      {/* Content — alwaysMount panels stay in DOM even when hidden */}
-      <div className="flex-1 overflow-hidden relative [contain:layout_paint]">
-        {mountedPanels.map((panel) => (
-          <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id && expanded ? '' : 'invisible'}`}>
-            <PanelContent panel={panel} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
-          </div>
-        ))}
+      {/* Content — alwaysMount panels stay in DOM even when hidden.
+          When the split layout tree has a group, render the tree (two+ panes)
+          instead of the single-panel overlap layer. */}
+      <div
+        ref={splitContentRef}
+        className="flex-1 overflow-hidden relative [contain:layout_paint]"
+        onPointerMove={onContentPointerMove}
+        onPointerUp={onContentPointerUp}
+      >
+        {isSplitLayout(splitRoot) ? (
+          <>
+            <SplitLayoutView
+              projectId={projectId}
+              projectRoot={projectRoot}
+              workingDirectory={workingDirectory}
+            />
+            {/* Drop overlays are rendered per-pane inside PaneView; the active-drag
+                indicator lives here. */}
+          </>
+        ) : (
+          mountedPanels.map((panel) => (
+            <div key={panel.id} className={`absolute inset-0 ${effectiveTab === panel.id && expanded ? '' : 'invisible'}`}>
+              <PanelContent panel={panel} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+            </div>
+          ))
+        )}
       </div>
     </div>
   );
