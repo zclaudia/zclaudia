@@ -195,6 +195,44 @@ describe('rightWorkspaceStore — simple actions (deferred)', () => {
   });
 });
 
+describe('rightWorkspaceStore — splitPane / replaceTool', () => {
+  beforeEach(reset);
+
+  it('splitPane wraps the source pane and inserts the new pane second', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    const from = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.splitPane('A', from, 'col', 'memory');
+    expect(res.ok).toBe(true);
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    const root = ws.root as any;
+    expect(root.kind).toBe('group');
+    expect(root.dir).toBe('col');
+    expect(root.children[0].id).toBe(from);
+    expect(root.children[1].activeToolId).toBe('memory');
+    if (res.ok) expect(ws.focusedPaneId).toBe(res.newPaneId);
+  });
+
+  it('splitPane refuses a duplicate singleton and leaves the tree unchanged', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory', { openMode: 'shared' });
+    const from = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const before = useRightWorkspaceStore.getState().bySession.A.root;
+    const res = s.splitPane('A', from, 'row', 'memory');
+    expect(res.ok).toBe(false);
+    expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
+  });
+
+  it('replaceTool swaps a pane active tool', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    const pane = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.replaceTool('A', pane, 'memory');
+    expect(res.ok).toBe(true);
+    expect((useRightWorkspaceStore.getState().bySession.A.root as any).activeToolId).toBe('memory');
+  });
+});
+
 // test helpers
 function findPaneFor(root: any, id: string): any {
   return findPane(root, id);

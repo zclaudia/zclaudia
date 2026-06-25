@@ -300,9 +300,33 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             return { ...ws, root: replaceChild(ws.root, fromId, group), focusedPaneId: ref.id };
           }),
 
-        // splitPane / replaceTool implemented in Task 5
-        splitPane: () => ({ ok: false, conflictPaneId: '' }),
-        replaceTool: () => ({ ok: false, conflictPaneId: '' }),
+        splitPane: (sessionId, fromPaneId, dir, toolId, instanceKey, multiInstance) => {
+          const ws = _get().bySession[sessionId];
+          if (!ws?.root || !findPane(ws.root, fromPaneId)) return { ok: false, conflictPaneId: '' };
+          const singleton = !multiInstance;
+          const conflict = findToolConflict(ws.root, toolId, instanceKey, singleton, ' __new__');
+          if (conflict) return { ok: false, conflictPaneId: conflict };
+          const fromPane = findPane(ws.root, fromPaneId)!;
+          const ref = newPane(toolId, instanceKey);
+          const group: GroupNode = {
+            id: genId('grp'), kind: 'group', dir, ratio: DEFAULT_RATIO,
+            children: [fromPane, ref],
+          };
+          update(sessionId, (w) => ({ ...w, root: replaceChild(w.root!, fromPaneId, group), focusedPaneId: ref.id }));
+          return { ok: true, newPaneId: ref.id };
+        },
+
+        replaceTool: (sessionId, paneId, toolId, instanceKey, multiInstance) => {
+          const ws = _get().bySession[sessionId];
+          const pane = ws?.root ? findPane(ws.root, paneId) : null;
+          if (!pane) return { ok: false, conflictPaneId: '' };
+          const singleton = !multiInstance;
+          const conflict = findToolConflict(ws!.root, toolId, instanceKey, singleton, paneId);
+          if (conflict) return { ok: false, conflictPaneId: conflict };
+          const replaced: PaneNode = { ...pane, tools: [{ toolId, instanceKey }], activeToolId: toolId };
+          update(sessionId, (w) => ({ ...w, root: replaceChild(w.root!, paneId, replaced), focusedPaneId: paneId }));
+          return { ok: true, newPaneId: '' };
+        },
 
         closePane: (sessionId, paneId) =>
           update(sessionId, (ws) => {
