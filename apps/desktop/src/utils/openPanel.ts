@@ -2,6 +2,9 @@ import { usePluginStore, getEffectivePlacement } from '../stores/pluginStore';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
 import { useRightSidebarStore } from '../stores/rightSidebarStore';
 import { useIsMobile, isMobileViewport } from '../hooks/useMediaQuery';
+import { useProjectStore } from '../stores/projectStore';
+import { useServerStore } from '../stores/serverStore';
+import { openToolInWorkspace, closeToolInWorkspace } from './workspaceActions';
 
 /**
  * Effective placement, viewport-aware: mobile renders every panel through the
@@ -14,10 +17,23 @@ function viewportPlacement(panelId: string): 'bottom' | 'right' {
 }
 
 /**
+ * Resolve current session context for workspace routing.
+ */
+function currentSessionCtx() {
+  const { selectedSessionId, sessions } = useProjectStore.getState();
+  const session = selectedSessionId ? sessions.find((s) => s.id === selectedSessionId) : undefined;
+  return {
+    sessionId: selectedSessionId,
+    projectId: session?.projectId,
+    backendId: useServerStore.getState().activeServerId,
+  };
+}
+
+/**
  * Activate a panel in its effective placement (bottom or right).
  *
- * Bottom: sets active tab in bottom panel.
- * Right: sets active tab in right sidebar.
+ * Bottom (mobile): sets active tab in bottom panel.
+ * Right (desktop): opens the tool in the session workspace (rightWorkspaceStore).
  *
  * Does NOT change the panel's `visible` flag — caller is responsible for the
  * panel-specific "open" behavior (e.g. terminal drawer, file viewer state,
@@ -26,10 +42,12 @@ function viewportPlacement(panelId: string): 'bottom' | 'right' {
 export function activatePanel(panelId: string): void {
   const placement = viewportPlacement(panelId);
   if (placement === 'right') {
-    const store = useRightSidebarStore.getState();
-    store.setActiveTab(panelId);
-    // Opened while the sidebar is collapsed → surface a dot rather than popping it open.
-    store.markUnread();
+    const ctx = currentSessionCtx();
+    if (!ctx.sessionId) return;
+    openToolInWorkspace(ctx.sessionId, panelId, {
+      projectId: ctx.projectId,
+      backendId: ctx.backendId,
+    });
   } else {
     useBottomPanelStore.getState().setActiveTab(panelId);
   }
@@ -56,18 +74,16 @@ export function isPanelActive(panelId: string): boolean {
 }
 
 /**
- * Clear active-tab state for a panel that's being closed.
+ * Close a panel in its effective placement.
  *
- * Bottom: if this panel was the active tab, reset to empty.
- * Right: if this panel was the active tab, leave activeTab as-is (sidebar
- *        will collapse naturally when no visible right panels remain;
- *        preserving activeTab means the user's preferred tab restores when
- *        they reopen the panel later).
+ * Bottom (mobile): if this panel was the active tab, reset to empty.
+ * Right (desktop): close the tool's pane in the session workspace.
  */
 export function deactivatePanel(panelId: string): void {
   const placement = viewportPlacement(panelId);
   if (placement === 'right') {
-    // Right sidebar collapses automatically when no visible right panels remain.
+    const ctx = currentSessionCtx();
+    if (ctx.sessionId) closeToolInWorkspace(ctx.sessionId, panelId);
     return;
   }
   const { activeTab, setActiveTab } = useBottomPanelStore.getState();
