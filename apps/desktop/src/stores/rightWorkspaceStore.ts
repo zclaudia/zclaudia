@@ -186,7 +186,124 @@ export function isSplitWorkspace(root: LayoutNode | null): boolean {
   return !!root && root.kind === 'group';
 }
 
-// Store object and actions will be added in Tasks 3–5.
-// These imports are here for use by later tasks.
-void create;
-void persist;
+const MAX_SESSIONS = 50;
+const EMPTY: SessionWorkspace = { root: null, primaryPaneId: null, focusedPaneId: null };
+
+export interface OpenToolOpts {
+  instanceKey?: string;
+  target?: 'primary' | 'focused' | 'new-split';
+  openMode?: 'shared' | 'dedicated';
+  multiInstance?: boolean;
+}
+
+interface RightWorkspaceState {
+  bySession: Record<string, SessionWorkspace>;
+  /** MRU order of sessionIds; front = most recent. Used for LRU eviction. */
+  order: string[];
+  ensureSession: (sessionId: string) => void;
+  openTool: (sessionId: string, toolId: string, opts?: OpenToolOpts) => void;
+  closePane: (sessionId: string, paneId: string) => void;
+  splitPane: (sessionId: string, fromPaneId: string, dir: SplitDir, toolId: string, instanceKey?: string, multiInstance?: boolean) => SplitResult;
+  replaceTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string, multiInstance?: boolean) => SplitResult;
+  setRatio: (sessionId: string, groupId: string, ratio: number) => void;
+  focusPane: (sessionId: string, paneId: string) => void;
+  resetSession: (sessionId: string) => void;
+  removeSession: (sessionId: string) => void;
+}
+
+/** Bump a sessionId to the front of MRU order and evict the oldest beyond MAX. */
+function touch(order: string[], bySession: Record<string, SessionWorkspace>, sessionId: string) {
+  const next = [sessionId, ...order.filter((id) => id !== sessionId)];
+  while (next.length > MAX_SESSIONS) {
+    const victim = next.pop()!;
+    delete bySession[victim];
+  }
+  return next;
+}
+
+export const useRightWorkspaceStore = create<RightWorkspaceState>()(
+  persist(
+    (set, _get) => {
+      /** Apply `mut` to a fresh copy of the session's workspace, then persist + touch MRU. */
+      const update = (sessionId: string, mut: (ws: SessionWorkspace) => SessionWorkspace) =>
+        set((s) => {
+          const bySession = { ...s.bySession };
+          const current = bySession[sessionId] ?? { ...EMPTY };
+          bySession[sessionId] = mut({ ...current });
+          const order = touch([...s.order], bySession, sessionId);
+          return { bySession, order };
+        });
+
+      return {
+        bySession: {},
+        order: [],
+
+        ensureSession: (sessionId) =>
+          set((s) => {
+            if (s.bySession[sessionId]) return {};
+            const bySession = { ...s.bySession, [sessionId]: { ...EMPTY } };
+            return { bySession, order: touch([...s.order], bySession, sessionId) };
+          }),
+
+        // openTool implemented in Task 4
+        openTool: () => {},
+
+        // splitPane / replaceTool implemented in Task 5
+        splitPane: () => ({ ok: false, conflictPaneId: '' }),
+        replaceTool: () => ({ ok: false, conflictPaneId: '' }),
+
+        closePane: (sessionId, paneId) =>
+          update(sessionId, (ws) => {
+            if (!ws.root) return ws;
+            const next = removePane(ws.root, paneId);
+            if (next === ws.root) return ws; // not found
+            const primaryPaneId =
+              ws.primaryPaneId === paneId ? pickFirstPane(next) : ws.primaryPaneId;
+            const focusedPaneId =
+              ws.focusedPaneId === paneId ? pickFirstPane(next) : ws.focusedPaneId;
+            return { root: next, primaryPaneId, focusedPaneId };
+          }),
+
+        setRatio: (sessionId, groupId, ratio) =>
+          update(sessionId, (ws) => (ws.root ? { ...ws, root: setRatioAt(ws.root, groupId, ratio) } : ws)),
+
+        focusPane: (sessionId, paneId) =>
+          update(sessionId, (ws) => (findPane(ws.root, paneId) ? { ...ws, focusedPaneId: paneId } : ws)),
+
+        resetSession: (sessionId) => update(sessionId, () => ({ ...EMPTY })),
+
+        removeSession: (sessionId) =>
+          set((s) => {
+            if (!s.bySession[sessionId]) return {};
+            const bySession = { ...s.bySession };
+            delete bySession[sessionId];
+            return { bySession, order: s.order.filter((id) => id !== sessionId) };
+          }),
+      };
+    },
+    {
+      name: 'claudia-right-workspace',
+      version: 1,
+      partialize: (s) => ({ bySession: s.bySession, order: s.order }),
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<RightWorkspaceState>;
+        const bySession: Record<string, SessionWorkspace> = {};
+        for (const [id, ws] of Object.entries(p.bySession ?? {})) {
+          const root = ws && isSafeTree(ws.root) ? ws.root : ws?.root === null ? null : null;
+          bySession[id] = {
+            root,
+            primaryPaneId: root ? ws?.primaryPaneId ?? null : null,
+            focusedPaneId: root ? ws?.focusedPaneId ?? null : null,
+          };
+        }
+        const order = (p.order ?? []).filter((id) => id in bySession);
+        return { ...current, bySession, order };
+      },
+    },
+  ),
+);
+
+// One-time cleanup of the retired global split-layout persistence.
+if (typeof localStorage !== 'undefined') {
+  try { localStorage.removeItem('claudia-split-layout'); } catch { /* ignore */ }
+}

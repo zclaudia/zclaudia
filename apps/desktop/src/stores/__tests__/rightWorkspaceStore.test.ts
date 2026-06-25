@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   newPane, findPane, findPaneWithTool, findToolConflict,
   removePane, setRatioAt, pickFirstPane, isSafeTree, isSplitWorkspace,
   type LayoutNode,
 } from '../rightWorkspaceStore';
+import { useRightWorkspaceStore } from '../rightWorkspaceStore';
+
+const reset = () => useRightWorkspaceStore.setState({ bySession: {}, order: [] });
 
 function group(a: LayoutNode, b: LayoutNode): LayoutNode {
   return { id: 'g1', kind: 'group', dir: 'row', ratio: 0.5, children: [a, b] };
@@ -74,5 +77,26 @@ describe('rightWorkspaceStore helpers', () => {
     expect(isSplitWorkspace(newPane('a'))).toBe(false);
     expect(isSplitWorkspace(group(newPane('a'), newPane('b')))).toBe(true);
     expect(isSplitWorkspace(null)).toBe(false);
+  });
+});
+
+describe('rightWorkspaceStore — simple actions', () => {
+  beforeEach(reset);
+
+  it('ensureSession creates an empty workspace once', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.ensureSession('A');
+    expect(useRightWorkspaceStore.getState().bySession.A)
+      .toEqual({ root: null, primaryPaneId: null, focusedPaneId: null });
+    s.ensureSession('A'); // idempotent
+    expect(useRightWorkspaceStore.getState().order).toEqual(['A']);
+  });
+
+  it('removeSession drops the entry and order', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.ensureSession('A');
+    s.removeSession('A');
+    expect(useRightWorkspaceStore.getState().bySession.A).toBeUndefined();
+    expect(useRightWorkspaceStore.getState().order).toEqual([]);
   });
 });
