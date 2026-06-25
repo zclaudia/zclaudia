@@ -1,11 +1,11 @@
-import { usePluginStore } from '../../stores/pluginStore';
+import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
 import { openToolInWorkspace } from '../../utils/workspaceActions';
 import { useServerStore } from '../../stores/serverStore';
 
 interface Props { sessionId: string; projectId?: string; onPick: () => void; }
 
 export function ToolLauncherMenu({ sessionId, projectId, onPick }: Props) {
-  const panels = usePluginStore((s) => s.panels);
+  const panels = usePluginStore(selectPluginPanels);
   const disabled = usePluginStore((s) => s.disabledBuiltinPanels);
   const backendId = useServerStore((s) => s.activeServerId);
   const tools = panels.filter(
