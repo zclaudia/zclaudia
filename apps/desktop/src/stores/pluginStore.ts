@@ -70,6 +70,9 @@ export interface UIExtension {
   actions?: unknown;       // React component for tab-specific action buttons
   onClose?: () => void;    // Called when user closes this panel
   defaultPlacement?: PanelPlacement; // Where panel appears by default (desktop). Defaults to 'right'
+  /** Right-sidebar workspace routing for openTool: 'shared' reuses the primary
+   *  pane; 'dedicated' opens (or focuses) its own pane. Defaults to 'shared'. */
+  openMode?: 'shared' | 'dedicated';
 }
 
 export interface PluginNotchTab {
