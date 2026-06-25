@@ -111,8 +111,8 @@ export function usePanelIsActive(panelId: string): boolean {
   });
   const bottomMatches = useBottomPanelStore((s) => s.activeTab === panelId);
   const singleton = isSingleton(panelId);
+  const sid = useProjectStore((s) => s.selectedSessionId);
   const rightMatches = useRightWorkspaceStore((s) => {
-    const sid = useProjectStore.getState().selectedSessionId;
     const root = sid ? (s.bySession[sid]?.root ?? null) : null;
     return findPaneWithTool(root, panelId, undefined, singleton) !== null;
   });

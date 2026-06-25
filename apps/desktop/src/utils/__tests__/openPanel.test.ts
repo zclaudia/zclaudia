@@ -242,5 +242,32 @@ describe('openPanel utility', () => {
       const { result } = renderHook(() => usePanelIsActive('foo'));
       expect(result.current).toBe(false);
     });
+
+    it('reacts when selectedSessionId changes to a session that has the panel open', async () => {
+      const { act } = await import('@testing-library/react');
+      const SESSION_2 = 'sess-2';
+      // Seed a second session with 'foo' already in the workspace
+      useProjectStore.setState({
+        selectedSessionId: SESSION_2,
+        sessions: [{ id: SESSION_2, projectId: PROJECT_ID } as any],
+      } as any);
+      useServerStore.setState({ activeServerId: BACKEND_ID } as any);
+      registerPanel('foo', 'right', true);
+      activatePanel('foo'); // opens in sess-2's workspace
+
+      // Start with no session selected — hook should return false
+      useProjectStore.setState({ selectedSessionId: null, sessions: [] } as any);
+      const { result } = renderHook(() => usePanelIsActive('foo'));
+      expect(result.current).toBe(false);
+
+      // Switch to the session that has 'foo' — hook must recompute to true
+      act(() => {
+        useProjectStore.setState({
+          selectedSessionId: SESSION_2,
+          sessions: [{ id: SESSION_2, projectId: PROJECT_ID } as any],
+        } as any);
+      });
+      expect(result.current).toBe(true);
+    });
   });
 });
