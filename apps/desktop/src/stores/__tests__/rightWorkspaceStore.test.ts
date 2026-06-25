@@ -234,6 +234,21 @@ describe('rightWorkspaceStore — splitPane / replaceTool', () => {
   });
 });
 
+describe('rightWorkspaceStore — LRU eviction', () => {
+  beforeEach(reset);
+
+  it('evicts the oldest session beyond the 50-session cap', () => {
+    const s = useRightWorkspaceStore.getState();
+    for (let i = 0; i < 55; i++) s.openTool(`S${i}`, 'memory', { openMode: 'shared' });
+    const { bySession, order } = useRightWorkspaceStore.getState();
+    expect(order.length).toBe(50);
+    expect(Object.keys(bySession).length).toBe(50);
+    expect(bySession.S0).toBeUndefined();   // oldest evicted
+    expect(bySession.S54).toBeDefined();    // newest kept
+    expect(order[0]).toBe('S54');           // MRU front
+  });
+});
+
 // test helpers
 function findPaneFor(root: any, id: string): any {
   return findPane(root, id);
