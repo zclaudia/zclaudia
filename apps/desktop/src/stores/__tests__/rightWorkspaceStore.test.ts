@@ -147,6 +147,16 @@ describe('rightWorkspaceStore — openTool', () => {
     expect(ws.focusedPaneId).toBe(memPaneId);
   });
 
+  it('multi-instance tool with a different instanceKey opens a new pane (no dedupe)', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });               // primary seed
+    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    const before = useRightWorkspaceStore.getState().bySession.A.root;
+    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::q', multiInstance: true });
+    const after = useRightWorkspaceStore.getState().bySession.A.root;
+    expect(countPanes(after)).toBe(countPanes(before) + 1); // new pane, not deduped
+  });
+
   it('isolates layouts per session', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'file-viewer', { openMode: 'shared' });
