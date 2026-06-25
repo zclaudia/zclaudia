@@ -306,13 +306,12 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const singleton = !multiInstance;
           const conflict = findToolConflict(ws.root, toolId, instanceKey, singleton, ' __new__');
           if (conflict) return { ok: false, conflictPaneId: conflict };
-          const fromPane = findPane(ws.root, fromPaneId)!;
           const ref = newPane(toolId, instanceKey);
-          const group: GroupNode = {
-            id: genId('grp'), kind: 'group', dir, ratio: DEFAULT_RATIO,
-            children: [fromPane, ref],
-          };
-          update(sessionId, (w) => ({ ...w, root: replaceChild(w.root!, fromPaneId, group), focusedPaneId: ref.id }));
+          update(sessionId, (w) => {
+            const fp = findPane(w.root!, fromPaneId)!;
+            const group: GroupNode = { id: genId('grp'), kind: 'group', dir, ratio: DEFAULT_RATIO, children: [fp, ref] };
+            return { ...w, root: replaceChild(w.root!, fromPaneId, group), focusedPaneId: ref.id };
+          });
           return { ok: true, newPaneId: ref.id };
         },
 
@@ -323,8 +322,11 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const singleton = !multiInstance;
           const conflict = findToolConflict(ws!.root, toolId, instanceKey, singleton, paneId);
           if (conflict) return { ok: false, conflictPaneId: conflict };
-          const replaced: PaneNode = { ...pane, tools: [{ toolId, instanceKey }], activeToolId: toolId };
-          update(sessionId, (w) => ({ ...w, root: replaceChild(w.root!, paneId, replaced), focusedPaneId: paneId }));
+          update(sessionId, (w) => {
+            const p = findPane(w.root!, paneId)!;
+            const replaced: PaneNode = { ...p, tools: [{ toolId, instanceKey }], activeToolId: toolId };
+            return { ...w, root: replaceChild(w.root!, paneId, replaced), focusedPaneId: paneId };
+          });
           return { ok: true, newPaneId: '' };
         },
 

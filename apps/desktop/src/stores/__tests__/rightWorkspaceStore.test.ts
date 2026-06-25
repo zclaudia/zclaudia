@@ -210,7 +210,8 @@ describe('rightWorkspaceStore — splitPane / replaceTool', () => {
     expect(root.dir).toBe('col');
     expect(root.children[0].id).toBe(from);
     expect(root.children[1].activeToolId).toBe('memory');
-    if (res.ok) expect(ws.focusedPaneId).toBe(res.newPaneId);
+    if (!res.ok) throw new Error('split failed');
+    expect(ws.focusedPaneId).toBe(res.newPaneId);
   });
 
   it('splitPane refuses a duplicate singleton and leaves the tree unchanged', () => {
