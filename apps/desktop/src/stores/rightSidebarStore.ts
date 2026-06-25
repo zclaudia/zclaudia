@@ -16,13 +16,10 @@ const clampFraction = (f: number) =>
 interface RightSidebarState {
   /** Panel width as a fraction (0..1) of the container width. */
   widthFraction: number;
-  /** Preferred active tab — may not match a currently-visible panel; consumers fallback. */
-  activeTab: string | null;
   /** User-collapsed: hide the sidebar even while panels remain open (mounted). */
   collapsed: boolean;
   /** A right panel opened while collapsed — surfaced as a dot on the header toggle. */
   unread: boolean;
-  setActiveTab: (panelId: string) => void;
   setWidthFraction: (fraction: number) => void;
   /** Collapse/expand; expanding always clears the unread marker. */
   setCollapsed: (collapsed: boolean) => void;
@@ -35,12 +32,10 @@ export const useRightSidebarStore = create<RightSidebarState>()(
   persist(
     (set, get) => ({
       widthFraction: DEFAULT_WIDTH_FRACTION,
-      activeTab: null,
       // Default collapsed — the right panel opens on demand via the header toggle
       // or a pinned tool tab, keeping the chat full-width until the user wants tools.
       collapsed: true,
       unread: false,
-      setActiveTab: (panelId) => set({ activeTab: panelId }),
       setWidthFraction: (fraction) => set({ widthFraction: clampFraction(fraction) }),
       setCollapsed: (collapsed) => set(collapsed ? { collapsed } : { collapsed, unread: false }),
       toggleCollapsed: () => {
@@ -53,21 +48,24 @@ export const useRightSidebarStore = create<RightSidebarState>()(
     }),
     {
       name: 'claudia-right-sidebar',
-      version: 1,
+      version: 2,
       // v0 persisted an absolute `widthPx`; convert it to a fraction of the
       // window width so existing users keep a comparable starting size.
+      // v2 drops the obsolete `activeTab` field (now handled by rightWorkspaceStore).
       migrate: (persisted, version) => {
-        const state = (persisted ?? {}) as Partial<RightSidebarState> & { widthPx?: number };
+        const state = (persisted ?? {}) as Partial<RightSidebarState> & { widthPx?: number; activeTab?: unknown };
+        let result = { ...state };
         if (version < 1 && typeof state.widthPx === 'number') {
           const ref = typeof window !== 'undefined' ? window.innerWidth : 1460;
-          const { widthPx, ...rest } = state;
-          return { ...rest, widthFraction: clampFraction(widthPx / ref) } as RightSidebarState;
+          const { widthPx, ...rest } = result as typeof result & { widthPx?: number };
+          result = { ...rest, widthFraction: clampFraction((widthPx ?? 0) / ref) };
         }
-        return state as RightSidebarState;
+        // Drop obsolete activeTab regardless of version
+        const { activeTab: _dropped, ...clean } = result as typeof result & { activeTab?: unknown };
+        return clean as RightSidebarState;
       },
       partialize: (state) => ({
         widthFraction: state.widthFraction,
-        activeTab: state.activeTab,
         collapsed: state.collapsed,
       }),
     },

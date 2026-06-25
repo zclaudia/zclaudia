@@ -4,10 +4,10 @@ import { renderHook } from '@testing-library/react';
 import { activatePanel, deactivatePanel, isPanelActive, usePanelIsActive } from '../openPanel';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
-import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useServerStore } from '../../stores/serverStore';
+import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 
 const SESSION_ID = 'sess-1';
 const PROJECT_ID = 'proj-1';
@@ -38,8 +38,8 @@ describe('openPanel utility', () => {
   beforeEach(() => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
     useBottomPanelStore.setState({ activeTab: '' });
-    useRightSidebarStore.setState({ activeTab: null, widthFraction: 0.26, collapsed: false, unread: false });
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+    useRightSidebarStore.setState({ collapsed: false, unread: false });
     // Default: no active session — right-path returns early when sessionId is null
     useProjectStore.setState({ selectedSessionId: null, sessions: [] } as any);
     useServerStore.setState({ activeServerId: null } as any);
@@ -161,16 +161,32 @@ describe('openPanel utility', () => {
       expect(isPanelActive('foo')).toBe(true);
     });
 
-    it('uses right sidebar active tab for right-placed panels', () => {
+    it('returns false for bottom-placed panel when not active', () => {
+      registerPanel('foo', 'bottom');
+      useBottomPanelStore.setState({ activeTab: 'bar' });
+      expect(isPanelActive('foo')).toBe(false);
+    });
+
+    it('uses workspace presence for right-placed panels', () => {
+      seedSessionCtx();
       registerPanel('foo', 'right');
-      useRightSidebarStore.setState({ activeTab: 'foo' });
+      // Not yet in workspace
+      expect(isPanelActive('foo')).toBe(false);
+      // Open it
+      activatePanel('foo');
       expect(isPanelActive('foo')).toBe(true);
-      expect(useBottomPanelStore.getState().activeTab).toBe('');
+    });
+
+    it('returns false for right-placed panel when no session selected', () => {
+      registerPanel('foo', 'right');
+      // No session → no workspace → false
+      expect(isPanelActive('foo')).toBe(false);
     });
 
     it('returns false when the panel is hidden', () => {
+      seedSessionCtx();
       registerPanel('foo', 'right', false);
-      useRightSidebarStore.setState({ activeTab: 'foo' });
+      activatePanel('foo');
       expect(isPanelActive('foo')).toBe(false);
     });
   });
@@ -202,16 +218,27 @@ describe('openPanel utility', () => {
       expect(result.current).toBe(false);
     });
 
-    it('returns true when right-placed panel is visible AND active in sidebar', () => {
+    it('returns true when right-placed panel is visible AND present in workspace', () => {
+      seedSessionCtx();
       registerPanel('foo', 'right', true);
-      useRightSidebarStore.setState({ activeTab: 'foo' });
+      // Seed workspace with 'foo' in it
+      activatePanel('foo');
       const { result } = renderHook(() => usePanelIsActive('foo'));
       expect(result.current).toBe(true);
     });
 
+    it('returns false when right-placed panel is visible but not in workspace', () => {
+      seedSessionCtx();
+      registerPanel('foo', 'right', true);
+      // Workspace is empty — not opened
+      const { result } = renderHook(() => usePanelIsActive('foo'));
+      expect(result.current).toBe(false);
+    });
+
     it('returns false when right panel is hidden', () => {
+      seedSessionCtx();
       registerPanel('foo', 'right', false);
-      useRightSidebarStore.setState({ activeTab: 'foo' });
+      activatePanel('foo');
       const { result } = renderHook(() => usePanelIsActive('foo'));
       expect(result.current).toBe(false);
     });

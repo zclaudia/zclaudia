@@ -1,9 +1,10 @@
 import { usePluginStore, getEffectivePlacement } from '../stores/pluginStore';
 import { useBottomPanelStore } from '../stores/bottomPanelStore';
-import { useRightSidebarStore } from '../stores/rightSidebarStore';
 import { useIsMobile, isMobileViewport } from '../hooks/useMediaQuery';
 import { useProjectStore } from '../stores/projectStore';
 import { useServerStore } from '../stores/serverStore';
+import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
+import { isSingleton } from '../stores/panelInstance';
 import { openToolInWorkspace, closeToolInWorkspace } from './workspaceActions';
 
 /**
@@ -68,9 +69,13 @@ export function isPanelActive(panelId: string): boolean {
   if (panel.visible === false) return false;
 
   const placement = viewportPlacement(panelId);
-  return placement === 'right'
-    ? useRightSidebarStore.getState().activeTab === panelId
-    : useBottomPanelStore.getState().activeTab === panelId;
+  if (placement === 'right') {
+    const sid = useProjectStore.getState().selectedSessionId;
+    if (!sid) return false;
+    const root = useRightWorkspaceStore.getState().bySession[sid]?.root ?? null;
+    return findPaneWithTool(root, panelId, undefined, isSingleton(panelId)) !== null;
+  }
+  return useBottomPanelStore.getState().activeTab === panelId;
 }
 
 /**
@@ -93,8 +98,8 @@ export function deactivatePanel(panelId: string): void {
 /**
  * Reactive hook: is this panel currently shown to the user?
  *
- * "Shown" means: panel.visible !== false AND it is the active tab in its
- * effective container (bottom panel or right sidebar). Use this for trigger
+ * "Shown" means: panel.visible !== false AND the tool is present in the current
+ * session's workspace (right) or is the active tab (bottom). Use this for trigger
  * button "active" indicators so they correctly reflect what the user sees.
  */
 export function usePanelIsActive(panelId: string): boolean {
@@ -105,6 +110,11 @@ export function usePanelIsActive(panelId: string): boolean {
     return panel ? panel.visible !== false : false;
   });
   const bottomMatches = useBottomPanelStore((s) => s.activeTab === panelId);
-  const rightMatches = useRightSidebarStore((s) => s.activeTab === panelId);
+  const singleton = isSingleton(panelId);
+  const rightMatches = useRightWorkspaceStore((s) => {
+    const sid = useProjectStore.getState().selectedSessionId;
+    const root = sid ? (s.bySession[sid]?.root ?? null) : null;
+    return findPaneWithTool(root, panelId, undefined, singleton) !== null;
+  });
   return isVisible && (placement === 'right' ? rightMatches : bottomMatches);
 }
