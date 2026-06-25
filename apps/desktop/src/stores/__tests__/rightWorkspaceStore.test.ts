@@ -100,3 +100,97 @@ describe('rightWorkspaceStore — simple actions', () => {
     expect(useRightWorkspaceStore.getState().order).toEqual([]);
   });
 });
+
+describe('rightWorkspaceStore — openTool', () => {
+  beforeEach(reset);
+
+  it('seeds the first pane as primary + focused', () => {
+    useRightWorkspaceStore.getState().openTool('A', 'file-viewer', { openMode: 'shared' });
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    expect(ws.root!.kind).toBe('pane');
+    expect((ws.root as any).activeToolId).toBe('file-viewer');
+    expect(ws.primaryPaneId).toBe(ws.root!.id);
+    expect(ws.focusedPaneId).toBe(ws.root!.id);
+  });
+
+  it('shared tool reuses the primary pane (replaces its tool)', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    const primary = useRightWorkspaceStore.getState().bySession.A.primaryPaneId;
+    s.openTool('A', 'session-changes', { openMode: 'shared' });
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    expect(ws.root!.kind).toBe('pane');
+    expect(ws.root!.id).toBe(primary);
+    expect((ws.root as any).activeToolId).toBe('session-changes');
+  });
+
+  it('dedicated tool opens its own pane and does not hijack the primary', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    expect(ws.root!.kind).toBe('group');
+    // primary still shows file-viewer
+    const primaryPane = findPaneFor(ws.root, ws.primaryPaneId!);
+    expect(primaryPane.activeToolId).toBe('file-viewer');
+  });
+
+  it('opening an already-open singleton focuses it instead of duplicating', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory', { openMode: 'dedicated' });
+    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    const before = useRightWorkspaceStore.getState().bySession.A.root;
+    s.openTool('A', 'memory', { openMode: 'dedicated' }); // already open
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    expect(countPanes(ws.root)).toBe(countPanes(before)); // no new pane
+    const memPaneId = findPaneWithTool(ws.root, 'memory', undefined, true);
+    expect(ws.focusedPaneId).toBe(memPaneId);
+  });
+
+  it('isolates layouts per session', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    s.openTool('B', 'terminal', { openMode: 'dedicated' });
+    expect((useRightWorkspaceStore.getState().bySession.A.root as any).activeToolId).toBe('file-viewer');
+    expect((useRightWorkspaceStore.getState().bySession.B.root as any).activeToolId).toBe('terminal');
+  });
+});
+
+describe('rightWorkspaceStore — simple actions (deferred)', () => {
+  beforeEach(reset);
+
+  it('closePane collapses the group and reassigns primary/focus', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    const root = ws.root!;
+    expect(root.kind).toBe('group');
+    // close the dedicated (second) pane
+    const second = (root as any).children[1].id;
+    s.closePane('A', second);
+    const after = useRightWorkspaceStore.getState().bySession.A;
+    expect(after.root!.kind).toBe('pane');
+    expect(after.focusedPaneId).toBe(after.root!.id);
+    expect(after.primaryPaneId).toBe(after.root!.id);
+  });
+
+  it('setRatio updates the group ratio', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    s.openTool('A', 'memory', { openMode: 'dedicated' });
+    const g = useRightWorkspaceStore.getState().bySession.A.root as any;
+    s.setRatio('A', g.id, 0.7);
+    expect((useRightWorkspaceStore.getState().bySession.A.root as any).ratio).toBeCloseTo(0.7);
+  });
+});
+
+// test helpers
+function findPaneFor(root: any, id: string): any {
+  return findPane(root, id);
+}
+function countPanes(root: any): number {
+  if (!root) return 0;
+  if (root.kind === 'pane') return 1;
+  return countPanes(root.children[0]) + countPanes(root.children[1]);
+}

@@ -245,8 +245,60 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             return { bySession, order: touch([...s.order], bySession, sessionId) };
           }),
 
-        // openTool implemented in Task 4
-        openTool: () => {},
+        openTool: (sessionId, toolId, opts = {}) =>
+          update(sessionId, (ws) => {
+            const singleton = !opts.multiInstance;
+            const instanceKey = opts.instanceKey;
+
+            // 1) Already open → focus it (and make it the pane's active tool).
+            const existing = findPaneWithTool(ws.root, toolId, instanceKey, singleton);
+            if (existing) {
+              const pane = findPane(ws.root, existing)!;
+              const root = replaceChild(ws.root!, existing, { ...pane, activeToolId: toolId });
+              return { ...ws, root, focusedPaneId: existing };
+            }
+
+            const ref = newPane(toolId, instanceKey);
+
+            // 2) Empty workspace → seed as primary + focused.
+            if (!ws.root) {
+              return { root: ref, primaryPaneId: ref.id, focusedPaneId: ref.id };
+            }
+
+            const target = opts.target ?? (opts.openMode === 'dedicated' ? 'new-split' : 'primary');
+
+            // 3a) primary → replace the primary pane's tool (fallback: seed if missing).
+            if (target === 'primary') {
+              const primaryId = ws.primaryPaneId && findPane(ws.root, ws.primaryPaneId)
+                ? ws.primaryPaneId
+                : pickFirstPane(ws.root);
+              if (!primaryId) return { root: ref, primaryPaneId: ref.id, focusedPaneId: ref.id };
+              const pane = findPane(ws.root, primaryId)!;
+              const replaced: PaneNode = { ...pane, tools: [{ toolId, instanceKey }], activeToolId: toolId };
+              return { ...ws, root: replaceChild(ws.root, primaryId, replaced), primaryPaneId: primaryId, focusedPaneId: primaryId };
+            }
+
+            // 3b) focused → replace the focused pane's tool.
+            if (target === 'focused') {
+              const focusId = ws.focusedPaneId && findPane(ws.root, ws.focusedPaneId)
+                ? ws.focusedPaneId
+                : pickFirstPane(ws.root)!;
+              const pane = findPane(ws.root, focusId)!;
+              const replaced: PaneNode = { ...pane, tools: [{ toolId, instanceKey }], activeToolId: toolId };
+              return { ...ws, root: replaceChild(ws.root, focusId, replaced), focusedPaneId: focusId };
+            }
+
+            // 3c) new-split (dedicated) → split off a new pane beside the primary.
+            const fromId = ws.primaryPaneId && findPane(ws.root, ws.primaryPaneId)
+              ? ws.primaryPaneId
+              : pickFirstPane(ws.root)!;
+            const fromPane = findPane(ws.root, fromId)!;
+            const group: GroupNode = {
+              id: genId('grp'), kind: 'group', dir: 'row', ratio: DEFAULT_RATIO,
+              children: [fromPane, ref],
+            };
+            return { ...ws, root: replaceChild(ws.root, fromId, group), focusedPaneId: ref.id };
+          }),
 
         // splitPane / replaceTool implemented in Task 5
         splitPane: () => ({ ok: false, conflictPaneId: '' }),
