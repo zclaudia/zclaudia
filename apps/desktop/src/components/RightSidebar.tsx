@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
-import { useRightWorkspaceStore } from '../stores/rightWorkspaceStore';
+import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { WorkspaceView } from './workspace/WorkspaceView';
 import { RightSidebarEmptyState } from './RightSidebarEmptyState';
 import { ToolLauncherMenu } from './workspace/ToolLauncherMenu';
+import { useDragSplitStore, resolvePointerToPane, dropZoneToDir, canDrop } from './workspace/dragSplit';
 
 interface RightSidebarProps {
   sessionId: string;
@@ -26,7 +27,13 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
   // Ensure a workspace entry exists for this session (no-op if present).
   useEffect(() => { useRightWorkspaceStore.getState().ensureSession(sessionId); }, [sessionId]);
 
+  // End any in-flight drag when the sidebar collapses.
+  useEffect(() => { if (collapsed) useDragSplitStore.getState().endDrag(); }, [collapsed]);
+  // End any in-flight drag on unmount.
+  useEffect(() => () => { useDragSplitStore.getState().endDrag(); }, []);
+
   const rootRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(0);
@@ -47,6 +54,36 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [launcherOpen]);
+
+  const onContentPointerMove = useCallback((e: React.PointerEvent) => {
+    const { active } = useDragSplitStore.getState();
+    if (!active) return;
+    const root = useRightWorkspaceStore.getState().bySession[sessionId]?.root ?? null;
+    const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
+    useDragSplitStore.getState().setHover(hit?.paneId ?? null, hit?.zone ?? null, hit?.disabled ?? new Set());
+  }, [sessionId]);
+
+  const onContentPointerUp = useCallback((e: React.PointerEvent) => {
+    const store = useRightWorkspaceStore.getState();
+    const { active } = useDragSplitStore.getState();
+    if (!active) return;
+    const root = store.bySession[sessionId]?.root ?? null;
+    const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
+    if (hit) {
+      const split = dropZoneToDir(hit.zone);
+      if (split) {
+        if (canDrop(root, hit.paneId, hit.zone, active).allowed) {
+          store.splitPane(sessionId, hit.paneId, split.dir, active.toolId, active.instanceKey, active.multiInstance);
+        } else {
+          const existing = findPaneWithTool(root, active.toolId, active.instanceKey, !active.multiInstance);
+          if (existing) store.focusPane(sessionId, existing);
+        }
+      } else {
+        store.replaceTool(sessionId, hit.paneId, active.toolId, active.instanceKey, active.multiInstance);
+      }
+    }
+    useDragSplitStore.getState().endDrag();
+  }, [sessionId]);
 
   const onDragStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
@@ -117,7 +154,12 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden relative [contain:layout_paint]">
+      <div
+        ref={contentRef}
+        className="flex-1 overflow-hidden relative [contain:layout_paint]"
+        onPointerMove={onContentPointerMove}
+        onPointerUp={onContentPointerUp}
+      >
         {root != null ? (
           <WorkspaceView sessionId={sessionId} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
         ) : (

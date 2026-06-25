@@ -1,12 +1,16 @@
 import { useCallback } from 'react';
 import { X } from 'lucide-react';
-import { useRightWorkspaceStore, findPane, activeToolRef, type PaneNode } from '../../stores/rightWorkspaceStore';
+import { useRightWorkspaceStore, activeToolRef, type PaneNode } from '../../stores/rightWorkspaceStore';
 import { usePluginStore, type UIExtension } from '../../stores/pluginStore';
 import { PanelContent, PanelActions } from '../panels/PanelRenderer';
+import { useDragSplitStore } from './dragSplit';
+import { DropOverlay } from './DropOverlay';
+import { MULTI_INSTANCE_PANELS } from '../../stores/panelInstance';
 
 interface PaneViewProps {
   sessionId: string;
   paneId: string;
+  pane: PaneNode;
   focused: boolean;
   projectId?: string;
   projectRoot?: string;
@@ -21,20 +25,33 @@ function decodeTerminalProjectId(instanceKey: string | undefined): string | unde
   return instanceKey.slice(sep + 2) || undefined;
 }
 
-export function PaneView({ sessionId, paneId, focused, projectId, projectRoot, workingDirectory }: PaneViewProps) {
-  const root = useRightWorkspaceStore((s) => s.bySession[sessionId]?.root ?? null);
-  const closePane = useRightWorkspaceStore((s) => s.closePane);
-  const focusPane = useRightWorkspaceStore((s) => s.focusPane);
-
-  const pane = findPane(root, paneId) as PaneNode | null;
+export function PaneView({ sessionId, paneId, pane, focused, projectId, projectRoot, workingDirectory }: PaneViewProps) {
   const panels = usePluginStore((s) => s.panels);
-  const ref = pane ? activeToolRef(pane) : null;
+  const ref = activeToolRef(pane);
   const panel: UIExtension | undefined = ref ? panels.find((p) => p.id === ref.toolId) : undefined;
 
-  const onFocus = useCallback(() => focusPane(sessionId, paneId), [focusPane, sessionId, paneId]);
-  const onClose = useCallback(() => closePane(sessionId, paneId), [closePane, sessionId, paneId]);
+  const onFocus = useCallback(
+    () => useRightWorkspaceStore.getState().focusPane(sessionId, paneId),
+    [sessionId, paneId],
+  );
+  const onClose = useCallback(
+    () => useRightWorkspaceStore.getState().closePane(sessionId, paneId),
+    [sessionId, paneId],
+  );
 
-  if (!pane || !ref || !panel) {
+  const onDragHandlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
+      useDragSplitStore.getState().startDrag({
+        toolId: ref.toolId,
+        instanceKey: ref.instanceKey,
+        multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
+      });
+    },
+    [ref.toolId, ref.instanceKey],
+  );
+
+  if (!panel) {
     return (
       <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center text-xs text-muted-foreground">
         Unavailable panel
@@ -53,7 +70,13 @@ export function PaneView({ sessionId, paneId, focused, projectId, projectRoot, w
       className={`flex flex-col min-w-0 min-h-0 bg-card ${focused ? 'ring-1 ring-inset ring-border' : ''}`}
     >
       <div className="flex items-center gap-1 px-2 h-8 border-b border-border flex-shrink-0 select-none min-w-0">
-        <span className="text-xs font-medium text-foreground truncate">{panel.label}</span>
+        <span
+          className="text-xs font-medium text-foreground truncate cursor-grab active:cursor-grabbing"
+          title={`Drag ${panel.label} to split`}
+          onPointerDown={onDragHandlePointerDown}
+        >
+          {panel.label}
+        </span>
         <div className="flex-1" />
         <PanelActions panel={panel} projectId={effectiveProjectId} />
         <button
@@ -66,6 +89,7 @@ export function PaneView({ sessionId, paneId, focused, projectId, projectRoot, w
       </div>
       <div className="flex-1 min-h-0 overflow-hidden relative">
         <PanelContent panel={panel} projectId={effectiveProjectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
+        <DropOverlay paneId={paneId} />
       </div>
     </div>
   );

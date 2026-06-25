@@ -35,6 +35,15 @@ describe('WorkspaceView', () => {
     expect(getByTestId('content-file-viewer')).toBeTruthy();
   });
 
+  it('renders a ResizeDivider [role=separator] between panes when split', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory', { openMode: 'shared' });
+    s.openTool('A', 'file-viewer', { openMode: 'dedicated' });
+    const { container } = render(<WorkspaceView sessionId="A" />);
+    const separator = container.querySelector('[role="separator"]');
+    expect(separator).toBeTruthy();
+  });
+
   it('renders nothing for an empty workspace', () => {
     const { container } = render(<WorkspaceView sessionId="A" />);
     expect(container.firstChild).toBeNull();
