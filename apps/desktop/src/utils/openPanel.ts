@@ -4,7 +4,6 @@ import { useIsMobile, isMobileViewport } from '../hooks/useMediaQuery';
 import { useProjectStore } from '../stores/projectStore';
 import { useServerStore } from '../stores/serverStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
-import { isSingleton } from '../stores/panelInstance';
 import { openToolInWorkspace, closeToolInWorkspace } from './workspaceActions';
 
 /**
@@ -73,7 +72,7 @@ export function isPanelActive(panelId: string): boolean {
     const sid = useProjectStore.getState().selectedSessionId;
     if (!sid) return false;
     const root = useRightWorkspaceStore.getState().bySession[sid]?.root ?? null;
-    return findPaneWithTool(root, panelId, undefined, isSingleton(panelId)) !== null;
+    return findPaneWithTool(root, panelId, undefined, true) !== null;
   }
   return useBottomPanelStore.getState().activeTab === panelId;
 }
@@ -110,11 +109,10 @@ export function usePanelIsActive(panelId: string): boolean {
     return panel ? panel.visible !== false : false;
   });
   const bottomMatches = useBottomPanelStore((s) => s.activeTab === panelId);
-  const singleton = isSingleton(panelId);
   const sid = useProjectStore((s) => s.selectedSessionId);
   const rightMatches = useRightWorkspaceStore((s) => {
     const root = sid ? (s.bySession[sid]?.root ?? null) : null;
-    return findPaneWithTool(root, panelId, undefined, singleton) !== null;
+    return findPaneWithTool(root, panelId, undefined, true) !== null;
   });
   return isVisible && (placement === 'right' ? rightMatches : bottomMatches);
 }

@@ -189,6 +189,20 @@ describe('openPanel utility', () => {
       activatePanel('foo');
       expect(isPanelActive('foo')).toBe(false);
     });
+
+    it('regression: returns true for terminal with instanceKey (multi-instance pane)', () => {
+      // Terminal is a multi-instance panel: openTool stores a real instanceKey ('be::p').
+      // Before the fix, isPanelActive('terminal') always returned false because
+      // isSingleton('terminal') is false, causing findPaneWithTool to require instanceKey===undefined.
+      seedSessionCtx();
+      registerPanel('terminal', 'right', true);
+      useRightWorkspaceStore.getState().openTool(SESSION_ID, 'terminal', {
+        instanceKey: 'be::p',
+        multiInstance: true,
+        openMode: 'dedicated',
+      });
+      expect(isPanelActive('terminal')).toBe(true);
+    });
   });
 
   describe('usePanelIsActive', () => {
@@ -241,6 +255,19 @@ describe('openPanel utility', () => {
       activatePanel('foo');
       const { result } = renderHook(() => usePanelIsActive('foo'));
       expect(result.current).toBe(false);
+    });
+
+    it('regression: returns true for terminal with instanceKey (multi-instance pane)', () => {
+      // Reactive counterpart of the isPanelActive regression test.
+      seedSessionCtx();
+      registerPanel('terminal', 'right', true);
+      useRightWorkspaceStore.getState().openTool(SESSION_ID, 'terminal', {
+        instanceKey: 'be::p',
+        multiInstance: true,
+        openMode: 'dedicated',
+      });
+      const { result } = renderHook(() => usePanelIsActive('terminal'));
+      expect(result.current).toBe(true);
     });
 
     it('reacts when selectedSessionId changes to a session that has the panel open', async () => {

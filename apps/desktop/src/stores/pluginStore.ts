@@ -341,7 +341,7 @@ export const selectPluginById = (pluginId: string) => (state: PluginStoreState):
   state.plugins.find((p) => p.manifest.id === pluginId);
 
 export const selectPluginPanels = (state: PluginStoreState): UIExtension[] =>
-  state.panels.sort((a, b) => (a.order || 0) - (b.order || 0));
+  [...state.panels].sort((a, b) => (a.order || 0) - (b.order || 0));
 
 export const selectPluginSettingsTabs = (state: PluginStoreState): UIExtension[] =>
   state.settingsTabs.sort((a, b) => (a.order || 0) - (b.order || 0));
