@@ -19,8 +19,15 @@ vi.mock('../../stores/selectionStore', () => ({
 vi.mock('../changes/useSessionChanges', () => ({
   useChangesData: () => ({ result: { modified: changesMock(), affected: [], turns: [] } }),
 }));
+vi.mock('../../stores/serverStore', () => ({
+  useServerStore: (selector: any) => selector({ activeServerId: 'local' }),
+}));
+vi.mock('../../utils/workspaceActions', () => ({
+  openToolInWorkspace: vi.fn(),
+}));
 
 import { RightSidebarEmptyState } from '../RightSidebarEmptyState';
+import { openToolInWorkspace } from '../../utils/workspaceActions';
 
 const onTerminal = vi.fn();
 const onChanges = vi.fn();
@@ -51,7 +58,7 @@ beforeEach(() => {
 });
 
 function renderEmpty() {
-  return render(<RightSidebarEmptyState projectId="p1" projectRoot="/repo" />);
+  return render(<RightSidebarEmptyState sessionId="s1" projectId="p1" projectRoot="/repo" />);
 }
 
 describe('RightSidebarEmptyState', () => {
@@ -62,10 +69,10 @@ describe('RightSidebarEmptyState', () => {
     expect(screen.getByText('File')).toBeInTheDocument();
   });
 
-  it('invokes a tool onClick when its tile is clicked', () => {
+  it('calls openToolInWorkspace when a tile is clicked', () => {
     renderEmpty();
     fireEvent.click(screen.getByText('Terminal'));
-    expect(onTerminal).toHaveBeenCalledTimes(1);
+    expect(openToolInWorkspace).toHaveBeenCalledWith('s1', 'terminal', expect.objectContaining({ projectId: 'p1' }));
   });
 
   it('shows the branch when git data is present', () => {

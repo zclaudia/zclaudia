@@ -103,6 +103,7 @@ export function SessionChatLayout({
       />
       {!poppedOutLabel && (
         <RightSidebar
+          sessionId={sessionId}
           projectId={projectId}
           projectRoot={projectRoot}
           workingDirectory={workingDirectory}

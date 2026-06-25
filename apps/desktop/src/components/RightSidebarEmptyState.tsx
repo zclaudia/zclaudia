@@ -4,8 +4,11 @@ import { useSessionToolsStore, type SessionTool } from '../stores/sessionToolsSt
 import { useGitStore } from '../features/git/store';
 import { useSelectionStore } from '../stores/selectionStore';
 import { useChangesData } from './changes/useSessionChanges';
+import { useServerStore } from '../stores/serverStore';
+import { openToolInWorkspace } from '../utils/workspaceActions';
 
 interface RightSidebarEmptyStateProps {
+  sessionId: string;
   projectId: string | undefined;
   projectRoot: string | undefined;
 }
@@ -23,17 +26,18 @@ const SUBTITLES = {
 /**
  * Default content for the right sidebar when it is expanded (pinned tools exist)
  * but no panel is open. Shows a compact git-branch + session-changes status line
- * and a launcher tile per pinned tool, reusing each tool's existing onClick.
+ * and a launcher tile per pinned tool, calling openToolInWorkspace on click.
  */
-export function RightSidebarEmptyState({ projectId, projectRoot }: RightSidebarEmptyStateProps) {
+export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: RightSidebarEmptyStateProps) {
   const tools = useSessionToolsStore((s) => s.tools);
-  const sessionId = useSelectionStore((s) => s.selectedSessionId);
+  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
+  const backendId = useServerStore((s) => s.activeServerId);
   const branch = useGitStore((s) => {
     if (!projectId) return undefined;
     const selectedPath = s.selectedWorktree[projectId];
     return (s.worktrees[projectId] ?? []).find((w) => w.path === selectedPath)?.branch;
   });
-  const { result } = useChangesData(sessionId, null, projectRoot);
+  const { result } = useChangesData(selectedSessionId, null, projectRoot);
   const changedCount = result.modified.length;
 
   const orderedTools: SessionTool[] = changedCount > 0
@@ -77,7 +81,7 @@ export function RightSidebarEmptyState({ projectId, projectRoot }: RightSidebarE
           return (
             <button
               key={tool.id}
-              onClick={tool.onClick}
+              onClick={() => openToolInWorkspace(sessionId, tool.id, { projectId, backendId })}
               className="flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border text-left hover:bg-secondary"
             >
               {Icon && <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
