@@ -5,6 +5,13 @@ import { activatePanel, deactivatePanel, isPanelActive, usePanelIsActive } from 
 import { usePluginStore } from '../../stores/pluginStore';
 import { useBottomPanelStore } from '../../stores/bottomPanelStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
+import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
+import { useProjectStore } from '../../stores/projectStore';
+import { useServerStore } from '../../stores/serverStore';
+
+const SESSION_ID = 'sess-1';
+const PROJECT_ID = 'proj-1';
+const BACKEND_ID = 'be-1';
 
 function registerPanel(id: string, defaultPlacement?: 'bottom' | 'right', visible = true) {
   usePluginStore.getState().registerPanel({
@@ -18,11 +25,24 @@ function registerPanel(id: string, defaultPlacement?: 'bottom' | 'right', visibl
   });
 }
 
+/** Seed project/server stores so activatePanel right-path has a session context. */
+function seedSessionCtx() {
+  useProjectStore.setState({
+    selectedSessionId: SESSION_ID,
+    sessions: [{ id: SESSION_ID, projectId: PROJECT_ID } as any],
+  } as any);
+  useServerStore.setState({ activeServerId: BACKEND_ID } as any);
+}
+
 describe('openPanel utility', () => {
   beforeEach(() => {
     usePluginStore.setState({ panels: [], panelPlacements: {} });
     useBottomPanelStore.setState({ activeTab: '' });
     useRightSidebarStore.setState({ activeTab: null, widthFraction: 0.26, collapsed: false, unread: false });
+    useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+    // Default: no active session — right-path returns early when sessionId is null
+    useProjectStore.setState({ selectedSessionId: null, sessions: [] } as any);
+    useServerStore.setState({ activeServerId: null } as any);
   });
 
   describe('activatePanel', () => {
@@ -30,28 +50,44 @@ describe('openPanel utility', () => {
       registerPanel('foo', 'bottom');
       activatePanel('foo');
       expect(useBottomPanelStore.getState().activeTab).toBe('foo');
-      expect(useRightSidebarStore.getState().activeTab).toBeNull();
+      // workspace untouched for bottom path
+      expect(useRightWorkspaceStore.getState().bySession[SESSION_ID]).toBeUndefined();
     });
 
-    it('routes right-placed panels to rightSidebarStore', () => {
+    it('routes right-placed panels into the session workspace on desktop', () => {
+      seedSessionCtx();
       registerPanel('foo', 'right');
       activatePanel('foo');
-      expect(useRightSidebarStore.getState().activeTab).toBe('foo');
+      const ws = useRightWorkspaceStore.getState().bySession[SESSION_ID];
+      expect(ws).toBeDefined();
+      expect((ws!.root as any)?.activeToolId).toBe('foo');
+      // bottom store must remain untouched
       expect(useBottomPanelStore.getState().activeTab).toBe('');
     });
 
-    it('uses user override over defaultPlacement', () => {
+    it('uses user override over defaultPlacement (bottom→right routes to workspace)', () => {
+      seedSessionCtx();
       registerPanel('foo', 'bottom');
       usePluginStore.setState({ panelPlacements: { foo: 'right' } });
       activatePanel('foo');
-      expect(useRightSidebarStore.getState().activeTab).toBe('foo');
+      const ws = useRightWorkspaceStore.getState().bySession[SESSION_ID];
+      expect((ws!.root as any)?.activeToolId).toBe('foo');
     });
 
-    it('defaults to right when no defaultPlacement is set', () => {
+    it('defaults to right (workspace) when no defaultPlacement is set', () => {
+      seedSessionCtx();
       registerPanel('foo');
       activatePanel('foo');
-      expect(useRightSidebarStore.getState().activeTab).toBe('foo');
+      const ws = useRightWorkspaceStore.getState().bySession[SESSION_ID];
+      expect((ws!.root as any)?.activeToolId).toBe('foo');
       expect(useBottomPanelStore.getState().activeTab).toBe('');
+    });
+
+    it('is a no-op when there is no selected session (no crash, no workspace entry)', () => {
+      // no seedSessionCtx — selectedSessionId remains null
+      registerPanel('foo', 'right');
+      activatePanel('foo');
+      expect(useRightWorkspaceStore.getState().bySession).toEqual({});
     });
 
     it('routes right-placed panels to the bottom store on mobile', () => {
@@ -65,23 +101,20 @@ describe('openPanel utility', () => {
         registerPanel('foo', 'right');
         activatePanel('foo');
         expect(useBottomPanelStore.getState().activeTab).toBe('foo');
-        expect(useRightSidebarStore.getState().activeTab).toBeNull();
+        // workspace must NOT be touched on mobile path
+        expect(useRightWorkspaceStore.getState().bySession[SESSION_ID]).toBeUndefined();
       } finally {
         window.matchMedia = orig;
       }
     });
 
-    it('marks the sidebar unread when activating a right panel while collapsed', () => {
+    it('uncollapes the sidebar when opening a right panel (via openToolInWorkspace)', () => {
+      seedSessionCtx();
       useRightSidebarStore.setState({ collapsed: true });
       registerPanel('foo', 'right');
       activatePanel('foo');
-      expect(useRightSidebarStore.getState().unread).toBe(true);
-    });
-
-    it('does not mark unread when the sidebar is expanded', () => {
-      registerPanel('foo', 'right');
-      activatePanel('foo');
-      expect(useRightSidebarStore.getState().unread).toBe(false);
+      // openToolInWorkspace calls setCollapsed(false)
+      expect(useRightSidebarStore.getState().collapsed).toBe(false);
     });
   });
 
@@ -100,12 +133,24 @@ describe('openPanel utility', () => {
       expect(useBottomPanelStore.getState().activeTab).toBe('bar');
     });
 
-    it('preserves rightSidebar activeTab even when deactivating', () => {
+    it('closes the tool pane in the session workspace for right-placed panels', () => {
+      seedSessionCtx();
       registerPanel('foo', 'right');
-      useRightSidebarStore.setState({ activeTab: 'foo' });
+      // First open it so the workspace has the tool
+      activatePanel('foo');
+      const wsBefore = useRightWorkspaceStore.getState().bySession[SESSION_ID];
+      expect(wsBefore?.root).not.toBeNull();
+      // Now deactivate
       deactivatePanel('foo');
-      // rightSidebar collapses naturally via panel visibility, activeTab preserved
-      expect(useRightSidebarStore.getState().activeTab).toBe('foo');
+      const wsAfter = useRightWorkspaceStore.getState().bySession[SESSION_ID];
+      expect(wsAfter?.root).toBeNull();
+    });
+
+    it('is a no-op when there is no selected session', () => {
+      // no seedSessionCtx — selectedSessionId is null
+      registerPanel('foo', 'right');
+      // Should not throw
+      expect(() => deactivatePanel('foo')).not.toThrow();
     });
   });
 
