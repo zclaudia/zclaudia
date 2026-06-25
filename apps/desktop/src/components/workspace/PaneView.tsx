@@ -27,8 +27,6 @@ function decodeTerminalProjectId(instanceKey: string | undefined): string | unde
 
 export function PaneView({ sessionId, paneId, pane, focused, projectId, projectRoot, workingDirectory }: PaneViewProps) {
   const panels = usePluginStore((s) => s.panels);
-  const ref = activeToolRef(pane);
-  const panel: UIExtension | undefined = ref ? panels.find((p) => p.id === ref.toolId) : undefined;
 
   const onFocus = useCallback(
     () => useRightWorkspaceStore.getState().focusPane(sessionId, paneId),
@@ -39,25 +37,26 @@ export function PaneView({ sessionId, paneId, pane, focused, projectId, projectR
     [sessionId, paneId],
   );
 
-  const onDragHandlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
-      useDragSplitStore.getState().startDrag({
-        toolId: ref.toolId,
-        instanceKey: ref.instanceKey,
-        multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
-      });
-    },
-    [ref.toolId, ref.instanceKey],
-  );
+  const ref = activeToolRef(pane);
+  const panel: UIExtension | undefined = ref ? panels.find((p) => p.id === ref.toolId) : undefined;
 
-  if (!panel) {
+  if (!panel || !ref) {
     return (
       <div className="flex-1 min-w-0 min-h-0 flex items-center justify-center text-xs text-muted-foreground">
         Unavailable panel
       </div>
     );
   }
+
+  const onDragHandlePointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
+    e.stopPropagation();
+    useDragSplitStore.getState().startDrag({
+      toolId: ref.toolId,
+      instanceKey: ref.instanceKey,
+      multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
+    });
+  };
 
   const effectiveProjectId =
     ref.toolId === 'terminal' ? decodeTerminalProjectId(ref.instanceKey) ?? projectId : projectId;

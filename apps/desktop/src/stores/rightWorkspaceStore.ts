@@ -203,7 +203,7 @@ interface RightWorkspaceState {
   ensureSession: (sessionId: string) => void;
   openTool: (sessionId: string, toolId: string, opts?: OpenToolOpts) => void;
   closePane: (sessionId: string, paneId: string) => void;
-  splitPane: (sessionId: string, fromPaneId: string, dir: SplitDir, toolId: string, instanceKey?: string, multiInstance?: boolean) => SplitResult;
+  splitPane: (sessionId: string, fromPaneId: string, dir: SplitDir, toolId: string, instanceKey?: string, multiInstance?: boolean, insertFirst?: boolean) => SplitResult;
   replaceTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string, multiInstance?: boolean) => SplitResult;
   setRatio: (sessionId: string, groupId: string, ratio: number) => void;
   focusPane: (sessionId: string, paneId: string) => void;
@@ -300,7 +300,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             return { ...ws, root: replaceChild(ws.root, fromId, group), focusedPaneId: ref.id };
           }),
 
-        splitPane: (sessionId, fromPaneId, dir, toolId, instanceKey, multiInstance) => {
+        splitPane: (sessionId, fromPaneId, dir, toolId, instanceKey, multiInstance, insertFirst = false) => {
           const ws = _get().bySession[sessionId];
           if (!ws?.root || !findPane(ws.root, fromPaneId)) return { ok: false, conflictPaneId: '' };
           const singleton = !multiInstance;
@@ -309,7 +309,10 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
           const ref = newPane(toolId, instanceKey);
           update(sessionId, (w) => {
             const fp = findPane(w.root!, fromPaneId)!;
-            const group: GroupNode = { id: genId('grp'), kind: 'group', dir, ratio: DEFAULT_RATIO, children: [fp, ref] };
+            const group: GroupNode = {
+              id: genId('grp'), kind: 'group', dir, ratio: DEFAULT_RATIO,
+              children: insertFirst ? [ref, fp] : [fp, ref],
+            };
             return { ...w, root: replaceChild(w.root!, fromPaneId, group), focusedPaneId: ref.id };
           });
           return { ok: true, newPaneId: ref.id };

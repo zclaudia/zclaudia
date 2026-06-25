@@ -73,7 +73,7 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
       const split = dropZoneToDir(hit.zone);
       if (split) {
         if (canDrop(root, hit.paneId, hit.zone, active).allowed) {
-          store.splitPane(sessionId, hit.paneId, split.dir, active.toolId, active.instanceKey, active.multiInstance);
+          store.splitPane(sessionId, hit.paneId, split.dir, active.toolId, active.instanceKey, active.multiInstance, split.insertFirst);
         } else {
           const existing = findPaneWithTool(root, active.toolId, active.instanceKey, !active.multiInstance);
           if (existing) store.focusPane(sessionId, existing);

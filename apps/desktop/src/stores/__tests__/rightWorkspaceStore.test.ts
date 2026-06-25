@@ -214,6 +214,20 @@ describe('rightWorkspaceStore — splitPane / replaceTool', () => {
     expect(ws.focusedPaneId).toBe(res.newPaneId);
   });
 
+  it('splitPane with insertFirst=true places the new pane as children[0]', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    const from = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.splitPane('A', from, 'row', 'memory', undefined, undefined, true);
+    expect(res.ok).toBe(true);
+    const root = useRightWorkspaceStore.getState().bySession.A.root as any;
+    expect(root.kind).toBe('group');
+    // new pane is first, original pane is second
+    if (!res.ok) throw new Error('split failed');
+    expect(root.children[0].id).toBe(res.newPaneId);
+    expect(root.children[1].id).toBe(from);
+  });
+
   it('splitPane refuses a duplicate singleton and leaves the tree unchanged', () => {
     const s = useRightWorkspaceStore.getState();
     s.openTool('A', 'memory', { openMode: 'shared' });
