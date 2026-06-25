@@ -1,5 +1,6 @@
 import { usePluginStore } from '../stores/pluginStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
+import { useRightSidebarStore } from '../stores/rightSidebarStore';
 import { MULTI_INSTANCE_PANELS } from '../stores/panelInstance';
 import { getTerminalScopeKey } from '../stores/terminalStore';
 
@@ -27,6 +28,7 @@ export function openToolInWorkspace(sessionId: string, toolId: string, ctx: Open
     instanceKey: resolveInstanceKey(toolId, ctx),
     target: ctx.target,
   });
+  useRightSidebarStore.getState().setCollapsed(false);
 }
 
 export function closeToolInWorkspace(sessionId: string, toolId: string): void {

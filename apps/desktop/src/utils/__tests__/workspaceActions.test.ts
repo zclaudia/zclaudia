@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
+import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { openToolInWorkspace, closeToolInWorkspace } from '../workspaceActions';
 
 beforeEach(() => {
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+  useRightSidebarStore.setState({ collapsed: true, widthFraction: 0.26, activeTab: null, unread: false });
   usePluginStore.setState({
     panels: [
       { id: 'memory', pluginId: 'x', type: 'panel', label: 'Memory', openMode: 'shared' },
@@ -19,6 +21,12 @@ describe('openToolInWorkspace', () => {
     const ws = useRightWorkspaceStore.getState().bySession.A;
     expect((ws.root as any).activeToolId).toBe('memory');
     expect(ws.primaryPaneId).toBe(ws.root!.id);
+  });
+
+  it('sets collapsed=false in rightSidebarStore', () => {
+    useRightSidebarStore.setState({ collapsed: true });
+    openToolInWorkspace('A', 'memory');
+    expect(useRightSidebarStore.getState().collapsed).toBe(false);
   });
 
   it('builds a terminal instanceKey from project + backend', () => {

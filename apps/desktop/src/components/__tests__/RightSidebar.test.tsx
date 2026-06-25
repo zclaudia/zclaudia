@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
@@ -24,12 +24,13 @@ const DummyMemoryPanel = () => <div data-testid="memory-panel">Memory</div>;
 
 describe('RightSidebar', () => {
   beforeEach(() => {
-    usePluginStore.setState({ panels: [], panelPlacements: {}, disabledBuiltinPanels: [] });
-    useRightSidebarStore.setState({ widthFraction: 0.26, activeTab: null, collapsed: false, unread: false });
     useRightWorkspaceStore.setState({ bySession: {}, order: [] });
+    useRightSidebarStore.setState({ widthFraction: 0.26, activeTab: null, collapsed: false, unread: false });
+    usePluginStore.setState({ panels: [], panelPlacements: {}, disabledBuiltinPanels: [] });
     (useIsMobile as any).mockReturnValue(false);
 
-    // Register a Dummy 'memory' panel so openTool can resolve it.
+    // Register panels: memory (no iconKey mapping → won't appear in empty-state tiles)
+    // plus the tile panels so the empty-state can render.
     usePluginStore.getState().registerPanel({
       id: 'memory',
       pluginId: 'com.zclaudia.memory',
@@ -37,6 +38,30 @@ describe('RightSidebar', () => {
       label: 'Memory',
       component: DummyMemoryPanel,
       order: 0,
+      platforms: ['desktop'],
+    });
+    usePluginStore.getState().registerPanel({
+      id: 'file-viewer',
+      pluginId: 'com.zclaudia.builtin',
+      type: 'panel',
+      label: 'File',
+      order: 1,
+      platforms: ['desktop'],
+    });
+    usePluginStore.getState().registerPanel({
+      id: 'terminal',
+      pluginId: 'com.zclaudia.builtin',
+      type: 'panel',
+      label: 'Terminal',
+      order: 2,
+      platforms: ['desktop'],
+    });
+    usePluginStore.getState().registerPanel({
+      id: 'session-changes',
+      pluginId: 'com.zclaudia.builtin',
+      type: 'panel',
+      label: 'Changes',
+      order: 3,
       platforms: ['desktop'],
     });
   });
@@ -49,20 +74,27 @@ describe('RightSidebar', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders nothing when the session workspace is empty', () => {
+  it('renders nothing when collapsed=true', () => {
+    useRightSidebarStore.setState({ collapsed: true });
     const { container } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
     expect(container.firstChild).toBeNull();
   });
 
+  it('renders the empty-state launcher when not collapsed and workspace is empty', () => {
+    const { getByTestId, getByText } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
+    expect(getByText('Workspace')).toBeTruthy();
+    expect(getByTestId('empty-state')).toBeTruthy();
+  });
+
   it('renders the workspace when a tool is open', () => {
     useRightWorkspaceStore.getState().openTool('A', 'memory', { openMode: 'shared' });
-    const { getByText } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
+    const { getByText, getByTestId } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
     expect(getByText('Workspace')).toBeTruthy();
+    expect(getByTestId('workspace-view')).toBeTruthy();
   });
 
   it('uses widthFraction from store as the sidebar width (proportional)', () => {
-    useRightWorkspaceStore.getState().openTool('A', 'memory', { openMode: 'shared' });
-    useRightSidebarStore.setState({ widthFraction: 0.3, activeTab: null });
+    useRightSidebarStore.setState({ widthFraction: 0.3, activeTab: null, collapsed: false });
 
     const { container } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
     const wrapper = container.firstChild as HTMLElement;
@@ -70,9 +102,10 @@ describe('RightSidebar', () => {
     expect(wrapper.style.minWidth).toBe('240px');
   });
 
-  it('renders nothing for a different session with empty workspace', () => {
+  it('renders the empty-state for a session with no open tools', () => {
     useRightWorkspaceStore.getState().openTool('B', 'memory', { openMode: 'shared' });
-    const { container } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
-    expect(container.firstChild).toBeNull();
+    const { getByTestId } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
+    // Session A has no tools open → empty-state is shown (not null)
+    expect(getByTestId('empty-state')).toBeTruthy();
   });
 });
