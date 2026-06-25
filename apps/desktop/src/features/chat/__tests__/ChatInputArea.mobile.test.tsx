@@ -154,12 +154,36 @@ vi.mock('../../../stores/uiStore', () => ({
   })),
 }));
 
+const projectStoreState = {
+  selectedSessionId: 'sess-1' as string | null,
+  sessions: [{ id: 'sess-1', projectId: 'proj-1' }] as any[],
+  updateSession: vi.fn(),
+};
+
 vi.mock('../../../stores/projectStore', () => ({
-  useProjectStore: {
-    getState: () => ({
-      updateSession: vi.fn(),
-    }),
-  },
+  useProjectStore: Object.assign(
+    vi.fn((selector?: (state: typeof projectStoreState) => unknown) =>
+      selector ? selector(projectStoreState) : projectStoreState),
+    {
+      getState: () => projectStoreState,
+    },
+  ),
+}));
+
+const rightWorkspaceStoreState = {
+  bySession: {} as Record<string, any>,
+  order: [] as string[],
+};
+
+vi.mock('../../../stores/rightWorkspaceStore', () => ({
+  useRightWorkspaceStore: Object.assign(
+    vi.fn((selector?: (state: typeof rightWorkspaceStoreState) => unknown) =>
+      selector ? selector(rightWorkspaceStoreState) : rightWorkspaceStoreState),
+    {
+      getState: () => rightWorkspaceStoreState,
+    },
+  ),
+  findPaneWithTool: vi.fn(() => null),
 }));
 
 const baseProps = {
