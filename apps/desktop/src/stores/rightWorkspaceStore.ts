@@ -289,7 +289,7 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
         const p = (persisted ?? {}) as Partial<RightWorkspaceState>;
         const bySession: Record<string, SessionWorkspace> = {};
         for (const [id, ws] of Object.entries(p.bySession ?? {})) {
-          const root = ws && isSafeTree(ws.root) ? ws.root : ws?.root === null ? null : null;
+          const root = ws && isSafeTree(ws.root) ? ws.root : null;
           bySession[id] = {
             root,
             primaryPaneId: root ? ws?.primaryPaneId ?? null : null,
