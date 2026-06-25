@@ -134,6 +134,7 @@ export function replaceChild(node: LayoutNode, oldId: string, replacement: Layou
   return { ...node, children };
 }
 
+/** Callers only ever pass `kind:'pane'` node IDs; group nodes are never passed as `paneId`, which is why the `newA ?? a` / `newB ?? b` fallbacks are safe (a removed subtree is always a single pane, never a group that should itself be collapsed). */
 export function removePane(root: LayoutNode, paneId: string): LayoutNode | null {
   if (root.kind === 'pane') return root.id === paneId ? null : root;
   const [a, b] = root.children;
@@ -173,7 +174,7 @@ export function isSafeTree(node: unknown): node is LayoutNode {
     return (
       typeof g.id === 'string' &&
       (g.dir === 'row' || g.dir === 'col') &&
-      typeof g.ratio === 'number' &&
+      typeof g.ratio === 'number' && g.ratio >= MIN_RATIO && g.ratio <= MAX_RATIO &&
       Array.isArray(g.children) && g.children.length === 2 &&
       isSafeTree(g.children[0]) && isSafeTree(g.children[1])
     );
