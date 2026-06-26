@@ -28,12 +28,20 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
   const submitLabel = active ? 'Update' : 'Set goal';
   const disableSubmit = objective.trim().length === 0;
 
+  const onKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      onClose();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onKeyDown={onKeyDown}
       role="presentation"
     >
       <div

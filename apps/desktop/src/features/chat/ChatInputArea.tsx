@@ -255,16 +255,32 @@ export function ChatInputArea({
   const [goalDialogOpen, setGoalDialogOpen] = useState(false);
 
   useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
     getGoal(sessionId)
-      .then((g) => setStoreGoal(sessionId, g))
+      .then((g) => {
+        if (!cancelled) setStoreGoal(sessionId, g);
+      })
       .catch((err) => console.warn('[goal] fetch failed', err));
+    return () => {
+      cancelled = true;
+    };
   }, [sessionId, setStoreGoal]);
 
   const goal = goalSlot?.goal ?? null;
 
   const handleGoalSubmit = useCallback(
     async (args: { objective: string; tokenBudget: number; maxTurns: number }) => {
+      if (!sessionId) return;
       try {
+        const current = goal;
+        if (current && (current.status === 'active' || current.status === 'paused')) {
+          await clearGoal(sessionId);
+          // Goal slot will reach 'aborted' via the WS state-changed event,
+          // but we need to wait for the server lock to release before setGoal —
+          // a sequential await on clearGoal is sufficient since the REST call
+          // returns only after the DB row is updated to status='aborted'.
+        }
         const next = await setGoal(sessionId, args);
         setStoreGoal(sessionId, next);
         setGoalDialogOpen(false);
@@ -272,7 +288,7 @@ export function ChatInputArea({
         console.error('[goal] set failed', err);
       }
     },
-    [sessionId, setStoreGoal],
+    [sessionId, goal, setStoreGoal],
   );
 
   const handleGoalPauseResume = useCallback(async () => {
@@ -289,9 +305,10 @@ export function ChatInputArea({
   }, [sessionId, goal, setStoreGoal]);
 
   const handleGoalClear = useCallback(async () => {
+    if (!sessionId) return;
     try {
-      const next = await clearGoal(sessionId);
-      setStoreGoal(sessionId, next);
+      await clearGoal(sessionId);
+      setStoreGoal(sessionId, null);
       setGoalDialogOpen(false);
     } catch (err) {
       console.error('[goal] clear failed', err);

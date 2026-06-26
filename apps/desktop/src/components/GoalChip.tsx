@@ -50,7 +50,7 @@ export function GoalChip({ goal, onOpen, onPauseResume }: GoalChipProps) {
             onOpen();
           }}
           className="text-muted-foreground hover:text-foreground leading-none"
-          aria-label="dismiss"
+          aria-label="open goal settings"
         >
           ×
         </button>
