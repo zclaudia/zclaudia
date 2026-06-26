@@ -280,6 +280,31 @@ describe('rightWorkspaceStore — LRU eviction', () => {
   });
 });
 
+describe('rightWorkspaceStore — tab actions', () => {
+  beforeEach(reset);
+
+  it('setActiveTool switches the active tab and focuses the pane', () => {
+    const pane = {
+      id: 'P1', kind: 'pane' as const,
+      tools: [{ toolId: 'memory' }, { toolId: 'file-viewer' }],
+      activeToolId: 'file-viewer', activeInstanceKey: undefined,
+    };
+    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    useRightWorkspaceStore.getState().setActiveTool('A', 'P1', 'memory');
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    expect((ws.root as any).activeToolId).toBe('memory');
+    expect(ws.focusedPaneId).toBe('P1');
+  });
+
+  it('setActiveTool is a no-op when the tool is not in the pane', () => {
+    const pane = { id: 'P1', kind: 'pane' as const, tools: [{ toolId: 'memory' }], activeToolId: 'memory' };
+    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    const before = useRightWorkspaceStore.getState().bySession.A.root;
+    useRightWorkspaceStore.getState().setActiveTool('A', 'P1', 'terminal');
+    expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
+  });
+});
+
 // test helpers
 function findPaneFor(root: any, id: string): any {
   return findPane(root, id);

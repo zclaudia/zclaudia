@@ -217,6 +217,7 @@ interface RightWorkspaceState {
   replaceTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string, multiInstance?: boolean) => SplitResult;
   setRatio: (sessionId: string, groupId: string, ratio: number) => void;
   focusPane: (sessionId: string, paneId: string) => void;
+  setActiveTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string) => void;
   resetSession: (sessionId: string) => void;
   removeSession: (sessionId: string) => void;
 }
@@ -360,6 +361,14 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
 
         focusPane: (sessionId, paneId) =>
           update(sessionId, (ws) => (findPane(ws.root, paneId) ? { ...ws, focusedPaneId: paneId } : ws)),
+
+        setActiveTool: (sessionId, paneId, toolId, instanceKey) =>
+          update(sessionId, (ws) => {
+            const pane = ws.root ? findPane(ws.root, paneId) : null;
+            if (!pane || !pane.tools.some((t) => sameRef(t, toolId, instanceKey))) return ws;
+            const replaced: PaneNode = { ...pane, activeToolId: toolId, activeInstanceKey: instanceKey };
+            return { ...ws, root: replaceChild(ws.root!, paneId, replaced), focusedPaneId: paneId };
+          }),
 
         resetSession: (sessionId) => update(sessionId, () => ({ ...EMPTY })),
 
