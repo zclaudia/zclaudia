@@ -232,21 +232,24 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   const evaluatorPort = new AnthropicEvaluatorPort();
   const goalEvaluator = new GoalEvaluator(evaluatorPort);
   const transcriptPort = new SqliteTranscriptPort(db as unknown as import('better-sqlite3').Database);
+
+  const resolveSessionLlmProfileId = (sessionId: string): string | null => {
+    const row = db
+      .prepare(
+        `SELECT ap.llm_profile_id AS llmProfileId
+         FROM sessions s
+         JOIN agent_profiles ap ON ap.id = s.agent_profile_id
+         WHERE s.id = ?`,
+      )
+      .get(sessionId) as { llmProfileId: string | null } | undefined;
+    return row?.llmProfileId ?? null;
+  };
+
   const continueTurnPort = new ContinueTurnPortImpl({
     handleRunStart,
     db,
     clients,
-    resolveLlmProfileId: (sessionId: string): string | null => {
-      const row = db
-        .prepare(
-          `SELECT ap.llm_profile_id
-           FROM sessions s
-           JOIN agent_profiles ap ON ap.id = s.agent_profile_id
-           WHERE s.id = ?`,
-        )
-        .get(sessionId) as { llm_profile_id: string | null } | undefined;
-      return row?.llm_profile_id ?? null;
-    },
+    resolveLlmProfileId: resolveSessionLlmProfileId,
     resolveWorkingDirectory: (sessionId: string): string => {
       const row = db
         .prepare('SELECT working_directory, root_path FROM sessions s JOIN projects p ON p.id = s.project_id WHERE s.id = ?')
@@ -259,17 +262,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     evaluator: goalEvaluator,
     transcript: transcriptPort,
     continuer: continueTurnPort,
-    resolveLlmProfile: (sessionId: string): string => {
-      const row = db
-        .prepare(
-          `SELECT ap.llm_profile_id
-           FROM sessions s
-           JOIN agent_profiles ap ON ap.id = s.agent_profile_id
-           WHERE s.id = ?`,
-        )
-        .get(sessionId) as { llm_profile_id: string | null } | undefined;
-      return row?.llm_profile_id ?? '';
-    },
+    resolveLlmProfile: (sessionId: string): string => resolveSessionLlmProfileId(sessionId) ?? '',
   });
 
   return {

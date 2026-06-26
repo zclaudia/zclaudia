@@ -17,7 +17,7 @@ export class SqliteTranscriptPort implements TranscriptPort {
         `SELECT role, content, created_at
          FROM messages
          WHERE session_id = ?
-         ORDER BY created_at DESC
+         ORDER BY offset DESC
          LIMIT ?`,
       )
       .all(sessionId, lookback) as MessageRow[];
