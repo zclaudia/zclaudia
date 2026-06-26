@@ -57,6 +57,7 @@ export class ServerState {
   metaWorkflowService: import('./domains/meta-workflow/service.js').MetaWorkflowService | undefined;
   agentTaskExecutor: TaskExecutor | undefined;
   goalCoordinator: import('./domains/goals/coordinator.js').GoalCoordinator | undefined;
+  goalService: import('./domains/goals/service.js').GoalService | undefined;
 
   // --- Broadcast wrappers ---
 
@@ -265,6 +266,16 @@ export class ServerState {
       permissionBridge: this.permissionBridge,
       cancelWorkflowRun: this.cancelWorkflowRun,
       metaWorkflowService: this.metaWorkflowService,
+      pauseActiveGoalForSession: (sessionId: string) => {
+        const g = this.goalService?.getActive(sessionId);
+        if (g && g.status === 'active') {
+          try {
+            this.goalService!.pause(g.id);
+          } catch (err) {
+            console.warn('[goal] pause-on-cancel failed', err);
+          }
+        }
+      },
     };
   }
 

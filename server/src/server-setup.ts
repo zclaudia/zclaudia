@@ -61,6 +61,7 @@ export interface SetupResult {
   metaWorkflowService?: import('./domains/meta-workflow/service.js').MetaWorkflowService;
   agentTaskExecutor?: import('./domains/tasks/executors/types.js').TaskExecutor;
   goalCoordinator?: import('./domains/goals/coordinator.js').GoalCoordinator;
+  goalService?: import('./domains/goals/service.js').GoalService;
   /** Cleanup function: call when WebSocket server closes */
   onWssClose: () => void;
 }
@@ -129,6 +130,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     metaWorkflowService,
     agentTaskExecutor,
     goalCoordinator,
+    goalService,
   } = bootstrapDomains({
     db, app, authMiddleware, clients, activeRuns,
     broadcastPluginState, broadcastHeartbeat,
@@ -199,6 +201,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     metaWorkflowService,
     agentTaskExecutor,
     goalCoordinator,
+    goalService,
     onWssClose,
   };
 }

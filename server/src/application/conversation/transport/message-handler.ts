@@ -15,6 +15,7 @@ import type { NotificationService } from '../../../domains/notification-feed/ind
 import type { TaskCoordinationPort } from '../../../application/conversation/task-coordination-port.js';
 import type { ProviderRegistryPort } from '../../../infra/providers/registry.js';
 import { sendMessage } from './broadcast.js';
+import { isTerminalPhase } from '../runtime/active-run-phase.js';
 
 // Domain handlers
 import {
@@ -56,6 +57,8 @@ export interface MessageHandlerContext {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- handleRunStart accepts various message shapes from different callers
   handleRunStart: (client: ConnectedClient, message: any, db: ReturnType<typeof initDatabase>, options?: Record<string, unknown>, clients?: Map<string, ConnectedClient>) => Promise<void>;
   cancelRun: (runId: string) => void;
+  /** Pause the session's active goal when its run is interrupted (Codex-aligned). */
+  pauseActiveGoalForSession?: (sessionId: string) => void;
   broadcastPluginState: () => void;
   findProcessPidsByTaskCommand: (taskCommand?: string, excludedPids?: number[]) => Promise<number[]>;
   notificationService?: NotificationService;
@@ -98,9 +101,13 @@ export async function handleClientMessage(
       }, db, {}, clients);
       break;
 
-    case 'run_cancel':
+    case 'run_cancel': {
+      const run = ctx.activeRuns.get(message.runId);
+      const pausable = !!run && !isTerminalPhase(run.phase);
       ctx.cancelRun(message.runId);
+      if (run?.sessionId && pausable) ctx.pauseActiveGoalForSession?.(run.sessionId);
       break;
+    }
 
     case 'run_steer':
       await handleRunSteer(client, message, ctx.activeRuns, broadcastRunMessage);

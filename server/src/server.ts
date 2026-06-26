@@ -143,6 +143,7 @@ export async function createServer(): Promise<ServerContext> {
   serverState.metaWorkflowService = setup.metaWorkflowService;
   serverState.agentTaskExecutor = setup.agentTaskExecutor;
   serverState.goalCoordinator = setup.goalCoordinator;
+  serverState.goalService = setup.goalService;
 
   // Error handling middleware (must be after routes)
   app.use(expressErrorHandler);
