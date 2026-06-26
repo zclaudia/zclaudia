@@ -1,9 +1,16 @@
 /**
  * Goal Feature E2E Tests
  *
- * Happy-path coverage for the Goal chip and dialog:
- *   1. Setting a goal updates the chip to show the objective and 0/N turn count.
- *   2. Clearing a goal returns the chip to the "+ Set goal" empty state.
+ * Happy-path coverage for the /goal command and the GoalPinnedBar:
+ *   1. Typing `/goal <objective>` in the composer and submitting it causes
+ *      the GoalPinnedBar (data-testid="goal-pinned-bar") to appear above the
+ *      composer showing the objective text and the Turns 0 / 50 meter.
+ *   2. Clicking the clear (X) button on the pinned bar (aria-label "Clear goal")
+ *      dismisses the bar entirely — no chip or bar remains.
+ *
+ * The slash-command autocomplete menu opens as soon as `/` is typed; it must
+ * be dismissed with Escape (which closes the menu without clearing the input)
+ * before Enter submits the composed command.
  */
 
 import { test, expect } from '../fixtures/test-fixtures';
@@ -26,7 +33,7 @@ test.describe('Goal feature', () => {
   });
 
   /**
-   * Ensure an active session is open (so the ChatInputArea — and GoalChip — are mounted).
+   * Ensure an active session is open (so the ChatInputArea — and GoalPinnedBar — are mounted).
    * Returns false if the prerequisite cannot be met (e.g. no server).
    */
   async function ensureSession(page: any): Promise<boolean> {
@@ -73,9 +80,9 @@ test.describe('Goal feature', () => {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // GF1: Setting a goal updates the chip
+  // GF1: Sending /goal command shows the GoalPinnedBar
   // ─────────────────────────────────────────────────────────────────────────
-  test('GF1: set goal updates chip to show objective and turn count', async ({ page }) => {
+  test('GF1: set goal via /goal command shows pinned bar', async ({ page }) => {
     const sessionReady = await ensureSession(page);
     if (!sessionReady) {
       console.log('  Warning: could not open a session — skipping test');
@@ -83,36 +90,32 @@ test.describe('Goal feature', () => {
       return;
     }
 
-    // The chip must be visible before we interact with it.
-    const chip = page.getByTestId('goal-chip');
-    await expect(chip).toBeVisible({ timeout: 5000 });
+    const textarea = page.locator('textarea').first();
 
-    // Initial state: "+ Set goal" dashed button.
-    await expect(chip).toContainText(/set goal/i);
+    // No pinned bar initially.
+    await expect(page.getByTestId('goal-pinned-bar')).toHaveCount(0);
 
-    // Open the goal dialog.
-    await chip.click();
+    // Type the /goal command. The slash-command autocomplete menu opens
+    // as soon as the value starts with `/` and suggestions exist. Escape
+    // closes the menu without clearing the textarea, then Enter submits.
+    await textarea.click();
+    await textarea.fill('/goal all tests pass');
+    await page.keyboard.press('Escape'); // close the slash-command menu
+    await textarea.press('Enter');       // dispatch the /goal command
 
-    // Fill in the objective.
-    const objectiveTextarea = page.getByPlaceholder(/what does done look like/i);
-    await expect(objectiveTextarea).toBeVisible({ timeout: 3000 });
-    await objectiveTextarea.fill('all tests pass');
+    // The pinned bar should appear with the objective and the Turns meter.
+    const bar = page.getByTestId('goal-pinned-bar');
+    await expect(bar).toBeVisible({ timeout: 5000 });
+    await expect(bar).toContainText(/all tests pass/i);
+    await expect(bar).toContainText(/0\s*\/\s*50/); // Turns 0 / 50
 
-    // Submit — button label is "Set goal" when no goal is active.
-    await page.getByRole('button', { name: /^set goal$/i }).click();
-
-    // Dialog should close and chip should reflect the new goal.
-    await expect(chip).toContainText(/all tests pass/i, { timeout: 5000 });
-    // Default maxTurns is 50; turnsUsed starts at 0.
-    await expect(chip).toContainText(/0\s*\/\s*50/);
-
-    console.log('GF1: set goal chip verified');
+    console.log('GF1: goal pinned bar verified');
   });
 
   // ─────────────────────────────────────────────────────────────────────────
-  // GF2: Clearing a goal returns chip to empty state
+  // GF2: Clearing a goal removes the GoalPinnedBar
   // ─────────────────────────────────────────────────────────────────────────
-  test('GF2: clearing a goal returns chip to Set goal empty state', async ({ page }) => {
+  test('GF2: clearing a goal removes the pinned bar', async ({ page }) => {
     const sessionReady = await ensureSession(page);
     if (!sessionReady) {
       console.log('  Warning: could not open a session — skipping test');
@@ -120,31 +123,24 @@ test.describe('Goal feature', () => {
       return;
     }
 
-    const chip = page.getByTestId('goal-chip');
-    await expect(chip).toBeVisible({ timeout: 5000 });
+    const textarea = page.locator('textarea').first();
 
-    // ── Set a temporary goal ──────────────────────────────────────────────
-    await chip.click();
+    // ── Activate a temporary goal ─────────────────────────────────────────
+    await textarea.click();
+    await textarea.fill('/goal temp goal');
+    await page.keyboard.press('Escape'); // close the slash-command menu
+    await textarea.press('Enter');       // dispatch the /goal command
 
-    const objectiveTextarea = page.getByPlaceholder(/what does done look like/i);
-    await expect(objectiveTextarea).toBeVisible({ timeout: 3000 });
-    await objectiveTextarea.fill('temp goal');
+    const bar = page.getByTestId('goal-pinned-bar');
+    await expect(bar).toBeVisible({ timeout: 5000 });
+    await expect(bar).toContainText(/temp goal/i);
 
-    await page.getByRole('button', { name: /^set goal$/i }).click();
+    // ── Clear the goal via the X button ──────────────────────────────────
+    await page.getByRole('button', { name: /clear goal/i }).click();
 
-    await expect(chip).toContainText(/temp goal/i, { timeout: 5000 });
+    // Bar should disappear entirely.
+    await expect(page.getByTestId('goal-pinned-bar')).toHaveCount(0, { timeout: 5000 });
 
-    // ── Clear the goal ────────────────────────────────────────────────────
-    await chip.click();
-
-    // Dialog re-opens in "active goal" mode; "Clear goal" button is visible.
-    const clearBtn = page.getByRole('button', { name: /clear goal/i });
-    await expect(clearBtn).toBeVisible({ timeout: 3000 });
-    await clearBtn.click();
-
-    // Chip returns to the dashed "+ Set goal" empty state.
-    await expect(chip).toContainText(/set goal/i, { timeout: 5000 });
-
-    console.log('GF2: clear goal chip verified');
+    console.log('GF2: clear goal pinned bar verified');
   });
 });
