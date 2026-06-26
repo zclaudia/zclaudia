@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
-import { openToolInWorkspace, closeToolInWorkspace } from '../workspaceActions';
+import { openToolInWorkspace, closeToolInWorkspace, closeTabInWorkspace } from '../workspaceActions';
 
 beforeEach(() => {
   useRightWorkspaceStore.setState({ bySession: {}, order: [] });
@@ -55,5 +55,19 @@ describe('closeToolInWorkspace', () => {
     openToolInWorkspace('A', 'memory');
     closeToolInWorkspace('A', 'memory');
     expect(useRightWorkspaceStore.getState().bySession.A.root).toBeNull();
+  });
+});
+
+describe('closeTabInWorkspace', () => {
+  it('closes the tab via the store and runs the panel onClose hook', () => {
+    let closed = 0;
+    usePluginStore.setState({
+      panels: [{ id: 'memory', pluginId: 'x', type: 'panel', label: 'Memory', onClose: () => { closed++; } }] as any,
+    });
+    openToolInWorkspace('A', 'memory');
+    const paneId = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    closeTabInWorkspace('A', paneId, 'memory');
+    expect(useRightWorkspaceStore.getState().bySession.A.root).toBeNull(); // last tab → pane gone
+    expect(closed).toBe(1);
   });
 });

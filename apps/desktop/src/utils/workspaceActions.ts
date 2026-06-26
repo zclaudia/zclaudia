@@ -44,6 +44,12 @@ export function closeToolInWorkspace(sessionId: string, toolId: string): void {
   usePluginStore.getState().panels.find((p) => p.id === toolId)?.onClose?.();
 }
 
+/** Close a single tab in a pane and run the panel's onClose lifecycle. */
+export function closeTabInWorkspace(sessionId: string, paneId: string, toolId: string, instanceKey?: string): void {
+  useRightWorkspaceStore.getState().closeTool(sessionId, paneId, toolId, instanceKey);
+  usePluginStore.getState().panels.find((p) => p.id === toolId)?.onClose?.();
+}
+
 /** Reactive: is `toolId` present anywhere in the session's workspace tree? */
 export function useToolOpenState(sessionId: string, toolId: string): boolean {
   return useRightWorkspaceStore((s) => {
