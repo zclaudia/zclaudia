@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import {
   newPane, findPane, findPaneWithTool, findToolConflict,
   removePane, setRatioAt, pickFirstPane, isSafeTree, isSplitWorkspace,
+  activeToolRef, sameRef,
   type LayoutNode,
 } from '../rightWorkspaceStore';
 import { useRightWorkspaceStore } from '../rightWorkspaceStore';
@@ -18,6 +19,22 @@ describe('rightWorkspaceStore helpers', () => {
     expect(p.kind).toBe('pane');
     expect(p.tools).toEqual([{ toolId: 'terminal', instanceKey: 'be::proj' }]);
     expect(p.activeToolId).toBe('terminal');
+  });
+
+  it('newPane records activeInstanceKey and sameRef matches a tab', () => {
+    const p = newPane('terminal', 'be::proj');
+    expect(p.activeInstanceKey).toBe('be::proj');
+    expect(sameRef(p.tools[0], 'terminal', 'be::proj')).toBe(true);
+    expect(sameRef(p.tools[0], 'terminal', 'be::other')).toBe(false);
+  });
+
+  it('activeToolRef disambiguates two same-tool tabs by instanceKey', () => {
+    const pane = {
+      id: 'p', kind: 'pane' as const,
+      tools: [{ toolId: 'terminal', instanceKey: 'a' }, { toolId: 'terminal', instanceKey: 'b' }],
+      activeToolId: 'terminal', activeInstanceKey: 'b',
+    };
+    expect(activeToolRef(pane).instanceKey).toBe('b');
   });
 
   it('findPane locates a pane by id', () => {

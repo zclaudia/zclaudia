@@ -13,8 +13,9 @@ export interface ToolRef {
 export interface PaneNode {
   id: string;
   kind: 'pane';
-  tools: ToolRef[];      // always length 1 in Phases 1–2
-  activeToolId: string;  // == tools[0].toolId today
+  tools: ToolRef[];           // 1..N tabs
+  activeToolId: string;       // active tab's toolId
+  activeInstanceKey?: string; // active tab's instanceKey (disambiguates multi-instance tabs)
 }
 
 export interface GroupNode {
@@ -49,12 +50,21 @@ export function genId(prefix: string): string {
 }
 
 export function newPane(toolId: string, instanceKey?: string): PaneNode {
-  return { id: genId('pane'), kind: 'pane', tools: [{ toolId, instanceKey }], activeToolId: toolId };
+  return { id: genId('pane'), kind: 'pane', tools: [{ toolId, instanceKey }], activeToolId: toolId, activeInstanceKey: instanceKey };
 }
 
-/** The pane's currently-active tool ref (falls back to the first slot). */
+/** True when `t` is the tab identified by (toolId, instanceKey). */
+export function sameRef(t: ToolRef, toolId: string, instanceKey?: string): boolean {
+  return t.toolId === toolId && t.instanceKey === instanceKey;
+}
+
+/** The pane's active tool ref: exact (toolId+instanceKey) match, then toolId-only, then first slot. */
 export function activeToolRef(pane: PaneNode): ToolRef {
-  return pane.tools.find((t) => t.toolId === pane.activeToolId) ?? pane.tools[0];
+  return (
+    pane.tools.find((t) => t.toolId === pane.activeToolId && t.instanceKey === pane.activeInstanceKey) ??
+    pane.tools.find((t) => t.toolId === pane.activeToolId) ??
+    pane.tools[0]
+  );
 }
 
 export function pathTo(root: LayoutNode | null, paneId: string): string[] | null {
