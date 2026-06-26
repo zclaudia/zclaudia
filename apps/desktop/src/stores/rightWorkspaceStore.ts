@@ -222,6 +222,7 @@ interface RightWorkspaceState {
   closeTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string) => void;
   reorderTab: (sessionId: string, paneId: string, fromIndex: number, toIndex: number) => void;
   moveTab: (sessionId: string, fromPaneId: string, toPaneId: string, toolId: string, instanceKey: string | undefined, toIndex?: number) => void;
+  splitTabOut: (sessionId: string, fromPaneId: string, toolId: string, instanceKey: string | undefined, dir: SplitDir, insertFirst?: boolean) => SplitResult;
   resetSession: (sessionId: string) => void;
   removeSession: (sessionId: string) => void;
 }
@@ -435,6 +436,30 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
 
             return { ...ws, root, primaryPaneId, focusedPaneId: toPaneId };
           }),
+
+        splitTabOut: (sessionId, fromPaneId, toolId, instanceKey, dir, insertFirst = false) => {
+          const ws = _get().bySession[sessionId];
+          const fromPane = ws?.root ? findPane(ws.root, fromPaneId) : null;
+          if (!fromPane) return { ok: false, conflictPaneId: '' };
+          const idx = fromPane.tools.findIndex((t) => sameRef(t, toolId, instanceKey));
+          if (idx < 0 || fromPane.tools.length <= 1) return { ok: false, conflictPaneId: '' };
+          const ref = fromPane.tools[idx];
+          const newP = newPane(ref.toolId, ref.instanceKey);
+          update(sessionId, (w) => {
+            const fp = findPane(w.root!, fromPaneId)!;
+            const remaining = fp.tools.filter((_, i) => i !== idx);
+            const wasActive = fp.activeToolId === toolId && fp.activeInstanceKey === instanceKey;
+            const activeRef = wasActive ? remaining[Math.min(idx, remaining.length - 1)]
+              : remaining.find((t) => t.toolId === fp.activeToolId && t.instanceKey === fp.activeInstanceKey) ?? remaining[0];
+            const updatedFrom: PaneNode = { ...fp, tools: remaining, activeToolId: activeRef.toolId, activeInstanceKey: activeRef.instanceKey };
+            const group: GroupNode = {
+              id: genId('grp'), kind: 'group', dir, ratio: DEFAULT_RATIO,
+              children: insertFirst ? [newP, updatedFrom] : [updatedFrom, newP],
+            };
+            return { ...w, root: replaceChild(w.root!, fromPaneId, group), focusedPaneId: newP.id };
+          });
+          return { ok: true, newPaneId: newP.id };
+        },
 
         resetSession: (sessionId) => update(sessionId, () => ({ ...EMPTY })),
 

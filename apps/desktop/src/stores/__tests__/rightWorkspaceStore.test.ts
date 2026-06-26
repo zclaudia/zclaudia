@@ -377,6 +377,31 @@ describe('rightWorkspaceStore — tab actions', () => {
     s.moveTab('A', res.newPaneId, p1, 'memory', undefined); // memory already in P1
     expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
   });
+
+  it('splitTabOut peels a tab into a new split region', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory');
+    s.openTool('A', 'file-viewer'); // [memory, file-viewer]
+    const p1 = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.splitTabOut('A', p1, 'file-viewer', undefined, 'row', false);
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('split failed');
+    const root = useRightWorkspaceStore.getState().bySession.A.root as any;
+    expect(root.kind).toBe('group');
+    expect(root.children[0].id).toBe(p1);
+    expect(root.children[0].tools.map((t: any) => t.toolId)).toEqual(['memory']);
+    expect(root.children[1].id).toBe(res.newPaneId);
+    expect(root.children[1].tools.map((t: any) => t.toolId)).toEqual(['file-viewer']);
+  });
+
+  it('splitTabOut refuses to peel a single-tab pane', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory');
+    const p1 = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.splitTabOut('A', p1, 'memory', undefined, 'row', false);
+    expect(res.ok).toBe(false);
+    expect(useRightWorkspaceStore.getState().bySession.A.root!.kind).toBe('pane');
+  });
 });
 
 // test helpers
