@@ -29,6 +29,9 @@ export function openToolInWorkspace(sessionId: string, toolId: string, ctx: Open
     target: ctx.target,
   });
   useRightSidebarStore.getState().setCollapsed(false);
+  // Per-tool init on explicit open (e.g. create a terminal session). Mirrors the
+  // onClose hook in closeToolInWorkspace; only fires on user-initiated opens.
+  panel?.onOpen?.({ sessionId, projectId: ctx.projectId, backendId: ctx.backendId });
 }
 
 export function closeToolInWorkspace(sessionId: string, toolId: string): void {

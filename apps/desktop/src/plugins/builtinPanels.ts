@@ -40,6 +40,11 @@ export function initBuiltinPanels() {
     openMode: 'dedicated',
     alwaysMount: true,
     visible: false,
+    onOpen: ({ projectId, backendId }) => {
+      // Create a terminal session so a freshly-opened pane is live instead of
+      // showing "No terminal session". No-op if one already exists for this scope.
+      if (projectId) useTerminalStore.getState().openTerminal(projectId, backendId);
+    },
     onClose: () => {
       // Close all open terminal drawers across backend/project scopes.
       const { drawerOpen } = useTerminalStore.getState();

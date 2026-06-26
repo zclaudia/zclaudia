@@ -54,6 +54,13 @@ export function migratePanelPlacements(
   return migrated;
 }
 
+/** Context passed to a panel's onOpen lifecycle when opened into the workspace. */
+export interface PanelOpenCtx {
+  sessionId: string;
+  projectId?: string;
+  backendId?: string | null;
+}
+
 export interface UIExtension {
   id: string;
   pluginId: string;
@@ -68,6 +75,9 @@ export interface UIExtension {
   alwaysMount?: boolean;   // Keep DOM mounted even when hidden (e.g. terminal xterm canvas)
   visible?: boolean;       // For alwaysMount panels: controls tab visibility without unmounting
   actions?: unknown;       // React component for tab-specific action buttons
+  /** Called when the user explicitly opens this panel into the workspace (not on
+   *  hidden always-mount renders). Use for per-tool init, e.g. creating a session. */
+  onOpen?: (ctx: PanelOpenCtx) => void;
   onClose?: () => void;    // Called when user closes this panel
   defaultPlacement?: PanelPlacement; // Where panel appears by default (desktop). Defaults to 'right'
   /** Right-sidebar workspace routing for openTool: 'shared' reuses the primary

@@ -28,6 +28,15 @@ export function DraftPanel() {
   const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
   const sessionMatches = !!activeSessionId && (!selectedSessionId || activeSessionId === selectedSessionId);
 
+  // Self-initialize when shown: bind the editor to the selected session. The
+  // workspace launcher opens this panel without calling openEditor, so without
+  // this the panel is stuck on "Loading draft...". Also re-converges on switch.
+  useEffect(() => {
+    if (selectedSessionId && activeSessionId !== selectedSessionId) {
+      void useDraftEditorStore.getState().openEditor(selectedSessionId);
+    }
+  }, [selectedSessionId, activeSessionId]);
+
   // Auto-focus textarea when panel mounts
   useEffect(() => {
     if (textareaRef.current && !isReadOnly && sessionMatches) {

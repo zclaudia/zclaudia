@@ -108,6 +108,13 @@ export function ChatInputArea({
   const terminalPanelActive = usePanelIsActive('terminal');
   const changesPanelActive = usePanelIsActive('session-changes');
 
+  // Keep the draft editor's send callback bound to the active session's sender so
+  // "Finish & Send" works no matter how the Draft tool was opened. The workspace
+  // launcher path doesn't set it (DraftPanel lives outside the chat's send context).
+  useEffect(() => {
+    setSendCallback((content: string) => onSendMessage(content));
+  }, [onSendMessage, setSendCallback]);
+
   // Mobile toolbar popover state
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const mobileToolsRef = useRef<HTMLDivElement>(null);
