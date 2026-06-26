@@ -39,7 +39,7 @@ import { SessionRepository } from '../domains/sessions/index.js';
 import type { TaskExecutor } from '../domains/tasks/executors/types.js';
 import { ensureSandboxInitialized } from '../infra/providers/pi-runtime/sandbox.js';
 import { EvalTaskRuntime } from '../infra/providers/pi-runtime/eval-task-runtime.js';
-import { GoalRepository, GoalService, GoalEvaluator, GoalCoordinator } from '../domains/goals/index.js';
+import { GoalRepository, GoalService, GoalEvaluator, GoalCoordinator, recoverActiveGoals } from '../domains/goals/index.js';
 import type { GoalEventPublisher } from '../domains/goals/types.js';
 import { createGoalRoutes } from '../domains/goals/routes.js';
 import { AnthropicEvaluatorPort } from '../domains/goals/ports/anthropic-evaluator-port.js';
@@ -323,6 +323,12 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     continuer: continueTurnPort,
     resolveLlmProfile: (sessionId: string): string => resolveSessionLlmProfileId(sessionId) ?? '',
   });
+
+  // Goal recovery — non-blocking. Fires onTurnCompleted for every active goal
+  // so post-restart they re-engage. Errors are logged inside the helper.
+  recoverActiveGoals(goalService, goalCoordinator).catch((err) =>
+    console.error('[goal] recovery sweep error', err),
+  );
 
   return {
     supervisorService,
