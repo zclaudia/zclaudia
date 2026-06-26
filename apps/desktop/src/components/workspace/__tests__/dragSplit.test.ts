@@ -4,6 +4,7 @@ import {
   dropZoneToDir,
   canDrop,
   disabledZones,
+  resolveTabDrop,
   type Rect,
 } from '../dragSplit';
 import { newPane } from '../../../stores/rightWorkspaceStore';
@@ -107,5 +108,35 @@ describe('disabledZones', () => {
   it('disables nothing when the tool is not present', () => {
     const root: LayoutNode = pane('p1', 'draft');
     expect(disabledZones(root, 'p1', { toolId: 'memory' }).size).toBe(0);
+  });
+});
+
+describe('resolveTabDrop', () => {
+  function strip(paneId: string, tabs: Array<[number, number]>): HTMLElement {
+    const el = document.createElement('div');
+    el.setAttribute('data-tab-strip', '');
+    el.setAttribute('data-pane-id', paneId);
+    el.getBoundingClientRect = () => ({ left: 0, top: 0, right: 300, bottom: 32, width: 300, height: 32, x: 0, y: 0, toJSON: () => ({}) } as DOMRect);
+    tabs.forEach(([l, r], i) => {
+      const t = document.createElement('div');
+      t.setAttribute('data-tab-index', String(i));
+      t.getBoundingClientRect = () => ({ left: l, top: 0, right: r, bottom: 32, width: r - l, height: 32, x: l, y: 0, toJSON: () => ({}) } as DOMRect);
+      el.appendChild(t);
+    });
+    return el;
+  }
+
+  it('returns the pane id and insert index based on tab midpoints', () => {
+    const container = document.createElement('div');
+    container.appendChild(strip('P1', [[0, 100], [100, 200]]));
+    // pointer x=160 is past tab 1's midpoint (150) → insert index 2
+    const hit = resolveTabDrop(container, 160, 16);
+    expect(hit).toEqual({ paneId: 'P1', index: 2 });
+  });
+
+  it('returns null when the pointer is not over any strip', () => {
+    const container = document.createElement('div');
+    container.appendChild(strip('P1', [[0, 100]]));
+    expect(resolveTabDrop(container, 16, 200)).toBeNull();
   });
 });
