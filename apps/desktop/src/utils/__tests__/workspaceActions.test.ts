@@ -33,8 +33,20 @@ describe('openToolInWorkspace', () => {
     openToolInWorkspace('A', 'memory'); // seed primary
     openToolInWorkspace('A', 'terminal', { projectId: 'proj', backendId: 'be' });
     const ws = useRightWorkspaceStore.getState().bySession.A;
-    const termPane = (ws.root as any).children.find((c: any) => c.activeToolId === 'terminal');
-    expect(termPane.tools[0].instanceKey).toBe('be::proj');
+    const pane = ws.root as any;
+    const termTab = pane.tools.find((t: any) => t.toolId === 'terminal');
+    expect(termTab.instanceKey).toBe('be::proj');
+  });
+
+  it('fires the panel onOpen lifecycle with session/project/backend on explicit open', () => {
+    const calls: any[] = [];
+    usePluginStore.setState({
+      panels: [
+        { id: 'memory', pluginId: 'x', type: 'panel', label: 'Memory', openMode: 'shared', onOpen: (ctx: any) => calls.push(ctx) },
+      ] as any,
+    });
+    openToolInWorkspace('A', 'memory', { projectId: 'proj', backendId: 'be' });
+    expect(calls).toEqual([{ sessionId: 'A', projectId: 'proj', backendId: 'be' }]);
   });
 });
 

@@ -130,26 +130,25 @@ describe('rightWorkspaceStore — openTool', () => {
     expect(ws.focusedPaneId).toBe(ws.root!.id);
   });
 
-  it('shared tool reuses the primary pane (replaces its tool)', () => {
+  it('opening a second tool appends a tab to the focused pane', () => {
     const s = useRightWorkspaceStore.getState();
-    s.openTool('A', 'file-viewer', { openMode: 'shared' });
+    s.openTool('A', 'file-viewer');
     const primary = useRightWorkspaceStore.getState().bySession.A.primaryPaneId;
-    s.openTool('A', 'session-changes', { openMode: 'shared' });
+    s.openTool('A', 'session-changes');
     const ws = useRightWorkspaceStore.getState().bySession.A;
     expect(ws.root!.kind).toBe('pane');
     expect(ws.root!.id).toBe(primary);
+    expect((ws.root as any).tools.map((t: any) => t.toolId)).toEqual(['file-viewer', 'session-changes']);
     expect((ws.root as any).activeToolId).toBe('session-changes');
   });
 
-  it('dedicated tool opens its own pane and does not hijack the primary', () => {
+  it('opening a tool appends as a tab instead of splitting (no auto-split)', () => {
     const s = useRightWorkspaceStore.getState();
-    s.openTool('A', 'file-viewer', { openMode: 'shared' });
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
+    s.openTool('A', 'file-viewer');
+    s.openTool('A', 'terminal', { instanceKey: 'be::p', multiInstance: true });
     const ws = useRightWorkspaceStore.getState().bySession.A;
-    expect(ws.root!.kind).toBe('group');
-    // primary still shows file-viewer
-    const primaryPane = findPaneFor(ws.root, ws.primaryPaneId!);
-    expect(primaryPane.activeToolId).toBe('file-viewer');
+    expect(ws.root!.kind).toBe('pane');
+    expect((ws.root as any).tools.map((t: any) => t.toolId)).toEqual(['file-viewer', 'terminal']);
   });
 
   it('opening an already-open singleton focuses it instead of duplicating', () => {
@@ -164,14 +163,14 @@ describe('rightWorkspaceStore — openTool', () => {
     expect(ws.focusedPaneId).toBe(memPaneId);
   });
 
-  it('multi-instance tool with a different instanceKey opens a new pane (no dedupe)', () => {
+  it('multi-instance tool with a different instanceKey appends a distinct tab', () => {
     const s = useRightWorkspaceStore.getState();
-    s.openTool('A', 'file-viewer', { openMode: 'shared' });               // primary seed
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
-    const before = useRightWorkspaceStore.getState().bySession.A.root;
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::q', multiInstance: true });
-    const after = useRightWorkspaceStore.getState().bySession.A.root;
-    expect(countPanes(after)).toBe(countPanes(before) + 1); // new pane, not deduped
+    s.openTool('A', 'terminal', { instanceKey: 'be::p', multiInstance: true });
+    s.openTool('A', 'terminal', { instanceKey: 'be::q', multiInstance: true });
+    const pane = useRightWorkspaceStore.getState().bySession.A.root as any;
+    expect(pane.kind).toBe('pane');
+    expect(pane.tools.map((t: any) => t.instanceKey)).toEqual(['be::p', 'be::q']);
+    expect(pane.activeInstanceKey).toBe('be::q');
   });
 
   it('isolates layouts per session', () => {
@@ -188,14 +187,11 @@ describe('rightWorkspaceStore — simple actions (deferred)', () => {
 
   it('closePane collapses the group and reassigns primary/focus', () => {
     const s = useRightWorkspaceStore.getState();
-    s.openTool('A', 'file-viewer', { openMode: 'shared' });
-    s.openTool('A', 'terminal', { openMode: 'dedicated', instanceKey: 'be::p', multiInstance: true });
-    const ws = useRightWorkspaceStore.getState().bySession.A;
-    const root = ws.root!;
-    expect(root.kind).toBe('group');
-    // close the dedicated (second) pane
-    const second = (root as any).children[1].id;
-    s.closePane('A', second);
+    s.openTool('A', 'file-viewer');
+    const from = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.splitPane('A', from, 'row', 'terminal', 'be::p', true);
+    if (!res.ok) throw new Error('split failed');
+    s.closePane('A', res.newPaneId);
     const after = useRightWorkspaceStore.getState().bySession.A;
     expect(after.root!.kind).toBe('pane');
     expect(after.focusedPaneId).toBe(after.root!.id);
@@ -204,8 +200,9 @@ describe('rightWorkspaceStore — simple actions (deferred)', () => {
 
   it('setRatio updates the group ratio', () => {
     const s = useRightWorkspaceStore.getState();
-    s.openTool('A', 'file-viewer', { openMode: 'shared' });
-    s.openTool('A', 'memory', { openMode: 'dedicated' });
+    s.openTool('A', 'file-viewer');
+    const from = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    s.splitPane('A', from, 'row', 'memory');
     const g = useRightWorkspaceStore.getState().bySession.A.root as any;
     s.setRatio('A', g.id, 0.7);
     expect((useRightWorkspaceStore.getState().bySession.A.root as any).ratio).toBeCloseTo(0.7);
