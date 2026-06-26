@@ -1,5 +1,5 @@
 import type { Goal } from '@zclaudia/shared';
-import { apiCallForBackend, apiCallVoidForBackend } from './unwrap';
+import { apiCallForBackend } from './unwrap';
 import { resolveSessionOwnerBackendId } from '../../utils/sessionOwnership';
 
 export interface SetGoalRequest {
@@ -42,8 +42,8 @@ export async function resumeGoal(sessionId: string): Promise<Goal> {
   );
 }
 
-export async function clearGoal(sessionId: string): Promise<void> {
-  return apiCallVoidForBackend(
+export async function clearGoal(sessionId: string): Promise<Goal> {
+  return apiCallForBackend<Goal>(
     resolveSessionOwnerBackendId(sessionId),
     `/api/sessions/${sessionId}/goal`,
     { method: 'DELETE' },

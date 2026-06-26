@@ -1,10 +1,11 @@
 import { create } from 'zustand';
-import type { Goal } from '@zclaudia/shared';
+import type { Goal, EvaluatorVerdictKind } from '@zclaudia/shared';
 
 interface GoalSlot {
   goal: Goal | null;
   budgetTokensUsed: number;
   budgetTurnsUsed: number;
+  lastVerdictKind: EvaluatorVerdictKind | null;
   lastVerdictReason: string | null;
 }
 
@@ -12,7 +13,7 @@ interface GoalState {
   bySession: Record<string, GoalSlot>;
   setGoal: (sessionId: string, goal: Goal | null) => void;
   applyBudget: (sessionId: string, tokensUsed: number, turnsUsed: number) => void;
-  applyVerdict: (sessionId: string, reason: string) => void;
+  applyVerdict: (sessionId: string, kind: EvaluatorVerdictKind, reason: string) => void;
   clearSession: (sessionId: string) => void;
 }
 
@@ -20,6 +21,7 @@ const emptySlot: GoalSlot = {
   goal: null,
   budgetTokensUsed: 0,
   budgetTurnsUsed: 0,
+  lastVerdictKind: null,
   lastVerdictReason: null,
 };
 
@@ -52,12 +54,13 @@ export const useGoalStore = create<GoalState>((set) => ({
       },
     })),
 
-  applyVerdict: (sessionId, reason) =>
+  applyVerdict: (sessionId, kind, reason) =>
     set((state) => ({
       bySession: {
         ...state.bySession,
         [sessionId]: {
           ...(state.bySession[sessionId] ?? emptySlot),
+          lastVerdictKind: kind,
           lastVerdictReason: reason,
         },
       },

@@ -8,7 +8,7 @@ export function handleGoalMessage(msg: ServerMessage): boolean {
       return true;
     }
     case 'goal:evaluator-verdict': {
-      useGoalStore.getState().applyVerdict(msg.sessionId, msg.reason);
+      useGoalStore.getState().applyVerdict(msg.sessionId, msg.kind, msg.reason);
       return true;
     }
     case 'goal:budget-update': {
