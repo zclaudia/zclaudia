@@ -45,8 +45,17 @@ export class GoalCoordinator {
       llmProfileId: this.deps.resolveLlmProfile(sessionId),
     });
 
-    this.deps.service.addTokenUsage(goal.id, evalResult.tokensUsed);
-    this.deps.service.recordVerdict(goal.id, evalResult.verdict.kind, evalResult.verdict.reason);
+    // Service writes (token usage + verdict). If a concurrent clear/complete
+    // happened between getActive() and now, requireNonTerminal will throw;
+    // catch and abandon this turn — the goal already reached its terminal
+    // state through another path.
+    try {
+      this.deps.service.addTokenUsage(goal.id, evalResult.tokensUsed);
+      this.deps.service.recordVerdict(goal.id, evalResult.verdict.kind, evalResult.verdict.reason);
+    } catch (err) {
+      console.warn(`[goal] post-eval write skipped for ${goal.id}:`, err);
+      return;
+    }
 
     switch (evalResult.verdict.kind) {
       case 'done':
@@ -64,10 +73,24 @@ export class GoalCoordinator {
         break;
     }
 
+    // Continue path: increment the turn counter, then schedule the next turn
+    // via the continuer. If the continuer fails, we can't recover — the next
+    // turn would never fire — so explicitly mark the goal as budget-limited
+    // with a 'continuation failed' reason. This surfaces the stuck state to
+    // the UI rather than letting the goal hang silently.
     this.deps.service.incrementTurns(goal.id);
-    await this.deps.continuer.appendAndRun(sessionId, GOAL_AUTO_CONTINUATION_TEXT, {
-      source: 'goal-auto',
-      goalId: goal.id,
-    });
+    try {
+      await this.deps.continuer.appendAndRun(sessionId, GOAL_AUTO_CONTINUATION_TEXT, {
+        source: 'goal-auto',
+        goalId: goal.id,
+      });
+    } catch (err) {
+      console.warn(`[goal] continuation failed for ${goal.id}:`, err);
+      try {
+        this.deps.service.markBudgetLimited(goal.id, 'continuation failed');
+      } catch (markErr) {
+        console.warn(`[goal] markBudgetLimited after continuation failure failed for ${goal.id}:`, markErr);
+      }
+    }
   }
 }

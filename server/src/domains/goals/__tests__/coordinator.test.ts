@@ -108,4 +108,85 @@ describe('GoalCoordinator', () => {
     expect(h.svc.get(goal.id)?.status).toBe('completed');
     expect(h.svc.get(goal.id)?.endReason).toContain('blocked-reason');
   });
+
+  it('no-ops on error verdict — goal stays active, continuer not called', async () => {
+    const db = makeDb();
+    const repo = new GoalRepository(db);
+    const events: unknown[] = [];
+    const svc = new GoalService(repo, { publish: (e) => events.push(e) });
+    const llm: EvaluatorLlmPort = {
+      async evaluate() {
+        throw new Error('llm down');
+      },
+    };
+    const continueCalls: Array<unknown> = [];
+    const coord = new GoalCoordinator({
+      service: svc,
+      evaluator: new GoalEvaluator(llm),
+      transcript: { read: async () => [] },
+      continuer: { appendAndRun: async (sid, text, meta) => { continueCalls.push({ sid, text, meta }); } },
+      resolveLlmProfile: () => 'lp1',
+    });
+    const goal = svc.setGoal('s1', { objective: 'x' });
+    await coord.onTurnCompleted('s1');
+    expect(svc.get(goal.id)?.status).toBe('active');
+    expect(continueCalls).toHaveLength(0);
+    expect(events.some((e: any) => e.type === 'goal:evaluator-verdict' && e.kind === 'error')).toBe(true);
+  });
+
+  it('marks goal budget-limited when continuer.appendAndRun throws', async () => {
+    const db = makeDb();
+    const repo = new GoalRepository(db);
+    const events: unknown[] = [];
+    const svc = new GoalService(repo, { publish: (e) => events.push(e) });
+    const llm: EvaluatorLlmPort = {
+      async evaluate() {
+        return { kind: 'continue', reason: 'wip', inputTokens: 10, outputTokens: 5 };
+      },
+    };
+    const coord = new GoalCoordinator({
+      service: svc,
+      evaluator: new GoalEvaluator(llm),
+      transcript: { read: async () => [] },
+      continuer: { appendAndRun: async () => { throw new Error('runtime not ready'); } },
+      resolveLlmProfile: () => 'lp1',
+    });
+    const goal = svc.setGoal('s1', { objective: 'x' });
+    await coord.onTurnCompleted('s1');
+    const after = svc.get(goal.id);
+    expect(after?.status).toBe('budget-limited');
+    expect(after?.endReason).toBe('continuation failed');
+  });
+
+  it('no-ops on concurrent terminal transition (race in recordVerdict)', async () => {
+    const db = makeDb();
+    const repo = new GoalRepository(db);
+    const svc = new GoalService(repo, { publish: () => {} });
+    let evalCallCount = 0;
+    const llm: EvaluatorLlmPort = {
+      async evaluate() {
+        evalCallCount += 1;
+        return { kind: 'continue', reason: 'wip', inputTokens: 10, outputTokens: 5 };
+      },
+    };
+    let goalForClose: string | null = null;
+    const coord = new GoalCoordinator({
+      service: svc,
+      evaluator: new GoalEvaluator(llm),
+      transcript: {
+        read: async () => {
+          // Simulate a concurrent user-clear that fires between transcript read and post-eval writes.
+          if (goalForClose) svc.clear(goalForClose);
+          return [];
+        },
+      },
+      continuer: { appendAndRun: async () => { throw new Error('should not reach'); } },
+      resolveLlmProfile: () => 'lp1',
+    });
+    const goal = svc.setGoal('s1', { objective: 'x' });
+    goalForClose = goal.id;
+    await expect(coord.onTurnCompleted('s1')).resolves.toBeUndefined();
+    expect(svc.get(goal.id)?.status).toBe('aborted');
+    expect(evalCallCount).toBe(1);
+  });
 });
