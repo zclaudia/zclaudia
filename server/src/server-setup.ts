@@ -60,6 +60,7 @@ export interface SetupResult {
   permissionWorkflowResolver?: import('./domains/workflows/index.js').PermissionWorkflowResolver;
   metaWorkflowService?: import('./domains/meta-workflow/service.js').MetaWorkflowService;
   agentTaskExecutor?: import('./domains/tasks/executors/types.js').TaskExecutor;
+  goalCoordinator?: import('./domains/goals/coordinator.js').GoalCoordinator;
   /** Cleanup function: call when WebSocket server closes */
   onWssClose: () => void;
 }
@@ -127,6 +128,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     permissionWorkflowResolver,
     metaWorkflowService,
     agentTaskExecutor,
+    goalCoordinator,
   } = bootstrapDomains({
     db, app, authMiddleware, clients, activeRuns,
     broadcastPluginState, broadcastHeartbeat,
@@ -196,6 +198,7 @@ export function setupRoutesAndServices(deps: SetupDependencies): SetupResult {
     permissionWorkflowResolver,
     metaWorkflowService,
     agentTaskExecutor,
+    goalCoordinator,
     onWssClose,
   };
 }

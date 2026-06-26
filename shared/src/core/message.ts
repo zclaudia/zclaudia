@@ -67,6 +67,13 @@ export interface MessageMetadata {
    * the file store when history is rebuilt. */
   attachments?: MessageAttachment[];
   /**
+   * Set on user messages auto-injected by the GoalCoordinator to continue
+   * a goal turn. Value is `'goal-auto'` for goal-driven continuation messages.
+   */
+  source?: string;
+  /** Goal ID associated with a goal-auto continuation message. */
+  goalId?: string;
+  /**
    * Set on synthetic system messages that represent a compaction event in the timeline.
    * The renderer detects this and replaces the default system-message bubble with a
    * dedicated CompactionMarkerCard. These messages are NOT persisted in the messages

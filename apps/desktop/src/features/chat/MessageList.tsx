@@ -990,6 +990,16 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
       >
         {isUser ? (
           <div className="text-sm">
+            {/* Goal-auto badge: shown when the GoalCoordinator injected this message */}
+            {message.metadata?.source === 'goal-auto' && (
+              <span
+                className="text-xs mr-2 inline-flex items-center opacity-70"
+                aria-label="auto goal turn"
+                title="Auto-continued by goal"
+              >
+                🎯
+              </span>
+            )}
             {/* Display attachments */}
             {attachments.length > 0 && (
               <div className="space-y-2 mb-2">

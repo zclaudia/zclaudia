@@ -49,6 +49,7 @@ export * from './features/turn-summary.js';
 export * from './features/system-tasks.js';
 export * from './features/workflows.js';
 export * from './features/notification-feed.js';
+export * from './features/goal.js';
 
 // Interaction types
 export * from './interaction/permissions.js';

@@ -10,6 +10,7 @@ export { handleSessionMessage } from './session-messages';
 export { handleFilePushMessage } from './file-push-messages';
 export { handleErrorMessage } from './error-messages';
 export { handleRunMessage } from './run-messages';
+export { handleGoalMessage } from './goal-messages';
 export type { HeartbeatState } from './heartbeat-reconciliation';
 export type { MessageDispatchContext, MessageHandlerContext } from './types';
 export { createMessageDispatcher } from './dispatcher';

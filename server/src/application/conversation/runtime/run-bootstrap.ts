@@ -39,6 +39,8 @@ export interface RunStartMessage extends Record<string, unknown> {
   systemContext?: string;
   workingDirectory?: string;
   resend?: boolean;
+  /** Arbitrary metadata to attach to the persisted user message (e.g. `{source: "goal-auto", goalId}`). */
+  userMessageMetadata?: unknown;
 }
 
 export interface RunSessionRecord {
@@ -269,6 +271,17 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
     // together — a partial write would leave the UI projection and the context
     // truth source disagreeing. (appendMessagesToTree's own transaction nests as
     // a savepoint.)
+    // Build user message metadata: merge attachments (if any) with any caller-supplied
+    // metadata (e.g. `{source: "goal-auto", goalId}` from GoalCoordinator).
+    const userMsgMetadata: Record<string, unknown> = {};
+    if (parsedInput.attachments.length > 0) userMsgMetadata.attachments = parsedInput.attachments;
+    if (message.userMessageMetadata != null && typeof message.userMessageMetadata === 'object') {
+      Object.assign(userMsgMetadata, message.userMessageMetadata as Record<string, unknown>);
+    }
+    const userMsgMetadataJson = Object.keys(userMsgMetadata).length > 0
+      ? JSON.stringify(userMsgMetadata)
+      : null;
+
     db.transaction(() => {
       db.prepare(`
         INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
@@ -277,7 +290,7 @@ export function initializeRunBootstrap(input: InitializeRunBootstrapInput): RunB
         userMessageId,
         message.sessionId,
         parsedInput.text,
-        parsedInput.attachments.length > 0 ? JSON.stringify({ attachments: parsedInput.attachments }) : null,
+        userMsgMetadataJson,
         Date.now(),
         userOffset,
       );

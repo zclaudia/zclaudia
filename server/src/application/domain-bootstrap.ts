@@ -39,6 +39,13 @@ import { SessionRepository } from '../domains/sessions/index.js';
 import type { TaskExecutor } from '../domains/tasks/executors/types.js';
 import { ensureSandboxInitialized } from '../infra/providers/pi-runtime/sandbox.js';
 import { EvalTaskRuntime } from '../infra/providers/pi-runtime/eval-task-runtime.js';
+import { GoalRepository, GoalService, GoalEvaluator, GoalCoordinator, recoverActiveGoals } from '../domains/goals/index.js';
+import type { GoalEventPublisher } from '../domains/goals/types.js';
+import { createGoalRoutes } from '../domains/goals/routes.js';
+import { AnthropicEvaluatorPort } from '../domains/goals/ports/anthropic-evaluator-port.js';
+import { SqliteTranscriptPort } from '../domains/goals/ports/sqlite-transcript-port.js';
+import { ContinueTurnPortImpl } from '../domains/goals/ports/continue-turn-port.js';
+import type { GoalStateChangedMessage, GoalEvaluatorVerdictMessage, GoalBudgetUpdateMessage } from '@zclaudia/shared';
 
 export interface BootstrapDeps {
   db: ReturnType<typeof initDatabase>;
@@ -63,6 +70,8 @@ export interface BootstrapResult {
   permissionWorkflowResolver: import('../domains/workflows/index.js').PermissionWorkflowResolver;
   metaWorkflowService: import('../domains/meta-workflow/service.js').MetaWorkflowService;
   agentTaskExecutor: TaskExecutor;
+  goalCoordinator: GoalCoordinator;
+  goalService: GoalService;
 }
 
 export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
@@ -220,6 +229,107 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
 
   void ensureSandboxInitialized().catch((err) => console.warn('[sandbox] startup init failed:', err));
 
+  // ── Goals domain wiring ──
+  const goalRepo = new GoalRepository(db as unknown as import('better-sqlite3').Database);
+
+  // Real WebSocket event publisher — translates internal goal events to wire
+  // messages and broadcasts to all authenticated clients.
+  const goalEventPublisher: GoalEventPublisher = {
+    publish: (event) => {
+      if (event.type === 'goal:state-changed') {
+        const wire: GoalStateChangedMessage = {
+          type: 'goal:state-changed',
+          sessionId: event.goal.sessionId,
+          goal: event.goal,
+        };
+        clients.forEach((client) => {
+          if (client.authenticated) sendMessage(client.ws, wire);
+        });
+      } else if (event.type === 'goal:evaluator-verdict') {
+        const goal = goalRepo.findById(event.goalId);
+        if (!goal) {
+          console.warn('[goals] publisher: goal not found, dropping evaluator-verdict event', event.goalId);
+          return;
+        }
+        const wire: GoalEvaluatorVerdictMessage = {
+          type: 'goal:evaluator-verdict',
+          sessionId: goal.sessionId,
+          goalId: event.goalId,
+          kind: event.kind,
+          reason: event.reason,
+        };
+        clients.forEach((client) => {
+          if (client.authenticated) sendMessage(client.ws, wire);
+        });
+      } else if (event.type === 'goal:budget-update') {
+        const goal = goalRepo.findById(event.goalId);
+        if (!goal) {
+          console.warn('[goals] publisher: goal not found, dropping budget-update event', event.goalId);
+          return;
+        }
+        const wire: GoalBudgetUpdateMessage = {
+          type: 'goal:budget-update',
+          sessionId: goal.sessionId,
+          goalId: event.goalId,
+          tokensUsed: event.tokensUsed,
+          turnsUsed: event.turnsUsed,
+        };
+        clients.forEach((client) => {
+          if (client.authenticated) sendMessage(client.ws, wire);
+        });
+      }
+    },
+  };
+
+  const goalService = new GoalService(goalRepo, goalEventPublisher);
+
+  // Mount goal REST routes under the sessions namespace.
+  // Mounted after registerFeatureDomains; Express will fall through to this
+  // handler when the session router has no match for /:id/goal sub-paths.
+  app.use('/api/sessions/:id/goal', authMiddleware, createGoalRoutes(goalService));
+
+  const evaluatorPort = new AnthropicEvaluatorPort();
+  const goalEvaluator = new GoalEvaluator(evaluatorPort);
+  const transcriptPort = new SqliteTranscriptPort(db as unknown as import('better-sqlite3').Database);
+
+  const resolveSessionLlmProfileId = (sessionId: string): string | null => {
+    const row = db
+      .prepare(
+        `SELECT ap.llm_profile_id AS llmProfileId
+         FROM sessions s
+         JOIN agent_profiles ap ON ap.id = s.agent_profile_id
+         WHERE s.id = ?`,
+      )
+      .get(sessionId) as { llmProfileId: string | null } | undefined;
+    return row?.llmProfileId ?? null;
+  };
+
+  const continueTurnPort = new ContinueTurnPortImpl({
+    handleRunStart,
+    db,
+    clients,
+    resolveLlmProfileId: resolveSessionLlmProfileId,
+    resolveWorkingDirectory: (sessionId: string): string => {
+      const row = db
+        .prepare('SELECT working_directory, root_path FROM sessions s JOIN projects p ON p.id = s.project_id WHERE s.id = ?')
+        .get(sessionId) as { working_directory: string | null; root_path: string | null } | undefined;
+      return row?.working_directory ?? row?.root_path ?? process.cwd();
+    },
+  });
+  const goalCoordinator = new GoalCoordinator({
+    service: goalService,
+    evaluator: goalEvaluator,
+    transcript: transcriptPort,
+    continuer: continueTurnPort,
+    resolveLlmProfile: (sessionId: string): string => resolveSessionLlmProfileId(sessionId) ?? '',
+  });
+
+  // Goal recovery — non-blocking. Fires onTurnCompleted for every active goal
+  // so post-restart they re-engage. Errors are logged inside the helper.
+  recoverActiveGoals(goalService, goalCoordinator).catch((err) =>
+    console.error('[goal] recovery sweep error', err),
+  );
+
   return {
     supervisorService,
     notificationsService,
@@ -228,5 +338,7 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     permissionWorkflowResolver,
     metaWorkflowService,
     agentTaskExecutor,
+    goalCoordinator,
+    goalService,
   };
 }

@@ -25,6 +25,7 @@ import { migration as m_022_drop_session_compactions } from './022_drop_session_
 import { migration as m_023_web_search_config } from './023_web_search_config.js';
 import { migration as m_024_session_fork_lineage } from './024_session_fork_lineage.js';
 import { migration as m_025_message_tree_entry_id } from './025_message_tree_entry_id.js';
+import { migration as m_026_session_goals } from './026_session_goals.js';
 
 export type { Migration };
 
@@ -54,6 +55,7 @@ export const migrations: Migration[] = [
   m_023_web_search_config,
   m_024_session_fork_lineage,
   m_025_message_tree_entry_id,
+  m_026_session_goals,
 ];
 
 /**

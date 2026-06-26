@@ -487,6 +487,89 @@ describe('initializeRunBootstrap message INSERT — parsed text + metadata', () 
     expect(row.content).toBe('no files');
     expect(row.metadata).toBeNull();
   });
+
+  it('persists userMessageMetadata when no attachments', () => {
+    const db = createDb('zclaudia');
+    const activeRuns = new Map();
+    const result = initializeRunBootstrap({
+      activeRuns,
+      client: {
+        id: 'client-1',
+        ws: {} as any,
+        isAlive: true,
+        isLocal: true,
+        authenticated: true,
+      },
+      db: db as any,
+      message: {
+        type: 'run_start',
+        clientRequestId: 'req-1',
+        sessionId: 'session-1',
+        input: 'hello',
+        mode: 'default',
+        userMessageMetadata: { source: 'goal-auto', goalId: 'g1' },
+      },
+      runId: 'run-1',
+      trace: {
+        log: vi.fn(),
+        setMeta: vi.fn(),
+      } as any,
+    });
+    expect(result?.userMessageId).toBeDefined();
+
+    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+      .get(result!.userMessageId!) as { content: string; metadata: string | null };
+
+    expect(row.content).toBe('hello');
+    expect(row.metadata).not.toBeNull();
+    const meta = JSON.parse(row.metadata!) as Record<string, unknown>;
+    expect(meta).toEqual({ source: 'goal-auto', goalId: 'g1' });
+  });
+
+  it('merges userMessageMetadata with attachments', () => {
+    const attachments = [
+      { fileId: 'file-1', name: 'photo.png', mimeType: 'image/png', type: 'image' as const },
+    ];
+    const envelopeInput = JSON.stringify({ text: 'check this', attachments });
+    const db = createDb('zclaudia');
+    const activeRuns = new Map();
+    const result = initializeRunBootstrap({
+      activeRuns,
+      client: {
+        id: 'client-1',
+        ws: {} as any,
+        isAlive: true,
+        isLocal: true,
+        authenticated: true,
+      },
+      db: db as any,
+      message: {
+        type: 'run_start',
+        clientRequestId: 'req-1',
+        sessionId: 'session-1',
+        input: envelopeInput,
+        mode: 'default',
+        userMessageMetadata: { source: 'goal-auto', goalId: 'g2' },
+      },
+      runId: 'run-1',
+      trace: {
+        log: vi.fn(),
+        setMeta: vi.fn(),
+      } as any,
+    });
+    expect(result?.userMessageId).toBeDefined();
+
+    const row = db.prepare('SELECT content, metadata FROM messages WHERE id = ?')
+      .get(result!.userMessageId!) as { content: string; metadata: string | null };
+
+    expect(row.content).toBe('check this');
+    expect(row.metadata).not.toBeNull();
+    const meta = JSON.parse(row.metadata!) as Record<string, unknown>;
+    expect(meta).toHaveProperty('attachments');
+    expect(meta.attachments).toEqual(attachments);
+    expect(meta.source).toBe('goal-auto');
+    expect(meta.goalId).toBe('g2');
+  });
 });
 
 describe('initializeRunBootstrap dual-write — messages.tree_entry_id', () => {

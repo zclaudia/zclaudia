@@ -1,5 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, Plus } from 'lucide-react';
+import { useGoalStore } from '../../stores/goalStore';
+import { GoalChip } from '../../components/GoalChip';
+import { GoalDialog } from '../../components/GoalDialog';
+import { getGoal, setGoal, pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
 import { ModeSelector } from './ModeSelector';
 import { PermissionSelector } from './PermissionSelector';
 import { WorktreeSelector } from './WorktreeSelector';
@@ -154,6 +158,72 @@ export function ChatInputArea({
     : restoreMessage?.content ?? initialDraft?.content;
   const messageInputInitialValue = pendingPrefill?.content ?? fallbackInitialValue;
 
+  // Goal state
+  const goalSlot = useGoalStore((s) => s.bySession[sessionId]);
+  const setStoreGoal = useGoalStore((s) => s.setGoal);
+  const [goalDialogOpen, setGoalDialogOpen] = useState(false);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    let cancelled = false;
+    getGoal(sessionId)
+      .then((g) => {
+        if (!cancelled) setStoreGoal(sessionId, g);
+      })
+      .catch((err) => console.warn('[goal] fetch failed', err));
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId, setStoreGoal]);
+
+  const goal = goalSlot?.goal ?? null;
+
+  const handleGoalSubmit = useCallback(
+    async (args: { objective: string; tokenBudget: number; maxTurns: number }) => {
+      if (!sessionId) return;
+      try {
+        const current = goal;
+        if (current && (current.status === 'active' || current.status === 'paused')) {
+          await clearGoal(sessionId);
+          // Goal slot will reach 'aborted' via the WS state-changed event,
+          // but we need to wait for the server lock to release before setGoal —
+          // a sequential await on clearGoal is sufficient since the REST call
+          // returns only after the DB row is updated to status='aborted'.
+        }
+        const next = await setGoal(sessionId, args);
+        setStoreGoal(sessionId, next);
+        setGoalDialogOpen(false);
+      } catch (err) {
+        console.error('[goal] set failed', err);
+      }
+    },
+    [sessionId, goal, setStoreGoal],
+  );
+
+  const handleGoalPauseResume = useCallback(async () => {
+    if (!goal) return;
+    try {
+      const next =
+        goal.status === 'paused'
+          ? await resumeGoal(sessionId)
+          : await pauseGoal(sessionId);
+      setStoreGoal(sessionId, next);
+    } catch (err) {
+      console.error('[goal] toggle failed', err);
+    }
+  }, [sessionId, goal, setStoreGoal]);
+
+  const handleGoalClear = useCallback(async () => {
+    if (!sessionId) return;
+    try {
+      await clearGoal(sessionId);
+      setStoreGoal(sessionId, null);
+      setGoalDialogOpen(false);
+    } catch (err) {
+      console.error('[goal] clear failed', err);
+    }
+  }, [sessionId, setStoreGoal]);
+
   // Read-only mode
   if (currentSession.isReadOnly) {
     return (
@@ -251,6 +321,21 @@ export function ChatInputArea({
       {/* Centered column matching the message reading column (ChatMessagePane) so
           the composer aligns with the chat content instead of stretching edge-to-edge. */}
       <div className="mx-auto w-full max-w-3xl">
+      {/* Goal chip row — visible on all breakpoints */}
+      <div className="mb-1.5 flex items-center gap-1">
+        <GoalChip
+          goal={goal}
+          onOpen={() => setGoalDialogOpen(true)}
+          onPauseResume={handleGoalPauseResume}
+        />
+      </div>
+      <GoalDialog
+        goal={goal}
+        open={goalDialogOpen}
+        onClose={() => setGoalDialogOpen(false)}
+        onSubmit={handleGoalSubmit}
+        onClear={handleGoalClear}
+      />
       {/* Mobile-only toolbar: three selectors, JS-gated to mobile only */}
       {isMobile && (
         <div className="mb-1.5 flex items-center gap-1">{selectorTrio}</div>

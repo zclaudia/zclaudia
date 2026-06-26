@@ -34,6 +34,7 @@ import { handleSessionMessage } from './message-handlers/session-messages';
 import { handleFilePushMessage } from './message-handlers/file-push-messages';
 import { handleErrorMessage } from './message-handlers/error-messages';
 import { handleRunMessage } from './message-handlers/run-messages';
+import { handleGoalMessage } from './message-handlers/goal-messages';
 import { createMessageDispatcher } from './message-handlers/dispatcher';
 import type { HeartbeatState } from './message-handlers/heartbeat-reconciliation';
 import type { MessageDispatchContext, MessageHandlerContext } from './message-handlers/types';
@@ -184,6 +185,10 @@ const messageDispatcher = createMessageDispatcher<ServerMessage, MessageDispatch
   {
     types: ['sessions_created', 'sessions_updated', 'system_task_update'],
     handle: (msg) => handleSessionMessage(msg),
+  },
+  {
+    types: ['goal:state-changed', 'goal:evaluator-verdict', 'goal:budget-update'],
+    handle: (msg) => handleGoalMessage(msg),
   },
   {
     types: ['file_push'],

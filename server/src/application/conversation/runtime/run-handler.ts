@@ -31,6 +31,8 @@ export interface RunHandlerContext {
   permissionBridge?: import('../agent/permission-bridge.js').PermissionBridge;
   permissionWorkflowResolver?: import('../../../domains/workflows/index.js').PermissionWorkflowResolver;
   agentTaskExecutor?: TaskExecutor;
+  /** Optional goal coordinator — fired after a turn completes successfully. */
+  goalCoordinator?: { onTurnCompleted(sessionId: string): Promise<void> };
 }
 
 export async function handleRunStart(
@@ -215,6 +217,17 @@ export async function handleRunStart(
       trace,
     });
     sdkSessionId = providerEventState.sdkSessionId;
+
+    // Goal coordinator: fire-and-forget so we don't block run finalization.
+    // Errors are logged inside; a crash here must not break the run.
+    if (ctx?.goalCoordinator) {
+      const coord = ctx.goalCoordinator;
+      queueMicrotask(() => {
+        coord
+          .onTurnCompleted(message.sessionId)
+          .catch((err) => console.error('[goal] coordinator error', err));
+      });
+    }
   } catch (error) {
     const recoveryResult = await handleRunException({
       activeRun,
