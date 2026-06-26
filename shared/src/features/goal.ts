@@ -29,7 +29,7 @@ export interface EvaluatorVerdict {
 }
 
 export const GOAL_DEFAULTS = {
-  tokenBudget: 200_000,
+  tokenBudget: 5_000_000,
   maxTurns: 50,
   evaluatorTranscriptWindow: 8,
   objectiveMaxChars: 1000,

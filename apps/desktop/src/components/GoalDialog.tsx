@@ -74,7 +74,7 @@ export function GoalDialog({ goal, open, onClose, onSubmit, onClear }: GoalDialo
               <input
                 type="number"
                 min={10000}
-                max={2_000_000}
+                max={10_000_000}
                 step={10000}
                 value={tokenBudget}
                 onChange={(e) => setTokenBudget(Number(e.target.value))}
