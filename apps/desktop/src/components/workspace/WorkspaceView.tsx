@@ -59,21 +59,23 @@ export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirect
         className={isRow ? 'flex flex-row min-w-0 min-h-0' : 'flex flex-col min-w-0 min-h-0'}
         style={{ flex: '1 1 0%', minWidth: 0, minHeight: 0 }}
       >
-        <div style={{ flex: `${group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>{renderNode(group.children[0])}</div>
+        <div className="flex min-w-0 min-h-0" style={{ flex: `${group.ratio} 1 0%` }}>{renderNode(group.children[0])}</div>
         <ResizeDivider
           groupId={group.id}
           dir={group.dir}
           containerSize={containerSize}
           onDrag={(delta) => setRatio(sessionId, group.id, group.ratio + delta)}
         />
-        <div style={{ flex: `${1 - group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>{renderNode(group.children[1])}</div>
+        <div className="flex min-w-0 min-h-0" style={{ flex: `${1 - group.ratio} 1 0%` }}>{renderNode(group.children[1])}</div>
       </div>
     );
   };
 
   if (!root) return null;
   return (
-    <div ref={containerRef} className="flex flex-1 min-w-0 min-h-0">
+    // `absolute inset-0` fills the (position: relative) sidebar content container.
+    // The container is a plain block, so a flex-grow here would be inert — fill explicitly.
+    <div ref={containerRef} className="absolute inset-0 flex min-w-0 min-h-0">
       {renderNode(root)}
     </div>
   );

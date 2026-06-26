@@ -66,7 +66,7 @@ export function PaneView({ sessionId, paneId, pane, focused, projectId, projectR
       data-pane-id={paneId}
       data-focused={focused ? 'true' : 'false'}
       onPointerDown={onFocus}
-      className={`flex flex-col min-w-0 min-h-0 bg-card ${focused ? 'ring-1 ring-inset ring-border' : ''}`}
+      className={`flex flex-col flex-1 min-w-0 min-h-0 bg-card ${focused ? 'ring-1 ring-inset ring-border' : ''}`}
     >
       <div className="flex items-center gap-1 px-2 h-8 border-b border-border flex-shrink-0 select-none min-w-0">
         <span

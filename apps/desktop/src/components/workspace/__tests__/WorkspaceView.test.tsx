@@ -28,8 +28,9 @@ describe('WorkspaceView', () => {
 
   it('renders both panes when split', () => {
     const s = useRightWorkspaceStore.getState();
-    s.openTool('A', 'memory', { openMode: 'shared' });
-    s.openTool('A', 'file-viewer', { openMode: 'dedicated' });
+    s.openTool('A', 'memory');
+    const p1 = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    s.splitPane('A', p1, 'row', 'file-viewer');
     const { getByTestId } = render(<WorkspaceView sessionId="A" />);
     expect(getByTestId('content-memory')).toBeTruthy();
     expect(getByTestId('content-file-viewer')).toBeTruthy();
@@ -37,8 +38,9 @@ describe('WorkspaceView', () => {
 
   it('renders a ResizeDivider [role=separator] between panes when split', () => {
     const s = useRightWorkspaceStore.getState();
-    s.openTool('A', 'memory', { openMode: 'shared' });
-    s.openTool('A', 'file-viewer', { openMode: 'dedicated' });
+    s.openTool('A', 'memory');
+    const p1 = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    s.splitPane('A', p1, 'row', 'file-viewer');
     const { container } = render(<WorkspaceView sessionId="A" />);
     const separator = container.querySelector('[role="separator"]');
     expect(separator).toBeTruthy();
@@ -47,5 +49,18 @@ describe('WorkspaceView', () => {
   it('renders nothing for an empty workspace', () => {
     const { container } = render(<WorkspaceView sessionId="A" />);
     expect(container.firstChild).toBeNull();
+  });
+
+  // Regression: the root must fill its (position: relative) block container. A bare
+  // flex-grow is inert against a non-flex parent and collapses the workspace to
+  // content height, leaving every tool mis-sized.
+  it('fills its container: root is absolute inset-0 and the pane grows', () => {
+    useRightWorkspaceStore.getState().openTool('A', 'memory', { openMode: 'shared' });
+    const { container } = render(<WorkspaceView sessionId="A" />);
+    const rootEl = container.firstChild as HTMLElement;
+    expect(rootEl.className).toContain('absolute');
+    expect(rootEl.className).toContain('inset-0');
+    const pane = container.querySelector('[data-pane-id]') as HTMLElement;
+    expect(pane.className).toContain('flex-1');
   });
 });
