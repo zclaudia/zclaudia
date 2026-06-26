@@ -26,6 +26,41 @@ function makeDeps(goal: Goal) {
   return { service, evaluator, transcript, continuer, resolveLlmProfile: () => 'p' };
 }
 
+describe('GoalCoordinator onResumed', () => {
+  it('schedules one continuation turn for an active goal within budget', async () => {
+    const goal = makeGoal({ status: 'active', tokenBudget: 1000, tokensUsed: 0, maxTurns: 50, turnsUsed: 3 });
+    const deps = makeDeps(goal);
+    const coord = new GoalCoordinator(deps as any);
+
+    await coord.onResumed('s1');
+
+    expect(deps.service.incrementTurns).toHaveBeenCalledWith('g1');
+    expect(deps.continuer.appendAndRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing when the goal is over budget', async () => {
+    const goal = makeGoal({ status: 'active', tokenBudget: 100, tokensUsed: 100 });
+    const deps = makeDeps(goal);
+    const coord = new GoalCoordinator(deps as any);
+
+    await coord.onResumed('s1');
+
+    expect(deps.continuer.appendAndRun).not.toHaveBeenCalled();
+    expect(deps.service.markBudgetLimited).toHaveBeenCalledWith('g1', 'token budget reached');
+  });
+
+  it('does nothing when max turns is reached', async () => {
+    const goal = makeGoal({ status: 'active', tokenBudget: 1000, tokensUsed: 0, maxTurns: 50, turnsUsed: 50 });
+    const deps = makeDeps(goal);
+    const coord = new GoalCoordinator(deps as any);
+
+    await coord.onResumed('s1');
+
+    expect(deps.continuer.appendAndRun).not.toHaveBeenCalled();
+    expect(deps.service.markBudgetLimited).toHaveBeenCalledWith('g1', 'max turns reached');
+  });
+});
+
 describe('GoalCoordinator token accounting', () => {
   it('adds the run tokens before the budget gate and budget-limits when exceeded', async () => {
     const goal = makeGoal({ tokenBudget: 100, tokensUsed: 0 });

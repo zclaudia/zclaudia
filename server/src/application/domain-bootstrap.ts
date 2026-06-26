@@ -283,11 +283,6 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
 
   const goalService = new GoalService(goalRepo, goalEventPublisher);
 
-  // Mount goal REST routes under the sessions namespace.
-  // Mounted after registerFeatureDomains; Express will fall through to this
-  // handler when the session router has no match for /:id/goal sub-paths.
-  app.use('/api/sessions/:id/goal', authMiddleware, createGoalRoutes(goalService));
-
   const evaluatorPort = new AnthropicEvaluatorPort();
   const goalEvaluator = new GoalEvaluator(evaluatorPort);
   const transcriptPort = new SqliteTranscriptPort(db as unknown as import('better-sqlite3').Database);
@@ -323,6 +318,12 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     continuer: continueTurnPort,
     resolveLlmProfile: (sessionId: string): string => resolveSessionLlmProfileId(sessionId) ?? '',
   });
+
+  // Mount goal REST routes under the sessions namespace, after the coordinator
+  // is built so we can pass it in for onResumed support.
+  // Mounted after registerFeatureDomains; Express will fall through to this
+  // handler when the session router has no match for /:id/goal sub-paths.
+  app.use('/api/sessions/:id/goal', authMiddleware, createGoalRoutes(goalService, goalCoordinator));
 
   // Goal recovery — non-blocking. Fires onTurnCompleted for every active goal
   // so post-restart they re-engage. Errors are logged inside the helper.

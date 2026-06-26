@@ -2,7 +2,10 @@ import { Router, type Request, type Response } from 'express';
 import { sendApiError } from '../../interfaces/http/response.js';
 import type { GoalService } from './service.js';
 
-export function createGoalRoutes(svc: GoalService): Router {
+export function createGoalRoutes(
+  svc: GoalService,
+  coordinator?: { onResumed(sessionId: string): Promise<void> },
+): Router {
   const router = Router({ mergeParams: true });
 
   // GET /sessions/:id/goal
@@ -51,7 +54,10 @@ export function createGoalRoutes(svc: GoalService): Router {
     const goal = svc.getActive(sessionId);
     if (!goal) return sendApiError(res, 404, 'no_active_goal', 'no active goal for this session');
     try {
-      return res.json({ success: true, data: svc.resume(goal.id) });
+      const resumed = svc.resume(goal.id);
+      // Fire-and-forget: re-arm the autonomous loop after resuming.
+      void coordinator?.onResumed(sessionId).catch((err) => console.error('[goal] onResumed error', err));
+      return res.json({ success: true, data: resumed });
     } catch (err) {
       return sendApiError(res, 400, 'invalid_transition', (err as Error).message);
     }

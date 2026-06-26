@@ -104,4 +104,39 @@ export class GoalCoordinator {
       }
     }
   }
+
+  /**
+   * Called when a paused goal is resumed. Re-arms the autonomous loop by
+   * kicking exactly one continuation turn (its completion re-triggers
+   * onTurnCompleted → evaluate → continue). No-op unless the goal is active
+   * and within budget. Mirrors the continue path of onTurnCompleted.
+   */
+  async onResumed(sessionId: string): Promise<void> {
+    const goal = this.deps.service.getActive(sessionId);
+    if (!goal || goal.status !== 'active') return;
+
+    if (goal.tokensUsed >= goal.tokenBudget) {
+      this.deps.service.markBudgetLimited(goal.id, 'token budget reached');
+      return;
+    }
+    if (goal.turnsUsed >= goal.maxTurns) {
+      this.deps.service.markBudgetLimited(goal.id, 'max turns reached');
+      return;
+    }
+
+    this.deps.service.incrementTurns(goal.id);
+    try {
+      await this.deps.continuer.appendAndRun(sessionId, GOAL_AUTO_CONTINUATION_TEXT, {
+        source: 'goal-auto',
+        goalId: goal.id,
+      });
+    } catch (err) {
+      console.warn(`[goal] resume continuation failed for ${goal.id}:`, err);
+      try {
+        this.deps.service.markBudgetLimited(goal.id, 'continuation failed');
+      } catch (markErr) {
+        console.warn(`[goal] markBudgetLimited after resume failure failed for ${goal.id}:`, markErr);
+      }
+    }
+  }
 }
