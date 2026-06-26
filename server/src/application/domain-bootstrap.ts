@@ -39,6 +39,10 @@ import { SessionRepository } from '../domains/sessions/index.js';
 import type { TaskExecutor } from '../domains/tasks/executors/types.js';
 import { ensureSandboxInitialized } from '../infra/providers/pi-runtime/sandbox.js';
 import { EvalTaskRuntime } from '../infra/providers/pi-runtime/eval-task-runtime.js';
+import { GoalRepository, GoalService, GoalEvaluator, GoalCoordinator } from '../domains/goals/index.js';
+import { AnthropicEvaluatorPort } from '../domains/goals/ports/anthropic-evaluator-port.js';
+import { SqliteTranscriptPort } from '../domains/goals/ports/sqlite-transcript-port.js';
+import { ContinueTurnPortImpl } from '../domains/goals/ports/continue-turn-port.js';
 
 export interface BootstrapDeps {
   db: ReturnType<typeof initDatabase>;
@@ -63,6 +67,7 @@ export interface BootstrapResult {
   permissionWorkflowResolver: import('../domains/workflows/index.js').PermissionWorkflowResolver;
   metaWorkflowService: import('../domains/meta-workflow/service.js').MetaWorkflowService;
   agentTaskExecutor: TaskExecutor;
+  goalCoordinator: GoalCoordinator;
 }
 
 export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
@@ -220,6 +225,53 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
 
   void ensureSandboxInitialized().catch((err) => console.warn('[sandbox] startup init failed:', err));
 
+  // ── Goals domain wiring ──
+  // Event publisher is a stub for now — Task 7 wires real WebSocket events.
+  const goalRepo = new GoalRepository(db as unknown as import('better-sqlite3').Database);
+  const goalService = new GoalService(goalRepo, { publish: () => {} });
+  const evaluatorPort = new AnthropicEvaluatorPort();
+  const goalEvaluator = new GoalEvaluator(evaluatorPort);
+  const transcriptPort = new SqliteTranscriptPort(db as unknown as import('better-sqlite3').Database);
+  const continueTurnPort = new ContinueTurnPortImpl({
+    handleRunStart,
+    db,
+    clients,
+    resolveLlmProfileId: (sessionId: string): string | null => {
+      const row = db
+        .prepare(
+          `SELECT ap.llm_profile_id
+           FROM sessions s
+           JOIN agent_profiles ap ON ap.id = s.agent_profile_id
+           WHERE s.id = ?`,
+        )
+        .get(sessionId) as { llm_profile_id: string | null } | undefined;
+      return row?.llm_profile_id ?? null;
+    },
+    resolveWorkingDirectory: (sessionId: string): string => {
+      const row = db
+        .prepare('SELECT working_directory, root_path FROM sessions s JOIN projects p ON p.id = s.project_id WHERE s.id = ?')
+        .get(sessionId) as { working_directory: string | null; root_path: string | null } | undefined;
+      return row?.working_directory ?? row?.root_path ?? process.cwd();
+    },
+  });
+  const goalCoordinator = new GoalCoordinator({
+    service: goalService,
+    evaluator: goalEvaluator,
+    transcript: transcriptPort,
+    continuer: continueTurnPort,
+    resolveLlmProfile: (sessionId: string): string => {
+      const row = db
+        .prepare(
+          `SELECT ap.llm_profile_id
+           FROM sessions s
+           JOIN agent_profiles ap ON ap.id = s.agent_profile_id
+           WHERE s.id = ?`,
+        )
+        .get(sessionId) as { llm_profile_id: string | null } | undefined;
+      return row?.llm_profile_id ?? '';
+    },
+  });
+
   return {
     supervisorService,
     notificationsService,
@@ -228,5 +280,6 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     permissionWorkflowResolver,
     metaWorkflowService,
     agentTaskExecutor,
+    goalCoordinator,
   };
 }

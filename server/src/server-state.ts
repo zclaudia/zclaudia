@@ -56,6 +56,7 @@ export class ServerState {
   branchAllocator: ClaudiaBranchService | undefined;
   metaWorkflowService: import('./domains/meta-workflow/service.js').MetaWorkflowService | undefined;
   agentTaskExecutor: TaskExecutor | undefined;
+  goalCoordinator: import('./domains/goals/coordinator.js').GoalCoordinator | undefined;
 
   // --- Broadcast wrappers ---
 
@@ -278,6 +279,7 @@ export class ServerState {
       permissionBridge: this.permissionBridge,
       permissionWorkflowResolver: this.permissionWorkflowResolver,
       agentTaskExecutor: this.agentTaskExecutor,
+      goalCoordinator: this.goalCoordinator,
       sessionSync: this.getSessionSync(),
       providerRegistry,
     };
