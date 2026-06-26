@@ -47,7 +47,9 @@ export class GoalRepository {
          VALUES (?, ?, ?, 'active', ?, 0, ?, 0, ?)`,
       )
       .run(id, input.sessionId, input.objective, input.tokenBudget, input.maxTurns, now);
-    return this.findById(id)!;
+    const created = this.findById(id);
+    if (!created) throw new Error(`Failed to create goal: ${id}`);
+    return created;
   }
 
   findById(id: string): Goal | null {
@@ -95,9 +97,18 @@ export class GoalRepository {
         params.push(input[key]);
       }
     }
-    if (fields.length === 0) return this.findById(id)!;
+    if (fields.length === 0) {
+      const goal = this.findById(id);
+      if (!goal) throw new Error(`Goal not found: ${id}`);
+      return goal;
+    }
     params.push(id);
-    this.db.prepare(`UPDATE session_goals SET ${fields.join(', ')} WHERE id = ?`).run(...params);
-    return this.findById(id)!;
+    const result = this.db
+      .prepare(`UPDATE session_goals SET ${fields.join(', ')} WHERE id = ?`)
+      .run(...params);
+    if (result.changes === 0) throw new Error(`Goal not found: ${id}`);
+    const updated = this.findById(id);
+    if (!updated) throw new Error(`Goal not found after update: ${id}`);
+    return updated;
   }
 }

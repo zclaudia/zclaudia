@@ -61,4 +61,8 @@ describe('GoalRepository', () => {
     expect(updated?.tokensUsed).toBe(250);
     expect(updated?.tokenBudget).toBe(1000);
   });
+
+  it('update throws when id does not exist', () => {
+    expect(() => repo.update('does-not-exist', { tokensUsed: 1 })).toThrowError(/not found/i);
+  });
 });
