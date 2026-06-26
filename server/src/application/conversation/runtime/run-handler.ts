@@ -32,7 +32,7 @@ export interface RunHandlerContext {
   permissionWorkflowResolver?: import('../../../domains/workflows/index.js').PermissionWorkflowResolver;
   agentTaskExecutor?: TaskExecutor;
   /** Optional goal coordinator — fired after a turn completes successfully. */
-  goalCoordinator?: { onTurnCompleted(sessionId: string): Promise<void> };
+  goalCoordinator?: { onTurnCompleted(sessionId: string, runTokensUsed: number): Promise<void> };
 }
 
 export async function handleRunStart(
@@ -222,9 +222,10 @@ export async function handleRunStart(
     // Errors are logged inside; a crash here must not break the run.
     if (ctx?.goalCoordinator) {
       const coord = ctx.goalCoordinator;
+      const runTokens = providerEventState.lastTurnTotalTokens ?? 0;
       queueMicrotask(() => {
         coord
-          .onTurnCompleted(message.sessionId)
+          .onTurnCompleted(message.sessionId, runTokens)
           .catch((err) => console.error('[goal] coordinator error', err));
       });
     }

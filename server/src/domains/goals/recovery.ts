@@ -1,7 +1,7 @@
 import type { GoalService } from './service.js';
 
 export interface CoordinatorLike {
-  onTurnCompleted(sessionId: string): Promise<void>;
+  onTurnCompleted(sessionId: string, runTokensUsed?: number): Promise<void>;
 }
 
 export async function recoverActiveGoals(svc: GoalService, coord: CoordinatorLike): Promise<void> {

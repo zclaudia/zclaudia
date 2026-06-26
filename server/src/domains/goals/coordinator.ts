@@ -25,9 +25,20 @@ export interface GoalCoordinatorDeps {
 export class GoalCoordinator {
   constructor(private readonly deps: GoalCoordinatorDeps) {}
 
-  async onTurnCompleted(sessionId: string): Promise<void> {
-    const goal = this.deps.service.getActive(sessionId);
+  async onTurnCompleted(sessionId: string, runTokensUsed = 0): Promise<void> {
+    let goal = this.deps.service.getActive(sessionId);
     if (!goal || goal.status !== 'active') return;
+
+    // Count the actual agent-turn tokens before gating so the budget reflects
+    // real work (evaluator + session), not just evaluator overhead.
+    if (runTokensUsed > 0) {
+      try {
+        goal = this.deps.service.addTokenUsage(goal.id, runTokensUsed);
+      } catch (err) {
+        console.warn(`[goal] run-token write skipped for ${goal.id}:`, err);
+        return;
+      }
+    }
 
     if (goal.tokensUsed >= goal.tokenBudget) {
       this.deps.service.markBudgetLimited(goal.id, 'token budget reached');

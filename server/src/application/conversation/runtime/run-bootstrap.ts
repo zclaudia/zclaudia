@@ -59,6 +59,8 @@ export interface RunSessionRecord {
 
 export interface RunProviderEventState {
   sdkSessionId?: string;
+  /** Sum of totalTokens across this run's turn-finished events; fed to the goal coordinator. */
+  lastTurnTotalTokens?: number;
 }
 
 interface InitializeRunBootstrapInput {

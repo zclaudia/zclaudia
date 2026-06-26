@@ -23,6 +23,8 @@ export interface ProviderEventState {
   sdkSessionId?: string;
   systemInfo?: SystemInfo;
   backgroundTaskKeys?: Set<string>;
+  /** Sum of totalTokens across this run's turn-finished events; fed to the goal coordinator. */
+  lastTurnTotalTokens?: number;
 }
 
 interface HandleProviderEventParams {

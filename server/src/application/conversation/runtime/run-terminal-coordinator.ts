@@ -31,6 +31,7 @@ import { maybeGenerateSessionTitle } from '../title/session-title-service.js';
 
 export interface TerminalProviderEventState {
   systemInfo?: SystemInfo;
+  lastTurnTotalTokens?: number;
 }
 
 export interface CompleteProviderTurnInput {
@@ -89,6 +90,10 @@ export function completeProviderTurn(input: CompleteProviderTurnInput): void {
     usage: msg.usage,
     indexMetadata: true,
   });
+
+  if (msg.usage) {
+    input.state.lastTurnTotalTokens = (input.state.lastTurnTotalTokens ?? 0) + msg.usage.totalTokens;
+  }
 
   finalizeRunInteractions({
     activeRun,
