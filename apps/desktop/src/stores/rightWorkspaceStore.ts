@@ -218,6 +218,7 @@ interface RightWorkspaceState {
   setRatio: (sessionId: string, groupId: string, ratio: number) => void;
   focusPane: (sessionId: string, paneId: string) => void;
   setActiveTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string) => void;
+  closeTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string) => void;
   resetSession: (sessionId: string) => void;
   removeSession: (sessionId: string) => void;
 }
@@ -368,6 +369,36 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             if (!pane || !pane.tools.some((t) => sameRef(t, toolId, instanceKey))) return ws;
             const replaced: PaneNode = { ...pane, activeToolId: toolId, activeInstanceKey: instanceKey };
             return { ...ws, root: replaceChild(ws.root!, paneId, replaced), focusedPaneId: paneId };
+          }),
+
+        closeTool: (sessionId, paneId, toolId, instanceKey) =>
+          update(sessionId, (ws) => {
+            if (!ws.root) return ws;
+            const pane = findPane(ws.root, paneId);
+            if (!pane) return ws;
+            const idx = pane.tools.findIndex((t) => sameRef(t, toolId, instanceKey));
+            if (idx < 0) return ws;
+            const nextTools = pane.tools.filter((_, i) => i !== idx);
+
+            // Last tab → collapse the pane (mirror closePane reassignment).
+            if (nextTools.length === 0) {
+              const next = removePane(ws.root, paneId);
+              if (next === ws.root) return ws;
+              const primaryPaneId = ws.primaryPaneId === paneId ? pickFirstPane(next) : ws.primaryPaneId;
+              const focusedPaneId = ws.focusedPaneId === paneId ? pickFirstPane(next) : ws.focusedPaneId;
+              return { root: next, primaryPaneId, focusedPaneId };
+            }
+
+            // Keep current active if it survived, else the neighbor at the closed index.
+            const wasActive = pane.activeToolId === toolId && pane.activeInstanceKey === instanceKey;
+            const activeRef = wasActive
+              ? nextTools[Math.min(idx, nextTools.length - 1)]
+              : nextTools.find((t) => t.toolId === pane.activeToolId && t.instanceKey === pane.activeInstanceKey) ?? nextTools[0];
+            const replaced: PaneNode = {
+              ...pane, tools: nextTools,
+              activeToolId: activeRef.toolId, activeInstanceKey: activeRef.instanceKey,
+            };
+            return { ...ws, root: replaceChild(ws.root, paneId, replaced), focusedPaneId: paneId };
           }),
 
         resetSession: (sessionId) => update(sessionId, () => ({ ...EMPTY })),

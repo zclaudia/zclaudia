@@ -303,6 +303,37 @@ describe('rightWorkspaceStore — tab actions', () => {
     useRightWorkspaceStore.getState().setActiveTool('A', 'P1', 'terminal');
     expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
   });
+
+  it('closeTool removes one tab and keeps the active tab', () => {
+    const pane = { id: 'P1', kind: 'pane' as const,
+      tools: [{ toolId: 'memory' }, { toolId: 'file-viewer' }, { toolId: 'session-changes' }],
+      activeToolId: 'session-changes' };
+    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    useRightWorkspaceStore.getState().closeTool('A', 'P1', 'file-viewer');
+    const p = useRightWorkspaceStore.getState().bySession.A.root as any;
+    expect(p.tools.map((t: any) => t.toolId)).toEqual(['memory', 'session-changes']);
+    expect(p.activeToolId).toBe('session-changes');
+  });
+
+  it('closeTool re-activates a neighbor when the active tab closes', () => {
+    const pane = { id: 'P1', kind: 'pane' as const,
+      tools: [{ toolId: 'memory' }, { toolId: 'file-viewer' }, { toolId: 'session-changes' }],
+      activeToolId: 'file-viewer' };
+    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    useRightWorkspaceStore.getState().closeTool('A', 'P1', 'file-viewer');
+    const p = useRightWorkspaceStore.getState().bySession.A.root as any;
+    expect(p.tools.map((t: any) => t.toolId)).toEqual(['memory', 'session-changes']);
+    expect(p.activeToolId).toBe('session-changes'); // neighbor at the closed index
+  });
+
+  it('closeTool collapses the pane when its last tab closes', () => {
+    const pane = { id: 'P1', kind: 'pane' as const, tools: [{ toolId: 'memory' }], activeToolId: 'memory' };
+    useRightWorkspaceStore.setState({ bySession: { A: { root: pane, primaryPaneId: 'P1', focusedPaneId: 'P1' } }, order: ['A'] });
+    useRightWorkspaceStore.getState().closeTool('A', 'P1', 'memory');
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    expect(ws.root).toBeNull();
+    expect(ws.focusedPaneId).toBeNull();
+  });
 });
 
 // test helpers
