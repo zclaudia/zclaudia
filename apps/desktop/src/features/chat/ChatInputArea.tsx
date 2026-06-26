@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, Plus } from 'lucide-react';
 import { useGoalStore } from '../../stores/goalStore';
-import { GoalChip } from '../../components/GoalChip';
+import { GoalPinnedBar } from '../../components/GoalPinnedBar';
 import { GoalDialog } from '../../components/GoalDialog';
 import { getGoal, pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
 import { activateGoal } from '../../services/goalActions';
@@ -179,6 +179,13 @@ export function ChatInputArea({
 
   const goal = goalSlot?.goal ?? null;
 
+  // The goal dialog is edit-only now (opened from the pinned bar). If the goal
+  // disappears (e.g. cleared via a WS event) while it's open, close it so we
+  // never show a stale blank form.
+  useEffect(() => {
+    if (!goal) setGoalDialogOpen(false);
+  }, [goal]);
+
   const handleGoalSubmit = useCallback(
     async (args: { objective: string; tokenBudget: number; maxTurns: number }) => {
       if (!sessionId) return;
@@ -313,14 +320,19 @@ export function ChatInputArea({
       {/* Centered column matching the message reading column (ChatMessagePane) so
           the composer aligns with the chat content instead of stretching edge-to-edge. */}
       <div className="mx-auto w-full max-w-3xl">
-      {/* Goal chip row — visible on all breakpoints */}
-      <div className="mb-1.5 flex items-center gap-1">
-        <GoalChip
-          goal={goal}
-          onOpen={() => setGoalDialogOpen(true)}
-          onPauseResume={handleGoalPauseResume}
-        />
-      </div>
+      {/* Pinned goal bar — only present when a goal exists */}
+      {goal && (
+        <div className="mb-1.5">
+          <GoalPinnedBar
+            goal={goal}
+            tokensUsed={goalSlot?.budgetTokensUsed ?? goal.tokensUsed}
+            turnsUsed={goalSlot?.budgetTurnsUsed ?? goal.turnsUsed}
+            onOpen={() => setGoalDialogOpen(true)}
+            onPauseResume={handleGoalPauseResume}
+            onClear={handleGoalClear}
+          />
+        </div>
+      )}
       <GoalDialog
         goal={goal}
         open={goalDialogOpen}
