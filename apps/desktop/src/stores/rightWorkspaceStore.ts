@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { MULTI_INSTANCE_PANELS } from './panelInstance';
 
 export type SplitDir = 'row' | 'col';
 
@@ -220,6 +221,7 @@ interface RightWorkspaceState {
   setActiveTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string) => void;
   closeTool: (sessionId: string, paneId: string, toolId: string, instanceKey?: string) => void;
   reorderTab: (sessionId: string, paneId: string, fromIndex: number, toIndex: number) => void;
+  moveTab: (sessionId: string, fromPaneId: string, toPaneId: string, toolId: string, instanceKey: string | undefined, toIndex?: number) => void;
   resetSession: (sessionId: string) => void;
   removeSession: (sessionId: string) => void;
 }
@@ -391,6 +393,47 @@ export const useRightWorkspaceStore = create<RightWorkspaceState>()(
             const [moved] = tools.splice(fromIndex, 1);
             tools.splice(toIndex, 0, moved);
             return { ...ws, root: replaceChild(ws.root!, paneId, { ...pane, tools }) };
+          }),
+
+        moveTab: (sessionId, fromPaneId, toPaneId, toolId, instanceKey, toIndex) =>
+          update(sessionId, (ws) => {
+            if (!ws.root || fromPaneId === toPaneId) return ws;
+            const fromPane = findPane(ws.root, fromPaneId);
+            const toPane = findPane(ws.root, toPaneId);
+            if (!fromPane || !toPane) return ws;
+            const idx = fromPane.tools.findIndex((t) => sameRef(t, toolId, instanceKey));
+            if (idx < 0) return ws;
+
+            // Destination already has this tool (singleton: any instance; multi: same instanceKey) → no-op.
+            const singleton = !MULTI_INSTANCE_PANELS.has(toolId);
+            const dup = toPane.tools.some((t) => t.toolId === toolId && (singleton || t.instanceKey === instanceKey));
+            if (dup) return ws;
+
+            const ref = fromPane.tools[idx];
+
+            // 1) Insert into destination at toIndex (default end) and make it active.
+            const insertAt = toIndex === undefined ? toPane.tools.length : Math.max(0, Math.min(toIndex, toPane.tools.length));
+            const toTools = [...toPane.tools];
+            toTools.splice(insertAt, 0, ref);
+            const newTo: PaneNode = { ...toPane, tools: toTools, activeToolId: ref.toolId, activeInstanceKey: ref.instanceKey };
+            let root = replaceChild(ws.root, toPaneId, newTo);
+
+            // 2) Remove from source; collapse if emptied.
+            const fromTools = fromPane.tools.filter((_, i) => i !== idx);
+            let primaryPaneId = ws.primaryPaneId;
+            if (fromTools.length === 0) {
+              const collapsed = removePane(root, fromPaneId);
+              root = collapsed ?? root;
+              if (primaryPaneId === fromPaneId) primaryPaneId = pickFirstPane(root);
+            } else {
+              const wasActive = fromPane.activeToolId === toolId && fromPane.activeInstanceKey === instanceKey;
+              const activeRef = wasActive ? fromTools[Math.min(idx, fromTools.length - 1)]
+                : fromTools.find((t) => t.toolId === fromPane.activeToolId && t.instanceKey === fromPane.activeInstanceKey) ?? fromTools[0];
+              const newFrom: PaneNode = { ...fromPane, tools: fromTools, activeToolId: activeRef.toolId, activeInstanceKey: activeRef.instanceKey };
+              root = replaceChild(root, fromPaneId, newFrom);
+            }
+
+            return { ...ws, root, primaryPaneId, focusedPaneId: toPaneId };
           }),
 
         resetSession: (sessionId) => update(sessionId, () => ({ ...EMPTY })),

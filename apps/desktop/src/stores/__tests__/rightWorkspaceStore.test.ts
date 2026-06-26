@@ -350,6 +350,33 @@ describe('rightWorkspaceStore — tab actions', () => {
     s.reorderTab('A', (before as any).id, 0, 5);
     expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
   });
+
+  it('moveTab moves a tab between panes and auto-collapses an emptied source', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory');
+    s.openTool('A', 'file-viewer'); // pane P1: [memory, file-viewer]
+    const p1 = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.splitPane('A', p1, 'row', 'session-changes'); // P2 holds [session-changes]
+    if (!res.ok) throw new Error('split failed');
+    const p2 = res.newPaneId;
+    s.moveTab('A', p2, p1, 'session-changes', undefined); // move the only tab of P2 → P1
+    const ws = useRightWorkspaceStore.getState().bySession.A;
+    expect(ws.root!.kind).toBe('pane'); // P2 emptied → group collapsed to P1
+    expect((ws.root as any).tools.map((t: any) => t.toolId)).toEqual(['memory', 'file-viewer', 'session-changes']);
+    expect((ws.root as any).activeToolId).toBe('session-changes');
+    expect(ws.focusedPaneId).toBe(p1);
+  });
+
+  it('moveTab is a no-op when the destination already holds the singleton', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory');
+    const p1 = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    const res = s.splitPane('A', p1, 'row', 'file-viewer');
+    if (!res.ok) throw new Error('split failed');
+    const before = useRightWorkspaceStore.getState().bySession.A.root;
+    s.moveTab('A', res.newPaneId, p1, 'memory', undefined); // memory already in P1
+    expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
+  });
 });
 
 // test helpers
