@@ -38,6 +38,7 @@ export default defineConfig({
       'src/services/__tests__/messageHandler.test.ts',
       'src/services/__tests__/sessionSync.test.ts',
       'src/services/__tests__/toolRendererRegistry.test.ts',
+      'src/services/__tests__/goalActions.test.ts',
       'src/services/api/__tests__/**/*.test.ts',
       'src/services/message-handlers/**/*.test.ts',
       'src/services/terminal/**/*.test.ts',

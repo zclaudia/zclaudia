@@ -3,7 +3,8 @@ import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon
 import { useGoalStore } from '../../stores/goalStore';
 import { GoalChip } from '../../components/GoalChip';
 import { GoalDialog } from '../../components/GoalDialog';
-import { getGoal, setGoal, pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
+import { getGoal, pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
+import { activateGoal } from '../../services/goalActions';
 import { ModeSelector } from './ModeSelector';
 import { PermissionSelector } from './PermissionSelector';
 import { WorktreeSelector } from './WorktreeSelector';
@@ -182,22 +183,13 @@ export function ChatInputArea({
     async (args: { objective: string; tokenBudget: number; maxTurns: number }) => {
       if (!sessionId) return;
       try {
-        const current = goal;
-        if (current && (current.status === 'active' || current.status === 'paused')) {
-          await clearGoal(sessionId);
-          // Goal slot will reach 'aborted' via the WS state-changed event,
-          // but we need to wait for the server lock to release before setGoal —
-          // a sequential await on clearGoal is sufficient since the REST call
-          // returns only after the DB row is updated to status='aborted'.
-        }
-        const next = await setGoal(sessionId, args);
-        setStoreGoal(sessionId, next);
+        await activateGoal(sessionId, args);
         setGoalDialogOpen(false);
       } catch (err) {
         console.error('[goal] set failed', err);
       }
     },
-    [sessionId, goal, setStoreGoal],
+    [sessionId],
   );
 
   const handleGoalPauseResume = useCallback(async () => {
