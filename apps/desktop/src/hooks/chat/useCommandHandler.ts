@@ -4,8 +4,11 @@ import { useLlmProfileMetaStore } from '../../stores/llmProfileMetaStore';
 import { useSupervisionStore } from '../../stores/supervisionStore';
 import { useRunStore } from '../../stores/runStore';
 import { useSessionConfigStore } from '../../stores/sessionConfigStore';
+import { useGoalStore } from '../../stores/goalStore';
 import { activatePanel } from '../../utils/openPanel';
 import * as api from '../../services/api';
+import { activateGoal } from '../../services/goalActions';
+import { pauseGoal, resumeGoal, clearGoal } from '../../services/api/goals';
 import type { CommandExecuteResponse, SlashCommand, Session, Project, MessageRole, MessageMetadata } from '@zclaudia/shared';
 
 interface UseCommandHandlerParams {
@@ -565,6 +568,62 @@ export function useCommandHandler({
           sessionId,
           role: 'system',
           content: `Failed to create worktree: ${(err as Error).message}`,
+          createdAt: Date.now(),
+        });
+      }
+      setTimeout(() => scrollToBottom(), 100);
+      return;
+    }
+
+    // Handle /goal locally — set / inspect / control an autonomous goal.
+    if (command === '/goal') {
+      const objective = args.trim();
+      const sub = objective.toLowerCase();
+      const store = useGoalStore.getState();
+      const current = store.bySession[sessionId]?.goal ?? null;
+      const live = !!current && (current.status === 'active' || current.status === 'paused');
+
+      if (!objective) {
+        addMessage(sessionId, {
+          id: crypto.randomUUID(), sessionId, role: 'system',
+          content: 'Usage: /goal <objective> — set an autonomous goal. Control it with `/goal pause`, `/goal resume`, or `/goal clear`.',
+          createdAt: Date.now(),
+        });
+        setTimeout(() => scrollToBottom(), 100);
+        return;
+      }
+
+      if (live && (sub === 'pause' || sub === 'resume' || sub === 'clear')) {
+        try {
+          if (sub === 'clear') {
+            await clearGoal(sessionId);
+            store.setGoal(sessionId, null);
+          } else {
+            const next = sub === 'pause' ? await pauseGoal(sessionId) : await resumeGoal(sessionId);
+            store.setGoal(sessionId, next);
+          }
+          addMessage(sessionId, {
+            id: crypto.randomUUID(), sessionId, role: 'system',
+            content: sub === 'pause' ? 'Goal paused.' : sub === 'resume' ? 'Goal resumed.' : 'Goal cleared.',
+            createdAt: Date.now(),
+          });
+        } catch (err) {
+          addMessage(sessionId, {
+            id: crypto.randomUUID(), sessionId, role: 'system',
+            content: `Failed to ${sub} goal: ${(err as Error).message}`,
+            createdAt: Date.now(),
+          });
+        }
+        setTimeout(() => scrollToBottom(), 100);
+        return;
+      }
+
+      try {
+        await activateGoal(sessionId, { objective });
+      } catch (err) {
+        addMessage(sessionId, {
+          id: crypto.randomUUID(), sessionId, role: 'system',
+          content: `Failed to set goal: ${(err as Error).message}`,
           createdAt: Date.now(),
         });
       }

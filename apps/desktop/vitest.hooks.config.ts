@@ -38,6 +38,7 @@ export default defineConfig({
       'src/hooks/__tests__/useAgentForSession.test.ts',
       'src/hooks/chat/__tests__/useProviderCapabilities.test.ts',
       'src/hooks/chat/__tests__/useMobileViewport.test.tsx',
+      'src/hooks/chat/__tests__/useCommandHandler.goal.test.ts',
     ],
     exclude: [
       '**/node_modules/**',

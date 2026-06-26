@@ -116,6 +116,11 @@ export function useProviderCapabilities({ sessionId, isConnected }: UseProviderC
         description: 'Alias of /new-cli-session',
         source: 'local',
       },
+      {
+        command: '/goal',
+        description: 'Set an autonomous goal — /goal <objective>',
+        source: 'local',
+      },
     ];
 
     const seen = new Set(base.map((c) => c.command));
