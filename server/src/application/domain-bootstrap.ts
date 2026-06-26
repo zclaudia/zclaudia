@@ -40,9 +40,12 @@ import type { TaskExecutor } from '../domains/tasks/executors/types.js';
 import { ensureSandboxInitialized } from '../infra/providers/pi-runtime/sandbox.js';
 import { EvalTaskRuntime } from '../infra/providers/pi-runtime/eval-task-runtime.js';
 import { GoalRepository, GoalService, GoalEvaluator, GoalCoordinator } from '../domains/goals/index.js';
+import type { GoalEventPublisher } from '../domains/goals/types.js';
+import { createGoalRoutes } from '../domains/goals/routes.js';
 import { AnthropicEvaluatorPort } from '../domains/goals/ports/anthropic-evaluator-port.js';
 import { SqliteTranscriptPort } from '../domains/goals/ports/sqlite-transcript-port.js';
 import { ContinueTurnPortImpl } from '../domains/goals/ports/continue-turn-port.js';
+import type { GoalStateChangedMessage, GoalEvaluatorVerdictMessage, GoalBudgetUpdateMessage } from '@zclaudia/shared';
 
 export interface BootstrapDeps {
   db: ReturnType<typeof initDatabase>;
@@ -68,6 +71,7 @@ export interface BootstrapResult {
   metaWorkflowService: import('../domains/meta-workflow/service.js').MetaWorkflowService;
   agentTaskExecutor: TaskExecutor;
   goalCoordinator: GoalCoordinator;
+  goalService: GoalService;
 }
 
 export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
@@ -226,9 +230,58 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
   void ensureSandboxInitialized().catch((err) => console.warn('[sandbox] startup init failed:', err));
 
   // ── Goals domain wiring ──
-  // Event publisher is a stub for now — Task 7 wires real WebSocket events.
   const goalRepo = new GoalRepository(db as unknown as import('better-sqlite3').Database);
-  const goalService = new GoalService(goalRepo, { publish: () => {} });
+
+  // Real WebSocket event publisher — translates internal goal events to wire
+  // messages and broadcasts to all authenticated clients.
+  const goalEventPublisher: GoalEventPublisher = {
+    publish: (event) => {
+      if (event.type === 'goal:state-changed') {
+        const wire: GoalStateChangedMessage = {
+          type: 'goal:state-changed',
+          sessionId: event.goal.sessionId,
+          goal: event.goal,
+        };
+        clients.forEach((client) => {
+          if (client.authenticated) sendMessage(client.ws, wire);
+        });
+      } else if (event.type === 'goal:evaluator-verdict') {
+        const goal = goalRepo.findById(event.goalId);
+        if (!goal) return;
+        const wire: GoalEvaluatorVerdictMessage = {
+          type: 'goal:evaluator-verdict',
+          sessionId: goal.sessionId,
+          goalId: event.goalId,
+          kind: event.kind,
+          reason: event.reason,
+        };
+        clients.forEach((client) => {
+          if (client.authenticated) sendMessage(client.ws, wire);
+        });
+      } else if (event.type === 'goal:budget-update') {
+        const goal = goalRepo.findById(event.goalId);
+        if (!goal) return;
+        const wire: GoalBudgetUpdateMessage = {
+          type: 'goal:budget-update',
+          sessionId: goal.sessionId,
+          goalId: event.goalId,
+          tokensUsed: event.tokensUsed,
+          turnsUsed: event.turnsUsed,
+        };
+        clients.forEach((client) => {
+          if (client.authenticated) sendMessage(client.ws, wire);
+        });
+      }
+    },
+  };
+
+  const goalService = new GoalService(goalRepo, goalEventPublisher);
+
+  // Mount goal REST routes under the sessions namespace.
+  // Mounted after registerFeatureDomains; Express will fall through to this
+  // handler when the session router has no match for /:id/goal sub-paths.
+  app.use('/api/sessions/:id/goal', authMiddleware, createGoalRoutes(goalService));
+
   const evaluatorPort = new AnthropicEvaluatorPort();
   const goalEvaluator = new GoalEvaluator(evaluatorPort);
   const transcriptPort = new SqliteTranscriptPort(db as unknown as import('better-sqlite3').Database);
@@ -274,5 +327,6 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
     metaWorkflowService,
     agentTaskExecutor,
     goalCoordinator,
+    goalService,
   };
 }

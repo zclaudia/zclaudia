@@ -13,6 +13,7 @@ export * from './notification-feed.js';
 export * from './plugins.js';
 export * from './meta-workflow.js';
 export * from './openspec.js';
+export * from './goal.js';
 
 // Re-import interaction types needed for the ServerMessage union
 import type { InteractionPromptMessage, TodoUpdateInteractionMessage, ApprovalInteractionMessage, PlanReviewInteractionMessage, InteractionResolvedMessage, InteractionResponseMessage } from '../../interaction/forms.js';
@@ -209,6 +210,7 @@ import type {
   OpenSpecSpecChangeStatusChangedMessage,
   BootstrapEventMessage,
 } from './openspec.js';
+import type { GoalServerMessage } from './goal.js';
 
 export type ServerMessage =
   | AuthResultMessage
@@ -321,4 +323,6 @@ export type ServerMessage =
   // Meta Workflow
   | MetaWorkflowRunUpdateMessage
   | MetaWorkflowPhaseUpdateMessage
-  | MetaWorkflowImpactRecommendationMessage;
+  | MetaWorkflowImpactRecommendationMessage
+  // Goal tracking
+  | GoalServerMessage;
