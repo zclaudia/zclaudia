@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect } from 'react';
+import { Fragment, useState, useRef, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import { useRightWorkspaceStore, type PaneNode, type ToolRef } from '../../stores/rightWorkspaceStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
 import { closeTabInWorkspace } from '../../utils/workspaceActions';
 import { ToolLauncherMenu } from './ToolLauncherMenu';
+import { useDragSplitStore } from './dragSplit';
+import { MULTI_INSTANCE_PANELS } from '../../stores/panelInstance';
 
 interface PaneTabsProps {
   sessionId: string;
@@ -15,6 +17,8 @@ interface PaneTabsProps {
 
 export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps) {
   const panels = usePluginStore((s) => s.panels);
+  const hoverTabPaneId = useDragSplitStore((s) => s.hoverTabPaneId);
+  const hoverTabIndex = useDragSplitStore((s) => s.hoverTabIndex);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
 
@@ -47,28 +51,46 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
         const isActive = ref.toolId === pane.activeToolId && ref.instanceKey === pane.activeInstanceKey;
         const label = panel?.label ?? ref.toolId;
         return (
-          <div
-            key={`${ref.toolId}:${ref.instanceKey ?? ''}`}
-            data-tab-index={index}
-            data-active={isActive ? 'true' : 'false'}
-            onClick={() => onActivate(ref)}
-            className={`group flex items-center gap-1.5 px-2 my-1 rounded-md cursor-pointer max-w-[140px] ${
-              isActive ? 'bg-card text-foreground ring-1 ring-inset ring-border' : 'text-muted-foreground hover:bg-secondary'
-            }`}
-            title={label}
-          >
-            <Icon className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
-            <span className="text-xs truncate">{label}</span>
-            <button
-              aria-label={`Close ${label}`}
-              onClick={(e) => onClose(e, ref)}
-              className="ml-0.5 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background hover:text-foreground flex-shrink-0"
+          <Fragment key={`${ref.toolId}:${ref.instanceKey ?? ''}`}>
+            {hoverTabPaneId === pane.id && hoverTabIndex === index && (
+              <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
+            )}
+            <div
+              data-tab-index={index}
+              data-active={isActive ? 'true' : 'false'}
+              onClick={() => onActivate(ref)}
+              onPointerDown={(e) => {
+                if (e.pointerType === 'mouse' && (e.buttons & 1) === 0) return;
+                useDragSplitStore.getState().startDrag({
+                  toolId: ref.toolId,
+                  instanceKey: ref.instanceKey,
+                  multiInstance: MULTI_INSTANCE_PANELS.has(ref.toolId),
+                  sourcePaneId: pane.id,
+                  sourceIndex: index,
+                });
+              }}
+              className={`group flex items-center gap-1.5 px-2 my-1 rounded-md cursor-pointer max-w-[140px] ${
+                isActive ? 'bg-card text-foreground ring-1 ring-inset ring-border' : 'text-muted-foreground hover:bg-secondary'
+              }`}
+              title={label}
             >
-              <X className="w-3 h-3" />
-            </button>
-          </div>
+              <Icon className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
+              <span className="text-xs truncate">{label}</span>
+              <button
+                aria-label={`Close ${label}`}
+                onClick={(e) => onClose(e, ref)}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="ml-0.5 rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-background hover:text-foreground flex-shrink-0"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          </Fragment>
         );
       })}
+      {hoverTabPaneId === pane.id && hoverTabIndex === pane.tools.length && (
+        <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
+      )}
 
       <div className="relative flex items-center" ref={launcherRef}>
         <button

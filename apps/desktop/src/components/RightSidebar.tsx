@@ -6,7 +6,7 @@ import { useIsMobile } from '../hooks/useMediaQuery';
 import { WorkspaceView } from './workspace/WorkspaceView';
 import { RightSidebarEmptyState } from './RightSidebarEmptyState';
 import { ToolLauncherMenu } from './workspace/ToolLauncherMenu';
-import { useDragSplitStore, resolvePointerToPane, dropZoneToDir, canDrop } from './workspace/dragSplit';
+import { useDragSplitStore, resolvePointerToPane, resolveTabDrop, dropZoneToDir } from './workspace/dragSplit';
 
 interface RightSidebarProps {
   sessionId: string;
@@ -58,6 +58,13 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
   const onContentPointerMove = useCallback((e: React.PointerEvent) => {
     const { active } = useDragSplitStore.getState();
     if (!active) return;
+    const tab = resolveTabDrop(contentRef.current, e.clientX, e.clientY);
+    if (tab) {
+      useDragSplitStore.getState().setTabHover(tab.paneId, tab.index);
+      useDragSplitStore.getState().setHover(null, null, new Set());
+      return;
+    }
+    useDragSplitStore.getState().setTabHover(null, null);
     const root = useRightWorkspaceStore.getState().bySession[sessionId]?.root ?? null;
     const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
     useDragSplitStore.getState().setHover(hit?.paneId ?? null, hit?.zone ?? null, hit?.disabled ?? new Set());
@@ -67,19 +74,36 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
     const store = useRightWorkspaceStore.getState();
     const { active } = useDragSplitStore.getState();
     if (!active) return;
+
+    // 1) Drop over a tab strip → reorder (same pane) or move (different pane).
+    const tab = resolveTabDrop(contentRef.current, e.clientX, e.clientY);
+    if (tab) {
+      if (active.sourcePaneId === tab.paneId && active.sourceIndex !== undefined) {
+        const to = tab.index > active.sourceIndex ? tab.index - 1 : tab.index;
+        store.reorderTab(sessionId, tab.paneId, active.sourceIndex, to);
+      } else if (active.sourcePaneId) {
+        store.moveTab(sessionId, active.sourcePaneId, tab.paneId, active.toolId, active.instanceKey, tab.index);
+      }
+      useDragSplitStore.getState().endDrag();
+      return;
+    }
+
+    // 2) Drop over a pane edge/center.
     const root = store.bySession[sessionId]?.root ?? null;
     const hit = resolvePointerToPane(contentRef.current, root, e.clientX, e.clientY, active);
-    if (hit) {
+    if (hit && active.sourcePaneId) {
       const split = dropZoneToDir(hit.zone);
       if (split) {
-        if (canDrop(root, hit.paneId, hit.zone, active).allowed) {
-          store.splitPane(sessionId, hit.paneId, split.dir, active.toolId, active.instanceKey, active.multiInstance, split.insertFirst);
+        if (hit.paneId === active.sourcePaneId) {
+          store.splitTabOut(sessionId, active.sourcePaneId, active.toolId, active.instanceKey, split.dir, split.insertFirst);
         } else {
-          const existing = findPaneWithTool(root, active.toolId, active.instanceKey, !active.multiInstance);
-          if (existing) store.focusPane(sessionId, existing);
+          store.moveTab(sessionId, active.sourcePaneId, hit.paneId, active.toolId, active.instanceKey);
+          const after = useRightWorkspaceStore.getState().bySession[sessionId]?.root ?? null;
+          const destPaneId = findPaneWithTool(after, active.toolId, active.instanceKey, !active.multiInstance);
+          if (destPaneId) store.splitTabOut(sessionId, destPaneId, active.toolId, active.instanceKey, split.dir, split.insertFirst);
         }
       } else {
-        store.replaceTool(sessionId, hit.paneId, active.toolId, active.instanceKey, active.multiInstance);
+        store.moveTab(sessionId, active.sourcePaneId, hit.paneId, active.toolId, active.instanceKey);
       }
     }
     useDragSplitStore.getState().endDrag();
