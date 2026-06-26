@@ -1,21 +1,8 @@
 import { GOAL_DEFAULTS } from '@zclaudia/shared';
-import type { Goal, GoalStatus } from './types.js';
+import type { Goal, GoalStatus, SetGoalInput, EvaluatorVerdictKind, GoalEventPublisher } from './types.js';
 import { GoalRepository } from './repository.js';
 
 const TERMINAL_STATUSES: GoalStatus[] = ['completed', 'budget-limited', 'aborted'];
-
-export interface GoalEventPublisher {
-  publish(event:
-    | { type: 'goal:state-changed'; goal: Goal }
-    | { type: 'goal:evaluator-verdict'; goalId: string; kind: 'done' | 'continue' | 'blocked' | 'error'; reason: string }
-    | { type: 'goal:budget-update'; goalId: string; tokensUsed: number; turnsUsed: number }): void;
-}
-
-export interface SetGoalArgs {
-  objective: string;
-  tokenBudget?: number;
-  maxTurns?: number;
-}
 
 export class GoalService {
   constructor(
@@ -31,7 +18,7 @@ export class GoalService {
     return this.repo.findActive(sessionId);
   }
 
-  setGoal(sessionId: string, args: SetGoalArgs): Goal {
+  setGoal(sessionId: string, args: SetGoalInput): Goal {
     if (this.repo.findActive(sessionId)) {
       throw new Error('session already has an active goal — clear it first');
     }
@@ -82,6 +69,7 @@ export class GoalService {
   }
 
   markCompleted(id: string, reason: string): Goal {
+    this.requireNonTerminal(id);
     const updated = this.repo.update(id, {
       status: 'completed',
       endedAt: Date.now(),
@@ -93,6 +81,7 @@ export class GoalService {
   }
 
   markBudgetLimited(id: string, reason: string): Goal {
+    this.requireNonTerminal(id);
     const updated = this.repo.update(id, {
       status: 'budget-limited',
       endedAt: Date.now(),
@@ -102,7 +91,8 @@ export class GoalService {
     return updated;
   }
 
-  recordVerdict(id: string, kind: 'done' | 'continue' | 'blocked' | 'error', reason: string): void {
+  recordVerdict(id: string, kind: EvaluatorVerdictKind, reason: string): void {
+    this.requireNonTerminal(id);
     if (kind !== 'error') {
       this.repo.update(id, { lastVerdictReason: reason });
     }
