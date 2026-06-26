@@ -124,7 +124,11 @@ const mockPluginStore = {
   registerPanel: vi.fn(),
   clearPluginExtensions: vi.fn(),
   updatePanelVisibility: vi.fn(),
+  panels: [] as Array<{ id: string; openMode?: string }>,
 };
+
+const mockOpenToolInWorkspace = vi.fn();
+const mockCloseToolInWorkspace = vi.fn();
 
 const mockFilePushStore = {
   addItem: vi.fn(),
@@ -188,6 +192,10 @@ vi.mock('../../stores/pluginStore', () => ({
   usePluginStore: { getState: () => mockPluginStore },
   getEffectivePlacement: (...args: any[]) => mockGetEffectivePlacement(...args),
 }));
+vi.mock('../../utils/workspaceActions', () => ({
+  openToolInWorkspace: (...args: any[]) => mockOpenToolInWorkspace(...args),
+  closeToolInWorkspace: (...args: any[]) => mockCloseToolInWorkspace(...args),
+}));
 vi.mock('../../stores/filePushStore', () => ({
   useFilePushStore: { getState: () => mockFilePushStore },
 }));
@@ -241,6 +249,7 @@ describe('handleServerMessage', () => {
     mockBackgroundTaskStore.tasks = {};
     mockProjectStore.selectedSessionId = 'current-session';
     mockProjectStore.sessions = [];
+    mockPluginStore.panels = [];
     mockServerStore.activeServerId = 'server-1';
     mockPermissionStore.aiReviewResults = {};
     mockRightSidebarStore.activeTab = null;
@@ -1407,8 +1416,11 @@ describe('handleServerMessage', () => {
 
     it('routes plugin_show_panel to the right sidebar when placed right', () => {
       mockGetEffectivePlacement.mockReturnValueOnce('right');
+      mockPluginStore.panels = [{ id: 'pan1', openMode: 'shared' }];
+      mockProjectStore.selectedSessionId = 'current-session';
+      mockProjectStore.sessions = [{ id: 'current-session', projectId: 'p1' }];
       handleServerMessage({ type: 'plugin_show_panel', panelId: 'pan1' }, makeCtx());
-      expect(mockRightSidebarStore.setActiveTab).toHaveBeenCalledWith('pan1');
+      expect(mockOpenToolInWorkspace).toHaveBeenCalledWith('current-session', 'pan1', expect.any(Object));
       expect(mockBottomPanelStore.setActiveTab).not.toHaveBeenCalledWith('pan1');
     });
 

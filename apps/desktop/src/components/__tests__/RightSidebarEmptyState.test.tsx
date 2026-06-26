@@ -1,71 +1,100 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { usePluginStore } from '../../stores/pluginStore';
 
-const toolsMock = vi.fn();
 const gitStateMock = vi.fn();
-const sessionIdMock = vi.fn();
 const changesMock = vi.fn();
 
-vi.mock('../../stores/sessionToolsStore', () => ({
-  useSessionToolsStore: (selector: any) => selector({ tools: toolsMock() }),
-}));
 vi.mock('../../features/git/store', () => ({
   useGitStore: (selector: any) => selector(gitStateMock()),
-}));
-vi.mock('../../stores/selectionStore', () => ({
-  useSelectionStore: (selector: any) => selector({ selectedSessionId: sessionIdMock() }),
 }));
 vi.mock('../changes/useSessionChanges', () => ({
   useChangesData: () => ({ result: { modified: changesMock(), affected: [], turns: [] } }),
 }));
+vi.mock('../../stores/serverStore', () => ({
+  useServerStore: (selector: any) => selector({ activeServerId: 'local' }),
+}));
+vi.mock('../../utils/workspaceActions', () => ({
+  openToolInWorkspace: vi.fn(),
+}));
 
 import { RightSidebarEmptyState } from '../RightSidebarEmptyState';
-
-const onTerminal = vi.fn();
-const onChanges = vi.fn();
-
-function tool(iconKey: string, over: Partial<any> = {}) {
-  return {
-    id: iconKey === 'changes' ? 'session-changes' : iconKey,
-    label: iconKey,
-    iconKey,
-    isActive: false,
-    onClick: vi.fn(),
-    ...over,
-  };
-}
+import { openToolInWorkspace } from '../../utils/workspaceActions';
 
 beforeEach(() => {
   cleanup();
-  onTerminal.mockClear();
-  onChanges.mockClear();
-  toolsMock.mockReturnValue([
-    tool('terminal', { label: 'Terminal', onClick: onTerminal }),
-    tool('changes', { label: 'Changes', onClick: onChanges }),
-    tool('file', { label: 'File' }),
-  ]);
   gitStateMock.mockReturnValue({ worktrees: {}, selectedWorktree: {} });
-  sessionIdMock.mockReturnValue('s1');
   changesMock.mockReturnValue([]);
+
+  // Reset plugin store and register the 5 known tile panels.
+  usePluginStore.setState({ panels: [], disabledBuiltinPanels: [], panelPlacements: {} });
+  usePluginStore.getState().registerPanel({
+    id: 'terminal',
+    pluginId: 'com.zclaudia.builtin',
+    type: 'panel',
+    label: 'Terminal',
+    order: 0,
+    platforms: ['desktop'],
+  });
+  usePluginStore.getState().registerPanel({
+    id: 'session-changes',
+    pluginId: 'com.zclaudia.builtin',
+    type: 'panel',
+    label: 'Changes',
+    order: 1,
+    platforms: ['desktop'],
+  });
+  usePluginStore.getState().registerPanel({
+    id: 'file-viewer',
+    pluginId: 'com.zclaudia.builtin',
+    type: 'panel',
+    label: 'File',
+    order: 2,
+    platforms: ['desktop'],
+  });
+  usePluginStore.getState().registerPanel({
+    id: 'draft',
+    pluginId: 'com.zclaudia.builtin',
+    type: 'panel',
+    label: 'Draft',
+    order: 3,
+    platforms: ['desktop'],
+  });
+  usePluginStore.getState().registerPanel({
+    id: 'lineage',
+    pluginId: 'com.zclaudia.builtin',
+    type: 'panel',
+    label: 'Lineage',
+    order: 4,
+    platforms: ['desktop'],
+  });
 });
 
 function renderEmpty() {
-  return render(<RightSidebarEmptyState projectId="p1" projectRoot="/repo" />);
+  return render(<RightSidebarEmptyState sessionId="s1" projectId="p1" projectRoot="/repo" />);
 }
 
 describe('RightSidebarEmptyState', () => {
-  it('renders one tile per pinned tool with its label', () => {
+  it('renders one tile per registered panel with its label', () => {
     renderEmpty();
     expect(screen.getByText('Terminal')).toBeInTheDocument();
     expect(screen.getByText('Changes')).toBeInTheDocument();
     expect(screen.getByText('File')).toBeInTheDocument();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+    expect(screen.getByText('Lineage')).toBeInTheDocument();
   });
 
-  it('invokes a tool onClick when its tile is clicked', () => {
+  it('calls openToolInWorkspace when a tile is clicked', () => {
     renderEmpty();
     fireEvent.click(screen.getByText('Terminal'));
-    expect(onTerminal).toHaveBeenCalledTimes(1);
+    expect(openToolInWorkspace).toHaveBeenCalledWith('s1', 'terminal', expect.objectContaining({ projectId: 'p1' }));
+  });
+
+  it('calls openToolInWorkspace with the correct toolId for changes tile', () => {
+    renderEmpty();
+    fireEvent.click(screen.getByText('Changes'));
+    expect(openToolInWorkspace).toHaveBeenCalledWith('s1', 'session-changes', expect.objectContaining({ projectId: 'p1' }));
   });
 
   it('shows the branch when git data is present', () => {
@@ -104,6 +133,26 @@ describe('RightSidebarEmptyState', () => {
   it('keeps declared order when there are no changes', () => {
     renderEmpty();
     const labels = screen.getAllByTestId('empty-tile-label').map((n) => n.textContent);
-    expect(labels).toEqual(['Terminal', 'Changes', 'File']);
+    // Order follows plugin store registration order (terminal=0, changes=1, file=2, draft=3, lineage=4)
+    expect(labels).toEqual(['Terminal', 'Changes', 'File', 'Draft', 'Lineage']);
+  });
+
+  it('does not show a panel that is disabled', () => {
+    usePluginStore.setState({ disabledBuiltinPanels: ['lineage'] });
+    renderEmpty();
+    expect(screen.queryByText('Lineage')).toBeNull();
+  });
+
+  it('does not show a panel that is mobile-only', () => {
+    usePluginStore.getState().registerPanel({
+      id: 'draft',
+      pluginId: 'com.zclaudia.builtin',
+      type: 'panel',
+      label: 'Draft',
+      order: 3,
+      platforms: ['mobile'],
+    });
+    renderEmpty();
+    expect(screen.queryByText('Draft')).toBeNull();
   });
 });

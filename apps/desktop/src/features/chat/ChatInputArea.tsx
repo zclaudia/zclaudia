@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Lock, Unlock, X, FileText, FileEdit, FileDiff, Terminal as TerminalIcon, Plus } from 'lucide-react';
 import { ModeSelector } from './ModeSelector';
 import { PermissionSelector } from './PermissionSelector';
@@ -14,7 +14,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useDraftEditorStore } from '../../stores/draftEditorStore';
 import { useComposerStore } from '../../stores/composerStore';
 import { useUIStore } from '../../stores/uiStore';
-import { useSessionToolsStore, type SessionTool } from '../../stores/sessionToolsStore';
 import { activatePanel, usePanelIsActive } from '../../utils/openPanel';
 import * as api from '../../services/api';
 import type { UnifiedPermissionPolicy, SlashCommand, Session, Project } from '@zclaudia/shared';
@@ -103,96 +102,6 @@ export function ChatInputArea({
   const fileViewerPanelActive = usePanelIsActive('file-viewer');
   const terminalPanelActive = usePanelIsActive('terminal');
   const changesPanelActive = usePanelIsActive('session-changes');
-  const lineagePanelActive = usePanelIsActive('lineage');
-
-  // Tool panel open/close handlers — shared by the mobile toolbar and the desktop
-  // right-sidebar pinned tab strip (published to the store below).
-  const terminalProjectId = currentSession?.projectId;
-  const terminalSupported = useServerStore.getState().activeServerSupports('remoteTerminal');
-  const openDraftTool = useCallback(() => {
-    if (draftPanelActive) {
-      useDraftEditorStore.getState().closeEditor();
-    } else {
-      setSendCallback((content: string) => onSendMessage(content));
-      openDraftEditor(sessionId);
-    }
-  }, [draftPanelActive, setSendCallback, onSendMessage, openDraftEditor, sessionId]);
-  const openFilesTool = useCallback(() => {
-    if (fileViewerPanelActive) {
-      useFileViewerStore.getState().close();
-    } else if (fileViewerOpen) {
-      activatePanel('file-viewer');
-    } else {
-      const store = useFileViewerStore.getState();
-      store.togglePanel();
-      store.setSearchOpen(true);
-      activatePanel('file-viewer');
-    }
-  }, [fileViewerPanelActive, fileViewerOpen]);
-  const openChangesTool = useCallback(() => {
-    const store = usePluginStore.getState();
-    if (changesPanelActive) {
-      store.updatePanelVisibility('session-changes', false);
-    } else {
-      store.updatePanelVisibility('session-changes', true);
-      activatePanel('session-changes');
-    }
-  }, [changesPanelActive]);
-  const openLineageTool = useCallback(() => {
-    const store = usePluginStore.getState();
-    if (lineagePanelActive) {
-      store.updatePanelVisibility('lineage', false);
-    } else {
-      store.updatePanelVisibility('lineage', true);
-      activatePanel('lineage');
-    }
-  }, [lineagePanelActive]);
-  const openTerminalTool = useCallback(() => {
-    if (!terminalProjectId) return;
-    const open = isDrawerOpen(terminalProjectId);
-    const active = open && terminalPanelActive;
-    if (active) {
-      setDrawerOpen(terminalProjectId, false);
-    } else if (open) {
-      activatePanel('terminal');
-    } else {
-      const store = useTerminalStore.getState();
-      if (!store.getTerminalId(terminalProjectId)) {
-        store.openTerminal(terminalProjectId);
-      }
-      setDrawerOpen(terminalProjectId, true);
-      activatePanel('terminal');
-    }
-  }, [terminalProjectId, isDrawerOpen, terminalPanelActive, setDrawerOpen]);
-
-  // The tool set for this session, in tab order: Draft / Files / Changes / Terminal.
-  const sessionTools = useMemo<SessionTool[]>(() => {
-    const tools: SessionTool[] = [];
-    if (!disabledBuiltinPanels.includes('draft')) {
-      tools.push({ id: 'draft', label: 'Draft', iconKey: 'draft', isActive: draftPanelActive, hasBadge: draftExists && !draftPanelActive, onClick: openDraftTool });
-    }
-    if (currentProject?.rootPath && !disabledBuiltinPanels.includes('file-viewer')) {
-      tools.push({ id: 'file-viewer', label: 'Files', iconKey: 'file', isActive: fileViewerPanelActive, onClick: openFilesTool });
-    }
-    if (!disabledBuiltinPanels.includes('session-changes') && currentSession) {
-      tools.push({ id: 'session-changes', label: 'Changes', iconKey: 'changes', isActive: changesPanelActive, onClick: openChangesTool });
-    }
-    if (!disabledBuiltinPanels.includes('terminal') && terminalSupported && terminalProjectId) {
-      tools.push({ id: 'terminal', label: 'Terminal', iconKey: 'terminal', isActive: isDrawerOpen(terminalProjectId) && terminalPanelActive, onClick: openTerminalTool });
-    }
-    if (!disabledBuiltinPanels.includes('lineage') && currentSession) {
-      tools.push({ id: 'lineage', label: 'Lineage', iconKey: 'lineage', isActive: lineagePanelActive, onClick: openLineageTool });
-    }
-    return tools;
-  }, [disabledBuiltinPanels, draftPanelActive, draftExists, fileViewerPanelActive, changesPanelActive, terminalPanelActive, lineagePanelActive, terminalSupported, terminalProjectId, isDrawerOpen, currentProject?.rootPath, currentSession, openDraftTool, openFilesTool, openChangesTool, openTerminalTool, openLineageTool]);
-
-  // Publish to the right-sidebar pinned strip (desktop only; mobile renders inline below).
-  const setSessionTools = useSessionToolsStore((s) => s.setTools);
-  useEffect(() => {
-    if (isMobile) return;
-    setSessionTools(sessionTools);
-    return () => setSessionTools([]);
-  }, [isMobile, sessionTools, setSessionTools]);
 
   // Mobile toolbar popover state
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);

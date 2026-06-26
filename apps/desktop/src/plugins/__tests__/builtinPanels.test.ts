@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { usePluginStore } from '../../stores/pluginStore';
+import { initBuiltinPanels } from '../builtinPanels';
 
 // Mock heavy component imports to prevent hangs in test environment
 vi.mock('../../components/terminal/TerminalPanel', () => ({
@@ -101,5 +102,33 @@ describe('initBuiltinPanels', () => {
         component: expect.any(Function),
       }),
     );
+  });
+});
+
+// Capture the real registerPanel before it can be replaced by spies in the
+// initBuiltinPanels describe block above — used to restore store integrity.
+const realRegisterPanel = usePluginStore.getState().registerPanel;
+
+describe('builtinPanels openMode', () => {
+  beforeEach(() => {
+    usePluginStore.setState({ panels: [], registerPanel: realRegisterPanel });
+    initBuiltinPanels();
+  });
+
+  it('marks terminal / notifications / lineage as dedicated', () => {
+    const panels = usePluginStore.getState().panels;
+    const byId = (id: string) => panels.find((p) => p.id === id);
+    expect(byId('terminal')?.openMode).toBe('dedicated');
+    expect(byId('notifications')?.openMode).toBe('dedicated');
+    expect(byId('lineage')?.openMode).toBe('dedicated');
+  });
+
+  it('marks file-viewer / draft / session-changes / memory as shared', () => {
+    const panels = usePluginStore.getState().panels;
+    const byId = (id: string) => panels.find((p) => p.id === id);
+    expect(byId('file-viewer')?.openMode).toBe('shared');
+    expect(byId('draft')?.openMode).toBe('shared');
+    expect(byId('session-changes')?.openMode).toBe('shared');
+    expect(byId('memory')?.openMode).toBe('shared');
   });
 });

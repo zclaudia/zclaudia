@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { useChatMessageStore } from '../../../stores/chatMessageStore';
 import { useServerStore } from '../../../stores/serverStore';
 import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
+import { useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
 
 // Prevent useAgentForSession's loadAll() from hitting the real API
 vi.mock('../../../services/api/agent-profiles', () => ({
@@ -12,31 +13,6 @@ vi.mock('../../../services/api/agent-profiles', () => ({
 // Mock useAgentForSession
 vi.mock('../../../hooks/useAgentForSession', () => ({
   useAgentForSession: () => ({ agent: null }),
-}));
-
-// Mock usePanelRegion
-vi.mock('../../../components/panels/usePanelRegion', () => ({
-  usePanelRegion: () => ({ isOpen: false }),
-}));
-
-// Mock activatePanel
-vi.mock('../../../utils/openPanel', () => ({
-  activatePanel: vi.fn(),
-}));
-
-// Mock pluginStore
-vi.mock('../../../stores/pluginStore', () => ({
-  usePluginStore: Object.assign(
-    vi.fn((selector?: (s: any) => any) => {
-      const state = { updatePanelVisibility: vi.fn() };
-      return selector ? selector(state) : state;
-    }),
-    {
-      getState: () => ({ updatePanelVisibility: vi.fn() }),
-      setState: vi.fn(),
-      subscribe: vi.fn(() => vi.fn()),
-    }
-  ),
 }));
 
 // Setup stores before import
@@ -119,6 +95,7 @@ function setupStores(overrides?: { messages?: Record<string, any[]> }) {
   } as any);
 
   useRightSidebarStore.setState(mockRightSidebarState as any);
+  useRightWorkspaceStore.setState({ bySession: {}, order: [] });
 }
 
 describe('SessionHeader', () => {

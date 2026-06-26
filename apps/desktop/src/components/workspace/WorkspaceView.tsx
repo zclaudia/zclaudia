@@ -1,37 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  useSplitLayoutStore,
-  type LayoutNode,
-  type GroupNode,
-} from '../../stores/splitLayoutStore';
+import { useRightWorkspaceStore, type LayoutNode, type GroupNode } from '../../stores/rightWorkspaceStore';
 import { PaneView } from './PaneView';
 import { ResizeDivider } from './ResizeDivider';
 
-interface SplitLayoutViewProps {
+interface WorkspaceViewProps {
+  sessionId: string;
   projectId?: string;
   projectRoot?: string;
   workingDirectory?: string;
 }
 
-/**
- * Recursive renderer for the split layout tree.
- *
- * - A PaneNode renders a single <PaneView> filling its slot.
- * - A GroupNode renders a flex row/column: first child, a ResizeDivider, second child.
- *   The group's `ratio` is applied as the first child's flex-grow (the second
- *   grows by `1 - ratio`); a px floor keeps each pane usable.
- *
- * The root container measures its own size via a ResizeObserver so ResizeDividers
- * get a real `containerSize` for ratio math. Nothing renders when root is null.
- */
-export function SplitLayoutView({ projectId, projectRoot, workingDirectory }: SplitLayoutViewProps) {
-  const root = useSplitLayoutStore((s) => s.root);
-  const focusedPaneId = useSplitLayoutStore((s) => s.focusedPaneId);
-  const setRatio = useSplitLayoutStore((s) => s.setRatio);
+export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirectory }: WorkspaceViewProps) {
+  const root = useRightWorkspaceStore((s) => s.bySession[sessionId]?.root ?? null);
+  const focusedPaneId = useRightWorkspaceStore((s) => s.bySession[sessionId]?.focusedPaneId ?? null);
+  const setRatio = useRightWorkspaceStore((s) => s.setRatio);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-
   useEffect(() => {
     const el = containerRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
@@ -49,7 +34,9 @@ export function SplitLayoutView({ projectId, projectRoot, workingDirectory }: Sp
         return (
           <PaneView
             key={node.id}
+            sessionId={sessionId}
             paneId={node.id}
+            pane={node}
             focused={focusedPaneId === node.id}
             projectId={projectId}
             projectRoot={projectRoot}
@@ -59,38 +46,32 @@ export function SplitLayoutView({ projectId, projectRoot, workingDirectory }: Sp
       }
       return renderGroup(node);
     },
-    [focusedPaneId, projectId, projectRoot, workingDirectory],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [focusedPaneId, projectId, projectRoot, workingDirectory, sessionId, size],
   );
 
   const renderGroup = (group: GroupNode): React.ReactNode => {
     const isRow = group.dir === 'row';
     const containerSize = isRow ? size.width : size.height;
-    const firstFlex = group.ratio;
-    const secondFlex = 1 - group.ratio;
     return (
       <div
         key={group.id}
         className={isRow ? 'flex flex-row min-w-0 min-h-0' : 'flex flex-col min-w-0 min-h-0'}
         style={{ flex: '1 1 0%', minWidth: 0, minHeight: 0 }}
       >
-        <div style={{ flex: `${firstFlex} 1 0%`, minWidth: 0, minHeight: 0 }}>
-          {renderNode(group.children[0])}
-        </div>
+        <div style={{ flex: `${group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>{renderNode(group.children[0])}</div>
         <ResizeDivider
           groupId={group.id}
           dir={group.dir}
           containerSize={containerSize}
-          onDrag={(delta) => setRatio(group.id, group.ratio + delta)}
+          onDrag={(delta) => setRatio(sessionId, group.id, group.ratio + delta)}
         />
-        <div style={{ flex: `${secondFlex} 1 0%`, minWidth: 0, minHeight: 0 }}>
-          {renderNode(group.children[1])}
-        </div>
+        <div style={{ flex: `${1 - group.ratio} 1 0%`, minWidth: 0, minHeight: 0 }}>{renderNode(group.children[1])}</div>
       </div>
     );
   };
 
   if (!root) return null;
-
   return (
     <div ref={containerRef} className="flex flex-1 min-w-0 min-h-0">
       {renderNode(root)}

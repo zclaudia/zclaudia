@@ -13,7 +13,7 @@ describe('DropOverlay', () => {
   });
 
   it('renders the four edge zones + center when a drag is active', () => {
-    useDragSplitStore.setState({ active: { panelId: 'memory' } });
+    useDragSplitStore.setState({ active: { toolId: 'memory' } });
     render(<DropOverlay paneId="p1" />);
     expect(screen.getAllByText('').length).toBeGreaterThanOrEqual(0); // smoke
     expect(document.querySelector('[data-zone="left"]')).not.toBeNull();
@@ -25,7 +25,7 @@ describe('DropOverlay', () => {
 
   it('marks the hovered pane zone as active', () => {
     useDragSplitStore.setState({
-      active: { panelId: 'memory' },
+      active: { toolId: 'memory' },
       hoverPaneId: 'p1',
       hoverZone: 'right',
       disabled: new Set(),
@@ -40,7 +40,7 @@ describe('DropOverlay', () => {
 
   it('marks disabled zones (singleton conflict)', () => {
     useDragSplitStore.setState({
-      active: { panelId: 'draft' },
+      active: { toolId: 'draft' },
       hoverPaneId: 'p1',
       hoverZone: 'right',
       disabled: new Set(['left', 'right', 'top', 'bottom']),
@@ -54,7 +54,7 @@ describe('DropOverlay', () => {
 
   it('only reflects hover for its own paneId', () => {
     useDragSplitStore.setState({
-      active: { panelId: 'memory' },
+      active: { toolId: 'memory' },
       hoverPaneId: 'p2', // a different pane
       hoverZone: 'right',
       disabled: new Set(),

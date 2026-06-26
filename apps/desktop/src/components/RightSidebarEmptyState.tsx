@@ -1,14 +1,27 @@
 import { GitBranch, FileDiff } from 'lucide-react';
 import { TOOL_ICONS } from './rightSidebarToolIcons';
-import { useSessionToolsStore, type SessionTool } from '../stores/sessionToolsStore';
+import { usePluginStore, selectPluginPanels } from '../stores/pluginStore';
 import { useGitStore } from '../features/git/store';
-import { useSelectionStore } from '../stores/selectionStore';
 import { useChangesData } from './changes/useSessionChanges';
+import { useServerStore } from '../stores/serverStore';
+import { openToolInWorkspace } from '../utils/workspaceActions';
 
 interface RightSidebarEmptyStateProps {
+  sessionId: string;
   projectId: string | undefined;
   projectRoot: string | undefined;
 }
+
+type EmptyTile = { id: string; label: string; iconKey: 'draft' | 'file' | 'changes' | 'terminal' | 'lineage' };
+
+/** Maps panel id → iconKey for the known 5 tool tiles. */
+const PANEL_ICON_MAP: Record<string, EmptyTile['iconKey']> = {
+  draft: 'draft',
+  'file-viewer': 'file',
+  'session-changes': 'changes',
+  terminal: 'terminal',
+  lineage: 'lineage',
+};
 
 /** Static subtitle per tool iconKey. The 'changes' tile is dynamic (count) and
  *  handled in render, so it is intentionally absent here. The `satisfies` clause
@@ -18,16 +31,17 @@ const SUBTITLES = {
   file: 'Browse working directory',
   terminal: 'Run commands',
   lineage: 'Session branch graph',
-} satisfies Record<Exclude<SessionTool['iconKey'], 'changes'>, string>;
+} satisfies Record<Exclude<EmptyTile['iconKey'], 'changes'>, string>;
 
 /**
- * Default content for the right sidebar when it is expanded (pinned tools exist)
- * but no panel is open. Shows a compact git-branch + session-changes status line
- * and a launcher tile per pinned tool, reusing each tool's existing onClick.
+ * Default content for the right sidebar when it is expanded but no panel is
+ * open. Shows a compact git-branch + session-changes status line and a
+ * launcher tile per known built-in panel, calling openToolInWorkspace on click.
  */
-export function RightSidebarEmptyState({ projectId, projectRoot }: RightSidebarEmptyStateProps) {
-  const tools = useSessionToolsStore((s) => s.tools);
-  const sessionId = useSelectionStore((s) => s.selectedSessionId);
+export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: RightSidebarEmptyStateProps) {
+  const panels = usePluginStore(selectPluginPanels);
+  const disabled = usePluginStore((s) => s.disabledBuiltinPanels);
+  const backendId = useServerStore((s) => s.activeServerId);
   const branch = useGitStore((s) => {
     if (!projectId) return undefined;
     const selectedPath = s.selectedWorktree[projectId];
@@ -36,19 +50,29 @@ export function RightSidebarEmptyState({ projectId, projectRoot }: RightSidebarE
   const { result } = useChangesData(sessionId, null, projectRoot);
   const changedCount = result.modified.length;
 
-  const orderedTools: SessionTool[] = changedCount > 0
-    ? [...tools.filter((t) => t.iconKey === 'changes'), ...tools.filter((t) => t.iconKey !== 'changes')]
-    : tools;
+  // Build tiles from the registry: desktop panels, not disabled, with a known iconKey.
+  const tiles: EmptyTile[] = panels
+    .filter(
+      (p) =>
+        (p.platforms ?? ['desktop']).includes('desktop') &&
+        !disabled.includes(p.id) &&
+        PANEL_ICON_MAP[p.id] !== undefined,
+    )
+    .map((p) => ({ id: p.id, label: p.label, iconKey: PANEL_ICON_MAP[p.id] }));
+
+  const orderedTiles: EmptyTile[] = changedCount > 0
+    ? [...tiles.filter((t) => t.iconKey === 'changes'), ...tiles.filter((t) => t.iconKey !== 'changes')]
+    : tiles;
 
   const showStatus = !!branch || changedCount > 0;
 
-  const subtitleFor = (tool: SessionTool): string | undefined => {
-    if (tool.iconKey === 'changes') {
+  const subtitleFor = (tile: EmptyTile): string | undefined => {
+    if (tile.iconKey === 'changes') {
       return changedCount > 0
         ? `${changedCount} file${changedCount === 1 ? '' : 's'} to review`
         : 'View session changes';
     }
-    return SUBTITLES[tool.iconKey];
+    return SUBTITLES[tile.iconKey];
   };
 
   return (
@@ -71,25 +95,24 @@ export function RightSidebarEmptyState({ projectId, projectRoot }: RightSidebarE
       )}
 
       <div className="flex flex-col gap-1.5">
-        {orderedTools.map((tool) => {
-          const Icon = TOOL_ICONS[tool.iconKey];
-          const subtitle = subtitleFor(tool);
+        {orderedTiles.map((tile) => {
+          const Icon = TOOL_ICONS[tile.iconKey];
+          const subtitle = subtitleFor(tile);
           return (
             <button
-              key={tool.id}
-              onClick={tool.onClick}
+              key={tile.id}
+              onClick={() => openToolInWorkspace(sessionId, tile.id, { projectId, backendId })}
               className="flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border text-left hover:bg-secondary"
             >
               {Icon && <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
               <span className="min-w-0">
                 <span data-testid="empty-tile-label" className="block text-[13px] font-medium text-foreground truncate">
-                  {tool.label}
+                  {tile.label}
                 </span>
                 {subtitle && (
                   <span className="block text-[11px] text-muted-foreground truncate">{subtitle}</span>
                 )}
               </span>
-              {tool.hasBadge && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />}
             </button>
           );
         })}

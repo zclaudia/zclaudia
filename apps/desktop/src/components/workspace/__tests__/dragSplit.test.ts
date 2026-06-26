@@ -6,14 +6,18 @@ import {
   disabledZones,
   type Rect,
 } from '../dragSplit';
-import type { LayoutNode, PaneNode, GroupNode } from '../../../stores/splitLayoutStore';
+import { newPane } from '../../../stores/rightWorkspaceStore';
+import type { LayoutNode, PaneNode, GroupNode } from '../../../stores/rightWorkspaceStore';
 
 const R: Rect = { left: 0, top: 0, width: 100, height: 100 };
 const cx = 50, cy = 50;
 
-const pane = (id: string, panelId: string, instanceKey?: string): PaneNode => ({
-  id, kind: 'pane', panelId, ...(instanceKey !== undefined ? { instanceKey } : {}),
-});
+// Build a pane fixture using the real newPane factory and override its id for
+// stable test assertions. We reassign id because newPane generates a random UUID.
+const pane = (id: string, toolId: string, instanceKey?: string): PaneNode => {
+  const p = newPane(toolId, instanceKey);
+  return { ...p, id };
+};
 
 describe('resolveDropZone', () => {
   it('returns center inside the deadzone', () => {
@@ -53,22 +57,22 @@ describe('dropZoneToDir', () => {
 });
 
 describe('canDrop', () => {
-  it('allows replacing a pane with a non-conflicting panel (center)', () => {
+  it('allows replacing a pane with a non-conflicting tool (center)', () => {
     const root: LayoutNode = pane('p1', 'draft');
-    expect(canDrop(root, 'p1', 'center', { panelId: 'memory' }).allowed).toBe(true);
+    expect(canDrop(root, 'p1', 'center', { toolId: 'memory' }).allowed).toBe(true);
   });
 
-  it('allows replacing a pane with the SAME panel (center excludes the target)', () => {
+  it('allows replacing a pane with the SAME tool (center excludes the target)', () => {
     const root: LayoutNode = pane('p1', 'draft');
     // Replacing p1 with draft is fine (it's the same pane).
-    expect(canDrop(root, 'p1', 'center', { panelId: 'draft' }).allowed).toBe(true);
+    expect(canDrop(root, 'p1', 'center', { toolId: 'draft' }).allowed).toBe(true);
   });
 
   it('forbids splitting to add a singleton already present (edge)', () => {
     const root: LayoutNode = pane('p1', 'draft');
     // Adding draft beside p1 (any edge) conflicts with p1.
-    expect(canDrop(root, 'p1', 'right', { panelId: 'draft' }).allowed).toBe(false);
-    expect(canDrop(root, 'p1', 'right', { panelId: 'draft' }).conflictPaneId).toBe('p1');
+    expect(canDrop(root, 'p1', 'right', { toolId: 'draft' }).allowed).toBe(false);
+    expect(canDrop(root, 'p1', 'right', { toolId: 'draft' }).conflictPaneId).toBe('p1');
   });
 
   it('forbids adding a singleton present in a sibling (edge)', () => {
@@ -77,31 +81,31 @@ describe('canDrop', () => {
       children: [pane('p1', 'draft'), pane('p2', 'memory')],
     };
     // Splitting p2 to add draft conflicts with p1.
-    expect(canDrop(root, 'p2', 'bottom', { panelId: 'draft' }).allowed).toBe(false);
-    expect(canDrop(root, 'p2', 'bottom', { panelId: 'draft' }).conflictPaneId).toBe('p1');
+    expect(canDrop(root, 'p2', 'bottom', { toolId: 'draft' }).allowed).toBe(false);
+    expect(canDrop(root, 'p2', 'bottom', { toolId: 'draft' }).conflictPaneId).toBe('p1');
   });
 
-  it('allows adding a terminal for a different scope (edge)', () => {
+  it('allows adding a multi-instance tool for a different scope (edge)', () => {
     const root: LayoutNode = pane('p1', 'terminal', 'b1::projA');
-    expect(canDrop(root, 'p1', 'right', { panelId: 'terminal', instanceKey: 'b1::projB' }).allowed).toBe(true);
+    expect(canDrop(root, 'p1', 'right', { toolId: 'terminal', instanceKey: 'b1::projB', multiInstance: true }).allowed).toBe(true);
   });
 
-  it('forbids adding a terminal for the same scope (edge)', () => {
+  it('forbids adding a multi-instance tool for the same scope (edge)', () => {
     const root: LayoutNode = pane('p1', 'terminal', 'b1::projA');
-    expect(canDrop(root, 'p1', 'right', { panelId: 'terminal', instanceKey: 'b1::projA' }).allowed).toBe(false);
+    expect(canDrop(root, 'p1', 'right', { toolId: 'terminal', instanceKey: 'b1::projA', multiInstance: true }).allowed).toBe(false);
   });
 });
 
 describe('disabledZones', () => {
   it('disables all edge zones for a singleton already present, keeps center', () => {
     const root: LayoutNode = pane('p1', 'draft');
-    const d = disabledZones(root, 'p1', { panelId: 'draft' });
+    const d = disabledZones(root, 'p1', { toolId: 'draft' });
     expect([...d].sort()).toEqual(['bottom', 'left', 'right', 'top']);
     expect(d.has('center')).toBe(false);
   });
 
-  it('disables nothing when the panel is not present', () => {
+  it('disables nothing when the tool is not present', () => {
     const root: LayoutNode = pane('p1', 'draft');
-    expect(disabledZones(root, 'p1', { panelId: 'memory' }).size).toBe(0);
+    expect(disabledZones(root, 'p1', { toolId: 'memory' }).size).toBe(0);
   });
 });

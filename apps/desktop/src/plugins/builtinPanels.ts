@@ -37,6 +37,7 @@ export function initBuiltinPanels() {
     order: 0,
     platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
+    openMode: 'dedicated',
     alwaysMount: true,
     visible: false,
     onClose: () => {
@@ -65,6 +66,7 @@ export function initBuiltinPanels() {
     order: 1,
     platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
+    openMode: 'shared',
     alwaysMount: false,
     visible: false,
     onClose: () => {
@@ -84,6 +86,7 @@ export function initBuiltinPanels() {
     order: 2,
     platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
+    openMode: 'shared',
     alwaysMount: false,
     visible: false,
     onClose: () => {
@@ -102,6 +105,7 @@ export function initBuiltinPanels() {
     order: 3,
     platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
+    openMode: 'shared',
     alwaysMount: false,
     visible: false,
     onClose: () => {
@@ -120,6 +124,7 @@ export function initBuiltinPanels() {
     order: 4,
     platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
+    openMode: 'shared',
     alwaysMount: false,
     visible: false,
     onClose: () => {
@@ -137,6 +142,7 @@ export function initBuiltinPanels() {
     order: 5,
     platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',
+    openMode: 'dedicated',
     alwaysMount: false,
     visible: false,
     onClose: () => {
@@ -154,6 +160,7 @@ export function initBuiltinPanels() {
     order: 6,
     platforms: ['desktop'],
     defaultPlacement: 'right',
+    openMode: 'dedicated',
     alwaysMount: false,
     visible: false,
     onClose: () => {

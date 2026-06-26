@@ -4,6 +4,9 @@ import { ChangeListItem } from '../ChangeListItem';
 import { usePluginStore } from '../../../stores/pluginStore';
 import { useRightSidebarStore } from '../../../stores/rightSidebarStore';
 import { useBottomPanelStore } from '../../../stores/bottomPanelStore';
+import { useProjectStore } from '../../../stores/projectStore';
+import { useServerStore } from '../../../stores/serverStore';
+import { useRightWorkspaceStore, findPaneWithTool } from '../../../stores/rightWorkspaceStore';
 import type { ModifiedEntry } from '../useSessionChanges';
 
 const mockOpenFile = vi.fn();
@@ -24,6 +27,8 @@ const entry: ModifiedEntry = {
   lastTimestamp: 110,
 };
 
+const SESSION_ID = 'sess-test-1';
+
 describe('ChangeListItem', () => {
   beforeEach(() => {
     mockOpenFile.mockClear();
@@ -38,8 +43,16 @@ describe('ChangeListItem', () => {
       }],
       panelPlacements: { 'file-viewer': 'right' },
     });
-    useRightSidebarStore.setState({ activeTab: 'session-changes' });
+    useRightSidebarStore.setState({ activeTab: 'session-changes', collapsed: false });
     useBottomPanelStore.setState({ activeTab: '' });
+    // Set up project/server context so activatePanel can resolve the session
+    useProjectStore.setState({
+      selectedSessionId: SESSION_ID,
+      sessions: [{ id: SESSION_ID, projectId: 'proj-1' } as any],
+    });
+    useServerStore.setState({ activeServerId: 'server-1' } as any);
+    // Reset workspace so each test starts clean
+    useRightWorkspaceStore.setState({ bySession: {}, order: [] });
   });
 
   it('opens the file and activates the file viewer panel', () => {
@@ -55,6 +68,9 @@ describe('ChangeListItem', () => {
     fireEvent.click(screen.getByTitle('Open in File Viewer'));
 
     expect(mockOpenFile).toHaveBeenCalledWith('/repo', 'src/index.ts');
-    expect(useRightSidebarStore.getState().activeTab).toBe('file-viewer');
+    // activatePanel now routes into the workspace (not rightSidebarStore.setActiveTab)
+    const ws = useRightWorkspaceStore.getState();
+    const root = ws.bySession[SESSION_ID]?.root ?? null;
+    expect(findPaneWithTool(root, 'file-viewer', undefined, true)).not.toBeNull();
   });
 });

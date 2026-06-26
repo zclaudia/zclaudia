@@ -7,6 +7,7 @@ import { useOwnershipStore } from './ownershipStore';
 import { parseBackendId } from './gatewayStore';
 import { getControlPlaneMode, resolveCanonicalBackendId, resolveLocalBackendId } from '../utils/controlPlane';
 import { useSelectionStore } from './selectionStore';
+import { useRightWorkspaceStore } from './rightWorkspaceStore';
 
 export type ProjectDashboardView =
   | 'home'
@@ -307,6 +308,7 @@ export const useProjectStore = create<ProjectState>((set) => ({
   deleteSession: (id) =>
     set((state) => {
       useOwnershipStore.getState().removeSessionOwner(id);
+      useRightWorkspaceStore.getState().removeSession(id);
       return {
         sessions: state.sessions.filter((s) => s.id !== id),
         selectedSessionId:

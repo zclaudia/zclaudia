@@ -1,5 +1,5 @@
 import { useCallback, useRef } from 'react';
-import type { SplitDir } from '../../stores/splitLayoutStore';
+import type { SplitDir } from '../../stores/rightWorkspaceStore';
 
 interface ResizeDividerProps {
   dir: SplitDir;

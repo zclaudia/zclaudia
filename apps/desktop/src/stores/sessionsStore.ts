@@ -4,6 +4,7 @@
 import { create } from 'zustand';
 import type { Session } from '@zclaudia/shared';
 import { useOwnershipStore } from './ownershipStore';
+import { useRightWorkspaceStore } from './rightWorkspaceStore';
 import { LEGACY_LOCAL_SERVER_ID, resolveCanonicalBackendId } from '../utils/controlPlane';
 
 export interface RemoteSession extends Session {
@@ -107,6 +108,7 @@ export const useSessionsStore = create<SessionsState>((set) => ({
   ) => {
     if (eventType === 'deleted') {
       useOwnershipStore.getState().removeSessionOwner(session.id);
+      useRightWorkspaceStore.getState().removeSession(session.id);
     } else {
       useOwnershipStore.getState().setSessionOwner(session.id, backendId);
     }

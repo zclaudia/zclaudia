@@ -4,9 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 import type { Session, Project, SystemInfo } from '@zclaudia/shared';
 import { useServerStore } from '../../stores/serverStore';
 import { useRightSidebarStore } from '../../stores/rightSidebarStore';
-import { usePluginStore } from '../../stores/pluginStore';
-import { usePanelRegion } from '../../components/panels/usePanelRegion';
-import { activatePanel } from '../../utils/openPanel';
+import { useRightWorkspaceStore } from '../../stores/rightWorkspaceStore';
 import { useAgentForSession } from '../../hooks/useAgentForSession';
 import { useChatMessageStore } from '../../stores/chatMessageStore';
 import { resolveTopicChip } from './sessionTopicChip';
@@ -93,21 +91,13 @@ export function SessionHeader({
   const rightCollapsed = useRightSidebarStore((s) => s.collapsed);
   const rightUnread = useRightSidebarStore((s) => s.unread);
   const toggleRightPanel = useRightSidebarStore((s) => s.toggleCollapsed);
-  const setRightCollapsed = useRightSidebarStore((s) => s.setCollapsed);
-  const rightActiveTab = useRightSidebarStore((s) => s.activeTab);
-  const { isOpen: rightHasContent } = usePanelRegion({ region: 'right', activeTab: rightActiveTab, isMobile });
+  const rightWorkspaceHasContent = useRightWorkspaceStore(
+    (s) => (s.bySession[currentSession.id]?.root ?? null) !== null,
+  );
   const showRightToggle = !isMobile && currentSession.type !== 'background';
-  const rightExpanded = rightHasContent && !rightCollapsed;
+  const rightExpanded = !rightCollapsed;
   const handleToggleRightPanel = () => {
-    if (rightHasContent) {
-      // Something is open underneath — pure show/hide.
-      toggleRightPanel();
-    } else {
-      // Empty panel — reveal a default work view rather than toggling to nothing.
-      usePluginStore.getState().updatePanelVisibility('session-changes', true);
-      activatePanel('session-changes');
-      setRightCollapsed(false);
-    }
+    toggleRightPanel();
   };
 
   return (
@@ -379,7 +369,7 @@ export function SessionHeader({
           aria-pressed={rightExpanded}
         >
           <PanelRight size={16} strokeWidth={1.75} />
-          {!rightExpanded && rightUnread && (
+          {!rightExpanded && rightWorkspaceHasContent && rightUnread && (
             <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary ring-2 ring-background" />
           )}
         </button>

@@ -11,6 +11,7 @@ const mockSetDrawerOpen = vi.fn();
 const mockOpenTerminal = vi.fn();
 const mockWaitForReady = vi.fn();
 const mockSetActiveTab = vi.fn();
+const mockOpenToolInWorkspace = vi.fn();
 const terminalIdsByBackend = new Map<string, string>();
 
 vi.mock('../../../contexts/ThemeContext', () => ({
@@ -76,13 +77,18 @@ vi.mock('../../../stores/bottomPanelStore', () => ({
   },
 }));
 
-// Terminal is placed in the right sidebar (defaultPlacement: 'right'), so
-// activatePanel('terminal') routes here on desktop. Reuse mockSetActiveTab so
-// the activation assertion below reflects the real right-sidebar routing.
 vi.mock('../../../stores/rightSidebarStore', () => ({
   useRightSidebarStore: {
-    getState: () => ({ setActiveTab: mockSetActiveTab, markUnread: vi.fn() }),
+    getState: () => ({ setCollapsed: vi.fn(), setActiveTab: mockSetActiveTab, markUnread: vi.fn() }),
   },
+}));
+
+// activatePanel('terminal') now routes to the session workspace on desktop.
+// Mock workspaceActions so we can assert the call without full workspace setup.
+vi.mock('../../../utils/workspaceActions', () => ({
+  openToolInWorkspace: (...args: unknown[]) => mockOpenToolInWorkspace(...args),
+  closeToolInWorkspace: vi.fn(),
+  useToolOpenState: vi.fn(() => false),
 }));
 
 // Simplify markdown rendering
@@ -246,6 +252,7 @@ beforeEach(async () => {
   mockOpenTerminal.mockReset();
   mockWaitForReady.mockReset();
   mockSetActiveTab.mockReset();
+  mockOpenToolInWorkspace.mockReset();
   terminalIdsByBackend.clear();
   (globalThis as any).__messageListTestActiveBackend = 'backend-1';
   mockOpenTerminal.mockImplementation((projectId: string) => {
@@ -883,6 +890,11 @@ describe('MessageList', () => {
       selectedSessionId: 'session-1',
       sessions: [{ id: 'session-1', projectId: 'proj-1' }],
     });
+    const { useServerStore } = await import('../../../stores/serverStore');
+    (useServerStore as any).getState = () => ({
+      activeServerId: 'backend-2',
+      activeServerSupports: (feature: string) => feature === 'remoteTerminal',
+    });
 
     terminalIdsByBackend.set('backend-1:proj-1', 'term-backend-1-proj-1');
 
@@ -895,7 +907,12 @@ describe('MessageList', () => {
 
     expect(mockOpenTerminal).toHaveBeenCalledWith('proj-1');
     expect(mockSetDrawerOpen).toHaveBeenCalledWith('proj-1', true);
-    expect(mockSetActiveTab).toHaveBeenCalledWith('terminal');
+    // activatePanel('terminal') now routes to the session workspace on desktop
+    expect(mockOpenToolInWorkspace).toHaveBeenCalledWith(
+      'session-1',
+      'terminal',
+      expect.objectContaining({ projectId: 'proj-1', backendId: 'backend-2' }),
+    );
     expect(mockWaitForReady).toHaveBeenCalledWith('term-backend-2-proj-1');
     await waitFor(() => {
       expect(mockSendMessage).toHaveBeenCalledWith({
