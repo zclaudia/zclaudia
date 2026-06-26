@@ -1,4 +1,4 @@
-import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, GitFork, type LucideIcon } from 'lucide-react';
+import { FileEdit, FileText, FileDiff, Terminal as TerminalIcon, GitFork, PanelTop, type LucideIcon } from 'lucide-react';
 
 /** Maps a SessionTool.iconKey to its Lucide icon. Shared by RightSidebar and
  *  RightSidebarEmptyState (kept out of RightSidebar.tsx to avoid an import cycle). */
@@ -9,3 +9,18 @@ export const TOOL_ICONS: Record<string, LucideIcon> = {
   terminal: TerminalIcon,
   lineage: GitFork,
 };
+
+/** Panel id → iconKey (kept in sync with RightSidebarEmptyState's PANEL_ICON_MAP). */
+const PANEL_ICON_KEY: Record<string, keyof typeof TOOL_ICONS> = {
+  draft: 'draft',
+  'file-viewer': 'file',
+  'session-changes': 'changes',
+  terminal: 'terminal',
+  lineage: 'lineage',
+};
+
+/** Resolve a Lucide icon for a panel id, with a neutral fallback. */
+export function iconForPanel(panelId: string): LucideIcon {
+  const key = PANEL_ICON_KEY[panelId];
+  return (key && TOOL_ICONS[key]) || PanelTop;
+}
