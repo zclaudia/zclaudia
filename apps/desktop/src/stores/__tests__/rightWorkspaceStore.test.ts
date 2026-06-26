@@ -331,6 +331,25 @@ describe('rightWorkspaceStore — tab actions', () => {
     expect(ws.root).toBeNull();
     expect(ws.focusedPaneId).toBeNull();
   });
+
+  it('reorderTab moves a tab to a new index', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory');
+    s.openTool('A', 'file-viewer');
+    s.openTool('A', 'session-changes'); // [memory, file-viewer, session-changes]
+    const paneId = useRightWorkspaceStore.getState().bySession.A.root!.id;
+    s.reorderTab('A', paneId, 0, 2); // move memory to the end
+    const pane = useRightWorkspaceStore.getState().bySession.A.root as any;
+    expect(pane.tools.map((t: any) => t.toolId)).toEqual(['file-viewer', 'session-changes', 'memory']);
+  });
+
+  it('reorderTab ignores out-of-range indices', () => {
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'memory');
+    const before = useRightWorkspaceStore.getState().bySession.A.root;
+    s.reorderTab('A', (before as any).id, 0, 5);
+    expect(useRightWorkspaceStore.getState().bySession.A.root).toBe(before);
+  });
 });
 
 // test helpers
