@@ -88,4 +88,33 @@ describe('goal routes', () => {
     const res = await request(app).post('/sessions/s1/goal/pause');
     expect(res.status).toBe(404);
   });
+
+  it('returns 404 when resuming without active goal', async () => {
+    const { app } = makeApp();
+    const res = await request(app).post('/sessions/s1/goal/resume');
+    expect(res.status).toBe(404);
+  });
+
+  it('PUT rejects empty/whitespace-only objective', async () => {
+    const { app } = makeApp();
+    const empty = await request(app).put('/sessions/s1/goal').send({ objective: '' });
+    expect(empty.status).toBe(400);
+    const whitespace = await request(app).put('/sessions/s1/goal').send({ objective: '   ' });
+    expect(whitespace.status).toBe(400);
+  });
+
+  it('PUT returns invalid_input error code (not goal_conflict) on 400', async () => {
+    const { app } = makeApp();
+    const res = await request(app).put('/sessions/s1/goal').send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error?.code).toBe('invalid_input');
+  });
+
+  it('PUT returns goal_conflict error code on 409', async () => {
+    const { app, svc } = makeApp();
+    svc.setGoal('s1', { objective: 'a' });
+    const res = await request(app).put('/sessions/s1/goal').send({ objective: 'b' });
+    expect(res.status).toBe(409);
+    expect(res.body.error?.code).toBe('goal_conflict');
+  });
 });

@@ -16,7 +16,7 @@ export function createGoalRoutes(svc: GoalService): Router {
   router.put('/', (req: Request, res: Response) => {
     const sessionId = req.params.id;
     const body = req.body as { objective?: string; tokenBudget?: number; maxTurns?: number };
-    if (!body || typeof body.objective !== 'string') {
+    if (!body || typeof body.objective !== 'string' || body.objective.trim().length === 0) {
       return sendApiError(res, 400, 'invalid_input', 'objective is required');
     }
     try {
@@ -28,8 +28,8 @@ export function createGoalRoutes(svc: GoalService): Router {
       return res.status(201).json({ success: true, data: goal });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'unknown error';
-      const status = message.includes('active goal') ? 409 : 400;
-      return sendApiError(res, status, 'goal_conflict', message);
+      const isConflict = message.includes('active goal');
+      return sendApiError(res, isConflict ? 409 : 400, isConflict ? 'goal_conflict' : 'invalid_input', message);
     }
   });
 

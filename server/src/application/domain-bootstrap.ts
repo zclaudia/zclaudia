@@ -247,7 +247,10 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
         });
       } else if (event.type === 'goal:evaluator-verdict') {
         const goal = goalRepo.findById(event.goalId);
-        if (!goal) return;
+        if (!goal) {
+          console.warn('[goals] publisher: goal not found, dropping evaluator-verdict event', event.goalId);
+          return;
+        }
         const wire: GoalEvaluatorVerdictMessage = {
           type: 'goal:evaluator-verdict',
           sessionId: goal.sessionId,
@@ -260,7 +263,10 @@ export function bootstrapDomains(deps: BootstrapDeps): BootstrapResult {
         });
       } else if (event.type === 'goal:budget-update') {
         const goal = goalRepo.findById(event.goalId);
-        if (!goal) return;
+        if (!goal) {
+          console.warn('[goals] publisher: goal not found, dropping budget-update event', event.goalId);
+          return;
+        }
         const wire: GoalBudgetUpdateMessage = {
           type: 'goal:budget-update',
           sessionId: goal.sessionId,
