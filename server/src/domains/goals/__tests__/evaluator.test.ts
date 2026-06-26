@@ -56,4 +56,29 @@ describe('GoalEvaluator', () => {
     expect(out.verdict.reason).toContain('upstream 502');
     expect(out.tokensUsed).toBe(0);
   });
+
+  it('truncates reason to 200 chars on success path', async () => {
+    const longReason = 'x'.repeat(300);
+    const stub: EvaluatorLlmPort = {
+      async evaluate() {
+        return { kind: 'done', reason: longReason, inputTokens: 0, outputTokens: 0 };
+      },
+    };
+    const ev = new GoalEvaluator(stub);
+    const out = await ev.evaluate({ objective: 'x', transcript: [], llmProfileId: 'lp1' });
+    expect(out.verdict.reason).toHaveLength(200);
+  });
+
+  it('truncates reason to 200 chars on error path', async () => {
+    const longMessage = 'y'.repeat(300);
+    const stub: EvaluatorLlmPort = {
+      async evaluate() {
+        throw new Error(longMessage);
+      },
+    };
+    const ev = new GoalEvaluator(stub);
+    const out = await ev.evaluate({ objective: 'x', transcript: [], llmProfileId: 'lp1' });
+    expect(out.verdict.kind).toBe('error');
+    expect(out.verdict.reason).toHaveLength(200);
+  });
 });

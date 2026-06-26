@@ -47,7 +47,7 @@ export class GoalEvaluator {
         transcript: windowed,
         llmProfileId: req.llmProfileId,
       });
-      const kind = result.kind as EvaluatorVerdictKind;
+      const kind: EvaluatorVerdictKind = result.kind;
       return {
         verdict: { kind, reason: (result.reason ?? '').slice(0, 200) },
         tokensUsed: result.inputTokens + result.outputTokens,
