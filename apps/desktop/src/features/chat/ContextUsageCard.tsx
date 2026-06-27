@@ -25,6 +25,13 @@ const SOURCE_LABELS: Record<string, string> = {
   fallback: 'context window unknown — fallback estimate',
 };
 
+const SOURCE_HINTS: Record<string, string> = {
+  fallback:
+    'No spec found for this model — declare it on your LLM profile for an accurate window.',
+  openai_compat_default:
+    'Using the openai-compat 128,000 default — no registry match; declare the model on your LLM profile for accuracy.',
+};
+
 /**
  * Inline card for the /context command. Rendered when MessageList encounters
  * a synthetic system message whose `metadata.contextUsage` is set (frontend
@@ -96,6 +103,9 @@ export function ContextUsageCard({ usage, bare = false }: ContextUsageCardProps)
           Breakdown values are chars/4 estimates; the total comes from real usage.
           {' '}({SOURCE_LABELS[usage.contextWindowSource] ?? usage.contextWindowSource})
         </div>
+        {SOURCE_HINTS[usage.contextWindowSource] && (
+          <div>{SOURCE_HINTS[usage.contextWindowSource]}</div>
+        )}
         {breakdown.messages.clamped && (
           <div>Note: category estimates exceeded real usage; Messages clamped to 0.</div>
         )}

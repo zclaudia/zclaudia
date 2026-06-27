@@ -81,4 +81,19 @@ describe('ContextUsageCard', () => {
     expect(screen.getByText(/estimates exceeded real usage/i)).toBeInTheDocument();
     expect(screen.getByText(/no completed run yet/i)).toBeInTheDocument();
   });
+
+  it('shows an actionable hint when the context window is a fallback estimate', () => {
+    render(<ContextUsageCard usage={makePayload({ contextWindowSource: 'fallback' })} />);
+    expect(screen.getByText(/declare it on your LLM profile/i)).toBeInTheDocument();
+  });
+
+  it('shows an actionable hint for the openai-compat default', () => {
+    render(<ContextUsageCard usage={makePayload({ contextWindowSource: 'openai_compat_default' })} />);
+    expect(screen.getByText(/openai-compat 128,000 default/i)).toBeInTheDocument();
+  });
+
+  it('shows no actionable hint for a known source', () => {
+    render(<ContextUsageCard usage={makePayload({ contextWindowSource: 'pi_ai_registry' })} />);
+    expect(screen.queryByText(/declare .*LLM profile/i)).toBeNull();
+  });
 });
