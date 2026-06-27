@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { RefreshCw, ExternalLink } from 'lucide-react';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -49,40 +50,41 @@ export function TerminalActions({ projectId }: { projectId: string }) {
   const terminalId = useTerminalStore((s) => s.getTerminalId(projectId, activeServerId));
   const isPoppedOut = useTerminalStore((s) => terminalId ? !!s.poppedOutTerminals[terminalId] : false);
 
-  return (
-    <div className="flex items-center gap-0.5">
-      {/* Pop-out button (desktop only) */}
-      {isDesktopTauri() && terminalId && !isPoppedOut && (
-        <button
-          onClick={() => openTerminalInNewWindow(terminalId, projectId)}
-          className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-          title="Open in new window"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-              d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-        </button>
-      )}
+  // Match the file viewer's action buttons: roomy, centered, lucide icons. The
+  // old hand-rolled SVGs at tight `p-1` made the reload read as oversized/heavy.
+  const actionBtn =
+    'inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground flex-shrink-0';
 
+  return (
+    <div className="flex items-center gap-1">
       {/* Reload button — disabled while popped out so the main window can't kill the
           standalone window's PTY (terminal_close has no ownership check on the server). */}
       {!isPoppedOut && (
-      <button
-        onClick={() => {
-          if (!terminalId) return;
-          terminalRegistry.get(terminalId)?.close();
-          useTerminalStore.getState().closeTerminal(terminalId);
-          useTerminalStore.getState().openTerminal(projectId, activeServerId);
-        }}
-        className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-        title="Reload terminal"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M4 4v5h5M20 20v-5h-5M4 9a9 9 0 0 1 15.36-5.36L20 4M20 15a9 9 0 0 1-15.36 5.36L4 20" />
-        </svg>
-      </button>
+        <button
+          onClick={() => {
+            if (!terminalId) return;
+            terminalRegistry.get(terminalId)?.close();
+            useTerminalStore.getState().closeTerminal(terminalId);
+            useTerminalStore.getState().openTerminal(projectId, activeServerId);
+          }}
+          className={actionBtn}
+          title="Reload terminal"
+          aria-label="Reload terminal"
+        >
+          <RefreshCw className="w-3.5 h-3.5" aria-hidden="true" />
+        </button>
+      )}
+
+      {/* Open in new window — kept rightmost to match the file viewer's layout. */}
+      {isDesktopTauri() && terminalId && !isPoppedOut && (
+        <button
+          onClick={() => openTerminalInNewWindow(terminalId, projectId)}
+          className={actionBtn}
+          title="Open in new window"
+          aria-label="Open in new window"
+        >
+          <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+        </button>
       )}
     </div>
   );
