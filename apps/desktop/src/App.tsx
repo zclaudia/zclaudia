@@ -5,6 +5,7 @@ import { SidebarCollapsedBar } from './features/sidebar/SidebarCollapsedBar';
 import { SessionChatLayout } from './features/chat/SessionChatLayout';
 import { MobileSetup } from './components/setup/MobileSetup';
 import { WindowsSetup } from './components/setup/WindowsSetup';
+import { SettingsPanel } from './components/SettingsPanel';
 import { ToastContainer } from './components/ToastContainer';
 import { UpdateBanner } from './components/UpdateBanner';
 import { WindowRouter } from './app/WindowRouter';
@@ -31,6 +32,8 @@ import { useProjectStore } from './stores/projectStore';
 import { useSelectionStore } from './stores/selectionStore';
 import { useClaudiaStore } from './stores/claudiaStore';
 import { useFileViewerStore } from './stores/fileViewerStore';
+import { useTopLevelViewStore } from './stores/topLevelViewStore';
+import { useAgentReadinessStore } from './stores/agentReadinessStore';
 import { usePluginStore } from './stores/pluginStore';
 import { useRecoveryStore } from './stores/recoveryStore';
 import { useNotificationFeedStore } from './stores/notificationFeedStore';
@@ -78,6 +81,10 @@ function AppContent() {
   const fileViewerFilePath = useFileViewerStore((s) => s.filePath);
   const fileViewerProjectRoot = useFileViewerStore((s) => s.projectRoot);
   const setFileViewerFullscreen = useFileViewerStore((s) => s.setFullscreen);
+  const topLevelView = useTopLevelViewStore((s) => s.view);
+  const openSettings = useTopLevelViewStore((s) => s.openSettings);
+  const returnToApp = useTopLevelViewStore((s) => s.returnToApp);
+  const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
 
   const { selectBackend: _selectBackend, selectProject: selectProjectRoute, selectSession: _selectSessionRoute } = useSelectionCoordinator();
 
@@ -142,6 +149,11 @@ function AppContent() {
       projectName: project?.name,
     }));
   }, []);
+
+  const closeTopLevelView = useCallback(() => {
+    returnToApp();
+    void refreshReadiness();
+  }, [returnToApp, refreshReadiness]);
 
   // --- Extracted hooks ---
   useClaudiaDesktop({
@@ -265,6 +277,18 @@ function AppContent() {
     );
   }
 
+  if (topLevelView.kind === 'settings') {
+    return (
+      <div className="flex flex-col h-dvh bg-background text-foreground">
+        <SettingsPanel
+          isOpen={true}
+          initialTab={topLevelView.initialTab}
+          onClose={closeTopLevelView}
+        />
+      </div>
+    );
+  }
+
   // --- Main render ---
   return (
     <div className="flex flex-col h-dvh bg-background text-foreground">
@@ -320,6 +344,7 @@ function AppContent() {
           searchOpen={!isMobile ? sidebarSearchOpen : undefined}
           onSearchOpenChange={!isMobile ? setSidebarSearchOpen : undefined}
           isNotificationsOpen={isMobile ? isFeedOpen : notificationsModalOpen}
+          onOpenSettings={openSettings}
           onOpenDashboard={(projectId) => {
             selectProjectRoute(projectId);
             selectSession(null);
