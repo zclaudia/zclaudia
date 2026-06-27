@@ -41,22 +41,27 @@ export function ContextUsagePopover({ sessionId, children }: Props) {
   const [state, setState] = useState<FetchState | null>(null);
   // Per-session stale-while-revalidate cache so re-hovering doesn't white-flash.
   const cacheRef = useRef<Map<string, ContextUsagePayload>>(new Map());
+  const mountedRef = useRef(true);
   const openTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const doFetch = useCallback(async () => {
-    const cached = cacheRef.current.get(sessionId);
+    const sid = sessionId;
+    const cached = cacheRef.current.get(sid);
     setState(cached ? { status: 'available', usage: cached } : { status: 'loading' });
     try {
-      const res = await getSessionContextUsage(sessionId);
+      const res = await getSessionContextUsage(sid);
+      // Drop the result if we unmounted or switched sessions mid-flight.
+      if (!mountedRef.current || sid !== sessionId) return;
       if (!res.available) {
         setState({ status: 'unavailable' });
         return;
       }
       const { available: _available, ...usage } = res;
-      cacheRef.current.set(sessionId, usage);
+      cacheRef.current.set(sid, usage);
       setState({ status: 'available', usage });
     } catch {
+      if (!mountedRef.current || sid !== sessionId) return;
       setState({ status: 'error' });
     }
   }, [sessionId]);
@@ -80,6 +85,7 @@ export function ContextUsagePopover({ sessionId, children }: Props) {
 
   useEffect(
     () => () => {
+      mountedRef.current = false;
       clearTimeout(openTimer.current);
       clearTimeout(closeTimer.current);
     },
