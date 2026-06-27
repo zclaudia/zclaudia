@@ -449,6 +449,19 @@ body.notch-window {
   border: 0.5px solid hsl(var(--border));
 }
 
+.inline-markdown-emoji {
+  display: inline-flex;
+  width: 1.1em;
+  height: 1em;
+  align-items: center;
+  justify-content: center;
+  vertical-align: -0.125em;
+  line-height: 1;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", emoji, sans-serif;
+  font-size: 1em;
+  font-variant-emoji: emoji;
+}
+
 /* Safe area insets for mobile (notch, rounded corners, gesture bar) */
 .safe-top-spacer {
   height: env(safe-area-inset-top, 0px);

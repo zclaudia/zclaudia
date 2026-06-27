@@ -44,9 +44,16 @@ describe('MarkdownChildrenWithInlineIcons', () => {
     expect(screen.getByRole('img', { name: 'Launch' })).toBeInTheDocument();
   });
 
-  it('keeps unsupported emoji as system emoji', () => {
+  it('wraps unsupported emoji with the generic emoji fallback', () => {
     render(<MarkdownChildrenWithInlineIcons>{'plain 😀'}</MarkdownChildrenWithInlineIcons>);
     expect(screen.queryByRole('img', { name: 'Grinning face' })).not.toBeInTheDocument();
-    expect(screen.getByText('plain 😀')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: '😀' })).toBeInTheDocument();
+  });
+
+  it('wraps common service/tool emoji without adding them to the lucide map', () => {
+    render(<MarkdownChildrenWithInlineIcons>{'🐦 🎮 🏠 ✉️ 📡 🎨 👁️ 🎬'}</MarkdownChildrenWithInlineIcons>);
+    for (const emoji of ['🐦', '🎮', '🏠', '✉️', '📡', '🎨', '👁️', '🎬']) {
+      expect(screen.getByRole('img', { name: emoji })).toBeInTheDocument();
+    }
   });
 });

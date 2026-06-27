@@ -27,6 +27,7 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useServerStore } from '../../stores/serverStore';
 import { TextWithFileRefs, MarkdownChildrenWithFileRefs } from './FileReference';
+import { hasInlineMarkdownIcon, TextWithInlineMarkdownIcons } from '../../components/markdown/InlineMarkdownIcons';
 import { FileLineReference, INLINE_FILE_REF_REGEX } from './FileLineReference';
 import { activatePanel } from '../../utils/openPanel';
 
@@ -1073,7 +1074,9 @@ const AssistantContent = memo(function AssistantContent({ content }: { content: 
                     className="bg-secondary px-1.5 py-0.5 rounded-md text-sm text-primary break-all"
                     {...props}
                   >
-                    {children}
+                    {hasInlineMarkdownIcon(codeText) ? (
+                      <TextWithInlineMarkdownIcons text={codeText} />
+                    ) : children}
                   </code>
                 );
               }

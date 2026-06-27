@@ -2,7 +2,11 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useMemo } from 'react';
 import { useTheme, isDarkTheme } from '../../contexts/ThemeContext';
-import { MarkdownChildrenWithInlineIcons } from '../markdown/InlineMarkdownIcons';
+import {
+  hasInlineMarkdownIcon,
+  MarkdownChildrenWithInlineIcons,
+  TextWithInlineMarkdownIcons,
+} from '../markdown/InlineMarkdownIcons';
 
 function normalizeMarkdownForRender(content: string): string {
   const normalized = content.replace(/\r\n/g, '\n');
@@ -28,6 +32,20 @@ export function MarkdownFileContent({ content }: MarkdownFileContentProps) {
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           components={{
+            code({ className, children, ...props }) {
+              const isBlock = (className ?? '').includes('language-');
+              const codeText = String(children);
+              if (isBlock || codeText.includes('\n')) {
+                return <code className={className} {...props}>{children}</code>;
+              }
+              return (
+                <code className={className} {...props}>
+                  {hasInlineMarkdownIcon(codeText) ? (
+                    <TextWithInlineMarkdownIcons text={codeText} />
+                  ) : children}
+                </code>
+              );
+            },
             pre({ children }) {
               return (
                 <div className="overflow-x-auto touch-pan-x [-webkit-overflow-scrolling:touch]">

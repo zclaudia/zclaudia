@@ -176,8 +176,12 @@ const INLINE_MARKDOWN_ICON_TOKENS = Object.keys(INLINE_MARKDOWN_ICONS)
 const INLINE_MARKDOWN_ICON_PATTERN = INLINE_MARKDOWN_ICON_TOKENS
   .map(escapeRegex)
   .join('|');
-const INLINE_MARKDOWN_ICON_REGEX = new RegExp(INLINE_MARKDOWN_ICON_PATTERN, 'gu');
-const INLINE_MARKDOWN_ICON_TEST_REGEX = new RegExp(INLINE_MARKDOWN_ICON_PATTERN, 'u');
+const EMOJI_FALLBACK_PATTERN = String.raw`(?:\p{Regional_Indicator}{2}|[0-9#*]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\uFE0E|\p{Emoji_Modifier})*)*)`;
+const INLINE_MARKDOWN_EMOJI_PATTERN = INLINE_MARKDOWN_ICON_PATTERN
+  ? `(?:${INLINE_MARKDOWN_ICON_PATTERN})|(?:${EMOJI_FALLBACK_PATTERN})`
+  : EMOJI_FALLBACK_PATTERN;
+const INLINE_MARKDOWN_ICON_REGEX = new RegExp(INLINE_MARKDOWN_EMOJI_PATTERN, 'gu');
+const INLINE_MARKDOWN_ICON_TEST_REGEX = new RegExp(INLINE_MARKDOWN_EMOJI_PATTERN, 'u');
 
 export function hasInlineMarkdownIcon(text: string): boolean {
   return INLINE_MARKDOWN_ICON_TEST_REGEX.test(text);
@@ -185,7 +189,17 @@ export function hasInlineMarkdownIcon(text: string): boolean {
 
 function InlineMarkdownIcon({ symbol }: { symbol: string }) {
   const definition = INLINE_MARKDOWN_ICONS[symbol];
-  if (!definition) return <>{symbol}</>;
+  if (!definition) {
+    return (
+      <span
+        aria-label={symbol}
+        role="img"
+        className="inline-markdown-emoji"
+      >
+        {symbol}
+      </span>
+    );
+  }
 
   const { Icon, label, className, filled } = definition;
   return (
