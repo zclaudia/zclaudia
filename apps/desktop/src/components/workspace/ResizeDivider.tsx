@@ -76,11 +76,20 @@ export function ResizeDivider({ dir, containerSize, onDrag, groupId }: ResizeDiv
       aria-orientation={isRow ? 'vertical' : 'horizontal'}
       className={
         isRow
-          ? 'flex-shrink-0 w-1 cursor-ew-resize bg-transparent hover:bg-border active:bg-border transition-colors'
-          : 'flex-shrink-0 h-1 cursor-ns-resize bg-transparent hover:bg-border active:bg-border transition-colors'
+          ? 'group flex-shrink-0 w-2 flex items-center justify-center cursor-ew-resize'
+          : 'group flex-shrink-0 h-2 flex items-center justify-center cursor-ns-resize'
       }
       onPointerDown={onPointerDown}
       style={{ touchAction: 'none' }}
-    />
+    >
+      {/* Handle: invisible at rest, revealed on hover/drag so the gutter stays clean. */}
+      <div
+        className={
+          isRow
+            ? 'h-8 w-1 rounded-full bg-muted-foreground/0 transition-colors group-hover:bg-muted-foreground/30 group-active:bg-muted-foreground/50'
+            : 'w-8 h-1 rounded-full bg-muted-foreground/0 transition-colors group-hover:bg-muted-foreground/30 group-active:bg-muted-foreground/50'
+        }
+      />
+    </div>
   );
 }
