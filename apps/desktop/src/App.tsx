@@ -48,6 +48,7 @@ import type { OpenAutomationWindowOptions } from './features/automation/openAuto
 
 const FileViewerWindow = lazy(() => import('./components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow })));
 const ProjectDashboard = lazy(() => import('./features/dashboard/ProjectDashboard').then(m => ({ default: m.ProjectDashboard })));
+const MOBILE_TOAST_CONTAINER_CLASS = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
 
 const LazyFallback = () => (
   <div className="flex items-center justify-center h-full">
@@ -115,6 +116,9 @@ function AppContent() {
     ? projects.find((p) => p.id === dashboardProjectId) || null
     : null;
   const isAppTopLevelView = topLevelView.kind === 'app';
+  const mobileToastContainer = isMobile ? (
+    <ToastContainer className={MOBILE_TOAST_CONTAINER_CLASS} />
+  ) : null;
 
   const currentContextProjectId = selectedSession?.projectId || dashboardProjectId || selectedProjectId || null;
 
@@ -286,6 +290,7 @@ function AppContent() {
           initialTab={topLevelView.initialTab}
           onClose={closeTopLevelView}
         />
+        {mobileToastContainer}
       </div>
     );
   }
@@ -414,7 +419,7 @@ function AppContent() {
         </main>
       </div>
 
-      {isMobile && <ToastContainer className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2" />}
+      {mobileToastContainer}
 
       {fileViewerFullscreen && fileViewerFilePath && fileViewerProjectRoot && (
         <div className="fixed inset-0 z-50 bg-background flex flex-col">

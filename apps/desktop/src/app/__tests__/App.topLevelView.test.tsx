@@ -38,7 +38,11 @@ vi.mock('../../features/sidebar/NotificationsModal', () => ({ NotificationsModal
 vi.mock('../../features/sidebar/SidebarCollapsedBar', () => ({ SidebarCollapsedBar: () => null }));
 vi.mock('../../components/setup/MobileSetup', () => ({ MobileSetup: () => <div>Mobile setup</div> }));
 vi.mock('../../components/setup/WindowsSetup', () => ({ WindowsSetup: () => <div>Windows setup</div> }));
-vi.mock('../../components/ToastContainer', () => ({ ToastContainer: () => null }));
+vi.mock('../../components/ToastContainer', () => ({
+  ToastContainer: ({ className }: { className?: string }) => (
+    <div data-testid="toast-container" className={className ?? ''} />
+  ),
+}));
 vi.mock('../../components/UpdateBanner', () => ({ UpdateBanner: () => null }));
 vi.mock('../AppHeader', () => ({ AppHeader: () => null }));
 vi.mock('../MobileOverlays', () => ({ MobileOverlays: () => null }));
@@ -180,5 +184,21 @@ describe('App top-level view routing', () => {
 
     const fileViewerBackCalls = mockUseAndroidBack.mock.calls.filter(([, , priority]) => priority === 25);
     expect(fileViewerBackCalls.at(-1)?.[1]).toBe(false);
+  });
+
+  it('keeps the mobile toast host mounted while Settings is visible', async () => {
+    mockUseIsMobile.mockReturnValue(true);
+
+    const { getByText, getByTestId } = render(<App />);
+
+    fireEvent.click(getByText('Open Settings'));
+
+    await waitFor(() => {
+      expect(getByTestId('settings-panel')).toBeTruthy();
+    });
+
+    const toastContainer = getByTestId('toast-container');
+    expect(toastContainer).toBeTruthy();
+    expect(toastContainer.className).toBe('fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2');
   });
 });
