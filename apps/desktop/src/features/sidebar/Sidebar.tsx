@@ -2,7 +2,6 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useSwipeBack } from '../../hooks/useSwipeBack';
 import { ProjectSettings } from '../settings/ProjectSettings';
-import { SettingsPanel } from '../../components/SettingsPanel';
 import { ActiveSessionsPanel } from '../../components/ActiveSessionsPanel';
 import { PluginPermissionDialog } from '../../components/permission/PluginPermissionDialog';
 import { SortableList, SortableItem } from '../../components/SortableList';
@@ -52,6 +51,7 @@ interface SidebarProps {
   onClose?: () => void;
   onOpenDashboard?: (projectId: string) => void;
   onOpenAutomations?: () => void;
+  onOpenSettings?: (initialTab?: SettingsTab) => void;
   /** Navigate to the welcome screen (deselect session + exit any dashboard). */
   onHome: () => void;
   /** Whether the welcome screen is currently showing. */
@@ -73,6 +73,7 @@ export function Sidebar({
   onClose,
   onOpenDashboard,
   onOpenAutomations,
+  onOpenSettings,
   onHome,
   isHomeActive,
   onOpenNotifications,
@@ -142,11 +143,9 @@ export function Sidebar({
   const [contextMenuProject, setContextMenuProject] = useState<string | null>(null);
   const [contextMenuPos, setContextMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
   const [agentDialogReason, setAgentDialogReason] = useState<AgentReadinessReason | undefined>(undefined);
   const [agentDialogOpen, setAgentDialogOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab | undefined>(undefined);
   const search = useSearchSidebar();
   // Controlled-or-uncontrolled search popover state.
   const [internalSearchOpen, setInternalSearchOpen] = useState(false);
@@ -533,14 +532,6 @@ export function Sidebar({
         />,
         document.body
       )}
-      {showSettings && createPortal(
-        <SettingsPanel
-          isOpen={showSettings}
-          initialTab={settingsInitialTab}
-          onClose={() => { setShowSettings(false); setSettingsInitialTab(undefined); void refreshReadiness(); }}
-        />,
-        document.body
-      )}
       {agentDialogOpen && createPortal(
         <AgentRequiredDialog
           open={agentDialogOpen}
@@ -548,8 +539,7 @@ export function Sidebar({
           onClose={() => setAgentDialogOpen(false)}
           onConfigure={(tab) => {
             setAgentDialogOpen(false);
-            setSettingsInitialTab(tab);
-            setShowSettings(true);
+            onOpenSettings?.(tab);
           }}
         />,
         document.body,
@@ -605,7 +595,7 @@ export function Sidebar({
           </div>
 
           <SidebarFooter
-            onShowSettings={() => setShowSettings(true)}
+            onShowSettings={() => onOpenSettings?.()}
             isMobile
           />
         </div>
@@ -682,7 +672,7 @@ export function Sidebar({
       </div>
 
       <SidebarFooter
-        onShowSettings={() => setShowSettings(true)}
+        onShowSettings={() => onOpenSettings?.()}
       />
     </div>
     {renderPortaledModals()}

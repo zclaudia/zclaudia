@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { render, fireEvent, act, waitFor } from '@testing-library/react';
+import { render, fireEvent, act, waitFor, screen } from '@testing-library/react';
 
 const selectionMocks = {
   selectProject: vi.fn(),
@@ -12,7 +12,6 @@ const neverSettles = new Promise(() => {});
 
 // Mock child components to isolate Sidebar
 vi.mock('../ProjectSettings', () => ({ ProjectSettings: ({ isOpen, onClose }: any) => isOpen ? <div data-testid="project-settings"><button onClick={onClose}>close-project-settings</button></div> : null }));
-vi.mock('../SettingsPanel', () => ({ SettingsPanel: ({ isOpen, onClose }: any) => isOpen ? <div data-testid="settings-panel"><button onClick={onClose}>close-settings</button></div> : null }));
 vi.mock('../SearchFilters', () => ({ SearchFilters: ({ onClose, onFiltersChange }: any) => <div data-testid="search-filters"><button onClick={onClose}>close-filters</button><button onClick={() => onFiltersChange({ sessionId: 's1' })}>apply-filter</button></div> }));
 vi.mock('../ActiveSessionsPanel', () => ({ ActiveSessionsPanel: ({ onSessionSelect }: any) => <div data-testid="active-sessions"><button onClick={() => onSessionSelect('local', 'sess-1')}>select-active</button><button onClick={() => onSessionSelect('backend-1', 'sess-2')}>select-gw</button></div> }));
 vi.mock('../PluginPermissionDialog', () => ({ PluginPermissionDialog: () => null }));
@@ -538,23 +537,17 @@ describe('Sidebar', () => {
 
   // ---- Settings panel ----
 
-  it('opens settings panel when settings button is clicked', () => {
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
+  it('calls the top-level settings opener when settings button is clicked', () => {
+    const onOpenSettings = vi.fn();
+    const { container } = render(
+      <Sidebar collapsed={false} onToggle={vi.fn()} onOpenSettings={onOpenSettings} />
+    );
     const settingsButton = container.querySelector('[data-testid="settings-button"]');
     expect(settingsButton).toBeTruthy();
     fireEvent.click(settingsButton!);
-    expect(document.querySelector('[data-testid="settings-panel"]')).toBeTruthy();
-  });
-
-  it('closes settings panel', () => {
-    const { container } = render(<Sidebar collapsed={false} onToggle={vi.fn()} />);
-    const settingsButton = container.querySelector('[data-testid="settings-button"]');
-    fireEvent.click(settingsButton!);
-    expect(document.querySelector('[data-testid="settings-panel"]')).toBeTruthy();
-
-    const closeBtn = document.querySelector('[data-testid="settings-panel"] button');
-    fireEvent.click(closeBtn!);
-    expect(document.querySelector('[data-testid="settings-panel"]')).toBeFalsy();
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(onOpenSettings.mock.calls[0]).toEqual([]);
+    expect(document.querySelector('[data-testid="settings-panel"]')).toBeNull();
   });
 
   // ---- New Project form ----
@@ -615,6 +608,35 @@ describe('Sidebar', () => {
     });
     expect(refresh).toHaveBeenCalled();
     expect(container.querySelector('input[placeholder="Project name"]')).toBeFalsy();
+  });
+
+  it('opens top-level Settings from the agent setup dialog configure action', async () => {
+    const onOpenSettings = vi.fn();
+    const refresh = vi.fn(async () => {
+      useAgentReadinessStore.setState({ readiness: { usable: false, reason: 'no_agent' }, loading: false });
+    });
+    setupStores({
+      agentReadinessStore: {
+        readiness: null,
+        refresh,
+      },
+    });
+
+    const { container } = render(
+      <Sidebar collapsed={false} onToggle={vi.fn()} onOpenSettings={onOpenSettings} />
+    );
+    const newProjectBtn = container.querySelector<HTMLButtonElement>('button[aria-label="New project"]')!;
+    fireEvent.click(newProjectBtn);
+
+    await waitFor(() => {
+      expect(document.body.textContent).toContain('No agent available yet');
+    });
+
+    fireEvent.click(screen.getByText('Configure →'));
+
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(onOpenSettings).toHaveBeenCalledWith('agents');
+    expect(document.body.textContent).not.toContain('No agent available yet');
   });
 
   it('creates project when form is submitted', async () => {
