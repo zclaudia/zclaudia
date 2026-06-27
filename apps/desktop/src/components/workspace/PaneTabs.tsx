@@ -43,8 +43,11 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
     <div
       data-tab-strip
       data-pane-id={pane.id}
-      className={`flex items-stretch gap-0.5 px-1 h-8 border-b border-border flex-shrink-0 select-none overflow-x-auto ${focused ? '' : 'opacity-90'}`}
+      className={`flex items-stretch px-1 h-8 border-b border-border flex-shrink-0 select-none ${focused ? '' : 'opacity-90'}`}
     >
+      {/* Only the tab list scrolls; the launcher + drag spacer stay outside so the
+          launcher dropdown isn't clipped by overflow (overflow-x:auto → overflow-y:auto). */}
+      <div className="flex items-stretch gap-0.5 min-w-0 overflow-x-auto">
       {pane.tools.map((ref, index) => {
         const panel = panels.find((p) => p.id === ref.toolId);
         const Icon = iconForPanel(ref.toolId);
@@ -93,6 +96,7 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
       {hoverTabPaneId === pane.id && hoverTabIndex === pane.tools.length && (
         <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
       )}
+      </div>
 
       <div className="relative flex items-center" ref={launcherRef}>
         <button

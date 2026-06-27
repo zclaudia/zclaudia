@@ -48,6 +48,33 @@ describe('PaneTabs', () => {
     expect(root.tools.map((t: any) => t.toolId)).toEqual(['file-viewer']);
   });
 
+  it('clicking + opens the tool launcher menu (JS layer works)', () => {
+    usePluginStore.setState({
+      panels: [
+        { id: 'memory', pluginId: 'x', type: 'panel', label: 'Memory' },
+        { id: 'file-viewer', pluginId: 'x', type: 'panel', label: 'Files' },
+        { id: 'terminal', pluginId: 'x', type: 'panel', label: 'Terminal' },
+      ] as any,
+      disabledBuiltinPanels: [],
+    });
+    const pane = seedPane(); // opens memory + file-viewer as tabs (terminal stays unopened)
+    const { getByLabelText, getByText, queryByText } = render(<PaneTabs sessionId="A" pane={pane} focused />);
+    expect(queryByText('Terminal')).toBeNull(); // not an open tab; menu closed
+    fireEvent.click(getByLabelText('Add tool'));
+    expect(getByText('Terminal')).toBeTruthy(); // launcher menu lists registered panels
+  });
+
+  it('keeps the + launcher outside the horizontally-scrolling tab area (its menu must not be clipped)', () => {
+    const pane = seedPane();
+    const { getByLabelText, container } = render(<PaneTabs sessionId="A" pane={pane} focused />);
+    const addBtn = getByLabelText('Add tool');
+    const scroller = container.querySelector('.overflow-x-auto');
+    expect(scroller).toBeTruthy();
+    // The launcher menu drops below the strip; if it lives under the overflow-scroll
+    // element, that element clips it (overflow-x:auto forces overflow-y:auto).
+    expect(scroller!.contains(addBtn)).toBe(false);
+  });
+
   it('exposes a trailing window-drag region (strip is the topmost row)', () => {
     const pane = seedPane();
     const { container } = render(<PaneTabs sessionId="A" pane={pane} focused />);
