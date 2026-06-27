@@ -150,6 +150,8 @@ export function initBuiltinPanels() {
     openMode: 'dedicated',
     alwaysMount: false,
     visible: false,
+    // Opened via the sidebar bell modal, not the workspace launcher.
+    hideFromLauncher: true,
     onClose: () => {
       usePluginStore.getState().updatePanelVisibility('notifications', false);
     },

@@ -83,6 +83,10 @@ export interface UIExtension {
   /** Right-sidebar workspace routing for openTool: 'shared' reuses the primary
    *  pane; 'dedicated' opens (or focuses) its own pane. Defaults to 'shared'. */
   openMode?: 'shared' | 'dedicated';
+  /** Hide from the workspace tool launcher (the `+` menu). Use for panels that
+   *  have their own dedicated entry point elsewhere (e.g. Notifications opens via
+   *  the sidebar bell modal). Still registered so it can render when opened. */
+  hideFromLauncher?: boolean;
 }
 
 export interface PluginNotchTab {

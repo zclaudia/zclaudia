@@ -21,7 +21,10 @@ export function ToolLauncherMenu({ sessionId, projectId, anchorRef, onPick }: Pr
   const disabled = usePluginStore((s) => s.disabledBuiltinPanels);
   const backendId = useServerStore((s) => s.activeServerId);
   const tools = panels.filter(
-    (p) => (p.platforms ?? ['desktop']).includes('desktop') && !disabled.includes(p.id),
+    (p) =>
+      (p.platforms ?? ['desktop']).includes('desktop') &&
+      !disabled.includes(p.id) &&
+      !p.hideFromLauncher,
   );
 
   const menuRef = useRef<HTMLDivElement>(null);
