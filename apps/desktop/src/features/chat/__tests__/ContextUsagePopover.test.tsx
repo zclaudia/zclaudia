@@ -1,0 +1,89 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import type { ContextUsagePayload } from '@zclaudia/shared';
+import { ContextUsagePopover } from '../ContextUsagePopover';
+
+// The component imports the named fetch from the api index; mock just that.
+vi.mock('../../../services/api', () => ({
+  getSessionContextUsage: vi.fn(),
+}));
+import { getSessionContextUsage } from '../../../services/api';
+
+const mockFetch = vi.mocked(getSessionContextUsage);
+
+function payload(): ContextUsagePayload {
+  return {
+    model: 'claude-sonnet-4-6',
+    contextWindow: 200_000,
+    contextWindowSource: 'pi_ai_registry',
+    usedTokens: 25_900,
+    usedTokensFromUsage: true,
+    breakdown: {
+      systemPrompt: { tokens: 2_900, estimated: true },
+      tools: { tokens: 5_600, estimated: true, count: 12 },
+      skills: { tokens: 8_800, estimated: true },
+      messages: { tokens: 8_600, estimated: true, clamped: false },
+      freeSpace: { tokens: 174_100, percent: 87.1 },
+    },
+    capturedAt: 1_770_000_000_000,
+  };
+}
+
+function renderPopover() {
+  return render(
+    <ContextUsagePopover sessionId="s1">
+      <span>indicator</span>
+    </ContextUsagePopover>,
+  );
+}
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe('ContextUsagePopover', () => {
+  it('does not open immediately on hover, then opens and renders the card', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = renderPopover();
+    const anchor = container.firstChild as HTMLElement;
+
+    fireEvent.mouseEnter(anchor);
+    // Open is delayed — the card must not be present synchronously.
+    expect(screen.queryByTestId('context-usage-card')).toBeNull();
+
+    await screen.findByTestId('context-usage-card');
+    expect(mockFetch).toHaveBeenCalledWith('s1');
+  });
+
+  it('renders the empty state when no context data is available', async () => {
+    mockFetch.mockResolvedValue({ available: false });
+    const { container } = renderPopover();
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+
+    await screen.findByTestId('context-usage-popover-empty');
+    expect(screen.queryByTestId('context-usage-card')).toBeNull();
+  });
+
+  it('stays open when the mouse bridges from anchor to popover, closes when leaving both', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = renderPopover();
+    const anchor = container.firstChild as HTMLElement;
+
+    fireEvent.mouseEnter(anchor);
+    const card = await screen.findByTestId('context-usage-card');
+    const popover = card.closest('[data-testid="context-usage-popover"]') as HTMLElement;
+
+    // Leave the anchor but enter the popover within the close delay (bridge).
+    fireEvent.mouseLeave(anchor);
+    fireEvent.mouseEnter(popover);
+    await new Promise((r) => setTimeout(r, 250));
+    expect(screen.queryByTestId('context-usage-card')).not.toBeNull();
+
+    // Leave the popover too — it closes after the delay.
+    fireEvent.mouseLeave(popover);
+    await waitFor(() => expect(screen.queryByTestId('context-usage-card')).toBeNull());
+  });
+});
