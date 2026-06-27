@@ -114,6 +114,7 @@ function AppContent() {
   const dashboardProject = dashboardProjectId
     ? projects.find((p) => p.id === dashboardProjectId) || null
     : null;
+  const isAppTopLevelView = topLevelView.kind === 'app';
 
   const currentContextProjectId = selectedSession?.projectId || dashboardProjectId || selectedProjectId || null;
 
@@ -201,16 +202,16 @@ function AppContent() {
   }, [isAgentExpanded]);
 
   // --- Android back gestures ---
-  useAndroidBack(() => setFileViewerFullscreen(false), fileViewerFullscreen, 25);
-  useAndroidBack(() => setAgentExpanded(false), isMobile && isAgentExpanded, 20);
-  useAndroidBack(() => setSidebarOpen(false), isMobile && sidebarOpen, 10);
-  useAndroidBack(() => setSidebarOpen(true), isMobile && !sidebarOpen && !isAgentExpanded && !fileViewerFullscreen, 5);
+  useAndroidBack(() => setFileViewerFullscreen(false), isAppTopLevelView && fileViewerFullscreen, 25);
+  useAndroidBack(() => setAgentExpanded(false), isAppTopLevelView && isMobile && isAgentExpanded, 20);
+  useAndroidBack(() => setSidebarOpen(false), isAppTopLevelView && isMobile && sidebarOpen, 10);
+  useAndroidBack(() => setSidebarOpen(true), isAppTopLevelView && isMobile && !sidebarOpen && !isAgentExpanded && !fileViewerFullscreen, 5);
 
   // --- Mobile swipe gestures ---
   const swipeOpenClaudiaRef = useSwipeBack<HTMLElement>({
     onSwipe: () => setAgentExpanded(true),
     onProgress: (progress) => setAgentSwipePreview(progress > 0 ? { mode: 'open', progress } : { mode: null, progress: 0 }),
-    enabled: isMobile && !isAgentExpanded && !sidebarOpen && !fileViewerFullscreen,
+    enabled: isAppTopLevelView && isMobile && !isAgentExpanded && !sidebarOpen && !fileViewerFullscreen,
     direction: 'left',
     startZone: { startRatio: 0.25, endRatio: 0.75 },
     threshold: 60,
@@ -219,7 +220,7 @@ function AppContent() {
   const swipeCloseClaudiaRef = useSwipeBack({
     onSwipe: () => setAgentExpanded(false),
     onProgress: (progress) => setAgentSwipePreview(progress > 0 ? { mode: 'close', progress } : { mode: null, progress: 0 }),
-    enabled: isMobile && isAgentExpanded,
+    enabled: isAppTopLevelView && isMobile && isAgentExpanded,
     direction: 'right',
     fullWidth: true,
     threshold: 60,

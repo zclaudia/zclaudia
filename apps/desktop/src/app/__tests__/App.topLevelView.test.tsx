@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, waitFor } from '@testing-library/react';
 
+const { mockUseIsMobile, mockUseAndroidBack } = vi.hoisted(() => ({
+  mockUseIsMobile: vi.fn(() => false),
+  mockUseAndroidBack: vi.fn(),
+}));
+
 vi.mock('../WindowRouter', () => ({
   WindowRouter: ({ children }: { children: any }) => <>{children}</>,
 }));
@@ -53,8 +58,8 @@ vi.mock('../../hooks/useSelectionCoordinator', () => ({
     selectSession: vi.fn(),
   }),
 }));
-vi.mock('../../hooks/useMediaQuery', () => ({ useIsMobile: () => false }));
-vi.mock('../../hooks/useAndroidBack', () => ({ useAndroidBack: vi.fn() }));
+vi.mock('../../hooks/useMediaQuery', () => ({ useIsMobile: mockUseIsMobile }));
+vi.mock('../../hooks/useAndroidBack', () => ({ useAndroidBack: mockUseAndroidBack }));
 vi.mock('../../hooks/useSwipeBack', () => ({ useSwipeBack: () => ({ current: null }) }));
 vi.mock('../../hooks/useNotchBridgeHost', () => ({ useNotchBridgeHost: () => undefined }));
 vi.mock('../../hooks/useAutoUpdate', () => ({ useAutoUpdate: () => undefined }));
@@ -127,6 +132,7 @@ describe('App top-level view routing', () => {
   beforeEach(() => {
     resetStores();
     vi.clearAllMocks();
+    mockUseIsMobile.mockReturnValue(false);
   });
 
   it('replaces the app shell with Settings and returns to the app shell', async () => {
@@ -154,5 +160,25 @@ describe('App top-level view routing', () => {
     });
     expect(getByText('Welcome to ZClaudia')).toBeTruthy();
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+
+  it('disables hidden app-shell back handlers while Settings is visible on mobile', async () => {
+    mockUseIsMobile.mockReturnValue(true);
+    useFileViewerStore.setState({
+      fullscreen: true,
+      filePath: '/tmp/example.txt',
+      projectRoot: '/tmp',
+    } as any);
+
+    const { getByText, getByTestId } = render(<App />);
+
+    fireEvent.click(getByText('Open Settings'));
+
+    await waitFor(() => {
+      expect(getByTestId('settings-panel')).toBeTruthy();
+    });
+
+    const fileViewerBackCalls = mockUseAndroidBack.mock.calls.filter(([, , priority]) => priority === 25);
+    expect(fileViewerBackCalls.at(-1)?.[1]).toBe(false);
   });
 });
