@@ -1,14 +1,14 @@
 import { Gauge } from 'lucide-react';
 import type { ContextUsagePayload } from '@zclaudia/shared';
+import { formatTokens } from '../../utils/formatTokens';
 
 interface ContextUsageCardProps {
   usage: ContextUsagePayload;
 }
 
+/** @deprecated use formatTokens; kept as a thin alias for existing imports/tests. */
 export function formatTokenCount(tokens: number): string {
-  if (tokens >= 1_000_000) return `${(tokens / 1_000_000).toFixed(1)}M`;
-  if (tokens >= 1_000) return `${(tokens / 1_000).toFixed(1)}k`;
-  return String(tokens);
+  return formatTokens(tokens);
 }
 
 const SOURCE_LABELS: Record<string, string> = {

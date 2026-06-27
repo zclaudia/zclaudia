@@ -1,5 +1,6 @@
 import { AlertTriangle } from 'lucide-react';
 import type { ContextWindowSource } from '@zclaudia/shared';
+import { formatTokens } from '../../utils/formatTokens';
 
 interface TokenUsageDisplayProps {
   latestInputTokens?: number;
@@ -28,16 +29,6 @@ interface TokenUsageDisplayProps {
   latestCacheReadTokens?: number;
   /** Cache-write tokens for the most recent agent run (snapshot). */
   latestCacheWriteTokens?: number;
-}
-
-function formatTokenCount(count: number): string {
-  if (count >= 1_000_000) {
-    return `${(count / 1_000_000).toFixed(1)}M`;
-  }
-  if (count >= 1_000) {
-    return `${(count / 1_000).toFixed(0)}K`;
-  }
-  return String(count);
 }
 
 /**
@@ -98,8 +89,8 @@ export function TokenUsageDisplay({
         : 'text-muted-foreground';
 
   const valueText = hasContextWindow
-    ? `${formatTokenCount(currentInput)}/${formatTokenCount(contextWindow)}`
-    : `${formatTokenCount(currentInput)}/--`;
+    ? `${formatTokens(currentInput, { decimals: 0, upper: true })}/${formatTokens(contextWindow, { decimals: 0, upper: true })}`
+    : `${formatTokens(currentInput, { decimals: 0, upper: true })}/--`;
 
   // sourceTip is used by the AlertTriangle warning spans (fallback / openai_compat_default).
   // The AlertTriangle from lucide-react doesn't accept `title`, so we wrap it
@@ -121,7 +112,7 @@ export function TokenUsageDisplay({
           title={`Prompt cache hit: ${(latestCacheReadTokens ?? 0).toLocaleString()} tokens read from cache this turn`}
           aria-label="Prompt cache hit"
         >
-          ↺ {formatTokenCount(latestCacheReadTokens ?? 0)}
+          ↺ {formatTokens(latestCacheReadTokens ?? 0, { decimals: 0, upper: true })}
         </span>
       )}
       {showFallbackIcon && (
