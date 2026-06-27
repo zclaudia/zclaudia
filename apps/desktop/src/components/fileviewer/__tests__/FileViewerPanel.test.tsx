@@ -199,14 +199,6 @@ describe('FileViewerPanel', () => {
     expect(screen.getByTestId('code-viewer')).toBeInTheDocument();
   });
 
-  it('renders the tree toggle in read mode and toggles the tree', () => {
-    mockFileViewerState.filePath = 'src/index.ts';
-    mockFileViewerState.content = 'const x = 1;';
-    render(<FileViewerPanel projectRoot="/project" />);
-    const toggleBtn = screen.getByRole('button', { name: 'Hide file tree' });
-    toggleBtn.click();
-    expect(mockFileViewerState.toggleTree).toHaveBeenCalled();
-  });
 });
 
 describe('FileViewerActions', () => {
@@ -278,5 +270,22 @@ describe('FileViewerActions', () => {
     const fullscreenBtn = container.querySelector('button[title="Fullscreen"]');
     // Button exists (either expand or fullscreen)
     expect(expandBtn || fullscreenBtn).toBeTruthy();
+  });
+
+  it('shows the tree toggle in read mode and toggles the tree', () => {
+    mockFileViewerState.filePath = 'src/index.ts';
+    mockFileViewerState.showTree = true;
+    const { container } = render(<FileViewerActions />);
+    const toggleBtn = container.querySelector('button[title="Hide file tree"]') as HTMLButtonElement;
+    expect(toggleBtn).toBeInTheDocument();
+    toggleBtn.click();
+    expect(mockFileViewerState.toggleTree).toHaveBeenCalled();
+  });
+
+  it('does not show the tree toggle when no file is open', () => {
+    mockFileViewerState.filePath = null;
+    const { container } = render(<FileViewerActions />);
+    expect(container.querySelector('button[title="Hide file tree"]')).not.toBeInTheDocument();
+    expect(container.querySelector('button[title="Show file tree"]')).not.toBeInTheDocument();
   });
 });

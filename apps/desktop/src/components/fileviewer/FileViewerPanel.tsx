@@ -219,7 +219,10 @@ export function FileViewerActions() {
     filePath,
     projectRoot,
     setFullscreen,
+    showTree,
+    toggleTree,
   } = useFileViewerStore();
+  const showFileTree = isMobile ? !filePath : showTree;
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -240,6 +243,19 @@ export function FileViewerActions() {
 
   return (
     <div className="flex items-center gap-1">
+      {filePath && !isMobile && (
+        <button
+          type="button"
+          onClick={toggleTree}
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
+            showFileTree ? 'text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+          }`}
+          title={showFileTree ? 'Hide file tree' : 'Show file tree'}
+          aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
+        >
+          {showFileTree ? <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" /> : <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />}
+        </button>
+      )}
       <button
         onClick={() => setSearchOpen(!searchOpen)}
         className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
@@ -283,7 +299,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const {
     loading, searchOpen,
     targetLine, targetEndLine, targetNonce,
-    openFile, setContent, setError, setSearchOpen, showTree, toggleTree,
+    openFile, setContent, setError, setSearchOpen, showTree,
   } = store;
   // Guard: when the store still holds state pointing at a different project
   // (e.g. user just switched session/project), treat the viewer as if no file
@@ -406,19 +422,6 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                 </span>
               );
             })()}
-            {!isMobile && (
-              <button
-                type="button"
-                onClick={toggleTree}
-                className={`ml-auto inline-flex h-6 w-6 items-center justify-center rounded-md flex-shrink-0 transition-colors ${
-                  showFileTree ? 'text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
-                title={showFileTree ? 'Hide file tree' : 'Show file tree'}
-                aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
-              >
-                {showFileTree ? <PanelLeftClose className="w-3.5 h-3.5" aria-hidden="true" /> : <PanelLeftOpen className="w-3.5 h-3.5" aria-hidden="true" />}
-              </button>
-            )}
           </div>
 
           {searchOpen && (
