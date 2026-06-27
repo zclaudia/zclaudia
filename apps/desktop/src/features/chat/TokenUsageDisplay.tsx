@@ -75,8 +75,8 @@ export function TokenUsageDisplay({
   contextWindow,
   contextWindowSource,
   contextWindowMatchedProvider,
-  cacheReadTokens,
-  cacheWriteTokens,
+  cacheReadTokens: _cacheReadTokens,
+  cacheWriteTokens: _cacheWriteTokens,
   latestCacheReadTokens,
   latestCacheWriteTokens: _latestCacheWriteTokens,
 }: TokenUsageDisplayProps) {
@@ -101,10 +101,7 @@ export function TokenUsageDisplay({
     ? `${formatTokenCount(currentInput)}/${formatTokenCount(contextWindow)}`
     : `${formatTokenCount(currentInput)}/--`;
 
-  // The numeric figures stay in the overall hover title (current/total/context)
-  // so we don't regress existing user behavior. The source tooltip lives on a
-  // dedicated wrapper around the value text so hovering exclusively over the
-  // "X/Y" cluster (or the warning icon) surfaces the source explanation.
+  // sourceTip is used by the AlertTriangle warning spans (fallback / openai_compat_default).
   // The AlertTriangle from lucide-react doesn't accept `title`, so we wrap it
   // in a span with title + aria-label to keep accessibility intact.
   const sourceTip = contextSourceTooltip(contextWindowSource, contextWindowMatchedProvider);
@@ -116,11 +113,8 @@ export function TokenUsageDisplay({
     hasContextWindow && contextWindowSource === 'openai_compat_default';
 
   return (
-    <div
-      className={`flex items-center gap-1 text-xs ${colorClass}`}
-      title={`Current: ${currentInput.toLocaleString()} in / ${currentOutput.toLocaleString()} out | Total: ${inputTokens.toLocaleString()} in / ${outputTokens.toLocaleString()} out | Context: ${hasContextWindow ? contextWindow.toLocaleString() : 'unknown'} | Cache: ${(cacheReadTokens ?? 0).toLocaleString()} read / ${(cacheWriteTokens ?? 0).toLocaleString()} written`}
-    >
-      <span title={sourceTip ?? undefined}>{valueText}</span>
+    <div className={`flex items-center gap-1 text-xs ${colorClass}`}>
+      <span>{valueText}</span>
       {(latestCacheReadTokens ?? 0) > 0 && (
         <span
           className="text-muted-foreground"
