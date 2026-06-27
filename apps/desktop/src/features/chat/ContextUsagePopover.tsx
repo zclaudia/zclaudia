@@ -42,6 +42,11 @@ export function ContextUsagePopover({ sessionId, children }: Props) {
   // Per-session stale-while-revalidate cache so re-hovering doesn't white-flash.
   const cacheRef = useRef<Map<string, ContextUsagePayload>>(new Map());
   const mountedRef = useRef(true);
+  // Always holds the latest sessionId so an in-flight fetch can detect that the
+  // component was re-pointed at a different session (it updates in place rather
+  // than remounting) and drop its now-stale result.
+  const sessionIdRef = useRef(sessionId);
+  sessionIdRef.current = sessionId;
   const openTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -52,7 +57,7 @@ export function ContextUsagePopover({ sessionId, children }: Props) {
     try {
       const res = await getSessionContextUsage(sid);
       // Drop the result if we unmounted or switched sessions mid-flight.
-      if (!mountedRef.current || sid !== sessionId) return;
+      if (!mountedRef.current || sid !== sessionIdRef.current) return;
       if (!res.available) {
         setState({ status: 'unavailable' });
         return;
@@ -61,7 +66,7 @@ export function ContextUsagePopover({ sessionId, children }: Props) {
       cacheRef.current.set(sid, usage);
       setState({ status: 'available', usage });
     } catch {
-      if (!mountedRef.current || sid !== sessionId) return;
+      if (!mountedRef.current || sid !== sessionIdRef.current) return;
       setState({ status: 'error' });
     }
   }, [sessionId]);
