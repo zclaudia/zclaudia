@@ -104,4 +104,30 @@ describe('ContextUsagePopover', () => {
     fireEvent.mouseLeave(popover);
     await waitFor(() => expect(screen.queryByTestId('context-usage-card')).toBeNull());
   });
+
+  it('shows a prompt-cache line when latestCacheRead > 0', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = render(
+      <ContextUsagePopover sessionId="s1" latestCacheRead={4200}>
+        <span>indicator</span>
+      </ContextUsagePopover>,
+    );
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    await screen.findByTestId('context-usage-card');
+    expect(screen.getByTestId('popover-cache-line').textContent).toMatch(
+      /Prompt cache:\s*4K read this turn/i,
+    );
+  });
+
+  it('omits the prompt-cache line when latestCacheRead is 0 or absent', async () => {
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = render(
+      <ContextUsagePopover sessionId="s1" latestCacheRead={0}>
+        <span>indicator</span>
+      </ContextUsagePopover>,
+    );
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    await screen.findByTestId('context-usage-card');
+    expect(screen.queryByTestId('popover-cache-line')).toBeNull();
+  });
 });

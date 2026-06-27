@@ -11,10 +11,13 @@ import { createPortal } from 'react-dom';
 import type { ContextUsagePayload } from '@zclaudia/shared';
 import { getSessionContextUsage } from '../../services/api';
 import { ContextUsageCard } from './ContextUsageCard';
+import { formatTokens } from '../../utils/formatTokens';
 
 interface Props {
   sessionId: string;
   children: ReactNode;
+  /** Cache-read tokens for the latest run (live store value, not in the snapshot). */
+  latestCacheRead?: number;
 }
 
 const OPEN_DELAY = 180;
@@ -35,7 +38,7 @@ type FetchState =
  * portaled overlay. Mounted only inside the desktop composer footer, so it is
  * implicitly desktop-only.
  */
-export function ContextUsagePopover({ sessionId, children }: Props) {
+export function ContextUsagePopover({ sessionId, children, latestCacheRead }: Props) {
   const anchorRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const [state, setState] = useState<FetchState | null>(null);
@@ -114,6 +117,7 @@ export function ContextUsagePopover({ sessionId, children }: Props) {
           state={state}
           onMouseEnter={cancelClose}
           onMouseLeave={scheduleClose}
+          latestCacheRead={latestCacheRead}
         />
       )}
     </span>
@@ -125,11 +129,13 @@ function PopoverBody({
   state,
   onMouseEnter,
   onMouseLeave,
+  latestCacheRead,
 }: {
   anchorRef: RefObject<HTMLElement | null>;
   state: FetchState | null;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  latestCacheRead?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -174,7 +180,19 @@ function PopoverBody({
       // Opaque floating surface so chat content behind it can't bleed through.
       className="z-50 w-80 max-w-[90vw] overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
     >
-      {state?.status === 'available' && <ContextUsageCard usage={state.usage} bare />}
+      {state?.status === 'available' && (
+        <>
+          <ContextUsageCard usage={state.usage} bare />
+          {(latestCacheRead ?? 0) > 0 && (
+            <div
+              data-testid="popover-cache-line"
+              className="border-t border-border/40 px-3 py-2 text-[10px] text-muted-foreground"
+            >
+              ↺ Prompt cache: {formatTokens(latestCacheRead ?? 0, { decimals: 0, upper: true })} read this turn
+            </div>
+          )}
+        </>
+      )}
       {state?.status === 'loading' && (
         <div className="px-3 py-2.5 text-xs text-muted-foreground">Loading context usage…</div>
       )}
