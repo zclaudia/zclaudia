@@ -16,17 +16,15 @@ export interface SessionUsage {
   cacheWriteTokens: number;
   contextWindow?: number;
   /**
-   * Which layer in the resolution chain supplied `contextWindow`. Surfaced
-   * by TokenUsageDisplay so users can tell when we're guessing (fallback)
-   * vs reading from their LLM profile / pi-ai registry.
+   * Which layer in the resolution chain supplied `contextWindow`. Surfaced in
+   * the context popover's card footer so users can tell when we're guessing
+   * (fallback) vs reading from their LLM profile / pi-ai registry.
    */
   contextWindowSource?: ContextWindowSource;
   /**
    * When `contextWindowSource === 'pi_ai_registry'`, the pi-ai provider id
-   * whose registry entry matched. Lets TokenUsageDisplay show
-   * "from registry (deepseek)" on cross-provider sweeps so users can tell
-   * which provider's spec we adopted. `undefined` on same-provider hits
-   * where the annotation would be redundant.
+   * whose registry entry matched. `undefined` on same-provider hits. Carried
+   * for completeness; the indicator no longer surfaces the provider name.
    */
   contextWindowMatchedProvider?: string;
   latestInputTokens?: number;
