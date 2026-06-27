@@ -164,40 +164,33 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
           ? 'w-full h-full safe-top-pad safe-bottom-pad'
           : 'w-full h-full'
       }`}>
-        {/* Header */}
-        <div className="flex items-center justify-between px-3 md:pl-[76px] md:pr-4 py-3 border-b border-border flex-shrink-0" data-tauri-drag-region>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                if (isMobile && mobileShowContent) {
-                  setMobileShowContent(false);
-                } else {
-                  onClose();
+        {/* Mobile header */}
+        {isMobile && (
+          <div className="flex items-center justify-between px-3 py-3 border-b border-border flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  if (mobileShowContent) {
+                    setMobileShowContent(false);
+                  } else {
+                    onClose();
+                  }
+                }}
+                className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+              <h2 className="text-lg font-semibold">
+                {mobileShowContent
+                  ? [...appTabs, ...serverTabs].find(t => t.id === activeTab)?.label || 'Settings'
+                  : 'Settings'
                 }
-              }}
-              className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground md:hidden"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              onClick={onClose}
-              className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              <span className="text-sm">Back to app</span>
-            </button>
-            <h2 className="text-lg font-semibold">
-              {isMobile && mobileShowContent
-                ? [...appTabs, ...serverTabs].find(t => t.id === activeTab)?.label || 'Settings'
-                : 'Settings'
-              }
-            </h2>
+              </h2>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
           {/* Mobile: Tab list */}
@@ -217,7 +210,17 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
 
           {/* Desktop: Tabs vertical sidebar */}
           {!isMobile && (
-            <div className="flex flex-col w-60 border-r border-border p-3 gap-0.5 shrink-0 overflow-y-auto">
+            <div className="flex flex-col w-60 border-r border-border bg-[hsl(var(--sidebar))] px-3 pb-3 gap-0.5 shrink-0 overflow-y-auto">
+              <div className="h-9 -mx-3 flex-shrink-0" data-tauri-drag-region />
+              <button
+                onClick={onClose}
+                className="self-start flex items-center gap-1.5 -ml-1.5 mt-1 mb-2 px-2 py-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                <span className="text-sm">Back to app</span>
+              </button>
               <div className="relative mb-2">
                 <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
@@ -277,8 +280,10 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
 
           {/* Content area */}
           {(!isMobile || mobileShowContent) && (
-          <div className="flex-1 overflow-y-auto">
-            <div className={isMobile ? 'p-3' : 'max-w-[640px] mx-auto px-8 py-6'}>
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {!isMobile && <div className="h-9 flex-shrink-0" data-tauri-drag-region />}
+            <div className="flex-1 overflow-y-auto">
+            <div className={isMobile ? 'p-3' : 'max-w-[640px] mx-auto px-8 pt-2 pb-10'}>
             {activeTab === 'general' && (
               <GeneralSettings
                 isOpen={isOpen}
@@ -397,6 +402,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                 </div>
               );
             })()}
+            </div>
             </div>
           </div>
           )}
