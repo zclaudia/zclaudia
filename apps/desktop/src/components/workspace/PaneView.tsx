@@ -50,7 +50,11 @@ export function PaneView({ sessionId, paneId, pane, focused, projectId, projectR
       data-pane-id={paneId}
       data-focused={focused ? 'true' : 'false'}
       onPointerDown={onFocus}
-      className={`flex flex-col flex-1 min-w-0 min-h-0 bg-card ${focused ? 'ring-1 ring-inset ring-border' : ''}`}
+      className={`flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-lg border bg-card transition-shadow ${
+        focused
+          ? 'border-primary/30 ring-1 ring-primary/30 shadow-md'
+          : 'border-border shadow-sm'
+      }`}
     >
       <PaneTabs sessionId={sessionId} pane={pane} focused={focused} projectId={effectiveProjectId} />
       <div className="flex-1 min-h-0 overflow-hidden relative">
