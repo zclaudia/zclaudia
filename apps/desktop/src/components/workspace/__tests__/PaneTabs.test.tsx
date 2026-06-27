@@ -81,4 +81,35 @@ describe('PaneTabs', () => {
     const { container } = render(<PaneTabs sessionId="A" pane={pane} focused />);
     expect(container.querySelector('[data-tauri-drag-region]')).toBeTruthy();
   });
+
+  it("renders the active tool's action buttons in the strip", () => {
+    const Actions = () => <button aria-label="Tool action">A</button>;
+    usePluginStore.setState({
+      panels: [
+        { id: 'memory', pluginId: 'x', type: 'panel', label: 'Memory' },
+        { id: 'file-viewer', pluginId: 'x', type: 'panel', label: 'Files', actions: Actions },
+      ] as any,
+      disabledBuiltinPanels: [],
+    });
+    const pane = seedPane(); // active = file-viewer
+    const { getByLabelText } = render(<PaneTabs sessionId="A" pane={pane} focused />);
+    expect(getByLabelText('Tool action')).toBeTruthy();
+  });
+
+  it('shows only the active tool\'s actions, not an inactive tab\'s', () => {
+    const Actions = () => <button aria-label="Tool action">A</button>;
+    usePluginStore.setState({
+      panels: [
+        { id: 'memory', pluginId: 'x', type: 'panel', label: 'Memory' },
+        { id: 'file-viewer', pluginId: 'x', type: 'panel', label: 'Files', actions: Actions },
+      ] as any,
+      disabledBuiltinPanels: [],
+    });
+    const s = useRightWorkspaceStore.getState();
+    s.openTool('A', 'file-viewer');
+    s.openTool('A', 'memory'); // active = memory (no actions)
+    const pane = useRightWorkspaceStore.getState().bySession.A.root as any;
+    const { queryByLabelText } = render(<PaneTabs sessionId="A" pane={pane} focused />);
+    expect(queryByLabelText('Tool action')).toBeNull();
+  });
 });

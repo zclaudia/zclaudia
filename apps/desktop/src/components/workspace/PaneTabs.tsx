@@ -5,6 +5,7 @@ import { usePluginStore } from '../../stores/pluginStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
 import { closeTabInWorkspace } from '../../utils/workspaceActions';
 import { ToolLauncherMenu } from './ToolLauncherMenu';
+import { PanelActions } from '../panels/PanelRenderer';
 import { useDragSplitStore } from './dragSplit';
 import { MULTI_INSTANCE_PANELS } from '../../stores/panelInstance';
 
@@ -21,6 +22,8 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
   const hoverTabIndex = useDragSplitStore((s) => s.hoverTabIndex);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
+
+  const activePanel = panels.find((p) => p.id === pane.activeToolId);
 
   const onActivate = (ref: ToolRef) =>
     useRightWorkspaceStore.getState().setActiveTool(sessionId, pane.id, ref.toolId, ref.instanceKey);
@@ -108,6 +111,14 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
 
       {/* Trailing empty area: drags the OS window (the strip is now the topmost row). */}
       <div className="flex-1 self-stretch" data-tauri-drag-region />
+
+      {/* Active tool's action buttons (search, reload, …) — re-homed here from the
+          old per-pane header that the tab strip replaced. */}
+      {activePanel?.actions ? (
+        <div className="flex items-center flex-shrink-0 pr-0.5">
+          <PanelActions panel={activePanel} projectId={projectId} />
+        </div>
+      ) : null}
     </div>
   );
 }
