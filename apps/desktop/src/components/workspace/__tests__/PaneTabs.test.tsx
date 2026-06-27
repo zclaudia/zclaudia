@@ -29,6 +29,8 @@ describe('PaneTabs', () => {
     expect(getByText('Memory')).toBeTruthy();
     const filesTab = getByText('Files').closest('[data-tab-index]') as HTMLElement;
     expect(filesTab.getAttribute('data-active')).toBe('true');
+    // Active tab carries the underline accent bar (not a pill/ring).
+    expect(filesTab.className).toContain('shadow-[inset_0_-2px_0_hsl(var(--primary))]');
   });
 
   it('clicking a tab activates it', () => {

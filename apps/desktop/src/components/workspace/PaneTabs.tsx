@@ -69,8 +69,10 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
                   sourceIndex: index,
                 });
               }}
-              className={`group flex items-center gap-1.5 px-2 my-1 rounded-md cursor-pointer max-w-[140px] ${
-                isActive ? 'bg-card text-foreground ring-1 ring-inset ring-border' : 'text-muted-foreground hover:bg-secondary'
+              className={`group flex items-center gap-1.5 px-2.5 cursor-pointer max-w-[140px] ${
+                isActive
+                  ? 'text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               title={label}
             >
