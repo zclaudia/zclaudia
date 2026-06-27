@@ -158,12 +158,12 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
   );
 
   return (
-    <div className="fixed inset-0 z-50">
-      <div className={`relative bg-card flex flex-col ${
-        isMobile
-          ? 'w-full h-full safe-top-pad safe-bottom-pad'
-          : 'w-full h-full'
-      }`}>
+    <div
+      data-testid="settings-panel"
+      className={`relative bg-card flex flex-col w-full h-full min-h-0 ${
+        isMobile ? 'safe-top-pad safe-bottom-pad' : ''
+      }`}
+    >
         {/* Mobile header */}
         {isMobile && (
           <div className="flex items-center justify-between px-3 py-3 border-b border-border flex-shrink-0">
@@ -407,7 +407,6 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
           </div>
           )}
         </div>
-      </div>
     </div>
   );
 }

@@ -301,8 +301,8 @@ describe('SettingsPanel', () => {
   });
 
   it('renders when open', async () => {
-    const { container } = await renderSettingsPanel();
-    expect(container.textContent).toContain('Settings');
+    const { getByTestId } = await renderSettingsPanel();
+    expect(getByTestId('settings-panel')).toBeTruthy();
   });
 
   it('renders General tab by default', async () => {
@@ -319,28 +319,24 @@ describe('SettingsPanel', () => {
     expect(mockRestartEmbeddedServer).toHaveBeenCalledTimes(1);
   });
 
-  it('calls onClose when backdrop is clicked', async () => {
-    const onClose = vi.fn();
-    const { container } = await renderSettingsPanel({ onClose });
-    // Backdrop is the div behind the modal
-    const backdrop = container.querySelector('.absolute.inset-0.bg-black\\/50');
-    if (backdrop) {
-      await clickAsync(backdrop);
-      expect(onClose).toHaveBeenCalled();
-    }
+  it('renders as a normal full-size view container instead of a fixed overlay', async () => {
+    const { getByTestId } = await renderSettingsPanel();
+    const root = getByTestId('settings-panel');
+
+    expect(root.className).toContain('h-full');
+    expect(root.className).toContain('min-h-0');
+    expect(root.className).not.toContain('fixed');
+    expect(root.className).not.toContain('inset-0');
+    expect(root.className).not.toContain('z-50');
   });
 
-  it('calls onClose when close button (X) is clicked', async () => {
+  it('calls onClose when Back to app is clicked', async () => {
     const onClose = vi.fn();
-    const { container } = await renderSettingsPanel({ onClose });
-    // Find the X close button (hidden on mobile, visible on desktop md:block)
-    const closeButtons = Array.from(container.querySelectorAll('button')).filter(b =>
-      b.className.includes('md:block')
-    );
-    if (closeButtons.length > 0) {
-      await clickAsync(closeButtons[0]);
-      expect(onClose).toHaveBeenCalled();
-    }
+    const { getByText } = await renderSettingsPanel({ onClose });
+
+    await clickAsync(getByText('Back to app'));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   // ---- Tab navigation ----
