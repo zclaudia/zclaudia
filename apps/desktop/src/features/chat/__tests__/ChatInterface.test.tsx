@@ -148,7 +148,7 @@ vi.mock('../WorktreeSelector', () => ({
 }));
 vi.mock('../TokenUsageDisplay', () => ({
   TokenUsageDisplay: (props: any) => (
-    <div data-testid="token-usage" data-input={props.inputTokens} data-output={props.outputTokens} />
+    <div data-testid="token-usage" data-input={props.inputTokens} data-context-window={props.contextWindow} />
   ),
 }));
 vi.mock('../../../components/BottomPanel', () => ({
@@ -1552,14 +1552,14 @@ describe('ChatInterface', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const tokenDisplay = container.querySelector('[data-testid="token-usage"]');
     expect(tokenDisplay?.getAttribute('data-input')).toBe('100');
-    expect(tokenDisplay?.getAttribute('data-output')).toBe('200');
+    expect(tokenDisplay?.getAttribute('data-context-window')).toBe('128000');
   });
 
   it('passes zero usage when no usage data exists', () => {
     const { container } = render(<ChatInterface sessionId="sess-1" />);
     const tokenDisplay = container.querySelector('[data-testid="token-usage"]');
     expect(tokenDisplay?.getAttribute('data-input')).toBe('0');
-    expect(tokenDisplay?.getAttribute('data-output')).toBe('0');
+    expect(tokenDisplay?.getAttribute('data-context-window')).toBeNull();
   });
 
   // ─── Message Input disabled state ─────────────────────────────────────

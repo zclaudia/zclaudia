@@ -520,19 +520,14 @@ export function ChatInputArea({
         <ComposerFooter
           left={selectorTrio}
           right={
-            <ContextUsagePopover sessionId={sessionId}>
+            <ContextUsagePopover
+              sessionId={sessionId}
+              latestCacheRead={currentUsage.latestCacheReadTokens}
+            >
               <TokenUsageDisplay
                 latestInputTokens={currentUsage.latestInputTokens}
-                latestOutputTokens={currentUsage.latestOutputTokens}
                 inputTokens={currentUsage.inputTokens}
-                outputTokens={currentUsage.outputTokens}
                 contextWindow={currentUsage.contextWindow}
-                contextWindowSource={currentUsage.contextWindowSource}
-                contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
-                cacheReadTokens={currentUsage.cacheReadTokens}
-                cacheWriteTokens={currentUsage.cacheWriteTokens}
-                latestCacheReadTokens={currentUsage.latestCacheReadTokens}
-                latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
               />
             </ContextUsagePopover>
           }
