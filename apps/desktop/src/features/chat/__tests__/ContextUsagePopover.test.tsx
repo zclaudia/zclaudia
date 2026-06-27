@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import type { ContextUsagePayload } from '@zclaudia/shared';
@@ -56,6 +57,23 @@ describe('ContextUsagePopover', () => {
 
     await screen.findByTestId('context-usage-card');
     expect(mockFetch).toHaveBeenCalledWith('s1');
+  });
+
+  it('still resolves under StrictMode (mount/cleanup/remount must not strand it on loading)', async () => {
+    // StrictMode double-invokes the mount effect: run → cleanup → run. The
+    // cleanup flips mountedRef to false, so the effect body must flip it back
+    // to true or every fetch result is dropped and the popover sticks on
+    // "Loading…". The real app wraps the tree in StrictMode; tests must too.
+    mockFetch.mockResolvedValue({ available: true, ...payload() });
+    const { container } = render(
+      <StrictMode>
+        <ContextUsagePopover sessionId="s1">
+          <span>indicator</span>
+        </ContextUsagePopover>
+      </StrictMode>,
+    );
+    fireEvent.mouseEnter(container.firstChild as HTMLElement);
+    await screen.findByTestId('context-usage-card');
   });
 
   it('renders the empty state when no context data is available', async () => {

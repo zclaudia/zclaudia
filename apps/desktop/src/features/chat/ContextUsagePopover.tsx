@@ -88,14 +88,17 @@ export function ContextUsagePopover({ sessionId, children }: Props) {
     closeTimer.current = setTimeout(() => setOpen(false), CLOSE_DELAY);
   }, []);
 
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    // Re-arm on (re)mount. StrictMode runs this effect twice with a cleanup in
+    // between; without setting this back to true the ref stays false and every
+    // fetch result is dropped, stranding the popover on "Loading…".
+    mountedRef.current = true;
+    return () => {
       mountedRef.current = false;
       clearTimeout(openTimer.current);
       clearTimeout(closeTimer.current);
-    },
-    [],
-  );
+    };
+  }, []);
 
   return (
     <span
