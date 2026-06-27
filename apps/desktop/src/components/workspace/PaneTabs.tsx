@@ -108,6 +108,9 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
           <ToolLauncherMenu sessionId={sessionId} projectId={projectId} onPick={() => setLauncherOpen(false)} />
         )}
       </div>
+
+      {/* Trailing empty area: drags the OS window (the strip is now the topmost row). */}
+      <div className="flex-1 self-stretch" data-tauri-drag-region />
     </div>
   );
 }

@@ -81,16 +81,15 @@ describe('RightSidebar', () => {
   });
 
   it('renders the empty-state launcher when not collapsed and workspace is empty', () => {
-    const { getByTestId, getByText } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
-    expect(getByText('Workspace')).toBeTruthy();
+    const { getByTestId } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
     expect(getByTestId('empty-state')).toBeTruthy();
   });
 
-  it('renders the workspace when a tool is open', () => {
+  it('renders the workspace without a separate "Workspace" header row', () => {
     useRightWorkspaceStore.getState().openTool('A', 'memory', { openMode: 'shared' });
-    const { getByText, getByTestId } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
-    expect(getByText('Workspace')).toBeTruthy();
+    const { getByTestId, queryByText } = render(<RightSidebar sessionId="A" projectId="p1" projectRoot="/test" />);
     expect(getByTestId('workspace-view')).toBeTruthy();
+    expect(queryByText('Workspace')).toBeNull();
   });
 
   it('uses widthFraction from store as the sidebar width (proportional)', () => {

@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useRightSidebarStore, RIGHT_SIDEBAR_LIMITS } from '../stores/rightSidebarStore';
 import { useRightWorkspaceStore, findPaneWithTool } from '../stores/rightWorkspaceStore';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { WorkspaceView } from './workspace/WorkspaceView';
 import { RightSidebarEmptyState } from './RightSidebarEmptyState';
-import { ToolLauncherMenu } from './workspace/ToolLauncherMenu';
 import { useDragSplitStore, resolvePointerToPane, resolveTabDrop, dropZoneToDir } from './workspace/dragSplit';
 
 interface RightSidebarProps {
@@ -22,7 +20,6 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
   const setWidthFraction = useRightSidebarStore((s) => s.setWidthFraction);
 
   const root = useRightWorkspaceStore((s) => s.bySession[sessionId]?.root ?? null);
-  const [launcherOpen, setLauncherOpen] = useState(false);
 
   // Ensure a workspace entry exists for this session (no-op if present).
   useEffect(() => { useRightWorkspaceStore.getState().ensureSession(sessionId); }, [sessionId]);
@@ -41,19 +38,6 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
 
   // Cleanup drag listeners on unmount to avoid document-listener leak.
   useEffect(() => () => { dragCleanupRef.current?.(); }, []);
-
-  // Outside-click dismissal for the launcher menu.
-  const launcherContainerRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!launcherOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (launcherContainerRef.current && !launcherContainerRef.current.contains(e.target as Node)) {
-        setLauncherOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [launcherOpen]);
 
   const onContentPointerMove = useCallback((e: React.PointerEvent) => {
     const { active } = useDragSplitStore.getState();
@@ -155,28 +139,6 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
         onMouseDown={onDragStart}
         onTouchStart={onDragStart}
       />
-
-      <div className="flex min-h-9 items-center gap-1 px-2 py-1 select-none border-b border-border flex-shrink-0" data-tauri-drag-region>
-        <span className="text-xs font-medium text-muted-foreground px-1">Workspace</span>
-        <div className="flex-1" />
-        <div className="relative" ref={launcherContainerRef}>
-          <button
-            onClick={() => setLauncherOpen((v) => !v)}
-            title="Add tool"
-            aria-label="Add tool"
-            className="p-1 rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <Plus className="w-3.5 h-3.5" />
-          </button>
-          {launcherOpen && (
-            <ToolLauncherMenu
-              sessionId={sessionId}
-              projectId={projectId}
-              onPick={() => setLauncherOpen(false)}
-            />
-          )}
-        </div>
-      </div>
 
       <div
         ref={contentRef}

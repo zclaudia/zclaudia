@@ -45,4 +45,10 @@ describe('PaneTabs', () => {
     const root = useRightWorkspaceStore.getState().bySession.A.root as any;
     expect(root.tools.map((t: any) => t.toolId)).toEqual(['file-viewer']);
   });
+
+  it('exposes a trailing window-drag region (strip is the topmost row)', () => {
+    const pane = seedPane();
+    const { container } = render(<PaneTabs sessionId="A" pane={pane} focused />);
+    expect(container.querySelector('[data-tauri-drag-region]')).toBeTruthy();
+  });
 });
