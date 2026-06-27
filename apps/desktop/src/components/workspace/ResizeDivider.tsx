@@ -76,8 +76,8 @@ export function ResizeDivider({ dir, containerSize, onDrag, groupId }: ResizeDiv
       aria-orientation={isRow ? 'vertical' : 'horizontal'}
       className={
         isRow
-          ? 'group flex-shrink-0 w-2 flex items-center justify-center cursor-ew-resize'
-          : 'group flex-shrink-0 h-2 flex items-center justify-center cursor-ns-resize'
+          ? 'group flex-shrink-0 w-1 flex items-center justify-center cursor-ew-resize'
+          : 'group flex-shrink-0 h-1 flex items-center justify-center cursor-ns-resize'
       }
       onPointerDown={onPointerDown}
       style={{ touchAction: 'none' }}

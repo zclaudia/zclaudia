@@ -69,16 +69,16 @@ describe('ResizeDivider', () => {
     expect(onDrag).not.toHaveBeenCalled();
   });
 
-  it('renders an 8px gutter with a handle child (row)', () => {
+  it('renders a gutter with a handle child (row)', () => {
     const { container } = render(<ResizeDivider dir="row" containerSize={1000} onDrag={() => {}} />);
     const divider = container.firstElementChild as HTMLElement;
-    expect(divider.className).toContain('w-2');           // widened gutter
+    expect(divider.className).toContain('w-1');           // gutter width
     expect(divider.querySelector('div')).not.toBeNull();  // handle pill
   });
 
-  it('renders an 8px gutter (col)', () => {
+  it('renders a gutter (col)', () => {
     const { container } = render(<ResizeDivider dir="col" containerSize={1000} onDrag={() => {}} />);
     const divider = container.firstElementChild as HTMLElement;
-    expect(divider.className).toContain('h-2');
+    expect(divider.className).toContain('h-1');
   });
 });
