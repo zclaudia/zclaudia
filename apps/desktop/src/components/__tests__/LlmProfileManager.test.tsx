@@ -2,6 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { LlmProfileManager as ProviderManager } from '../../features/settings/LlmProfileManager';
 import * as api from '../../services/api';
+import {
+  fetchCodexModels,
+  startCodexOAuth,
+  updateLlmProfile as updateCodexLlmProfile,
+} from '../../services/api/llm-profiles';
 
 const ASYNC_TIMEOUT = 200;
 const waitForFast = (assertion: Parameters<typeof waitFor>[0]) =>
@@ -114,7 +119,15 @@ vi.mock('../../services/api', () => ({
   resolveContextWindowPreview: vi.fn(),
 }));
 
-import { useServerStore } from '../../stores/serverStore';
+vi.mock('../../services/api/llm-profiles', () => ({
+  fetchCodexModels: vi.fn(),
+  signOutCodexOAuth: vi.fn(),
+  updateLlmProfile: vi.fn(),
+  startCodexOAuth: vi.fn(),
+  pollCodexOAuthStatus: vi.fn(),
+  cancelCodexOAuth: vi.fn(),
+}));
+
 import { isAndroid } from '../../utils/platform';
 
 describe('ProviderManager', () => {
@@ -150,6 +163,15 @@ describe('ProviderManager', () => {
     vi.mocked(api.fetchModelsForLlmProfilePreview).mockResolvedValue({ ok: true, models: [] });
     vi.mocked(api.probeLlmProfileModelPreview).mockResolvedValue({ ok: true, latencyMs: 0 });
     vi.mocked(api.resolveContextWindowPreview).mockResolvedValue({ value: 200_000, source: 'pi_ai_registry' });
+    vi.mocked(fetchCodexModels).mockResolvedValue({ models: [], fetchedAt: Date.now(), source: 'fallback' });
+    vi.mocked(updateCodexLlmProfile).mockResolvedValue(mockProviders[0]);
+    vi.mocked(startCodexOAuth).mockResolvedValue({
+      sessionId: 'oauth-session',
+      method: 'device_code',
+      userCode: 'ABCD-1234',
+      verificationUri: 'https://auth.openai.com/codex/device',
+      expiresAt: Date.now() + 900_000,
+    });
     mockProviderMetaState.getProviders.mockReturnValue([]);
     mockServerState.activeServerId = 'local';
     mockServerState.connections.local.status = 'connected';
@@ -762,6 +784,146 @@ describe('ProviderManager', () => {
       // Request headers textarea should have JSON content
       const headersTextarea = screen.getByPlaceholderText(/X-Org-Id/);
       expect(headersTextarea).toHaveValue(JSON.stringify({ 'X-Org-Id': 'secret' }, null, 2));
+    });
+  });
+
+  describe('Codex provider form', () => {
+    const codexProfile = {
+      id: 'codex1',
+      name: 'Codex',
+      providerType: 'openai-codex' as const,
+      baseUrl: 'https://proxy.example.com/v1',
+      apiKey: 'sk-old',
+      compat: { supportsDeveloperRole: false },
+      requestHeaders: { 'X-Org-Id': 'old' },
+      models: [{ modelId: 'old-model' }],
+      cacheRetention: 'long' as const,
+      isDefault: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    it('hides generic provider controls that do not apply to Codex', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([codexProfile]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('Codex')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+
+      await waitFor(() => {
+        expect(screen.getByText('Not signed in to ChatGPT')).toBeInTheDocument();
+      });
+      expect(screen.queryByText(/Base URL/)).not.toBeInTheDocument();
+      expect(screen.queryByText('Request Headers (JSON)')).not.toBeInTheDocument();
+      expect(screen.queryByText('Fetch from /models')).not.toBeInTheDocument();
+      expect(screen.queryByText(/\+ Add model/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Advanced \(compat\)/)).not.toBeInTheDocument();
+    });
+
+    it('clears stale generic settings when saving a Codex profile', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([codexProfile]);
+      vi.mocked(api.updateLlmProfile).mockResolvedValue({
+        ...codexProfile,
+        baseUrl: undefined,
+        apiKey: undefined,
+        compat: undefined,
+        requestHeaders: undefined,
+        models: [],
+        cacheRetention: undefined,
+      });
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('Codex')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+      await clickAsync(screen.getByText('Update'));
+
+      await waitFor(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'codex1',
+          expect.objectContaining({
+            providerType: 'openai-codex',
+            baseUrl: null,
+            apiKey: null,
+            compat: null,
+            requestHeaders: null,
+            models: [],
+            cacheRetention: null,
+          }),
+        );
+      });
+    });
+
+    it('starts OAuth immediately for an already-saved Codex profile', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([codexProfile]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('Codex')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+      await clickAsync(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
+
+      await waitFor(() => {
+        expect(startCodexOAuth).toHaveBeenCalledWith('codex1', expect.stringMatching(/^(browser|device_code)$/));
+      });
+      expect(api.updateLlmProfile).not.toHaveBeenCalled();
+      expect(screen.getByText('ABCD-1234')).toBeInTheDocument();
+    });
+
+    it('creates a new Codex profile before starting OAuth from the add form', async () => {
+      const createdCodexProfile = {
+        id: 'new-codex',
+        name: 'Codex One Step',
+        providerType: 'openai-codex' as const,
+        isDefault: false,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      vi.mocked(api.createLlmProfile).mockResolvedValue(createdCodexProfile);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitFor(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'Codex One Step' },
+      });
+
+      await clickAsync(screen.getByText('Provider Type').nextElementSibling as Element);
+      await clickAsync(screen.getByText('OpenAI Codex (ChatGPT Plus/Pro)'));
+      expect(screen.queryByText('Save the profile first, then sign in with ChatGPT to authenticate.')).not.toBeInTheDocument();
+
+      await clickAsync(screen.getByRole('button', { name: 'Sign in with ChatGPT' }));
+
+      await waitFor(() => {
+        expect(api.createLlmProfile).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: 'Codex One Step',
+            providerType: 'openai-codex',
+            baseUrl: null,
+            apiKey: null,
+            compat: null,
+            requestHeaders: null,
+            models: [],
+          }),
+        );
+      });
+      await waitFor(() => {
+        expect(startCodexOAuth).toHaveBeenCalledWith('new-codex', 'browser');
+      });
     });
   });
 

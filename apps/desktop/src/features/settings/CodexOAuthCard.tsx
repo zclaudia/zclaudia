@@ -27,7 +27,6 @@ function formatExpiry(expiresMs: number): string {
 export function CodexOAuthCard({
   profile,
   isCurrentLocalServer,
-  isTauri,
   onSignIn,
   onSignOut,
   inFlight,
@@ -38,7 +37,7 @@ export function CodexOAuthCard({
     return 'authenticated' as const;
   }, [profile.oauthCredentials]);
 
-  const flowHint = isTauri && isCurrentLocalServer
+  const flowHint = isCurrentLocalServer
     ? 'Sign in using this machine’s browser'
     : 'Sign in with the device code flow (enter the code at auth.openai.com/codex/device)';
 

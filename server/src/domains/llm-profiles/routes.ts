@@ -435,7 +435,9 @@ export function createLlmProfileRoutes(db: Database.Database): Router {
       if (Object.prototype.hasOwnProperty.call(body, 'requestHeaders')) {
         try {
           const validated = validateRequestHeaders(body.requestHeaders);
-          patch.requestHeaders = Object.keys(validated).length > 0 ? validated : undefined;
+          patch.requestHeaders = Object.keys(validated).length > 0
+            ? validated
+            : null as unknown as LlmProfileConfig['requestHeaders'];
         } catch (err) {
           res.status(400).json({
             success: false,

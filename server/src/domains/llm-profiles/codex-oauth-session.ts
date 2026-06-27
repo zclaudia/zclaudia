@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { loginOpenAICodex, loginOpenAICodexDeviceCode } from '@earendil-works/pi-ai/oauth';
 import type { CodexOAuthCredentials } from '@zclaudia/shared/core/llm-profile';
-import { CodexOAuthError } from './codex-oauth-errors.js';
+import { CodexOAuthError, type CodexOAuthErrorCode } from './codex-oauth-errors.js';
 import type { OAuthCredentialsWriter } from './codex-oauth-service.js';
 
 interface BaseSession {
@@ -41,6 +41,16 @@ interface InternalSession extends BaseSession {
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
 const CLEANUP_INTERVAL_MS = 60 * 1000;
+const DEVICE_AUTH_CHALLENGE_MESSAGE = [
+  'OpenAI blocked the Codex device-code request with a browser verification challenge.',
+  'Enable device code login in ChatGPT security settings or workspace permissions, wait a moment, then retry.',
+  'If this keeps failing, use browser login from a local Codex app or CLI session instead.',
+].join(' ');
+
+interface LoginErrorClassification {
+  code: CodexOAuthErrorCode;
+  message: string;
+}
 
 export class CodexOAuthSessionManager {
   private sessions = new Map<string, InternalSession>();
@@ -75,20 +85,20 @@ export class CodexOAuthSessionManager {
       onPrompt: async () => { throw new CodexOAuthError('OAUTH_TIMEOUT', 'Manual prompt not supported via HTTP flow'); },
       signal: controller.signal,
     } as any).then(
-      (creds: unknown) => {
-        this.markSuccess(sessionId, creds as any);
+      async (creds: unknown) => {
+        await this.markSuccess(sessionId, creds as any);
       },
       (err: unknown) => {
         if (controller.signal.aborted) {
           this.markCancelled(sessionId);
           return;
         }
-        const code = this.classifyLoginError(err);
-        this.markError(sessionId, code, err instanceof Error ? err.message : String(err));
-        if (code === 'OAUTH_PORT_CONFLICT') {
-          rejectAuth(new CodexOAuthError('OAUTH_PORT_CONFLICT', 'localhost:1455 is occupied by another process'));
+        const classified = this.classifyLoginError(err);
+        this.markError(sessionId, classified.code, classified.message);
+        if (classified.code === 'OAUTH_PORT_CONFLICT') {
+          rejectAuth(new CodexOAuthError('OAUTH_PORT_CONFLICT', classified.message));
         } else {
-          rejectAuth(err instanceof Error ? err : new Error(String(err)));
+          rejectAuth(new CodexOAuthError(classified.code, classified.message));
         }
       },
     );
@@ -125,15 +135,15 @@ export class CodexOAuthSessionManager {
       onDeviceCode: (info) => resolveDevice(info),
       signal: controller.signal,
     }).then(
-      (creds) => this.markSuccess(sessionId, creds as any),
+      async (creds) => this.markSuccess(sessionId, creds as any),
       (err) => {
         if (controller.signal.aborted) {
           this.markCancelled(sessionId);
           return;
         }
-        const code = this.classifyLoginError(err);
-        this.markError(sessionId, code, err instanceof Error ? err.message : String(err));
-        rejectDevice(err instanceof Error ? err : new Error(String(err)));
+        const classified = this.classifyLoginError(err);
+        this.markError(sessionId, classified.code, classified.message);
+        rejectDevice(new CodexOAuthError(classified.code, classified.message));
       },
     );
 
@@ -179,15 +189,23 @@ export class CodexOAuthSessionManager {
     this.sessions.delete(sessionId);
   }
 
-  private markSuccess(sessionId: string, creds: CodexOAuthCredentials): void {
+  private async markSuccess(sessionId: string, creds: CodexOAuthCredentials): Promise<void> {
     const s = this.sessions.get(sessionId);
     if (!s) return;
-    s.status = { state: 'success', credentials: creds, accountId: creds.accountId };
     if (this.writer) {
-      Promise.resolve(this.writer.updateOAuthCredentials(s.profileId, creds)).catch((err) => {
+      try {
+        await this.writer.updateOAuthCredentials(s.profileId, creds);
+      } catch (err) {
         console.error('[codex-oauth-session] failed to persist credentials', err);
-      });
+        this.markError(sessionId, 'REFRESH_FAILED_TRANSIENT', err instanceof Error ? err.message : String(err));
+        return;
+      }
     }
+    if (s.controller.signal.aborted) {
+      this.markCancelled(sessionId);
+      return;
+    }
+    s.status = { state: 'success', credentials: creds, accountId: creds.accountId };
   }
 
   private markError(sessionId: string, code: string, message: string): void {
@@ -202,13 +220,35 @@ export class CodexOAuthSessionManager {
     s.status = { state: 'cancelled' };
   }
 
-  private classifyLoginError(err: unknown): string {
+  private classifyLoginError(err: unknown): LoginErrorClassification {
     const msg = err instanceof Error ? err.message : String(err);
-    if (/EADDRINUSE.*1455/i.test(msg)) return 'OAUTH_PORT_CONFLICT';
-    if (/state mismatch/i.test(msg)) return 'OAUTH_STATE_MISMATCH';
-    if (/timeout/i.test(msg)) return 'OAUTH_TIMEOUT';
-    if (/cancel/i.test(msg)) return 'OAUTH_CANCELLED';
-    return 'OAUTH_TIMEOUT';
+    if (/EADDRINUSE.*1455/i.test(msg)) {
+      return { code: 'OAUTH_PORT_CONFLICT', message: 'localhost:1455 is occupied by another process' };
+    }
+    if (this.isDeviceAuthChallenge(msg)) {
+      return { code: 'OAUTH_DEVICE_AUTH_CHALLENGE', message: DEVICE_AUTH_CHALLENGE_MESSAGE };
+    }
+    if (/state mismatch/i.test(msg)) return { code: 'OAUTH_STATE_MISMATCH', message: 'OAuth state mismatch. Please retry the sign-in flow.' };
+    if (/timeout/i.test(msg)) return { code: 'OAUTH_TIMEOUT', message: 'OAuth login timed out. Please retry.' };
+    if (/cancel/i.test(msg)) return { code: 'OAUTH_CANCELLED', message: 'OAuth login cancelled.' };
+    return { code: 'OAUTH_TIMEOUT', message: this.compactErrorMessage(msg) };
+  }
+
+  private isDeviceAuthChallenge(message: string): boolean {
+    return (
+      /OpenAI Codex device code request failed with status 429/i.test(message)
+      || (
+        /deviceauth\/(?:usercode|token)|OpenAI Codex device auth/i.test(message)
+        && /<!doctype html|<html|cloudflare|challenges\.cloudflare\.com|Enable JavaScript and cookies|Just a moment|__cf_chl/i.test(message)
+      )
+    );
+  }
+
+  private compactErrorMessage(message: string): string {
+    if (/<!doctype html|<html/i.test(message)) {
+      return 'OAuth login failed because the provider returned an HTML error page. Please retry, or use browser login from a local Codex app or CLI session.';
+    }
+    return message.length > 500 ? `${message.slice(0, 500)}...` : message;
   }
 
   private cleanupExpired(): void {

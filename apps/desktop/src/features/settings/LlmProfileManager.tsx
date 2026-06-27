@@ -217,6 +217,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     try {
       const data = await api.listLlmProfiles();
       setProfiles(data);
+      setEditingProfile((current) => (
+        current ? data.find((p) => p.id === current.id) ?? current : current
+      ));
       // Sync to global store so Sidebar's profile dropdown stays current
       useLlmProfileMetaStore.getState().setProviders(data, activeServerId);
     } catch (error) {
@@ -348,6 +351,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
    * the profile rather than silently falling back to pi-ai defaults.
    */
   const hasAtLeastOneModelEntry = draftsToEntries(formModels).length > 0;
+  const isCodexProvider = formProviderType === 'openai-codex';
 
   const handleSubmit = async (opts: { keepEditing?: boolean; targetId?: string } = {}): Promise<LlmProfileConfig | null> => {
     if (!formName.trim()) return null;
@@ -355,7 +359,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setSaving(true);
     try {
       let requestHeadersObj: Record<string, string> | undefined;
-      if (formRequestHeaders.trim()) {
+      if (isCodexProvider) {
+        setFormRequestHeadersError(null);
+      } else if (formRequestHeaders.trim()) {
         try {
           const parsed = JSON.parse(formRequestHeaders);
           if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -388,7 +394,9 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
       let compatObj: LlmProfileCompat | undefined;
       const compatTrimmed = formCompat.trim();
-      if (compatTrimmed && compatTrimmed !== '{}') {
+      if (isCodexProvider) {
+        setFormCompatError(null);
+      } else if (compatTrimmed && compatTrimmed !== '{}') {
         try {
           const parsed = JSON.parse(compatTrimmed);
           if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -413,22 +421,24 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       const compatMerged: Record<string, unknown> = { ...(compatObj ?? {}) };
       if (formCacheMarkers) compatMerged.cacheControlFormat = 'anthropic';
       else delete compatMerged.cacheControlFormat;
-      const compatOut = Object.keys(compatMerged).length > 0 ? compatMerged : undefined;
+      const compatOut = !isCodexProvider && Object.keys(compatMerged).length > 0 ? compatMerged : undefined;
 
       // Models — block save if any row has an inline error (duplicate / empty
       // id / non-positive-integer override). Empty rows are silently dropped.
       // Row-level errors already surface inline; this banner just points the
       // user at the offending row so they don't have to scan a long list.
       let modelsSaveError: string | null = null;
-      for (let i = 0; i < formModels.length; i += 1) {
-        const row = formModels[i];
-        if (!row.modelId.trim() && !row.displayName.trim() && !row.contextWindowStr.trim() && !row.maxTokensStr.trim()) {
-          continue; // fully empty — drop on serialize
-        }
-        const errs = validateModelDraftRow(row, formModels, i);
-        if (errs.modelId || errs.contextWindow || errs.maxTokens) {
-          modelsSaveError = `Fix model row ${i + 1} before saving (${errs.modelId ?? errs.contextWindow ?? errs.maxTokens}).`;
-          break;
+      if (!isCodexProvider) {
+        for (let i = 0; i < formModels.length; i += 1) {
+          const row = formModels[i];
+          if (!row.modelId.trim() && !row.displayName.trim() && !row.contextWindowStr.trim() && !row.maxTokensStr.trim()) {
+            continue; // fully empty — drop on serialize
+          }
+          const errs = validateModelDraftRow(row, formModels, i);
+          if (errs.modelId || errs.contextWindow || errs.maxTokens) {
+            modelsSaveError = `Fix model row ${i + 1} before saving (${errs.modelId ?? errs.contextWindow ?? errs.maxTokens}).`;
+            break;
+          }
         }
       }
       if (modelsSaveError) {
@@ -436,7 +446,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         setSaving(false);
         return null;
       }
-      const modelsArr = draftsToEntries(formModels);
+      const modelsArr = isCodexProvider ? [] : draftsToEntries(formModels);
       // F2: a profile with no declared models is no longer accepted. Agent
       // profiles consume `llmProfile.models` to choose which model id to send
       // and to resolve the context window — saving an empty list silently
@@ -454,10 +464,10 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       const baseData = {
         name: formName.trim(),
         providerType: formProviderType,
-        baseUrl: formBaseUrl.trim() || undefined,
-        apiKey: formApiKey.trim() || undefined,
-        compat: compatOut as LlmProfileCompat | undefined,
-        requestHeaders: requestHeadersObj,
+        baseUrl: isCodexProvider ? null : formBaseUrl.trim() || undefined,
+        apiKey: isCodexProvider ? null : formApiKey.trim() || undefined,
+        compat: isCodexProvider ? null : (compatOut as LlmProfileCompat | undefined),
+        requestHeaders: isCodexProvider ? null : requestHeadersObj,
         models: modelsArr,
         isDefault: formIsDefault,
       };
@@ -471,12 +481,15 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       let saved: LlmProfileConfig;
       if (updateTargetId) {
         // PUT null clears the cacheRetention field on the server side.
-        saved = await api.updateLlmProfile(updateTargetId, { ...baseData, cacheRetention: cacheRetentionValue });
+        saved = await api.updateLlmProfile(updateTargetId, {
+          ...baseData,
+          cacheRetention: isCodexProvider ? null : cacheRetentionValue,
+        });
       } else {
         // POST ignores null server-side; only send a defined value.
         saved = await api.createLlmProfile({
           ...baseData,
-          ...(cacheRetentionValue !== null ? { cacheRetention: cacheRetentionValue } : {}),
+          ...(!isCodexProvider && cacheRetentionValue !== null ? { cacheRetention: cacheRetentionValue } : {}),
         });
       }
 
@@ -695,6 +708,15 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
 
   if (!isOpen) return null;
 
+  const codexOAuthProfile: LlmProfileConfig = editingProfile ?? {
+    id: '__new_codex_profile__',
+    name: formName.trim() || 'Codex',
+    providerType: 'openai-codex',
+    isDefault: formIsDefault,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
   // Content rendering - shared between modal and inline modes
   const content = !isConnected ? (
     <p className="text-muted-foreground text-center py-8">Connect to a server first</p>
@@ -767,108 +789,110 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         </>
       )}
 
-      {formProviderType === 'openai-codex' && editingProfile && (
+      {formProviderType === 'openai-codex' && (
         <CodexOAuthSection
-          profile={editingProfile}
+          profile={codexOAuthProfile}
           onCredentialsChanged={loadProfiles}
-          onBeforeSignIn={() => handleSubmit({ keepEditing: true, targetId: editingProfile.id })}
+          onBeforeSignIn={!editingProfile || editingProfile.providerType !== 'openai-codex'
+            ? () => handleSubmit({ keepEditing: true, targetId: editingProfile?.id })
+            : undefined}
         />
       )}
 
-      {formProviderType === 'openai-codex' && !editingProfile && (
-        <p className="text-xs text-muted-foreground rounded-lg border border-border bg-secondary/50 px-3 py-2">
-          Save the profile first, then sign in with ChatGPT to authenticate.
-        </p>
-      )}
-
-      <div>
-        <label className="block text-sm font-medium text-muted-foreground mb-1">Request Headers (JSON)</label>
-        <textarea
-          value={formRequestHeaders}
-          onChange={(e) => {
-            setFormRequestHeaders(e.target.value);
-            if (formRequestHeadersError) setFormRequestHeadersError(null);
-          }}
-          placeholder={`{
+      {!isCodexProvider && (
+        <div>
+          <label className="block text-sm font-medium text-muted-foreground mb-1">Request Headers (JSON)</label>
+          <textarea
+            value={formRequestHeaders}
+            onChange={(e) => {
+              setFormRequestHeaders(e.target.value);
+              if (formRequestHeadersError) setFormRequestHeadersError(null);
+            }}
+            placeholder={`{
 "X-Org-Id": "abc",
 "User-Agent": "ZClaudia/1.0"
 }`}
-          rows={5}
-          className={`w-full px-3 py-2 bg-secondary border ${formRequestHeadersError ? 'border-destructive' : 'border-border'} rounded-lg text-sm focus:outline-none focus:border-primary font-mono`}
-        />
-        {formRequestHeadersError ? (
-          <p className="text-xs text-destructive mt-1">{formRequestHeadersError}</p>
-        ) : (
-          <p className="text-xs text-muted-foreground mt-1">
-            Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host are reserved.
-          </p>
-        )}
-      </div>
-
-      <ModelsSection
-        models={formModels}
-        providerType={formProviderType}
-        fetching={fetchingModels}
-        fetchError={fetchModelsError}
-        saveError={formModelsSaveError}
-        onAdd={addEmptyModelRow}
-        onUpdate={updateModelRow}
-        onRemove={removeModelRow}
-        onFetch={handleFetchModels}
-        onProbe={handleProbeModel}
-        buildPreviewInput={buildPreviewInputFromForm}
-      />
-
-      <div>
-        <button
-          type="button"
-          onClick={() => setShowAdvanced((v) => !v)}
-          className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
-        >
-          <ChevronDown
-            size={14}
-            className={`transition-transform duration-200 ${showAdvanced ? 'rotate-0' : '-rotate-90'}`}
+            rows={5}
+            className={`w-full px-3 py-2 bg-secondary border ${formRequestHeadersError ? 'border-destructive' : 'border-border'} rounded-lg text-sm focus:outline-none focus:border-primary font-mono`}
           />
-          Advanced (compat)
-        </button>
-        {showAdvanced && (
-          <div className="mt-2">
-            <div className="flex items-center gap-2 mb-2">
-              <input
-                type="checkbox"
-                id="cacheMarkers"
-                checked={formCacheMarkers}
-                onChange={(e) => setFormCacheMarkers(e.target.checked)}
-                aria-label="Anthropic-style cache markers"
-              />
-              <label htmlFor="cacheMarkers" className="text-sm">
-                Anthropic-style cache markers (enable when routing Claude through an OpenAI-compatible proxy)
-              </label>
-            </div>
-            <textarea
-              value={formCompat}
-              onChange={(e) => {
-                setFormCompat(e.target.value);
-                if (formCompatError) setFormCompatError(null);
-              }}
-              placeholder={`{
+          {formRequestHeadersError ? (
+            <p className="text-xs text-destructive mt-1">{formRequestHeadersError}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground mt-1">
+              Extra HTTP headers added to LLM API requests. Authorization / Content-Type / Host are reserved.
+            </p>
+          )}
+        </div>
+      )}
+
+      {!isCodexProvider && (
+        <ModelsSection
+          models={formModels}
+          providerType={formProviderType}
+          fetching={fetchingModels}
+          fetchError={fetchModelsError}
+          saveError={formModelsSaveError}
+          onAdd={addEmptyModelRow}
+          onUpdate={updateModelRow}
+          onRemove={removeModelRow}
+          onFetch={handleFetchModels}
+          onProbe={handleProbeModel}
+          buildPreviewInput={buildPreviewInputFromForm}
+        />
+      )}
+
+      {!isCodexProvider && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((v) => !v)}
+            className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-200 ${showAdvanced ? 'rotate-0' : '-rotate-90'}`}
+            />
+            Advanced (compat)
+          </button>
+          {showAdvanced && (
+            <div className="mt-2">
+              <div className="flex items-center gap-2 mb-2">
+                <input
+                  type="checkbox"
+                  id="cacheMarkers"
+                  checked={formCacheMarkers}
+                  onChange={(e) => setFormCacheMarkers(e.target.checked)}
+                  aria-label="Anthropic-style cache markers"
+                />
+                <label htmlFor="cacheMarkers" className="text-sm">
+                  Anthropic-style cache markers (enable when routing Claude through an OpenAI-compatible proxy)
+                </label>
+              </div>
+              <textarea
+                value={formCompat}
+                onChange={(e) => {
+                  setFormCompat(e.target.value);
+                  if (formCompatError) setFormCompatError(null);
+                }}
+                placeholder={`{
 "supportsDeveloperRole": false,
 "supportsReasoningEffort": true,
 "supportsStrictMode": false
 }`}
-              rows={5}
-              aria-label="Compat JSON"
-              className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Per-provider capability overrides (JSON object). Leave empty for defaults.
-            </p>
-            {formCompatError && (
-              <p className="text-xs text-destructive mt-1">{formCompatError}</p>
-            )}
-          </div>
-        )}
-      </div>
+                rows={5}
+                aria-label="Compat JSON"
+                className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm focus:outline-none focus:border-primary font-mono"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Per-provider capability overrides (JSON object). Leave empty for defaults.
+              </p>
+              {formCompatError && (
+                <p className="text-xs text-destructive mt-1">{formCompatError}</p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="flex items-center gap-2">
         <input
@@ -886,8 +910,8 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       <div className="flex gap-2 pt-2">
         <button
           onClick={() => { void handleSubmit(); }}
-          disabled={!formName.trim() || saving || !!formRequestHeadersError || (formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry)}
-          title={(formProviderType !== 'openai-codex' && !hasAtLeastOneModelEntry) ? 'Add at least one model before saving' : undefined}
+          disabled={!formName.trim() || saving || (!isCodexProvider && !!formRequestHeadersError) || (!isCodexProvider && !hasAtLeastOneModelEntry)}
+          title={(!isCodexProvider && !hasAtLeastOneModelEntry) ? 'Add at least one model before saving' : undefined}
           className="flex-1 px-4 py-2 bg-muted/60 text-foreground hover:bg-muted rounded-lg text-sm font-medium disabled:opacity-50"
         >
           {saving ? 'Saving...' : editingProfile ? 'Update' : 'Create'}

@@ -250,7 +250,7 @@ export function buildModel(
     (model as any).compat = { ...((model as any).compat ?? {}), supportsDeveloperRole: false };
   }
 
-  if (profile?.requestHeaders) {
+  if (profile?.requestHeaders && profile.providerType !== 'openai-codex') {
     model.headers = { ...(model.headers ?? {}), ...profile.requestHeaders };
   }
   if (profile?.providerType === 'openai-codex' && profile.oauthCredentials) {

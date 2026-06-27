@@ -17,6 +17,7 @@ describe('CodexOAuthError', () => {
     expect(codexOAuthErrorToHttpStatus('OAUTH_TIMEOUT')).toBe(408);
     expect(codexOAuthErrorToHttpStatus('OAUTH_PORT_CONFLICT')).toBe(409);
     expect(codexOAuthErrorToHttpStatus('OAUTH_STATE_MISMATCH')).toBe(400);
+    expect(codexOAuthErrorToHttpStatus('OAUTH_DEVICE_AUTH_CHALLENGE')).toBe(429);
     expect(codexOAuthErrorToHttpStatus('MODELS_FETCH_FAILED')).toBe(503);
     expect(codexOAuthErrorToHttpStatus('RESPONSE_ENDPOINT_REJECTED')).toBe(403);
   });

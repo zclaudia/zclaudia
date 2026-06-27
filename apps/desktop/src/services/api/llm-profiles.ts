@@ -45,12 +45,12 @@ export async function listLlmProfiles(options?: RequestInit): Promise<LlmProfile
 export async function createLlmProfile(data: {
   name: string;
   providerType?: string;
-  baseUrl?: string;
-  apiKey?: string;
-  compat?: LlmProfileCompat;
+  baseUrl?: string | null;
+  apiKey?: string | null;
+  compat?: LlmProfileCompat | null;
   env?: Record<string, string>;
-  requestHeaders?: Record<string, string>;
-  models?: LlmProfileModelEntry[];
+  requestHeaders?: Record<string, string> | null;
+  models?: LlmProfileModelEntry[] | null;
   cacheRetention?: CacheRetentionSetting | null;
   isDefault?: boolean;
 }): Promise<LlmProfileConfig> {
@@ -63,7 +63,14 @@ export async function createLlmProfile(data: {
 export async function updateLlmProfile(
   id: string,
   // `cacheRetention: null` is meaningful on PUT: it clears the stored value.
-  data: Omit<Partial<LlmProfileConfig>, 'cacheRetention'> & { cacheRetention?: CacheRetentionSetting | null }
+  data: Omit<Partial<LlmProfileConfig>, 'baseUrl' | 'apiKey' | 'compat' | 'requestHeaders' | 'models' | 'cacheRetention'> & {
+    baseUrl?: string | null;
+    apiKey?: string | null;
+    compat?: LlmProfileCompat | null;
+    requestHeaders?: Record<string, string> | null;
+    models?: LlmProfileModelEntry[] | null;
+    cacheRetention?: CacheRetentionSetting | null;
+  }
 ): Promise<LlmProfileConfig> {
   return apiCall<LlmProfileConfig>(`/api/llm-profiles/${id}`, {
     method: 'PUT',

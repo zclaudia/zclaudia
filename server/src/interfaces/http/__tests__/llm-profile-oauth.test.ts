@@ -64,6 +64,19 @@ describe('llm-profile-oauth router', () => {
     expect(resp.body.data.userCode).toBe('ABCD-1234');
   });
 
+  it('POST /:id/oauth/start (device_code) returns a concise error for Cloudflare challenges', async () => {
+    (loginOpenAICodexDeviceCode as any).mockRejectedValue(new Error(
+      'OpenAI Codex device code request failed with status 429: <!DOCTYPE html><html><title>Just a moment...</title><body>Enable JavaScript and cookies to continue<script>window._cf_chl_opt = {}</script></body></html>',
+    ));
+
+    const { app } = makeApp();
+    const resp = await request(app).post('/api/llm-profiles/p1/oauth/start').send({ method: 'device_code' });
+    expect(resp.status).toBe(429);
+    expect(resp.body.error.code).toBe('OAUTH_DEVICE_AUTH_CHALLENGE');
+    expect(resp.body.error.message).toContain('OpenAI blocked the Codex device-code request');
+    expect(resp.body.error.message).not.toMatch(/<!DOCTYPE html|_cf_chl/i);
+  });
+
   it('GET /:id/oauth/status returns pending then success', async () => {
     let resolveLogin!: (creds: any) => void;
     (loginOpenAICodex as any).mockImplementation((opts: any) => {

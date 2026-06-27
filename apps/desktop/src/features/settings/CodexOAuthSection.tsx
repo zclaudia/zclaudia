@@ -5,9 +5,10 @@ import { CodexOAuthLoginModal } from './CodexOAuthLoginModal';
 import {
   fetchCodexModels,
   signOutCodexOAuth,
+  updateLlmProfile,
   type CodexModelEntry,
 } from '../../services/api/llm-profiles';
-import type { LlmProfileConfig } from '@zclaudia/shared';
+import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared';
 
 interface Props {
   profile: LlmProfileConfig;
@@ -26,12 +27,37 @@ function detectIsTauri(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
 
+function codexModelsToProfileEntries(models: CodexModelEntry[]): LlmProfileModelEntry[] {
+  return models.map((m) => ({
+    modelId: m.id,
+    displayName: m.displayName && m.displayName !== m.id ? m.displayName : undefined,
+    contextWindow: m.contextWindow,
+  }));
+}
+
+function sameProfileModels(a: LlmProfileModelEntry[] | undefined, b: LlmProfileModelEntry[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  for (let i = 0; i < b.length; i += 1) {
+    const left = a[i];
+    const right = b[i];
+    if (
+      left.modelId !== right.modelId ||
+      left.displayName !== right.displayName ||
+      left.contextWindow !== right.contextWindow ||
+      left.maxTokens !== right.maxTokens
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignIn }: Props) {
   const activeServerId = useServerStore((s) => s.activeServerId);
   const isCurrentLocalServer = activeServerId === 'local';
   const isTauri = detectIsTauri();
   const method: 'browser' | 'device_code' =
-    isTauri && isCurrentLocalServer ? 'browser' : 'device_code';
+    isCurrentLocalServer ? 'browser' : 'device_code';
 
   const [showLogin, setShowLogin] = useState(false);
   // The profile id used by the login modal. Defaults to props.profile.id but
@@ -77,6 +103,15 @@ export function CodexOAuthSection({ profile, onCredentialsChanged, onBeforeSignI
     try {
       const result = await fetchCodexModels(profile.id, { refresh });
       setModels(result.models);
+      const profileModels = codexModelsToProfileEntries(result.models);
+      if (!sameProfileModels(profile.models, profileModels)) {
+        try {
+          await updateLlmProfile(profile.id, { models: profileModels });
+          onCredentialsChanged();
+        } catch (err) {
+          console.warn('[CodexOAuthSection] failed to sync codex models to profile', err);
+        }
+      }
     } catch {
       setModels([]);
     } finally {

@@ -146,6 +146,23 @@ describe('llm-profiles routes', () => {
       });
       expect(res.status).toBe(400);
     });
+
+    it('PUT clears requestHeaders when null is sent', async () => {
+      const createRes = await request(app).post('/api/llm-profiles').send({
+        name: 'with-headers',
+        providerType: 'openai',
+        requestHeaders: { 'X-Org-Id': 'abc' },
+      });
+      const id = createRes.body.data.id;
+
+      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
+        requestHeaders: null,
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.requestHeaders).toBeUndefined();
+      expect(new LlmProfileRepository(db).findById(id)?.requestHeaders).toBeUndefined();
+    });
   });
 
   describe('models validation', () => {

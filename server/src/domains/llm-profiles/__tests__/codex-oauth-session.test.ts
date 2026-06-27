@@ -50,6 +50,23 @@ describe('CodexOAuthSessionManager', () => {
     expect(session.verificationUri).toBe('https://auth.openai.com/codex/device');
   });
 
+  it('sanitizes Cloudflare HTML device-code failures', async () => {
+    (loginOpenAICodexDeviceCode as any).mockRejectedValue(new Error(
+      'OpenAI Codex device code request failed with status 429: <!DOCTYPE html><html><head><title>Just a moment...</title></head><body>Enable JavaScript and cookies to continue<script>window._cf_chl_opt = {}</script></body></html>',
+    ));
+
+    try {
+      await mgr.startDeviceCodeFlow('p1');
+      throw new Error('expected startDeviceCodeFlow to reject');
+    } catch (err) {
+      expect(err).toMatchObject({
+        code: 'OAUTH_DEVICE_AUTH_CHALLENGE',
+        message: expect.stringContaining('OpenAI blocked the Codex device-code request'),
+      });
+      expect(err instanceof Error ? err.message : String(err)).not.toMatch(/<!DOCTYPE html|_cf_chl/i);
+    }
+  });
+
   it('on success, status becomes success with credentials', async () => {
     const credsFromPiAi = { access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' };
     (loginOpenAICodex as any).mockImplementation(async (opts: any) => {
@@ -62,6 +79,35 @@ describe('CodexOAuthSessionManager', () => {
     const status = mgr.getStatus(session.sessionId);
     expect(status?.state).toBe('success');
     expect(status?.credentials).toEqual(credsFromPiAi);
+  });
+
+  it('does not report success until credentials are persisted', async () => {
+    mgr.dispose();
+    let resolvePersist!: () => void;
+    const writer = {
+      updateOAuthCredentials: vi.fn(() => new Promise<void>((resolve) => {
+        resolvePersist = resolve;
+      })),
+    };
+    mgr = new CodexOAuthSessionManager(writer);
+    const credsFromPiAi = { access: 'a', refresh: 'r', expires: 1, accountId: 'acct_x' };
+    (loginOpenAICodex as any).mockImplementation(async (opts: any) => {
+      opts.onAuth({ url: 'http://x' });
+      return credsFromPiAi;
+    });
+
+    const session = await mgr.startBrowserFlow('p1');
+    await new Promise((r) => setTimeout(r, 5));
+
+    expect(writer.updateOAuthCredentials).toHaveBeenCalledWith('p1', credsFromPiAi);
+    expect(mgr.getStatus(session.sessionId)?.state).toBe('pending');
+
+    resolvePersist();
+    await new Promise((r) => setTimeout(r, 5));
+
+    const status = mgr.getStatus(session.sessionId);
+    expect(status?.state).toBe('success');
+    expect(status).toMatchObject({ accountId: 'acct_x' });
   });
 
   it('cancel aborts the flow', async () => {

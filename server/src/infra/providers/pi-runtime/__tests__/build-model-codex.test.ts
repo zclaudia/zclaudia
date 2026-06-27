@@ -58,4 +58,17 @@ describe('buildModel — openai-codex', () => {
     expect(model.headers?.['ChatGPT-Account-Id']).toBe('acct_x');
     expect(model.headers?.['originator']).toBe('zclaudia');
   });
+
+  it('ignores custom requestHeaders on Codex profiles', () => {
+    const { model } = buildModel(
+      {
+        ...makeCodexProfile(),
+        requestHeaders: { 'X-Org-Id': 'stale-org', originator: 'wrong-originator' },
+      },
+      'gpt-5-codex',
+    );
+
+    expect(model.headers?.['X-Org-Id']).toBeUndefined();
+    expect(model.headers?.['originator']).toBe('zclaudia');
+  });
 });
