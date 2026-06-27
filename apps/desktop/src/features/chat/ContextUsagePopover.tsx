@@ -171,26 +171,23 @@ function PopoverBody({
         left: pos?.left ?? -9999,
         visibility: pos ? 'visible' : 'hidden',
       }}
-      className="z-50 w-80 max-w-[90vw]"
+      // Opaque floating surface so chat content behind it can't bleed through.
+      className="z-50 w-80 max-w-[90vw] overflow-hidden rounded-lg border border-border bg-popover shadow-lg"
     >
-      {state?.status === 'available' && <ContextUsageCard usage={state.usage} />}
+      {state?.status === 'available' && <ContextUsageCard usage={state.usage} bare />}
       {state?.status === 'loading' && (
-        <div className="my-3 rounded-lg border border-border/60 bg-popover px-3 py-2.5 text-xs text-muted-foreground">
-          Loading context usage…
-        </div>
+        <div className="px-3 py-2.5 text-xs text-muted-foreground">Loading context usage…</div>
       )}
       {state?.status === 'unavailable' && (
         <div
           data-testid="context-usage-popover-empty"
-          className="my-3 rounded-lg border border-border/60 bg-popover px-3 py-2.5 text-xs text-muted-foreground"
+          className="px-3 py-2.5 text-xs text-muted-foreground"
         >
           No context data yet — send a message first.
         </div>
       )}
       {state?.status === 'error' && (
-        <div className="my-3 rounded-lg border border-border/60 bg-popover px-3 py-2.5 text-xs text-destructive">
-          Failed to load context usage.
-        </div>
+        <div className="px-3 py-2.5 text-xs text-destructive">Failed to load context usage.</div>
       )}
     </div>,
     document.body,

@@ -4,6 +4,13 @@ import { formatTokens } from '../../utils/formatTokens';
 
 interface ContextUsageCardProps {
   usage: ContextUsagePayload;
+  /**
+   * Drop the inline-message chrome (outer margin, border, rounding, translucent
+   * background) so a host that already supplies an opaque floating surface — the
+   * hover popover — doesn't get a translucent double-border. Defaults to the
+   * inline `/context` styling.
+   */
+  bare?: boolean;
 }
 
 /** @deprecated use formatTokens; kept as a thin alias for existing imports/tests. */
@@ -24,7 +31,7 @@ const SOURCE_LABELS: Record<string, string> = {
  * only, never persisted). Shows total occupancy from real usage plus a
  * chars/4-estimated per-category breakdown.
  */
-export function ContextUsageCard({ usage }: ContextUsageCardProps) {
+export function ContextUsageCard({ usage, bare = false }: ContextUsageCardProps) {
   const { contextWindow, usedTokens, breakdown } = usage;
   const usedPercent = contextWindow > 0 ? (usedTokens / contextWindow) * 100 : 0;
 
@@ -42,7 +49,11 @@ export function ContextUsageCard({ usage }: ContextUsageCardProps) {
   return (
     <div
       data-testid="context-usage-card"
-      className="my-3 rounded-lg border border-border/60 bg-secondary/30 text-xs px-3 py-2.5 space-y-2"
+      className={
+        bare
+          ? 'text-xs px-3 py-2.5 space-y-2'
+          : 'my-3 rounded-lg border border-border/60 bg-secondary/30 text-xs px-3 py-2.5 space-y-2'
+      }
     >
       <div className="flex items-center gap-2">
         <Gauge size={14} strokeWidth={1.5} className="flex-shrink-0 text-muted-foreground" />

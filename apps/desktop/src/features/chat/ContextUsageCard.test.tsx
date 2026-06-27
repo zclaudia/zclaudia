@@ -48,6 +48,18 @@ describe('ContextUsageCard', () => {
     expect(screen.getByText('174.1k')).toBeInTheDocument();  // free space → no prefix
   });
 
+  it('drops the translucent inline chrome in the bare variant (opaque host owns the surface)', () => {
+    const { rerender } = render(<ContextUsageCard usage={makePayload()} />);
+    // Inline default keeps its translucent bordered card chrome.
+    expect(screen.getByTestId('context-usage-card').className).toContain('bg-secondary/30');
+    // Bare variant drops the translucent bg / border / margin so it can sit on
+    // an opaque popover surface without bleed-through or a double border.
+    rerender(<ContextUsageCard usage={makePayload()} bare />);
+    const bare = screen.getByTestId('context-usage-card').className;
+    expect(bare).not.toContain('bg-secondary/30');
+    expect(bare).not.toContain('border');
+  });
+
   it('shows the estimation footnote and context-window source', () => {
     render(<ContextUsageCard usage={makePayload()} />);
     expect(screen.getByText(/chars\/4 estimates/i)).toBeInTheDocument();
