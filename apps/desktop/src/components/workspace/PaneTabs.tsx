@@ -1,4 +1,4 @@
-import { Fragment, useState, useRef, useEffect } from 'react';
+import { Fragment, useState, useRef } from 'react';
 import { X, Plus } from 'lucide-react';
 import { useRightWorkspaceStore, type PaneNode, type ToolRef } from '../../stores/rightWorkspaceStore';
 import { usePluginStore } from '../../stores/pluginStore';
@@ -21,15 +21,6 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
   const hoverTabIndex = useDragSplitStore((s) => s.hoverTabIndex);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!launcherOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (launcherRef.current && !launcherRef.current.contains(e.target as Node)) setLauncherOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [launcherOpen]);
 
   const onActivate = (ref: ToolRef) =>
     useRightWorkspaceStore.getState().setActiveTool(sessionId, pane.id, ref.toolId, ref.instanceKey);
@@ -111,7 +102,7 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
           <Plus className="w-3.5 h-3.5" />
         </button>
         {launcherOpen && (
-          <ToolLauncherMenu sessionId={sessionId} projectId={projectId} onPick={() => setLauncherOpen(false)} />
+          <ToolLauncherMenu sessionId={sessionId} projectId={projectId} anchorRef={launcherRef} onPick={() => setLauncherOpen(false)} />
         )}
       </div>
 

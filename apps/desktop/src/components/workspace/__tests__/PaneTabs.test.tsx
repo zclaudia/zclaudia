@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { render, fireEvent } from '@testing-library/react';
+import { render, fireEvent, screen } from '@testing-library/react';
 import { usePluginStore } from '../../../stores/pluginStore';
 import { useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
 import { PaneTabs } from '../PaneTabs';
@@ -58,10 +58,11 @@ describe('PaneTabs', () => {
       disabledBuiltinPanels: [],
     });
     const pane = seedPane(); // opens memory + file-viewer as tabs (terminal stays unopened)
-    const { getByLabelText, getByText, queryByText } = render(<PaneTabs sessionId="A" pane={pane} focused />);
-    expect(queryByText('Terminal')).toBeNull(); // not an open tab; menu closed
+    const { getByLabelText } = render(<PaneTabs sessionId="A" pane={pane} focused />);
+    // Menu portals to document.body → query via screen. Terminal isn't an open tab.
+    expect(screen.queryByText('Terminal')).toBeNull();
     fireEvent.click(getByLabelText('Add tool'));
-    expect(getByText('Terminal')).toBeTruthy(); // launcher menu lists registered panels
+    expect(screen.getByText('Terminal')).toBeTruthy(); // launcher menu lists registered panels
   });
 
   it('keeps the + launcher outside the horizontally-scrolling tab area (its menu must not be clipped)', () => {
