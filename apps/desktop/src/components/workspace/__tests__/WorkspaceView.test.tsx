@@ -69,7 +69,7 @@ describe('WorkspaceView', () => {
     const { container } = render(<WorkspaceView sessionId="A" />);
     const rootEl = container.firstChild as HTMLElement;
     expect(rootEl.className).toContain('bg-muted'); // recessed canvas
-    expect(rootEl.className).toContain('p-2');      // gutter padding
+    expect(rootEl.className).toContain('p-1');      // gutter padding
     expect(rootEl.className).toContain('inset-0');  // still fills container
     const pane = container.querySelector('[data-pane-id]') as HTMLElement;
     expect(pane.className).toContain('rounded-lg'); // card
