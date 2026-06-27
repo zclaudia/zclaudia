@@ -9,6 +9,7 @@ import { ModeSelector } from './ModeSelector';
 import { PermissionSelector } from './PermissionSelector';
 import { WorktreeSelector } from './WorktreeSelector';
 import { TokenUsageDisplay } from './TokenUsageDisplay';
+import { ContextUsagePopover } from './ContextUsagePopover';
 import { ComposerFooter } from './ComposerFooter';
 import { MessageInput, type Attachment } from './MessageInput';
 import { useServerStore } from '../../stores/serverStore';
@@ -519,19 +520,21 @@ export function ChatInputArea({
         <ComposerFooter
           left={selectorTrio}
           right={
-            <TokenUsageDisplay
-              latestInputTokens={currentUsage.latestInputTokens}
-              latestOutputTokens={currentUsage.latestOutputTokens}
-              inputTokens={currentUsage.inputTokens}
-              outputTokens={currentUsage.outputTokens}
-              contextWindow={currentUsage.contextWindow}
-              contextWindowSource={currentUsage.contextWindowSource}
-              contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
-              cacheReadTokens={currentUsage.cacheReadTokens}
-              cacheWriteTokens={currentUsage.cacheWriteTokens}
-              latestCacheReadTokens={currentUsage.latestCacheReadTokens}
-              latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
-            />
+            <ContextUsagePopover sessionId={sessionId}>
+              <TokenUsageDisplay
+                latestInputTokens={currentUsage.latestInputTokens}
+                latestOutputTokens={currentUsage.latestOutputTokens}
+                inputTokens={currentUsage.inputTokens}
+                outputTokens={currentUsage.outputTokens}
+                contextWindow={currentUsage.contextWindow}
+                contextWindowSource={currentUsage.contextWindowSource}
+                contextWindowMatchedProvider={currentUsage.contextWindowMatchedProvider}
+                cacheReadTokens={currentUsage.cacheReadTokens}
+                cacheWriteTokens={currentUsage.cacheWriteTokens}
+                latestCacheReadTokens={currentUsage.latestCacheReadTokens}
+                latestCacheWriteTokens={currentUsage.latestCacheWriteTokens}
+              />
+            </ContextUsagePopover>
           }
         />
       )}
