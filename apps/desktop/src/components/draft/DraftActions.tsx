@@ -21,7 +21,6 @@ export function DraftActions() {
     sendCallback,
     finishDraft,
     discardDraft,
-    setPoppedOut,
   } = useDraftEditorStore();
 
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
