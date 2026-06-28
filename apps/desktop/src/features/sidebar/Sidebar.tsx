@@ -10,6 +10,8 @@ import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
 import { SidebarNav } from './SidebarNav';
+import { AutomationScopeList } from './AutomationScopeList';
+import type { AutomationTab } from '../automation/automation-types';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
 import { SearchModal } from './SearchModal';
@@ -18,6 +20,7 @@ import { BackendRow } from './BackendRow';
 import { useOnlineBackends } from './onlineBackends';
 import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
+import { useServerStore } from '../../stores/serverStore';
 import { NewProjectForm } from './NewProjectForm';
 import { SidebarFooter } from './SidebarFooter';
 import { useSidebarData } from './useSidebarData';
@@ -51,6 +54,15 @@ interface SidebarProps {
   onClose?: () => void;
   onOpenDashboard?: (projectId: string) => void;
   onOpenAutomations?: () => void;
+  /** When present, the sidebar renders in automation mode (tab nav + scope list). */
+  automationMode?: {
+    tab: AutomationTab;
+    projectId?: string;
+    onSelectTab: (tab: AutomationTab) => void;
+    onBack: () => void;
+    /** projectId omitted = scope to the whole backend (global). */
+    onSelectScope: (backendId: string, projectId?: string) => void;
+  };
   onOpenSettings?: (initialTab?: SettingsTab) => void;
   /** Navigate to the welcome screen (deselect session + exit any dashboard). */
   onHome: () => void;
@@ -73,6 +85,7 @@ export function Sidebar({
   onClose,
   onOpenDashboard,
   onOpenAutomations,
+  automationMode,
   onOpenSettings,
   onHome,
   isHomeActive,
@@ -112,6 +125,7 @@ export function Sidebar({
   } = data;
 
   const onlineBackends = useOnlineBackends();
+  const activeServerId = useServerStore((s) => s.activeServerId);
   const expandedBackendIds = useSidebarExpansionStore((s) => s.expandedBackendIds);
   const toggleBackend = useSidebarExpansionStore((s) => s.toggleBackend);
   const expandBackend = useSidebarExpansionStore((s) => s.expandBackend);
@@ -579,10 +593,28 @@ export function Sidebar({
             onHome={() => { onHome(); onClose?.(); }}
             isHomeActive={isHomeActive}
             isMobile
+            automationMode={automationMode ? {
+              tab: automationMode.tab,
+              onSelectTab: automationMode.onSelectTab,
+              onBack: automationMode.onBack,
+            } : undefined}
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
-            {renderProjectList()}
+            {automationMode ? (
+              <AutomationScopeList
+                backends={onlineBackends}
+                getProjectsForBackend={getProjectsForBackend}
+                expandedBackendIds={expandedBackendIds}
+                onToggleBackend={toggleBackend}
+                activeBackendId={activeServerId}
+                selectedProjectId={automationMode.projectId}
+                onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
+                onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
+              />
+            ) : (
+              renderProjectList()
+            )}
           </div>
 
           <div className="flex-shrink-0">
@@ -659,10 +691,28 @@ export function Sidebar({
         onHome={onHome}
         isHomeActive={isHomeActive}
         onOpenAutomations={onOpenAutomations}
+        automationMode={automationMode ? {
+          tab: automationMode.tab,
+          onSelectTab: automationMode.onSelectTab,
+          onBack: automationMode.onBack,
+        } : undefined}
       />
 
       <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
-        {renderProjectList()}
+        {automationMode ? (
+          <AutomationScopeList
+            backends={onlineBackends}
+            getProjectsForBackend={getProjectsForBackend}
+            expandedBackendIds={expandedBackendIds}
+            onToggleBackend={toggleBackend}
+            activeBackendId={activeServerId}
+            selectedProjectId={automationMode.projectId}
+            onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
+            onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
+          />
+        ) : (
+          renderProjectList()
+        )}
       </div>
 
       <div className="flex-shrink-0">
