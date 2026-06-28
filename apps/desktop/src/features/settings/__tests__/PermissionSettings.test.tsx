@@ -138,6 +138,18 @@ describe('PermissionSettings', () => {
     expect(screen.getByRole('option', { name: 'Primary (zclaudia)' })).toBeInTheDocument();
   });
 
+  it('renders the master toggle and grouped sections once loaded', async () => {
+    render(<PermissionSettings />);
+    expect(await screen.findByText('Auto-approve tools')).toBeTruthy();
+    expect(screen.getByRole('switch', { name: 'Auto-approve tools' })).toBeTruthy();
+    // policy defaults to enabled via DEFAULT_UNIFIED_POLICY; grouped sections present:
+    expect(screen.getByText('Permission categories')).toBeTruthy();
+    expect(screen.getByText('Tool rules')).toBeTruthy();
+    expect(screen.getByText('Hooks')).toBeTruthy();
+    expect(screen.getByText('Safety guards')).toBeTruthy();
+    expect(screen.getByText('File Read')).toBeTruthy();
+  });
+
   it('lists non-system workflows as global override options', async () => {
     mockListAllWorkflows.mockResolvedValue([
       { id: 'wf-global', name: 'Global Review', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } },

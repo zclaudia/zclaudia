@@ -21,6 +21,8 @@ import {
 } from '@zclaudia/shared';
 import { ToolRuleList } from '../../components/permission/ToolRuleList';
 import { HookList } from '../../components/permission/HookList';
+import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
+import { Toggle } from '../../components/ui/Toggle';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
 
@@ -51,23 +53,21 @@ function CategoryRow({ category, value, onChange, disabled }: {
 }) {
   const info = CATEGORY_LABELS[category];
   const isLocked = category === 'userQuestions';
-
   return (
-    <div className="flex items-center justify-between py-1">
-      <div className="min-w-0 mr-3">
-        <span className="text-xs font-medium">{info.label}</span>
-        <p className="text-[10px] text-muted-foreground truncate">{info.description}</p>
-      </div>
-      <Select<CategoryAction>
-        value={isLocked ? 'ask' : value}
-        onChange={onChange}
-        options={ACTION_OPTIONS}
-        disabled={disabled || isLocked}
-        title={isLocked ? 'User questions always require approval' : undefined}
-        triggerClassName="min-w-[120px]"
-        className="flex-shrink-0"
-      />
-    </div>
+    <SettingsRow
+      title={info.label}
+      description={info.description}
+      control={
+        <Select<CategoryAction>
+          value={isLocked ? 'ask' : value}
+          onChange={onChange}
+          options={ACTION_OPTIONS}
+          disabled={disabled || isLocked}
+          title={isLocked ? 'User questions always require approval' : undefined}
+          triggerClassName="min-w-[120px]"
+        />
+      }
+    />
   );
 }
 
@@ -130,38 +130,33 @@ function AIReviewProviderSelector({ value, onChange, disabled }: {
   const selectedProviderSupported = selectedProvider ? eligibleProviderIds[selectedProvider.id] === true : true;
 
   return (
-    <div className="flex items-center justify-between">
-      <div>
-        <span className="text-xs font-medium">Review provider</span>
-        <p className="text-[10px] text-muted-foreground">Only providers that support AI review are shown here</p>
-      </div>
-      <div className="flex flex-col items-end gap-1">
-        <Select
-          value={value || ''}
-          onChange={(next) => onChange(next || undefined)}
-          disabled={disabled}
-          triggerClassName="max-w-[220px] min-w-[180px]"
-          options={[
-            { value: '', label: 'Session default' },
-            ...(selectedProvider && !selectedProviderSupported
-              ? [{
-                  value: selectedProvider.id,
-                  label: `${selectedProvider.name} (${selectedProvider.providerType}) - unsupported`,
-                }]
-              : []),
-            ...eligibleProviders.map((provider) => ({
-              value: provider.id,
-              label: `${provider.name} (${provider.providerType})`,
-            })),
-          ]}
-        />
-        {selectedProvider && !selectedProviderSupported && (
-          <p className="text-[10px] text-amber-600">
-            The selected provider does not support AI review and cannot be used here.
-          </p>
-        )}
-      </div>
-    </div>
+    <SettingsRow
+      align="start"
+      title="Review provider"
+      description="Only providers that support AI review are shown here"
+      control={
+        <div className="flex flex-col items-end gap-1">
+          <Select
+            value={value || ''}
+            onChange={(next) => onChange(next || undefined)}
+            disabled={disabled}
+            triggerClassName="max-w-[220px] min-w-[180px]"
+            options={[
+              { value: '', label: 'Session default' },
+              ...(selectedProvider && !selectedProviderSupported
+                ? [{ value: selectedProvider.id, label: `${selectedProvider.name} (${selectedProvider.providerType}) - unsupported` }]
+                : []),
+              ...eligibleProviders.map((provider) => ({ value: provider.id, label: `${provider.name} (${provider.providerType})` })),
+            ]}
+          />
+          {selectedProvider && !selectedProviderSupported && (
+            <p className="text-[10px] text-amber-600">
+              The selected provider does not support AI review and cannot be used here.
+            </p>
+          )}
+        </div>
+      }
+    />
   );
 }
 
@@ -304,172 +299,127 @@ export function PermissionSettings() {
 
   return (
     <div className="space-y-6">
-
-      {/* Enable toggle */}
-      <div className="p-3 bg-secondary/50 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <span className="text-sm">Auto-Approve Tools</span>
-            <p className="text-xs text-muted-foreground mt-0.5">
+      {/* Master toggle (standalone, label-less card) */}
+      <SettingsGroup>
+        <SettingsRow
+          align="start"
+          title="Auto-approve tools"
+          description={
+            <>
               Automatically approve or block tool calls based on category rules
-            </p>
-          </div>
-          <button
-            onClick={toggleEnabled}
-            disabled={saving}
-            className={`relative w-10 h-5 rounded-full transition-colors flex-shrink-0 ${
-              policy.enabled ? 'bg-primary' : 'bg-muted'
-            }`}
-          >
-            <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-              policy.enabled ? 'translate-x-5' : 'translate-x-0'
-            }`} />
-          </button>
-        </div>
-        {!policy.enabled && (
-          <p className="text-[10px] text-muted-foreground/70 mt-2 italic">
-            When disabled, all tool calls require manual approval.
-          </p>
-        )}
-      </div>
-
-      {/* Unified category profile */}
-      {policy.enabled && (
-        <div>
-          <h3 className="text-sm font-medium mb-3">Permission Categories</h3>
-          <div className="border border-border rounded-lg px-3 pb-2.5 pt-1 space-y-0.5">
-            {CATEGORY_ORDER.map((cat) => (
-              <CategoryRow
-                key={cat}
-                category={cat}
-                value={policy.profile[cat]}
-                onChange={(action) => updateCategory(cat, action)}
-                disabled={saving}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Tool Rules */}
-      {policy.enabled && (
-        <div>
-          <h3 className="text-sm font-medium mb-1">Tool Rules</h3>
-          <p className="text-[10px] text-muted-foreground mb-2">
-            Fine-grained per-tool rules like <code className="font-mono">Bash(git *)</code>. Deny outranks guards; Allow cannot bypass sensitive-file protection.
-          </p>
-          <ToolRuleList
-            rules={policy.customRules}
-            onChange={(customRules) => savePolicy({ ...policy, customRules })}
-          />
-        </div>
-      )}
-
-      {/* Hooks */}
-      <div>
-        <h3 className="text-sm font-medium mb-1">Hooks</h3>
-        <p className="text-[10px] text-muted-foreground mb-2">
-          Shell commands that run before/after tool calls. Exit code 2 from a PreToolUse hook blocks the call.
-        </p>
-        <HookList
-          hooks={hookList}
-          onChange={(next) => { void saveHooks(next); }}
+              {!policy.enabled && (
+                <span className="mt-2 block italic text-muted-foreground/70">
+                  When disabled, all tool calls require manual approval.
+                </span>
+              )}
+            </>
+          }
+          control={<Toggle checked={policy.enabled} onChange={toggleEnabled} disabled={saving} aria-label="Auto-approve tools" />}
         />
-      </div>
+      </SettingsGroup>
 
-      {/* AI Review */}
       {policy.enabled && (
-        <div>
-          <h3 className="text-sm font-medium mb-3">AI Review</h3>
-          <div className="p-3 bg-secondary/50 rounded-lg space-y-3">
-            <label className="flex items-center justify-between cursor-pointer">
-              <div>
-                <span className="text-xs font-medium">Enable AI Review</span>
-                <p className="text-[10px] text-muted-foreground">
-                  When a blacklisted command times out, AI reviews it before denying
-                </p>
-              </div>
-              <button
-                onClick={() => updateAIReview({ enabled: !policy.aiReview.enabled })}
-                disabled={saving}
-                className={`relative w-9 h-[18px] rounded-full transition-colors flex-shrink-0 ${
-                  policy.aiReview.enabled ? 'bg-primary' : 'bg-muted'
-                }`}
-              >
-                <span className={`absolute top-[2px] left-[2px] w-[14px] h-[14px] rounded-full bg-white shadow transition-transform ${
-                  policy.aiReview.enabled ? 'translate-x-[18px]' : 'translate-x-0'
-                }`} />
-              </button>
-            </label>
+        <SettingsGroup label="Permission categories">
+          {CATEGORY_ORDER.map((cat) => (
+            <CategoryRow
+              key={cat}
+              category={cat}
+              value={policy.profile[cat]}
+              onChange={(action) => updateCategory(cat, action)}
+              disabled={saving}
+            />
+          ))}
+        </SettingsGroup>
+      )}
 
-            {policy.aiReview.enabled && (
-              <>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-medium">Review timeout</span>
-                    <p className="text-[10px] text-muted-foreground">Seconds before triggering AI review</p>
-                  </div>
+      {policy.enabled && (
+        <SettingsGroup label="Tool rules">
+          <div className="space-y-3 p-4">
+            <p className="text-xs text-muted-foreground">
+              Fine-grained per-tool rules like <code className="font-mono">Bash(git *)</code>. Deny outranks guards; Allow cannot bypass sensitive-file protection.
+            </p>
+            <ToolRuleList
+              rules={policy.customRules}
+              onChange={(customRules) => savePolicy({ ...policy, customRules })}
+            />
+          </div>
+        </SettingsGroup>
+      )}
+
+      <SettingsGroup label="Hooks">
+        <div className="space-y-3 p-4">
+          <p className="text-xs text-muted-foreground">
+            Shell commands that run before/after tool calls. Exit code 2 from a PreToolUse hook blocks the call.
+          </p>
+          <HookList hooks={hookList} onChange={(next) => { void saveHooks(next); }} />
+        </div>
+      </SettingsGroup>
+
+      {policy.enabled && (
+        <SettingsGroup label="AI review">
+          <SettingsRow
+            align="start"
+            title="Enable AI review"
+            description="When a blacklisted command times out, AI reviews it before denying"
+            control={<Toggle checked={policy.aiReview.enabled} onChange={() => updateAIReview({ enabled: !policy.aiReview.enabled })} disabled={saving} aria-label="Enable AI review" />}
+          />
+          {policy.aiReview.enabled && (
+            <>
+              <SettingsRow
+                title="Review timeout"
+                description="Seconds before triggering AI review"
+                control={
                   <input
-                    type="number"
-                    min={10}
-                    max={300}
+                    type="number" min={10} max={300}
                     defaultValue={policy.aiReview.timeoutBeforeReview}
                     onBlur={(e) => updateAIReview({ timeoutBeforeReview: Math.max(10, parseInt(e.target.value) || 60) })}
                     disabled={saving}
-                    className="w-16 h-6 px-2 text-[11px] text-right bg-background border border-border rounded-full focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
                   />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-medium">Confidence threshold</span>
-                    <p className="text-[10px] text-muted-foreground">AI must be this confident to auto-approve (%)</p>
-                  </div>
+                }
+              />
+              <SettingsRow
+                title="Confidence threshold"
+                description="AI must be this confident to auto-approve (%)"
+                control={
                   <input
-                    type="number"
-                    min={50}
-                    max={100}
+                    type="number" min={50} max={100}
                     defaultValue={Math.round(policy.aiReview.confidenceThreshold * 100)}
                     onBlur={(e) => updateAIReview({ confidenceThreshold: Math.max(0.5, Math.min(1, (parseInt(e.target.value) || 80) / 100)) })}
                     disabled={saving}
-                    className="w-16 h-6 px-2 text-[11px] text-right bg-background border border-border rounded-full focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
                   />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="text-xs font-medium">Rate limit</span>
-                    <p className="text-[10px] text-muted-foreground">Max auto-approvals per minute</p>
-                  </div>
+                }
+              />
+              <SettingsRow
+                title="Rate limit"
+                description="Max auto-approvals per minute"
+                control={
                   <input
-                    type="number"
-                    min={1}
-                    max={60}
+                    type="number" min={1} max={60}
                     defaultValue={policy.aiReview.maxAutoApprovalsPerMinute}
                     onBlur={(e) => updateAIReview({ maxAutoApprovalsPerMinute: Math.max(1, parseInt(e.target.value) || 10) })}
                     disabled={saving}
-                    className="w-16 h-6 px-2 text-[11px] text-right bg-background border border-border rounded-full focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-6 w-16 rounded-full border border-border bg-background px-2 text-right text-[11px] focus:outline-none focus:ring-1 focus:ring-primary"
                   />
-                </div>
-                <AIReviewProviderSelector
-                  value={policy.aiReview.analysisLlmProfileId}
-                  onChange={(id) => updateAIReview({ analysisLlmProfileId: id })}
-                  disabled={saving}
-                />
-              </>
-            )}
-          </div>
-        </div>
+                }
+              />
+              <AIReviewProviderSelector
+                value={policy.aiReview.analysisLlmProfileId}
+                onChange={(id) => updateAIReview({ analysisLlmProfileId: id })}
+                disabled={saving}
+              />
+            </>
+          )}
+        </SettingsGroup>
       )}
 
-      <div>
-        <h3 className="text-sm font-medium mb-3">Permission Workflow</h3>
-        <div className="p-3 bg-secondary/50 rounded-lg space-y-3">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-xs font-medium">Global override</span>
-              <p className="text-[10px] text-muted-foreground">
-                Optional workflow override. If unavailable, the system fallback workflow is still used.
-              </p>
-            </div>
+      <SettingsGroup label="Permission workflow">
+        <SettingsRow
+          align="start"
+          title="Global override"
+          description="Optional workflow override. If unavailable, the system fallback workflow is still used."
+          control={
             <Select
               value={selectedWorkflowId}
               onChange={(next) => { void updatePermissionWorkflowOverride(next); }}
@@ -484,19 +434,21 @@ export function PermissionSettings() {
                 })),
               ]}
             />
-          </div>
+          }
+        >
           <p className="text-[10px] text-muted-foreground">
             Resolution order: project override, then global override, then immutable system fallback.
           </p>
-        </div>
-      </div>
+        </SettingsRow>
+      </SettingsGroup>
 
-      {/* Global guards */}
       {policy.enabled && (
-        <div>
-          <h3 className="text-sm font-medium mb-3">Safety Guards</h3>
-          <div className="p-3 bg-secondary/50 rounded-lg space-y-2">
-            <label className="flex items-start gap-2 cursor-pointer">
+        <SettingsGroup label="Safety guards">
+          <SettingsRow
+            align="start"
+            title="Protect sensitive files"
+            description=".env, .ssh, credentials, *.key, *.pem — requires approval even if category is auto-approve"
+            control={
               <input
                 type="checkbox"
                 checked={policy.globalGuards.blockSensitiveFiles}
@@ -504,12 +456,13 @@ export function PermissionSettings() {
                 disabled={saving}
                 className="mt-0.5 rounded-md border-border"
               />
-              <div>
-                <span className="text-xs font-medium">Protect sensitive files</span>
-                <p className="text-[10px] text-muted-foreground">.env, .ssh, credentials, *.key, *.pem — requires approval even if category is auto-approve</p>
-              </div>
-            </label>
-            <label className="flex items-start gap-2 cursor-pointer">
+            }
+          />
+          <SettingsRow
+            align="start"
+            title="Enforce workspace scope"
+            description="Block file/bash operations targeting paths outside the project directory"
+            control={
               <input
                 type="checkbox"
                 checked={policy.globalGuards.blockOutsideWorkspace}
@@ -517,29 +470,22 @@ export function PermissionSettings() {
                 disabled={saving}
                 className="mt-0.5 rounded-md border-border"
               />
-              <div>
-                <span className="text-xs font-medium">Enforce workspace scope</span>
-                <p className="text-[10px] text-muted-foreground">Block file/bash operations targeting paths outside the project directory</p>
-              </div>
-            </label>
-          </div>
-        </div>
+            }
+          />
+        </SettingsGroup>
       )}
 
-      {/* Reset + error */}
       {policy.enabled && (
         <button
           onClick={resetDefaults}
           disabled={saving}
-          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           Reset to defaults
         </button>
       )}
 
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
-      )}
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
 }
