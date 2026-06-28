@@ -17,9 +17,11 @@ export function DraftActions() {
     isReadOnly,
     sessionArchived,
     activeSessionId,
+    poppedOut,
     sendCallback,
     finishDraft,
     discardDraft,
+    setPoppedOut,
   } = useDraftEditorStore();
 
   const [confirmingDiscard, setConfirmingDiscard] = useState(false);
@@ -52,8 +54,10 @@ export function DraftActions() {
     void discardDraft();
   }, [confirmingDiscard, discardDraft]);
 
-  const handlePopOut = useCallback(() => {
-    if (activeSessionId) void openDraftInNewWindow(activeSessionId);
+  const handlePopOut = useCallback(async () => {
+    if (!activeSessionId) return;
+    const label = await openDraftInNewWindow(activeSessionId);
+    useDraftEditorStore.getState().setPoppedOut(true, label);
   }, [activeSessionId]);
 
   return (
@@ -108,7 +112,7 @@ export function DraftActions() {
         <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
       </button>
 
-      {isDesktopTauri() && activeSessionId && (
+      {isDesktopTauri() && activeSessionId && !poppedOut && (
         <button
           onClick={handlePopOut}
           className={`${ICON_BTN} text-muted-foreground hover:bg-secondary hover:text-foreground`}

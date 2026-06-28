@@ -3,7 +3,8 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 
 const finishDraft = vi.fn();
 const discardDraft = vi.fn().mockResolvedValue(undefined);
-const openDraftInNewWindow = vi.fn().mockResolvedValue(undefined);
+const setPoppedOut = vi.fn();
+const openDraftInNewWindow = vi.fn().mockResolvedValue('draft-window-1');
 
 let state: Record<string, unknown>;
 function buildState() {
@@ -14,9 +15,11 @@ function buildState() {
     isReadOnly: false,
     sessionArchived: false,
     activeSessionId: 'sess-1',
+    poppedOut: false,
     sendCallback: vi.fn(),
     finishDraft,
     discardDraft,
+    setPoppedOut,
   };
 }
 
@@ -87,6 +90,12 @@ describe('DraftActions', () => {
     state = { ...buildState(), isReadOnly: true };
     render(<DraftActions />);
     expect(screen.getByText('Read Only')).toBeTruthy();
+  });
+
+  it('hides the pop-out button when already popped out', () => {
+    state = { ...buildState(), poppedOut: true };
+    render(<DraftActions />);
+    expect(screen.queryByLabelText('Open draft in new window')).toBeNull();
   });
 
   describe('discard confirm auto-reset', () => {

@@ -2,10 +2,10 @@ import { openPopoutWindow, buildWindowTitle, getConnectionParams } from './popou
 import { useOwnershipStore } from '../stores/ownershipStore';
 
 /** Open the current session's draft in a standalone pop-out window. */
-export async function openDraftInNewWindow(sessionId: string): Promise<void> {
+export async function openDraftInNewWindow(sessionId: string): Promise<string> {
   const backendId = useOwnershipStore.getState().getSessionBackendId(sessionId);
   const conn = getConnectionParams({ backendId });
-  await openPopoutWindow({
+  return openPopoutWindow({
     type: 'draft',
     params: { draftWindow: sessionId },
     title: buildWindowTitle('Draft', conn.serverName),

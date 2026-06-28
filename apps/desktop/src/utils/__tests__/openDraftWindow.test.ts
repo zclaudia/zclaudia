@@ -20,7 +20,8 @@ describe('openDraftInNewWindow', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('opens the draft pop-out route with the session id and resolved backend', async () => {
-    await openDraftInNewWindow('sess-123');
+    const label = await openDraftInNewWindow('sess-123');
+    expect(label).toBe('draft-window-1');
 
     expect(getSessionBackendId).toHaveBeenCalledWith('sess-123');
     expect(getConnectionParams).toHaveBeenCalledWith({ backendId: 'backend-7' });
