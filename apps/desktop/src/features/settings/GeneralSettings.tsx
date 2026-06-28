@@ -9,6 +9,7 @@ import type { SdkVersionReport } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { Select } from '../../components/ui/Select';
 import { SettingsGroup, SettingsRow } from './ui/SettingsGroup';
+import { Toggle } from '../../components/ui/Toggle';
 
 interface GeneralSettingsProps {
   isOpen: boolean;
@@ -200,14 +201,7 @@ function NotchPanelToggle() {
       }
       title="Notification Panel"
       description="Show Dynamic Island-style notifications at top of screen"
-      control={
-        <button
-          onClick={() => setShowNotchPanel(!showNotchPanel)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${showNotchPanel ? 'bg-primary' : 'bg-secondary'}`}
-        >
-          <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white shadow-sm transition-transform ${showNotchPanel ? 'translate-x-[18px]' : 'translate-x-[3px]'}`} />
-        </button>
-      }
+      control={<Toggle checked={showNotchPanel} onChange={setShowNotchPanel} aria-label="Notification panel" />}
     />
   );
 }
