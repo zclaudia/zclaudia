@@ -29,6 +29,9 @@ interface AutomationScopeListProps {
  * Sidebar backend/project list used while in automation mode. Reuses BackendRow
  * for the backend grouping; each backend exposes an "All projects" (global)
  * filter row plus one row per project. Selecting a row sets the automation scope.
+ *
+ * Callers pass the backends to display (typically the online ones); this
+ * component does not filter by `online` itself.
  */
 export function AutomationScopeList({
   backends,
@@ -82,7 +85,7 @@ export function AutomationScopeList({
                     aria-label={project.name}
                     className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
                   >
-                    <Folder className="w-4 h-4 flex-shrink-0 text-muted-foreground" strokeWidth={1.75} />
+                    <Folder className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
                     <span className="truncate">{project.name}</span>
                   </button>
                 );

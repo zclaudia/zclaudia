@@ -59,4 +59,16 @@ describe('AutomationScopeList', () => {
     setup({ selectedProjectId: undefined });
     expect(screen.getByRole('button', { name: 'All projects' }).className).not.toContain('text-muted-foreground');
   });
+
+  it('hides project rows when the backend is collapsed', () => {
+    setup({ expandedBackendIds: [] });
+    expect(screen.queryByRole('button', { name: 'openclaw' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'All projects' })).toBeNull();
+    expect(screen.getByText('Local Server')).toBeTruthy();
+  });
+
+  it('shows an empty state when there are no backends', () => {
+    setup({ backends: [] });
+    expect(screen.getByText('No backends online')).toBeTruthy();
+  });
 });
