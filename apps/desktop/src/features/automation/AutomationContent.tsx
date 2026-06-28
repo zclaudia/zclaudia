@@ -102,7 +102,7 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
           />
         )}
         {tab === 'runs' && (
-          <RunsTab key={`runs-${scopeKey}`} api={api} projects={projects} />
+          <RunsTab key={`runs-${scopeKey}`} api={api} projects={projects} projectId={projectId} />
         )}
         {tab === 'system' && <SystemTasksTab key={`system-${scopeKey}`} api={api} />}
       </div>

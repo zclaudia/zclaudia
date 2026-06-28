@@ -4,22 +4,20 @@ import type { Workflow, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
 import { StepRunCard, RunStatusBadge, formatDuration } from '../workflows/components/RunComponents';
 import type { AutomationApiType } from './useAutomationApi';
 import type { ProjectInfo } from './automation-types';
-import { projectSelectOptions } from './automation-types';
-import { Select } from '../../components/ui/Select';
 
 interface RunsTabProps {
   api: AutomationApiType;
   projects: ProjectInfo[];
+  projectId?: string;
 }
 
-export function RunsTab({ api, projects }: RunsTabProps) {
+export function RunsTab({ api, projects: _projects, projectId }: RunsTabProps) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
 
-  const effectiveProjectId = selectedProjectId || projects[0]?.id || '';
+  const effectiveProjectId = projectId ?? '';
 
   const workflowNameMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -63,16 +61,6 @@ export function RunsTab({ api, projects }: RunsTabProps) {
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold">Run History</h2>
         <div className="flex items-center gap-2">
-          {projects.length > 0 && (
-            <Select
-              value={effectiveProjectId}
-              onChange={setSelectedProjectId}
-              size="md"
-              align="right"
-              triggerClassName="min-w-[160px]"
-              options={projectSelectOptions(projects)}
-            />
-          )}
           <button
             onClick={refresh}
             disabled={loading}
