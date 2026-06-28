@@ -68,7 +68,7 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
               }}
               className={`group flex items-center gap-1.5 px-2.5 cursor-pointer max-w-[140px] ${
                 isActive
-                  ? 'text-foreground shadow-[inset_0_-2px_0_hsl(var(--primary))]'
+                  ? 'text-foreground shadow-[inset_0_-2px_0_hsl(var(--muted-foreground))]'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title={label}

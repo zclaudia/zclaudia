@@ -105,7 +105,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
                 onClick={() => isDirectory ? toggleDirectory(entry.path) : onOpenFile(entry.path)}
                 className={`group w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-mono min-w-0 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
                   isSelected
-                    ? 'bg-primary/10 text-primary shadow-[inset_2px_0_0_hsl(var(--primary))]'
+                    ? 'bg-muted text-foreground shadow-[inset_2px_0_0_hsl(var(--muted-foreground))]'
                     : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'
                 }`}
                 style={entryIndent(depth)}
@@ -121,7 +121,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
                   ) : null}
                 </span>
                 {isDirectory ? (
-                  <span className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center text-sky-500/90 dark:text-sky-400/90">
+                  <span className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center text-muted-foreground">
                     <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                 ) : (

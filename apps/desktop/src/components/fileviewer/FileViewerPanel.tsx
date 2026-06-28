@@ -248,7 +248,7 @@ export function FileViewerActions() {
           type="button"
           onClick={toggleTree}
           className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-            showFileTree ? 'text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+            showFileTree ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
           }`}
           title={showFileTree ? 'Hide file tree' : 'Show file tree'}
           aria-label={showFileTree ? 'Hide file tree' : 'Show file tree'}
@@ -259,7 +259,7 @@ export function FileViewerActions() {
       <button
         onClick={() => setSearchOpen(!searchOpen)}
         className={`inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors flex-shrink-0 ${
-          searchOpen ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+          searchOpen ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'
         } hover:bg-secondary`}
         title="Search files (Cmd+P)"
         aria-label="Search files"
