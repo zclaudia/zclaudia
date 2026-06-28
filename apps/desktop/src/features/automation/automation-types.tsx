@@ -1,6 +1,13 @@
 import type { Project, Workflow } from '@zclaudia/shared';
 import type { SelectOption } from '../../components/ui/Select';
 
+export type AutomationTab = 'automations' | 'workflows' | 'runs' | 'system';
+
+export interface OpenAutomationsOptions {
+  tab?: AutomationTab;
+  projectId?: string;
+}
+
 export type ProjectInfo = Pick<Project, 'id' | 'name' | 'permissionWorkflowOverrideId'>;
 
 export interface AgentConfigInfo {
