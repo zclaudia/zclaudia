@@ -44,10 +44,10 @@ import { isDesktopTauri } from './utils/platform';
 import { initBuiltinPanels } from './plugins/builtinPanels';
 import { shouldShowDirectGatewaySetup } from './utils/directGatewaySetup';
 import { getMobileControlPlaneState } from './services/mobileConnectionState';
-import type { OpenAutomationWindowOptions } from './features/automation/openAutomationWindow';
 
 const FileViewerWindow = lazy(() => import('./components/fileviewer/FileViewerWindow').then(m => ({ default: m.FileViewerWindow })));
 const ProjectDashboard = lazy(() => import('./features/dashboard/ProjectDashboard').then(m => ({ default: m.ProjectDashboard })));
+const AutomationContent = lazy(() => import('./features/automation/AutomationContent').then(m => ({ default: m.AutomationContent })));
 const MOBILE_TOAST_CONTAINER_CLASS = 'fixed top-4 left-1/2 -translate-x-1/2 z-50 flex flex-col items-center gap-2';
 
 const LazyFallback = () => (
@@ -62,10 +62,12 @@ function AppContent() {
 
   // --- Store selectors ---
   const activeServerId = useServerStore((s) => s.activeServerId);
+  const setActiveServer = useServerStore((s) => s.setActiveServer);
   const transportStatus = useRecoveryStore((s) => s.transport.status);
   const facadeConnectionState = useFacadeStore((s) => s.connectionState);
   const facadeSnapshotVersion = useFacadeStore((s) => s.snapshotVersion);
   const facadeBackends = useFacadeStore((s) => s.backends);
+  const localBackendId = useFacadeStore((s) => s.localBackendId);
   const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
   const selectedProjectId = useSelectionStore((s) => s.selectedProjectId);
   const sessions = useProjectStore((s) => s.sessions);
@@ -85,6 +87,9 @@ function AppContent() {
   const topLevelView = useTopLevelViewStore((s) => s.view);
   const openSettings = useTopLevelViewStore((s) => s.openSettings);
   const returnToApp = useTopLevelViewStore((s) => s.returnToApp);
+  const openAutomations = useTopLevelViewStore((s) => s.openAutomations);
+  const setAutomationTab = useTopLevelViewStore((s) => s.setAutomationTab);
+  const setAutomationProjectFilter = useTopLevelViewStore((s) => s.setAutomationProjectFilter);
   const refreshReadiness = useAgentReadinessStore((s) => s.refresh);
 
   const { selectBackend: _selectBackend, selectProject: selectProjectRoute, selectSession: _selectSessionRoute } = useSelectionCoordinator();
@@ -134,10 +139,6 @@ function AppContent() {
     return isAgentExpanded ? 0.14 : 0;
   }, [agentSwipePreview.mode, claudiaSwipePreviewProgress, isAgentExpanded]);
 
-  const openAutomationWindowFn = useCallback((opts?: OpenAutomationWindowOptions) => {
-    import('./features/automation/openAutomationWindow').then(m => m.openAutomationWindow(opts ?? {}));
-  }, []);
-
   const openNotifications = useCallback(() => {
     setAgentExpanded(false);
     if (isMobile) {
@@ -159,6 +160,19 @@ function AppContent() {
     returnToApp();
     void refreshReadiness();
   }, [returnToApp, refreshReadiness]);
+
+  const automationMode = topLevelView.kind === 'automations'
+    ? {
+        tab: topLevelView.tab,
+        projectId: topLevelView.projectId,
+        onSelectTab: setAutomationTab,
+        onBack: closeTopLevelView,
+        onSelectScope: (backendId: string, projectId?: string) => {
+          setActiveServer(backendId);
+          setAutomationProjectFilter(projectId);
+        },
+      }
+    : undefined;
 
   // --- Extracted hooks ---
   useClaudiaDesktop({
@@ -362,7 +376,8 @@ function AppContent() {
             setDashboardProjectId(null);
           }}
           isHomeActive={!selectedSessionId && !dashboardProjectId}
-          onOpenAutomations={openAutomationWindowFn}
+          onOpenAutomations={() => openAutomations()}
+          automationMode={automationMode}
         />
 
         {!isMobile && (
@@ -387,12 +402,20 @@ function AppContent() {
               />
             )}
 
-            {dashboardProject ? (
+            {topLevelView.kind === 'automations' ? (
+              <Suspense fallback={<LazyFallback />}>
+                <AutomationContent
+                  tab={topLevelView.tab}
+                  projectId={topLevelView.projectId}
+                  backendId={activeServerId ?? localBackendId}
+                />
+              </Suspense>
+            ) : dashboardProject ? (
               <Suspense fallback={<LazyFallback />}>
                 <ProjectDashboard
                   projectId={dashboardProject.id}
                   projectRootPath={dashboardProject.rootPath}
-                  onOpenAutomations={openAutomationWindowFn}
+                  onOpenAutomations={(opts) => openAutomations({ tab: opts.tab, projectId: opts.projectId })}
                   onOpenDashboardWindow={openProjectDashboardWindowFn}
                 />
               </Suspense>
