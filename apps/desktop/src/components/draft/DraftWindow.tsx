@@ -251,7 +251,7 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
               This draft auto-saves and syncs across your devices — come back anytime.
             </p>
             <p className="text-xs text-muted-foreground">
-              Close this window to return your draft to the chat.
+              Your draft is saved automatically — reopen it from the Draft tab anytime.
             </p>
           </div>
         )}
@@ -261,7 +261,7 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
       <div className="flex items-center justify-between px-3 py-2 border-t border-border flex-shrink-0">
         <button
           onClick={handleDiscard}
-          disabled={sessionArchived}
+          disabled={effectiveReadOnly}
           className="px-3 py-1 text-xs rounded-md border border-border text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
         >
           Discard
