@@ -1,5 +1,4 @@
 import type { Project, Workflow } from '@zclaudia/shared';
-import type { SelectOption } from '../../components/ui/Select';
 
 export type AutomationTab = 'automations' | 'workflows' | 'runs' | 'system';
 
@@ -36,15 +35,6 @@ export function displayProjectName(name: string): string {
   if (!isInternalProject(name)) return name;
   const stripped = name.replace(/^_+/, '');
   return stripped.charAt(0).toUpperCase() + stripped.slice(1);
-}
-
-export function projectSelectOptions(projects: ProjectInfo[]): SelectOption[] {
-  const internal = projects.filter(p => isInternalProject(p.name));
-  const normal = projects.filter(p => !isInternalProject(p.name)).sort((a, b) => a.name.localeCompare(b.name));
-  return [
-    ...internal.map(p => ({ value: p.id, label: `\u25C8 ${displayProjectName(p.name)} (Global)` })),
-    ...normal.map(p => ({ value: p.id, label: `\u25B8 ${p.name}` })),
-  ];
 }
 
 export function formatInterval(ms: number): string {

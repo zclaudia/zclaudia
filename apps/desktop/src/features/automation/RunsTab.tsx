@@ -3,15 +3,13 @@ import { Loader2, RefreshCw, ArrowLeft } from 'lucide-react';
 import type { Workflow, WorkflowRun, WorkflowStepRun } from '@zclaudia/shared';
 import { StepRunCard, RunStatusBadge, formatDuration } from '../workflows/components/RunComponents';
 import type { AutomationApiType } from './useAutomationApi';
-import type { ProjectInfo } from './automation-types';
 
 interface RunsTabProps {
   api: AutomationApiType;
-  projects: ProjectInfo[];
   projectId?: string;
 }
 
-export function RunsTab({ api, projects: _projects, projectId }: RunsTabProps) {
+export function RunsTab({ api, projectId }: RunsTabProps) {
   const [runs, setRuns] = useState<WorkflowRun[]>([]);
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +75,7 @@ export function RunsTab({ api, projects: _projects, projectId }: RunsTabProps) {
         </div>
       ) : runs.length === 0 ? (
         <div className="text-center py-12 text-sm text-muted-foreground">
-          No workflow runs found for this project.
+          No workflow runs yet.
         </div>
       ) : (
         <div className="space-y-2">

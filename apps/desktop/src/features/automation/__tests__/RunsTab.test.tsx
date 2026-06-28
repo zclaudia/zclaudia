@@ -13,12 +13,10 @@ function makeApi() {
   };
 }
 
-const projects = [{ id: 'p1', name: 'proj-one' }];
-
 describe('RunsTab scope', () => {
   it('queries runs scoped to the projectId prop', async () => {
     const api = makeApi();
-    render(<RunsTab api={api as never} projects={projects} projectId="p1" />);
+    render(<RunsTab api={api as never} projectId="p1" />);
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/api/workflow-runs?projectId=p1');
     });
@@ -26,7 +24,7 @@ describe('RunsTab scope', () => {
 
   it('queries runs globally when no projectId is given', async () => {
     const api = makeApi();
-    render(<RunsTab api={api as never} projects={projects} projectId={undefined} />);
+    render(<RunsTab api={api as never} projectId={undefined} />);
     await waitFor(() => {
       expect(api.get).toHaveBeenCalledWith('/api/workflow-runs');
     });

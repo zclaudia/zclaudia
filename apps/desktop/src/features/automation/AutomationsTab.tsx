@@ -2,14 +2,13 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
 import type { Workflow } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
-import type { ProjectInfo, AutomationItem } from './automation-types';
+import type { AutomationItem } from './automation-types';
 import { simpleWorkflowToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
 
 interface AutomationsTabProps {
   api: AutomationApiType;
-  projects: ProjectInfo[];
   projectName: (id?: string) => string;
   projectId?: string;
 }
