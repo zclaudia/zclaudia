@@ -3,7 +3,7 @@ import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-
 import type { Workflow } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { ProjectInfo, AutomationItem } from './automation-types';
-import { projectSelectOptions, simpleWorkflowToItem } from './automation-types';
+import { simpleWorkflowToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
 
@@ -11,15 +11,14 @@ interface AutomationsTabProps {
   api: AutomationApiType;
   projects: ProjectInfo[];
   projectName: (id?: string) => string;
-  initialProjectId?: string;
+  projectId?: string;
 }
 
-export function AutomationsTab({ api, projects, projectName, initialProjectId }: AutomationsTabProps) {
+export function AutomationsTab({ api, projectName, projectId }: AutomationsTabProps) {
   const [simpleWorkflows, setSimpleWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Create form state
-  const [createProjectId, setCreateProjectId] = useState(initialProjectId ?? '');
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState('');
   const [newTriggerType, setNewTriggerType] = useState<string>('interval');
@@ -32,7 +31,7 @@ export function AutomationsTab({ api, projects, projectName, initialProjectId }:
   const [newShellCmd, setNewShellCmd] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const effectiveProjectId = createProjectId || projects[0]?.id || '';
+  const effectiveProjectId = projectId ?? '';
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -123,16 +122,6 @@ export function AutomationsTab({ api, projects, projectName, initialProjectId }:
           {items.length} automation{items.length !== 1 ? 's' : ''}
         </h2>
         <div className="flex items-center gap-1.5">
-          {projects.length > 0 && (
-            <Select
-              value={effectiveProjectId}
-              onChange={setCreateProjectId}
-              size="md"
-              align="right"
-              triggerClassName="min-w-[160px]"
-              options={projectSelectOptions(projects)}
-            />
-          )}
           <button
             onClick={() => setShowCreate(!showCreate)}
             className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"

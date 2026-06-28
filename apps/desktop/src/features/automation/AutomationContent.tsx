@@ -86,7 +86,7 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
             api={api}
             projects={projects}
             projectName={projectName}
-            initialProjectId={projectId}
+            projectId={projectId}
           />
         )}
         {tab === 'workflows' && (
