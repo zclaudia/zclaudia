@@ -175,6 +175,29 @@ describe('llm-profiles routes', () => {
       expect(res.body.data.models).toEqual([{ modelId: 'claude-opus-4-7', contextWindow: 1_000_000 }]);
     });
 
+    it('normalizes image inputModalities by including text', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'vision',
+        providerType: 'openai',
+        models: [{ modelId: 'gpt-4o', inputModalities: ['image'] }],
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.data.models).toEqual([
+        { modelId: 'gpt-4o', inputModalities: ['text', 'image'] },
+      ]);
+    });
+
+    it('rejects invalid inputModalities values', async () => {
+      const res = await request(app).post('/api/llm-profiles').send({
+        name: 'bad-modalities',
+        providerType: 'openai',
+        models: [{ modelId: 'gpt-4o', inputModalities: ['audio'] }],
+      });
+      expect(res.status).toBe(400);
+      expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      expect(res.body.error.message).toMatch(/inputModalities/i);
+    });
+
     it('rejects duplicate modelId', async () => {
       const res = await request(app).post('/api/llm-profiles').send({
         name: 'dup', providerType: 'anthropic',
@@ -241,6 +264,21 @@ describe('llm-profiles routes', () => {
         models: [{ modelId: 'a' }, { modelId: 'a' }],
       });
       expect(res.status).toBe(400);
+    });
+
+    it('PUT persists valid inputModalities', async () => {
+      const created = await request(app).post('/api/llm-profiles').send({
+        name: 'patch-modalities',
+        providerType: 'openai',
+      });
+      const id = created.body.data.id;
+      const res = await request(app).put(`/api/llm-profiles/${id}`).send({
+        models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image', 'image'] }],
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.data.models).toEqual([
+        { modelId: 'gpt-4o', inputModalities: ['text', 'image'] },
+      ]);
     });
   });
 

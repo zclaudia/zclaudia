@@ -342,6 +342,33 @@ describe('ProviderManager', () => {
       });
     });
 
+    it('serializes image input support for a declared model', async () => {
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('ZClaudia Default')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByText('Add Provider'));
+      fireEvent.change(screen.getByPlaceholderText(/Local ZClaudia Agent/), {
+        target: { value: 'Vision Provider' },
+      });
+      await clickAsync(screen.getByText('+ Add model'));
+      fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
+        target: { value: 'gpt-4o' },
+      });
+      await clickAsync(screen.getByLabelText(/supports images/));
+      await clickAsync(screen.getByText('Create'));
+
+      await waitForFast(() => {
+        expect(api.createLlmProfile).toHaveBeenCalledWith(
+          expect.objectContaining({
+            models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
+          })
+        );
+      });
+    });
+
     it('does not submit when name is empty', async () => {
       await renderProviderManager({ onClose: mockOnClose });
 
@@ -423,6 +450,30 @@ describe('ProviderManager', () => {
           })
         );
       });
+    });
+
+    it('populates image input support when editing a provider model', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'Vision',
+          providerType: 'openai' as const,
+          isDefault: true,
+          models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('Vision')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+
+      expect(screen.getByLabelText(/model gpt-4o supports images/)).toBeChecked();
     });
   });
 

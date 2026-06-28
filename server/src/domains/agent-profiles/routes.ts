@@ -3,6 +3,7 @@ import type Database from 'better-sqlite3';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { AgentProfileRepository } from './repository.js';
+import { LlmProfileRepository } from '../llm-profiles/repository.js';
 import {
   AgentProfileDeletionService,
   AgentProfileInUseError,
@@ -11,6 +12,49 @@ import {
 import { resolveAgentReadiness } from '../agent-readiness/check.js';
 
 const VALID_THINKING_LEVELS: readonly ThinkingLevel[] = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh'];
+
+type MultimodalFallbackValidation =
+  | { ok: true; value: AgentProfileConfig['multimodalFallback'] | null | undefined }
+  | { ok: false; error: string };
+
+function validateMultimodalFallback(
+  db: Database.Database,
+  input: unknown,
+  options: { allowNull: boolean },
+): MultimodalFallbackValidation {
+  if (input === undefined) return { ok: true, value: undefined };
+  if (input === null) return { ok: true, value: options.allowNull ? null : undefined };
+  if (!input || typeof input !== 'object' || Array.isArray(input)) {
+    return { ok: false, error: 'multimodalFallback must be an object or null' };
+  }
+  const raw = input as Record<string, unknown>;
+  if (typeof raw.llmProfileId !== 'string' || !raw.llmProfileId.trim()) {
+    return { ok: false, error: 'multimodalFallback.llmProfileId is required' };
+  }
+  if (typeof raw.model !== 'string' || !raw.model.trim()) {
+    return { ok: false, error: 'multimodalFallback.model is required' };
+  }
+
+  const fallback = {
+    llmProfileId: raw.llmProfileId.trim(),
+    model: raw.model.trim(),
+  };
+  const llm = new LlmProfileRepository(db).findById(fallback.llmProfileId);
+  if (!llm) {
+    return { ok: false, error: `multimodalFallback.llmProfileId not found: ${fallback.llmProfileId}` };
+  }
+  const declaredModels = llm.models ?? [];
+  if (declaredModels.length > 0) {
+    const entry = declaredModels.find((model) => model.modelId === fallback.model);
+    if (!entry) {
+      return { ok: false, error: `multimodalFallback.model not found on LLM profile: ${fallback.model}` };
+    }
+    if (entry.inputModalities && !entry.inputModalities.includes('image')) {
+      return { ok: false, error: `multimodalFallback.model must support image input: ${fallback.model}` };
+    }
+  }
+  return { ok: true, value: fallback };
+}
 
 export function createAgentProfileRoutes(db: Database.Database): Router {
   const router = Router();
@@ -73,6 +117,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         toolSelection,
         skillSelection,
         skillExecution,
+        multimodalFallback,
         thinkingLevel,
         isDefault,
       } = req.body ?? {};
@@ -131,6 +176,15 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         repo.clearAllDefaults();
       }
 
+      const validatedFallback = validateMultimodalFallback(db, multimodalFallback, { allowNull: false });
+      if (!validatedFallback.ok) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'VALIDATION_ERROR', message: validatedFallback.error },
+        });
+        return;
+      }
+
       const profile = repo.create({
         name,
         description,
@@ -141,6 +195,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         toolSelection,
         skillSelection,
         skillExecution,
+        multimodalFallback: validatedFallback.value ?? undefined,
         thinkingLevel: thinkingLevel ?? undefined,
         isDefault: Boolean(isDefault),
       });
@@ -190,6 +245,18 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
         }
       }
 
+      let validatedFallback: MultimodalFallbackValidation = { ok: true, value: undefined };
+      if (Object.prototype.hasOwnProperty.call(body, 'multimodalFallback')) {
+        validatedFallback = validateMultimodalFallback(db, body.multimodalFallback, { allowNull: true });
+        if (!validatedFallback.ok) {
+          res.status(400).json({
+            success: false,
+            error: { code: 'VALIDATION_ERROR', message: validatedFallback.error },
+          });
+          return;
+        }
+      }
+
       if (!repo.findById(req.params.id)) {
         res.status(404).json({
           success: false,
@@ -212,6 +279,7 @@ export function createAgentProfileRoutes(db: Database.Database): Router {
       if (Object.prototype.hasOwnProperty.call(body, 'toolSelection')) patch.toolSelection = body.toolSelection;
       if (Object.prototype.hasOwnProperty.call(body, 'skillSelection')) patch.skillSelection = body.skillSelection;
       if (Object.prototype.hasOwnProperty.call(body, 'skillExecution')) patch.skillExecution = body.skillExecution;
+      if (Object.prototype.hasOwnProperty.call(body, 'multimodalFallback')) patch.multimodalFallback = validatedFallback.value as never;
       if (Object.prototype.hasOwnProperty.call(body, 'thinkingLevel')) patch.thinkingLevel = body.thinkingLevel ?? undefined;
       if (Object.prototype.hasOwnProperty.call(body, 'isDefault')) patch.isDefault = Boolean(body.isDefault);
 

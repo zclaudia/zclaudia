@@ -58,6 +58,24 @@ type BuiltinToolSetId = keyof typeof BUILTIN_TOOL_SETS;
 const EDITABLE_BUILTIN_TOOL_SET_IDS = (Object.keys(BUILTIN_TOOL_SETS) as BuiltinToolSetId[])
   .filter((setId) => setId !== 'all-builtin');
 
+type LlmProfileModelEntry = NonNullable<LlmProfileConfig['models']>[number];
+
+function modelSupportsImages(entry: LlmProfileModelEntry): boolean {
+  return entry.inputModalities?.includes('image') ?? false;
+}
+
+function imageCapableModels(profile: LlmProfileConfig | undefined): LlmProfileModelEntry[] {
+  return (profile?.models ?? []).filter(modelSupportsImages);
+}
+
+function fallbackModelValidForProfile(model: string, profile: LlmProfileConfig | undefined): boolean {
+  const trimmed = model.trim();
+  if (!trimmed) return false;
+  const models = profile?.models;
+  if (!models || models.length === 0) return true;
+  return models.some((entry) => entry.modelId === trimmed && modelSupportsImages(entry));
+}
+
 function isBuiltinRefForTools(ref: ToolSelection['include'][number], tools: readonly ToolName[]): boolean {
   return ref.source === 'builtin' && tools.includes(ref.name);
 }
@@ -130,6 +148,8 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
   const [formDescription, setFormDescription] = useState('');
   const [formLlmProfileId, setFormLlmProfileId] = useState('');
   const [formModel, setFormModel] = useState('');
+  const [formFallbackLlmProfileId, setFormFallbackLlmProfileId] = useState('');
+  const [formFallbackModel, setFormFallbackModel] = useState('');
   const [formSystemPrompt, setFormSystemPrompt] = useState('');
   const [formToolSelection, setFormToolSelection] = useState<ToolSelection>(defaultToolSelection);
   const [formSkillSelection, setFormSkillSelection] = useState<SkillSelection>(defaultSkillSelection);
@@ -219,6 +239,8 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setFormDescription('');
     setFormLlmProfileId('');
     setFormModel('');
+    setFormFallbackLlmProfileId('');
+    setFormFallbackModel('');
     setFormSystemPrompt('');
     setFormToolSelection(defaultToolSelection);
     setFormSkillSelection(defaultSkillSelection);
@@ -238,6 +260,8 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     setFormDescription(agent.description ?? '');
     setFormLlmProfileId(agent.llmProfileId);
     setFormModel(agent.model);
+    setFormFallbackLlmProfileId(agent.multimodalFallback?.llmProfileId ?? '');
+    setFormFallbackModel(agent.multimodalFallback?.model ?? '');
     setFormSystemPrompt(agent.systemPrompt);
     const nextToolSelection = agent.toolSelection ?? legacyEnabledToolsToSelection(agent.enabledTools);
     setFormToolSelection(nextToolSelection);
@@ -451,16 +475,28 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
       setFormError('Model is required');
       return;
     }
+    const fallbackProfile = llmProfiles.find((p) => p.id === formFallbackLlmProfileId);
+    const trimmedFallbackModel = formFallbackModel.trim();
+    if (formFallbackLlmProfileId && !fallbackModelValidForProfile(trimmedFallbackModel, fallbackProfile)) {
+      setFormError('Fallback model must be image-capable on the selected LLM profile');
+      return;
+    }
 
     setSaving(true);
     setFormError(null);
     try {
       const resolvedTools = resolveToolSelection(formToolSelection).builtinTools;
+      const multimodalFallback = formFallbackLlmProfileId && trimmedFallbackModel
+        ? { llmProfileId: formFallbackLlmProfileId, model: trimmedFallbackModel }
+        : editingAgent?.multimodalFallback
+          ? null
+          : undefined;
       const payload = {
         name: formName.trim(),
         description: formDescription.trim() || undefined,
         llmProfileId: formLlmProfileId,
         model: formModel.trim(),
+        multimodalFallback,
         systemPrompt: formSystemPrompt,
         enabledTools: resolvedTools,
         toolSelection: formToolSelection,
@@ -600,6 +636,24 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
       <ModelDeclarationWarning
         formModel={formModel}
         llmProfile={llmProfiles.find((p) => p.id === formLlmProfileId)}
+      />
+
+      <MultimodalFallbackSelector
+        profiles={llmProfiles}
+        profileId={formFallbackLlmProfileId}
+        model={formFallbackModel}
+        onProfileChange={(id) => {
+          setFormFallbackLlmProfileId(id);
+          if (!id) {
+            setFormFallbackModel('');
+            return;
+          }
+          const nextProfile = llmProfiles.find((p) => p.id === id);
+          if (formFallbackModel && !fallbackModelValidForProfile(formFallbackModel, nextProfile)) {
+            setFormFallbackModel('');
+          }
+        }}
+        onModelChange={setFormFallbackModel}
       />
 
       <div>
@@ -1193,6 +1247,88 @@ function ModelSelector({
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+function MultimodalFallbackSelector({
+  profiles,
+  profileId,
+  model,
+  onProfileChange,
+  onModelChange,
+}: {
+  profiles: LlmProfileConfig[];
+  profileId: string;
+  model: string;
+  onProfileChange: (v: string) => void;
+  onModelChange: (v: string) => void;
+}) {
+  const selectedProfile = profiles.find((profile) => profile.id === profileId);
+  const declaredModels = selectedProfile?.models ?? [];
+  const visionModels = imageCapableModels(selectedProfile);
+  const hasDeclaredModels = declaredModels.length > 0;
+  const modelValue = hasDeclaredModels && !visionModels.some((entry) => entry.modelId === model) ? '' : model;
+
+  return (
+    <div className="rounded-lg border border-border bg-secondary/40 p-3 space-y-3">
+      <label className="block text-sm font-medium text-muted-foreground">Multimodal fallback</label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="min-w-0 text-xs text-muted-foreground">
+          <span className="mb-1 block">Fallback LLM Profile</span>
+          <select
+            aria-label="Fallback LLM Profile"
+            value={profileId}
+            onChange={(event) => onProfileChange(event.target.value)}
+            className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary"
+          >
+            <option value="">None</option>
+            {profiles.map((profile) => (
+              <option key={profile.id} value={profile.id}>{profile.name}</option>
+            ))}
+          </select>
+        </label>
+
+        {profileId && hasDeclaredModels && (
+          <label className="min-w-0 text-xs text-muted-foreground">
+            <span className="mb-1 block">Fallback Model</span>
+            <select
+              aria-label="Fallback Model"
+              value={modelValue}
+              onChange={(event) => onModelChange(event.target.value)}
+              disabled={visionModels.length === 0}
+              className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary disabled:opacity-50"
+            >
+              <option value="">Select an image-capable model</option>
+              {visionModels.map((entry) => {
+                const label = entry.displayName || entry.modelId;
+                return (
+                  <option key={entry.modelId} value={entry.modelId}>
+                    {label === entry.modelId ? label : `${label} (${entry.modelId})`}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+        )}
+
+        {profileId && !hasDeclaredModels && (
+          <label className="min-w-0 text-xs text-muted-foreground">
+            <span className="mb-1 block">Fallback Model</span>
+            <input
+              type="text"
+              aria-label="Fallback Model"
+              value={model}
+              onChange={(event) => onModelChange(event.target.value)}
+              placeholder="model id"
+              className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary font-mono"
+            />
+          </label>
+        )}
+      </div>
+      {profileId && hasDeclaredModels && visionModels.length === 0 && (
+        <p className="text-xs text-amber-600">No image-capable models declared on this LLM profile.</p>
       )}
     </div>
   );

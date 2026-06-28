@@ -26,6 +26,7 @@ import {
 } from './run-domain-event-listeners.js';
 import { projectRunDomainEventToWireMessages } from './wire-projector.js';
 import { registerPluginDomainEventListener } from './plugin-domain-event-listener.js';
+import { resolveMultimodalFallbackForRun } from './multimodal-fallback.js';
 
 registerPluginDomainEventListener();
 
@@ -79,7 +80,6 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     permissionCallback,
     processedInput,
     providerConfig,
-    llmProfileId,
     providerType,
     runId,
     agentTaskExecutor,
@@ -94,9 +94,30 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     userHooks,
   } = input;
 
+  const multimodalFallback = resolveMultimodalFallbackForRun({
+    db: db as import('better-sqlite3').Database,
+    agentProfile,
+    llmProfile: providerConfig,
+    images,
+  });
+  const effectiveAgentProfile = multimodalFallback.agentProfile;
+  const effectiveProviderConfig = multimodalFallback.llmProfile;
+  const effectiveLlmProfileId = multimodalFallback.llmProfileId;
+  const effectiveProviderType = effectiveProviderConfig?.providerType ?? providerType;
+  if (multimodalFallback.applied) {
+    activeRun.agentProfile = effectiveAgentProfile;
+    activeRun.llmProfile = effectiveProviderConfig;
+    activeRun.providerType = effectiveProviderType;
+    trace.log('server_norm', 'multimodal_fallback_applied', {
+      llmProfileId: effectiveLlmProfileId,
+      providerType: effectiveProviderType,
+      model: effectiveAgentProfile.model,
+    }, `multimodal fallback model=${effectiveAgentProfile.model}`);
+  }
+
   if (adapter.manifest) {
     activeRun.effectiveProfile = negotiateProfile(adapter.manifest, {
-      model: agentProfile.model,
+      model: effectiveAgentProfile.model,
       mode: modeValue,
       hasMcpBridge: !!serverPort,
       serverPort,
@@ -114,8 +135,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     activeRun,
     input: message.input,
     listeners,
-    llmProfileId,
-    providerType: providerConfig?.providerType,
+    llmProfileId: effectiveLlmProfileId,
+    providerType: effectiveProviderConfig?.providerType ?? effectiveProviderType,
     runId,
     sendRunEvent,
     sessionId: message.sessionId,
@@ -136,7 +157,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   persistMcpInstructionsDeltaForSession(db as import('better-sqlite3').Database, message.sessionId);
 
   let effectiveInput = processedInput;
-  const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, { agentProfile });
+  const directSkill = await prepareDirectSkillInvocation(activeRun.skillState, processedInput, { agentProfile: effectiveAgentProfile });
   if (directSkill.matched) {
     if (!directSkill.ok) {
       return completeRunLocally({
@@ -161,8 +182,8 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
         cwd,
         db: db as import('better-sqlite3').Database,
         enabledTools,
-        llmProfileConfig: providerConfig,
-        agentProfile,
+        llmProfileConfig: effectiveProviderConfig,
+        agentProfile: effectiveAgentProfile,
         permissionCallback,
       });
       return completeRunLocally({
@@ -182,15 +203,15 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
 
   const { runOptions } = await buildRunContext({
     adapter,
-    agentProfile,
+    agentProfile: effectiveAgentProfile,
     cwd,
     db,
     enabledTools,
     forcedPlanBySession,
     message,
     modeValue,
-    providerConfig,
-    providerType,
+    providerConfig: effectiveProviderConfig,
+    providerType: effectiveProviderType,
     runId,
     agentTaskExecutor,
     sdkSessionId,
@@ -215,15 +236,15 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
     activeRun.pendingSteers = [];
   };
 
-  console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${providerType} mode=${modeValue} model=${agentProfile.model || 'default'} cwd=${cwd} baseUrl=${providerConfig?.baseUrl || 'default'}`);
-  trace.setMeta({ provider: providerType, cwd });
+  console.log(`[Run Debug] session=${message.sessionId} sdk_session=${sdkSessionId || 'NEW'} provider=${effectiveProviderType} mode=${modeValue} model=${effectiveAgentProfile.model || 'default'} cwd=${cwd} baseUrl=${effectiveProviderConfig?.baseUrl || 'default'}`);
+  trace.setMeta({ provider: effectiveProviderType, cwd });
   trace.log('server_norm', 'provider_runner_created', {
-    providerType,
+    providerType: effectiveProviderType,
     sdkSessionId,
     modeValue,
-    model: agentProfile.model,
+    model: effectiveAgentProfile.model,
     cwd,
-  }, `provider runner ${providerType}`);
+  }, `provider runner ${effectiveProviderType}`);
 
   // Pre-flight compaction. History is rebuilt from the DB inside adapter.run, so
   // if the stored history already exceeds the CURRENT model's threshold — e.g.
@@ -233,13 +254,13 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
   // preempt an overflow that the very first request would trigger. Non-fatal: on
   // any failure the request still goes out and handleRunException's
   // overflow-recovery retry remains the net.
-  if (providerConfig) {
+  if (effectiveProviderConfig) {
     try {
       const preflight = await maybeCompact({
         db: db as import('better-sqlite3').Database,
         sessionId: message.sessionId,
-        agentProfile,
-        llmProfile: providerConfig,
+        agentProfile: effectiveAgentProfile,
+        llmProfile: effectiveProviderConfig,
         source: 'preflight',
         signal: activeRun.abortController?.signal,
       });
@@ -271,7 +292,7 @@ export async function launchProviderRun(input: LaunchProviderRunInput): Promise<
 
   const providerRunner = adapter.run(effectiveInput, runOptions, permissionCallback);
 
-  activeRun.providerType = providerType;
+  activeRun.providerType = effectiveProviderType;
   const runState = adapter.getRunState?.(runOptions) || {};
   Object.assign(activeRun, runState);
 

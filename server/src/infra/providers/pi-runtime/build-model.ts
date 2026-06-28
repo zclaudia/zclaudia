@@ -39,6 +39,9 @@ function applyModelEntryOverrides(
   if (entry.maxTokens && entry.maxTokens > 0) {
     model.maxTokens = entry.maxTokens;
   }
+  if (entry.inputModalities && entry.inputModalities.length > 0) {
+    model.input = [...entry.inputModalities];
+  }
   if (entry.displayName) {
     model.name = entry.displayName;
   }

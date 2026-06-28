@@ -1227,6 +1227,15 @@ describe('buildModel — modelEntry overrides', () => {
     expect(built.model.name).toBe('Pretty Name');
   });
 
+  it('overrides input modalities on openai-compat literal path', () => {
+    const built = buildModel(
+      { providerType: 'openai', baseUrl: 'http://x/v1' } as any,
+      'unregistered-vision',
+      { modelId: 'unregistered-vision', inputModalities: ['text', 'image'] },
+    );
+    expect((built.model as { input?: string[] }).input).toEqual(['text', 'image']);
+  });
+
   it('overrides registry-resolved Model.contextWindow', () => {
     delete process.env.OPENAI_BASE_URL;
     const built = buildModel(undefined, 'claude-opus-4-7', { modelId: 'claude-opus-4-7', contextWindow: 1_000_000 });

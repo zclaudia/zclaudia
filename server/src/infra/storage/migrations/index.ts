@@ -26,6 +26,7 @@ import { migration as m_023_web_search_config } from './023_web_search_config.js
 import { migration as m_024_session_fork_lineage } from './024_session_fork_lineage.js';
 import { migration as m_025_message_tree_entry_id } from './025_message_tree_entry_id.js';
 import { migration as m_026_session_goals } from './026_session_goals.js';
+import { migration as m_027_agent_multimodal_fallback } from './027_agent_multimodal_fallback.js';
 
 export type { Migration };
 
@@ -56,6 +57,7 @@ export const migrations: Migration[] = [
   m_024_session_fork_lineage,
   m_025_message_tree_entry_id,
   m_026_session_goals,
+  m_027_agent_multimodal_fallback,
 ];
 
 /**

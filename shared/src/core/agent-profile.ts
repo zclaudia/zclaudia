@@ -3,6 +3,11 @@ import type { SkillExecutionSelection, SkillSelection } from './skills.js';
 
 export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
+export interface MultimodalFallbackConfig {
+  llmProfileId: string;
+  model: string;
+}
+
 export interface AgentProfileConfig {
   id: string;
   name: string;
@@ -20,6 +25,8 @@ export interface AgentProfileConfig {
   skillSelection?: SkillSelection;
   /** Optional profile-level skill execution policy overrides. */
   skillExecution?: SkillExecutionSelection;
+  /** Run-local fallback used only when the current user input contains images and the primary model lacks vision. */
+  multimodalFallback?: MultimodalFallbackConfig;
   thinkingLevel?: ThinkingLevel;
   isDefault?: boolean;
   source?: 'user' | 'plugin';

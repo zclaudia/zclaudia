@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import type Database from 'better-sqlite3';
 import { LLM_PROVIDER_TYPES } from '@zclaudia/shared/core/llm-profile';
-import type { LlmProfileConfig, LlmProfileModelEntry } from '@zclaudia/shared/core/llm-profile';
+import type { LlmProfileConfig, LlmProfileModelEntry, ModelInputModality } from '@zclaudia/shared/core/llm-profile';
 import type { ApiResponse } from '@zclaudia/shared/core/api';
 import { LlmProfileRepository } from './repository.js';
 import {
@@ -15,6 +15,7 @@ import { resolveContextWindow } from '../../application/conversation/compaction/
 
 const VALID_PROVIDER_TYPES: readonly string[] = LLM_PROVIDER_TYPES;
 const VALID_CACHE_RETENTION = ['none', 'short', 'long'];
+const VALID_INPUT_MODALITIES: readonly ModelInputModality[] = ['text', 'image'];
 
 const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
 
@@ -40,6 +41,23 @@ const RESERVED_HEADER_KEYS = new Set(['authorization', 'content-type', 'host']);
  * - `displayName` (optional) is a string.
  * - `contextWindow` / `maxTokens` (optional) are positive integers.
  */
+function normalizeInputModalities(input: unknown, index: number): ModelInputModality[] | undefined {
+  if (input === undefined || input === null) return undefined;
+  if (!Array.isArray(input)) {
+    throw new Error(`models[${index}].inputModalities must be an array`);
+  }
+  const seen = new Set<ModelInputModality>();
+  for (let j = 0; j < input.length; j += 1) {
+    const value = input[j];
+    if (typeof value !== 'string' || !VALID_INPUT_MODALITIES.includes(value as ModelInputModality)) {
+      throw new Error(`models[${index}].inputModalities[${j}] must be one of: ${VALID_INPUT_MODALITIES.join(', ')}`);
+    }
+    seen.add(value as ModelInputModality);
+  }
+  if (seen.has('image')) seen.add('text');
+  return VALID_INPUT_MODALITIES.filter((value) => seen.has(value));
+}
+
 function validateModels(input: unknown): LlmProfileModelEntry[] | undefined {
   if (input === undefined || input === null) return undefined;
   if (!Array.isArray(input)) {
@@ -67,6 +85,10 @@ function validateModels(input: unknown): LlmProfileModelEntry[] | undefined {
         throw new Error(`models[${i}].displayName must be a string`);
       }
       normalized.displayName = entry.displayName;
+    }
+    const inputModalities = normalizeInputModalities(entry.inputModalities, i);
+    if (inputModalities !== undefined) {
+      normalized.inputModalities = inputModalities;
     }
     if (entry.contextWindow !== undefined && entry.contextWindow !== null) {
       const cw = entry.contextWindow;

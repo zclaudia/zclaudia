@@ -42,6 +42,7 @@ interface ModelRowDraft {
   displayName: string;
   contextWindowStr: string;
   maxTokensStr: string;
+  supportsImage: boolean;
   /** Last probe result; cleared after a few seconds via a setTimeout. */
   testStatus?:
     | { kind: 'running' }
@@ -63,6 +64,7 @@ function entryToDraft(entry: LlmProfileModelEntry): ModelRowDraft {
     displayName: entry.displayName ?? '',
     contextWindowStr: entry.contextWindow != null ? String(entry.contextWindow) : '',
     maxTokensStr: entry.maxTokens != null ? String(entry.maxTokens) : '',
+    supportsImage: entry.inputModalities?.includes('image') ?? false,
   };
 }
 
@@ -114,6 +116,7 @@ function draftsToEntries(drafts: ModelRowDraft[]): LlmProfileModelEntry[] {
     if (cw.value !== undefined) entry.contextWindow = cw.value;
     const mt = parsePositiveInteger(d.maxTokensStr);
     if (mt.value !== undefined) entry.maxTokens = mt.value;
+    if (d.supportsImage) entry.inputModalities = ['text', 'image'];
     out.push(entry);
   }
   return out;
@@ -431,7 +434,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
       if (!isCodexProvider) {
         for (let i = 0; i < formModels.length; i += 1) {
           const row = formModels[i];
-          if (!row.modelId.trim() && !row.displayName.trim() && !row.contextWindowStr.trim() && !row.maxTokensStr.trim()) {
+          if (!row.modelId.trim() && !row.displayName.trim() && !row.contextWindowStr.trim() && !row.maxTokensStr.trim() && !row.supportsImage) {
             continue; // fully empty — drop on serialize
           }
           const errs = validateModelDraftRow(row, formModels, i);
@@ -515,7 +518,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     if (formModelsSaveError) setFormModelsSaveError(null);
     setFormModels((rows) => [
       ...rows,
-      { rowUid: generateRowUid(), modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '' },
+      { rowUid: generateRowUid(), modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '', supportsImage: false },
     ]);
   };
 
@@ -596,6 +599,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           displayName: '',
           contextWindowStr: '',
           maxTokensStr: '',
+          supportsImage: false,
         })),
       ]);
     }
@@ -1376,8 +1380,20 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
           )}
         </div>
       </div>
-      <div className="flex items-center justify-between">
-        <ModelTestStatus status={row.testStatus} />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <ModelTestStatus status={row.testStatus} />
+          <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={row.supportsImage}
+              onChange={(e) => onChange({ supportsImage: e.target.checked })}
+              aria-label={`model ${row.modelId.trim() || index + 1} supports images`}
+              className="h-3.5 w-3.5 rounded border-border"
+            />
+            Images
+          </label>
+        </div>
         <div className="flex items-center gap-1">
           <button
             type="button"

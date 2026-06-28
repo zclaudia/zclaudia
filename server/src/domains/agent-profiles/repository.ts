@@ -1,6 +1,6 @@
 import { BaseRepository } from '../../infra/repositories/base.js';
 import type { Database } from 'better-sqlite3';
-import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
+import type { AgentProfileConfig, MultimodalFallbackConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import {
   normalizeSkillExecutionSelection,
   normalizeSkillSelection,
@@ -23,6 +23,11 @@ import {
 import { newId } from '../../utils/uuid.js';
 
 const VALID_THINKING_LEVELS = new Set<ThinkingLevel>(['off', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+
+type AgentProfileCreate = Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>;
+type AgentProfileUpdate = Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>> & {
+  multimodalFallback?: MultimodalFallbackConfig | null;
+};
 
 function normalizeEnabledTools(tools: string[]): string[] {
   const normalized = tools.flatMap((tool) => {
@@ -129,8 +134,8 @@ function stringifySkillExecution(selection: SkillExecutionSelection): string {
 
 export class AgentProfileRepository extends BaseRepository<
   AgentProfileConfig,
-  Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>,
-  Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>
+  AgentProfileCreate,
+  AgentProfileUpdate
 > {
   constructor(db: Database) {
     super(db, 'agent_profiles');
@@ -152,6 +157,7 @@ export class AgentProfileRepository extends BaseRepository<
       resolvedTools: resolved.refs,
       skillSelection: this.parseSkillSelection(row.skill_selection),
       skillExecution: this.parseSkillExecution(row.skill_execution),
+      multimodalFallback: this.parseMultimodalFallback(row.multimodal_fallback),
       thinkingLevel: this.parseThinkingLevel(row.thinking_level),
       isDefault: row.is_default === 1,
       source: row.source === 'plugin' ? 'plugin' : 'user',
@@ -216,15 +222,33 @@ export class AgentProfileRepository extends BaseRepository<
     return undefined;
   }
 
-  createQuery(data: Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>): { sql: string; params: unknown[] } {
+  private parseMultimodalFallback(raw: string | null | undefined): MultimodalFallbackConfig | undefined {
+    if (!raw) return undefined;
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      if (
+        typeof parsed?.llmProfileId === 'string' && parsed.llmProfileId.trim()
+        && typeof parsed?.model === 'string' && parsed.model.trim()
+      ) {
+        return { llmProfileId: parsed.llmProfileId, model: parsed.model };
+      }
+      console.warn('[AgentProfileRepository] multimodal_fallback missing fields, falling back to undefined');
+      return undefined;
+    } catch (err) {
+      console.warn('[AgentProfileRepository] invalid multimodal_fallback JSON, falling back to undefined:', err);
+      return undefined;
+    }
+  }
+
+  createQuery(data: AgentProfileCreate): { sql: string; params: unknown[] } {
     const id = newId();
     const now = Date.now();
     const toolSelection = data.toolSelection ?? legacyEnabledToolsToSelection(data.enabledTools);
     const enabledTools = resolveToolSelection(toolSelection).builtinTools;
     return {
       sql: `
-        INSERT INTO agent_profiles (id, name, description, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO agent_profiles (id, name, description, llm_profile_id, model, system_prompt, enabled_tools, tool_selection, skill_selection, skill_execution, multimodal_fallback, thinking_level, is_default, source, plugin_id, plugin_profile_id, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       params: [
         id,
@@ -237,6 +261,7 @@ export class AgentProfileRepository extends BaseRepository<
         stringifySelection(toolSelection),
         data.skillSelection ? stringifySkillSelection(data.skillSelection) : null,
         data.skillExecution ? stringifySkillExecution(data.skillExecution) : null,
+        data.multimodalFallback ? JSON.stringify(data.multimodalFallback) : null,
         data.thinkingLevel ?? null,
         data.isDefault ? 1 : 0,
         data.source ?? 'user',
@@ -250,7 +275,7 @@ export class AgentProfileRepository extends BaseRepository<
 
   updateQuery(
     id: string,
-    data: Partial<Omit<AgentProfileConfig, 'id' | 'createdAt' | 'updatedAt'>>,
+    data: AgentProfileUpdate,
   ): { sql: string; params: unknown[] } {
     const updates: string[] = [];
     const params: unknown[] = [];
@@ -295,6 +320,10 @@ export class AgentProfileRepository extends BaseRepository<
     if (data.skillExecution !== undefined) {
       updates.push('skill_execution = ?');
       params.push(data.skillExecution ? stringifySkillExecution(data.skillExecution) : null);
+    }
+    if (Object.prototype.hasOwnProperty.call(data, 'multimodalFallback')) {
+      updates.push('multimodal_fallback = ?');
+      params.push(data.multimodalFallback ? JSON.stringify(data.multimodalFallback) : null);
     }
     if (data.thinkingLevel !== undefined) {
       updates.push('thinking_level = ?');

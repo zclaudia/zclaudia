@@ -16,6 +16,7 @@ export const LLM_PROVIDER_TYPES = [
 export type LlmProviderType = typeof LLM_PROVIDER_TYPES[number] | string;
 
 export type CacheRetentionSetting = 'none' | 'short' | 'long';
+export type ModelInputModality = 'text' | 'image';
 
 export interface LlmProfileCompat {
   supportsDeveloperRole?: boolean;
@@ -34,6 +35,8 @@ export interface LlmProfileModelEntry {
   modelId: string;
   /** Optional human-readable label shown in UI. Falls back to modelId. */
   displayName?: string;
+  /** Declared input modalities for custom/proxy models. Undefined → use registry/default model metadata. */
+  inputModalities?: ModelInputModality[];
   /** Override pi-ai's default context window. Positive integer; falsy/undefined → use registry default. */
   contextWindow?: number;
   /** Override pi-ai's default max output tokens. Positive integer. */

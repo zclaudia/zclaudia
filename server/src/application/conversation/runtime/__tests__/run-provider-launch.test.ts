@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import { applyMigrations } from '../../../../infra/storage/migrations/index.js';
+import { LlmProfileRepository } from '../../../../domains/llm-profiles/repository.js';
 import { RunDomainEventListenerRegistry } from '../run-domain-event-listeners.js';
 
 const buildRunContextMock = vi.fn();
@@ -324,6 +327,108 @@ describe('ws/run-provider-launch', () => {
       },
     }));
     expect(adapter.run).toHaveBeenCalled();
+
+    clearInterval(activeRun.saveInterval);
+  });
+
+  it('uses the multimodal fallback profile and model for image runs before provider launch', async () => {
+    const db = new Database(':memory:');
+    applyMigrations(db);
+    const llmRepo = new LlmProfileRepository(db);
+    const primary = llmRepo.create({
+      name: 'Primary',
+      providerType: 'openai',
+      baseUrl: 'http://primary/v1',
+      models: [{ modelId: 'primary-text', inputModalities: ['text'] }],
+    });
+    const fallback = llmRepo.create({
+      name: 'Vision',
+      providerType: 'openai',
+      baseUrl: 'http://vision/v1',
+      models: [{ modelId: 'vision-model', inputModalities: ['text', 'image'] }],
+    });
+    const { launchProviderRun } = await import('../run-provider-launch.js');
+    const activeRun = {
+      sessionId: 'session-1',
+      assistantMessageId: 'assistant-1',
+      pendingSteers: [],
+      eventSeq: 0,
+    } as any;
+    const adapter = {
+      run: vi.fn(() => providerStream()),
+      getRunState: vi.fn(() => ({})),
+    } as any;
+    const sendRunEventMock = vi.fn();
+    const listeners = new RunDomainEventListenerRegistry();
+    const runStartedListener = vi.fn();
+    listeners.on('run.started', runStartedListener);
+
+    await launchProviderRun({
+      activeRun,
+      adapter,
+      agentProfile: {
+        id: 'agent-1',
+        name: 'Test Agent',
+        llmProfileId: primary.id,
+        model: 'primary-text',
+        systemPrompt: '',
+        enabledTools: [],
+        multimodalFallback: { llmProfileId: fallback.id, model: 'vision-model' },
+      } as any,
+      broadcastSessionCatalogUpdate: vi.fn(),
+      client: { ws: {} as any } as any,
+      cwd: '/tmp/project',
+      db: db as any,
+      enabledTools: [],
+      forcedPlanBySession: false,
+      images: [{ name: 'a.png', mimeType: 'image/png', data: 'abc' }],
+      message: { type: 'run_start', sessionId: 'session-1', clientRequestId: 'req-1', input: 'look' },
+      modeValue: 'default',
+      permissionCallback: vi.fn(),
+      processedInput: 'look',
+      providerConfig: primary,
+      llmProfileId: primary.id,
+      providerType: primary.providerType,
+      runId: 'run-1',
+      sendRunEvent: sendRunEventMock,
+      serverPort: 3100,
+      session: {
+        id: 'session-1',
+        project_id: 'project-1',
+        name: 'Test Session',
+        root_path: '/tmp/project',
+        sdk_session_id: null,
+        session_type: 'regular',
+        working_directory: '/tmp/project',
+        project_role: null,
+        plan_status: null,
+        task_id: null,
+      },
+      sessionType: 'regular',
+      trace: { log: vi.fn(), setMeta: vi.fn() } as any,
+      listeners,
+    });
+
+    expect(buildRunContextMock).toHaveBeenCalledWith(expect.objectContaining({
+      agentProfile: expect.objectContaining({
+        llmProfileId: fallback.id,
+        model: 'vision-model',
+      }),
+      providerConfig: expect.objectContaining({
+        id: fallback.id,
+        baseUrl: 'http://vision/v1',
+      }),
+      providerType: fallback.providerType,
+    }));
+    expect(runStartedListener).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'run.started',
+      payload: expect.objectContaining({
+        llmProfileId: fallback.id,
+        providerType: fallback.providerType,
+      }),
+    }));
+    expect(activeRun.agentProfile).toEqual(expect.objectContaining({ model: 'vision-model' }));
+    expect(activeRun.llmProfile).toEqual(expect.objectContaining({ id: fallback.id }));
 
     clearInterval(activeRun.saveInterval);
   });

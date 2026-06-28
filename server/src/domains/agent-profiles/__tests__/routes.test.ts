@@ -46,6 +46,49 @@ describe('agent-profiles routes', () => {
     expect(res.body.data.thinkingLevel).toBe('medium');
   });
 
+  it('POST creates an agent profile with a cross-profile multimodal fallback', async () => {
+    const vision = new LlmProfileRepository(db).create({
+      name: 'vision',
+      providerType: 'openai',
+      apiKey: 'sk-vision',
+      models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
+    });
+
+    const res = await request(app).post('/api/agent-profiles').send({
+      name: 'coder',
+      llmProfileId,
+      model: 'claude-haiku-4-5',
+      systemPrompt: '',
+      enabledTools: ['read'],
+      multimodalFallback: { llmProfileId: vision.id, model: 'gpt-4o' },
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.body.data.multimodalFallback).toEqual({ llmProfileId: vision.id, model: 'gpt-4o' });
+  });
+
+  it('POST rejects fallback models declared without image support', async () => {
+    const textOnly = new LlmProfileRepository(db).create({
+      name: 'text-only',
+      providerType: 'openai',
+      apiKey: 'sk-text',
+      models: [{ modelId: 'gpt-text', inputModalities: ['text'] }],
+    });
+
+    const res = await request(app).post('/api/agent-profiles').send({
+      name: 'coder',
+      llmProfileId,
+      model: 'claude-haiku-4-5',
+      systemPrompt: '',
+      enabledTools: ['read'],
+      multimodalFallback: { llmProfileId: textOnly.id, model: 'gpt-text' },
+    });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    expect(res.body.error.message).toMatch(/image/i);
+  });
+
   it('POST rejects missing required fields', async () => {
     const res = await request(app).post('/api/agent-profiles').send({ name: 'a', enabledTools: [] });
     expect(res.status).toBe(400);
@@ -77,6 +120,30 @@ describe('agent-profiles routes', () => {
       .send({ name: 'updated' });
     expect(res.status).toBe(200);
     expect(res.body.data.name).toBe('updated');
+  });
+
+  it('PATCH clears a multimodal fallback with null', async () => {
+    const vision = new LlmProfileRepository(db).create({
+      name: 'vision',
+      providerType: 'openai',
+      apiKey: 'sk-vision',
+      models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
+    });
+    const create = await request(app).post('/api/agent-profiles').send({
+      name: 'a',
+      llmProfileId,
+      model: 'm',
+      systemPrompt: '',
+      enabledTools: ['read'],
+      multimodalFallback: { llmProfileId: vision.id, model: 'gpt-4o' },
+    });
+
+    const res = await request(app)
+      .patch(`/api/agent-profiles/${create.body.data.id}`)
+      .send({ multimodalFallback: null });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.multimodalFallback).toBeUndefined();
   });
 
   it('DELETE rejects when sessions reference the agent (409)', async () => {

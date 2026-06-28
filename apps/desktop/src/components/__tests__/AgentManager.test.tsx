@@ -83,7 +83,7 @@ describe('AgentManager', () => {
       name: 'OpenAI',
       providerType: 'openai' as const,
       isDefault: false,
-      models: [{ modelId: 'gpt-4o' }],
+      models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
       createdAt: Date.now(),
       updatedAt: Date.now(),
     },
@@ -356,6 +356,66 @@ describe('AgentManager', () => {
           toolSelection: expect.objectContaining({
             providers: [{ source: 'mcp', serverId: 'github' }],
           }),
+        }),
+      );
+    });
+  });
+
+  it('saves a multimodal fallback on a different LLM profile', async () => {
+    await renderAgentManager({ onClose: mockOnClose });
+
+    await waitForFast(() => {
+      expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+    });
+
+    await clickAsync(screen.getAllByTitle('Edit')[0]);
+
+    fireEvent.change(screen.getByLabelText('Fallback LLM Profile'), {
+      target: { value: 'llm-2' },
+    });
+    await waitForFast(() => {
+      expect(screen.getByLabelText('Fallback Model')).toBeInTheDocument();
+    });
+    fireEvent.change(screen.getByLabelText('Fallback Model'), {
+      target: { value: 'gpt-4o' },
+    });
+    await clickAsync(screen.getByText('Update'));
+
+    await waitForFast(() => {
+      expect(api.updateAgentProfile).toHaveBeenCalledWith(
+        'agent-1',
+        expect.objectContaining({
+          multimodalFallback: { llmProfileId: 'llm-2', model: 'gpt-4o' },
+        }),
+      );
+    });
+  });
+
+  it('clears a persisted multimodal fallback when the fallback profile is set to None', async () => {
+    vi.mocked(api.listAgentProfiles).mockResolvedValue([
+      {
+        ...mockAgents[0],
+        multimodalFallback: { llmProfileId: 'llm-2', model: 'gpt-4o' },
+      },
+    ]);
+
+    await renderAgentManager({ onClose: mockOnClose });
+
+    await waitForFast(() => {
+      expect(screen.getByText('Default Coding Agent')).toBeInTheDocument();
+    });
+
+    await clickAsync(screen.getAllByTitle('Edit')[0]);
+    fireEvent.change(screen.getByLabelText('Fallback LLM Profile'), {
+      target: { value: '' },
+    });
+    await clickAsync(screen.getByText('Update'));
+
+    await waitForFast(() => {
+      expect(api.updateAgentProfile).toHaveBeenCalledWith(
+        'agent-1',
+        expect.objectContaining({
+          multimodalFallback: null,
         }),
       );
     });
