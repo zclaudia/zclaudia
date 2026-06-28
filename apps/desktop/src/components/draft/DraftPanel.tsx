@@ -94,12 +94,9 @@ export function DraftPanel() {
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           readOnly={effectiveReadOnly}
-          className={`w-full h-full resize-none bg-transparent py-5 text-sm leading-relaxed text-foreground focus:outline-none ${
+          className={`w-full h-full resize-none bg-transparent px-4 py-4 text-sm leading-relaxed text-foreground focus:outline-none ${
             effectiveReadOnly ? 'opacity-60 cursor-default' : ''
           }`}
-          style={{
-            paddingInline: 'max(1rem, calc((100% - 680px) / 2))',
-          }}
           placeholder=""
           aria-label="Draft message"
           spellCheck={!effectiveReadOnly}

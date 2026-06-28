@@ -89,7 +89,7 @@ export function DraftActions() {
         <button
           onClick={handleSend}
           disabled={!hasContent || !sendCallback}
-          className={`${ICON_BTN} bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed`}
+          className={`${ICON_BTN} bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40 disabled:cursor-not-allowed`}
           title="Send to chat (⌘↩)"
           aria-label="Send to chat"
         >
