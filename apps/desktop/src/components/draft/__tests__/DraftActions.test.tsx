@@ -83,6 +83,12 @@ describe('DraftActions', () => {
     expect(screen.queryByLabelText('Send to chat')).toBeNull();
   });
 
+  it('shows a Read Only badge when read-only and not archived', () => {
+    state = { ...buildState(), isReadOnly: true };
+    render(<DraftActions />);
+    expect(screen.getByText('Read Only')).toBeTruthy();
+  });
+
   describe('discard confirm auto-reset', () => {
     beforeEach(() => {
       vi.useFakeTimers();

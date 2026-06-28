@@ -75,6 +75,11 @@ export function DraftActions() {
             </span>
           )}
         </span>
+        {isReadOnly && !sessionArchived && (
+          <span className="rounded-md bg-yellow-500/10 px-1.5 py-0.5 text-[11px] text-yellow-500">
+            Read Only
+          </span>
+        )}
       </span>
 
       {!effectiveReadOnly && (
