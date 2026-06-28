@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../../services/api';
 import type { PermissionLogEntry } from '../../../services/api/debug';
-import { DebugSection } from './DebugGroup';
+import { SettingsRow } from '../ui/SettingsGroup';
 
 export function PermissionLogsSection() {
   const [permLogs, setPermLogs] = useState<PermissionLogEntry[]>([]);
@@ -35,10 +35,11 @@ export function PermissionLogsSection() {
   }, [loadPermissionLogs, permLogsFilter]);
 
   return (
-    <DebugSection
+    <SettingsRow
+      align="start"
       title="Permission logs"
       description="Historical permission decisions (auto-approve, user decisions, AI review)."
-      actions={
+      control={
         <button
           onClick={() => { setPermLogs([]); void loadPermissionLogs(0, permLogsFilter); }}
           disabled={permLogsLoading}
@@ -48,7 +49,7 @@ export function PermissionLogsSection() {
         </button>
       }
     >
-      <div className="mt-3 space-y-3">
+      <div className="space-y-3">
         {/* Filter */}
         <div className="flex gap-1">
           {(['', 'allow', 'deny'] as const).map((filter) => (
@@ -109,6 +110,6 @@ export function PermissionLogsSection() {
           </button>
         )}
       </div>
-    </DebugSection>
+    </SettingsRow>
   );
 }

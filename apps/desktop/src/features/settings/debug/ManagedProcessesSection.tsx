@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../../services/api';
 import type { ManagedProcessRecord } from '../../../services/api/debug';
-import { DebugSection } from './DebugGroup';
+import { SettingsRow } from '../ui/SettingsGroup';
 
 interface ManagedProcessesSectionProps {
   embeddedServerStatus: string;
@@ -63,10 +63,11 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
   }, [embeddedServerStatus]);
 
   return (
-    <DebugSection
+    <SettingsRow
+      align="start"
       title="Managed processes"
       description="Read-only process registry for product-owned commands and adopted roots."
-      actions={
+      control={
         <button
           onClick={() => { void handleRefreshProcesses(); }}
           disabled={managedProcessesLoading || embeddedServerStatus === 'disabled'}
@@ -76,7 +77,7 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
         </button>
       }
     >
-      <div className="mt-3 space-y-3">
+      <div className="space-y-3">
         {managedProcessesError && (
           <div className="text-xs text-destructive">{managedProcessesError}</div>
         )}
@@ -122,6 +123,6 @@ export function ManagedProcessesSection({ embeddedServerStatus }: ManagedProcess
           </div>
         )}
       </div>
-    </DebugSection>
+    </SettingsRow>
   );
 }

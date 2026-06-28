@@ -4,7 +4,7 @@ import * as api from '../../../services/api';
 import type { SimulateAIReviewResponse } from '../../../services/api/debug';
 import type { LlmProfileConfig } from '@zclaudia/shared';
 import { Select } from '../../../components/ui/Select';
-import { DebugSection } from './DebugGroup';
+import { SettingsRow } from '../ui/SettingsGroup';
 
 export function AiReviewSimulatorSection() {
   const [expanded, setExpanded] = useState(false);
@@ -59,10 +59,11 @@ export function AiReviewSimulatorSection() {
   }, []);
 
   return (
-    <DebugSection
+    <SettingsRow
+      align="start"
       title="AI review simulator"
       description="Test how AI review evaluates different commands with your configured providers."
-      actions={
+      control={
         <button
           onClick={() => setExpanded((v) => !v)}
           aria-label={expanded ? 'Collapse AI review simulator' : 'Expand AI review simulator'}
@@ -73,7 +74,7 @@ export function AiReviewSimulatorSection() {
       }
     >
       {expanded && (
-        <div className="mt-3 space-y-3">
+        <div className="space-y-3">
           {/* Form (verbatim from original lines 546–617) */}
           <div className="space-y-2">
             {/* Row 1: Tool + Command */}
@@ -290,6 +291,6 @@ export function AiReviewSimulatorSection() {
           )}
         </div>
       )}
-    </DebugSection>
+    </SettingsRow>
   );
 }

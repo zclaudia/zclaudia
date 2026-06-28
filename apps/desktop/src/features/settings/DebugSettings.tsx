@@ -1,5 +1,5 @@
 import type { ClientMessage } from '@zclaudia/shared';
-import { DebugGroup } from './debug/DebugGroup';
+import { SettingsGroup } from './ui/SettingsGroup';
 import { CrashReportsSection } from './debug/CrashReportsSection';
 import { ManagedProcessesSection } from './debug/ManagedProcessesSection';
 import { ClientLogsSection } from './debug/ClientLogsSection';
@@ -20,20 +20,20 @@ export function DebugSettings({ isConnected, sendMessage, embeddedServerStatus }
       <p className="text-sm text-muted-foreground">Diagnostics and troubleshooting tools.</p>
 
       <div className="space-y-6">
-        <DebugGroup label="Diagnostics">
+        <SettingsGroup label="Diagnostics">
           <CrashReportsSection embeddedServerStatus={embeddedServerStatus} />
           <ManagedProcessesSection embeddedServerStatus={embeddedServerStatus} />
-        </DebugGroup>
+        </SettingsGroup>
 
-        <DebugGroup label="Logs">
+        <SettingsGroup label="Logs">
           <ClientLogsSection />
           <PermissionLogsSection />
-        </DebugGroup>
+        </SettingsGroup>
 
-        <DebugGroup label="Tools">
+        <SettingsGroup label="Tools">
           <LeakedProcessCleanupSection isConnected={isConnected} sendMessage={sendMessage} />
           <AiReviewSimulatorSection />
-        </DebugGroup>
+        </SettingsGroup>
       </div>
     </div>
   );

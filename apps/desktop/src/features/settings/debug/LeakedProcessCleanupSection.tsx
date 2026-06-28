@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useProcessMonitorStore } from '../../../stores/processMonitorStore';
 import type { ClientMessage } from '@zclaudia/shared';
-import { DebugSection } from './DebugGroup';
+import { SettingsRow } from '../ui/SettingsGroup';
 
 interface LeakedProcessCleanupSectionProps {
   isConnected: boolean;
@@ -63,11 +63,12 @@ export function LeakedProcessCleanupSection({ isConnected, sendMessage }: Leaked
   }, [cleanupResult]);
 
   return (
-    <DebugSection
+    <SettingsRow
+      align="start"
       title="Leaked process cleanup"
       description="Trigger an immediate server-side scan for orphaned provider child processes and terminate any matches."
     >
-      <div className="mt-3 space-y-3">
+      <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div className="text-xs text-muted-foreground">
             {isConnected ? 'Connected to active server' : 'Server disconnected'}
@@ -86,6 +87,6 @@ export function LeakedProcessCleanupSection({ isConnected, sendMessage }: Leaked
           </div>
         )}
       </div>
-    </DebugSection>
+    </SettingsRow>
   );
 }

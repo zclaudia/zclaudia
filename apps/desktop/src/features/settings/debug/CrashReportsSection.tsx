@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as api from '../../../services/api';
 import type { CrashReportEntry } from '../../../services/api/debug';
-import { DebugSection } from './DebugGroup';
+import { SettingsRow } from '../ui/SettingsGroup';
 
 export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerStatus: string }) {
   const [crashReports, setCrashReports] = useState<CrashReportEntry[]>([]);
@@ -42,10 +42,11 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
   }, [embeddedServerStatus, loadCrashReports]);
 
   return (
-    <DebugSection
+    <SettingsRow
+      align="start"
       title="Crash reports"
       description="Recent embedded server fatal crashes stored on disk."
-      actions={
+      control={
         <>
           <button
             onClick={() => { void loadCrashReports(); }}
@@ -64,7 +65,7 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
         </>
       }
     >
-      <div className="mt-3 space-y-3">
+      <div className="space-y-3">
         {crashReportsPath && (
           <div className="text-[11px] text-muted-foreground break-all">
             {crashReportsPath}
@@ -100,6 +101,6 @@ export function CrashReportsSection({ embeddedServerStatus }: { embeddedServerSt
           </div>
         )}
       </div>
-    </DebugSection>
+    </SettingsRow>
   );
 }

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { exportLogs, getLogCount, clearLogs } from '../../../services/logger';
 import { isTauri } from '../../../utils/platform';
-import { DebugSection } from './DebugGroup';
+import { SettingsRow } from '../ui/SettingsGroup';
 
 export function ClientLogsSection() {
   const handleExportLogs = useCallback(async () => {
@@ -35,10 +35,11 @@ export function ClientLogsSection() {
   }, []);
 
   return (
-    <DebugSection
+    <SettingsRow
+      align="start"
       title="Client logs"
       description={`${getLogCount()} entries in buffer`}
-      actions={
+      control={
         <>
           <button
             onClick={() => { clearLogs(); }}
