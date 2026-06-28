@@ -1,13 +1,13 @@
 import type { ReactNode } from 'react';
 
-/** A labeled group of debug sections rendered as a bordered card with divided rows. */
+/** A labeled group of debug sections rendered as a soft borderless card with divided rows. */
 export function DebugGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
     <section>
       <h4 className="mb-2 ml-0.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </h4>
-      <div className="divide-y divide-border rounded-xl border border-border bg-card">
+      <div className="divide-y divide-border rounded-xl bg-secondary/30">
         {children}
       </div>
     </section>
