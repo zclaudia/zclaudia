@@ -3,8 +3,7 @@ import { Loader2 } from 'lucide-react';
 import { ConnectionProvider, useConnection } from '../../contexts/ConnectionContext';
 import { WindowContextBar } from '../window/WindowContextBar';
 import * as api from '../../services/api';
-
-const MAX_CONTENT_BYTES = 100 * 1024;
+import { MAX_CONTENT_BYTES } from './draftConstants';
 const CLIENT_DEVICE_ID = crypto.randomUUID();
 const SAVE_DEBOUNCE_MS = 1500;
 const SESSION_CHECK_INTERVAL_MS = 30_000;
@@ -232,19 +231,30 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
       )}
 
       {/* Editor */}
-      <div className="flex-1 overflow-hidden p-3">
+      <div className="relative flex-1 overflow-hidden flex justify-center">
         <textarea
           ref={textareaRef}
           value={content}
           onChange={handleChange}
           readOnly={effectiveReadOnly}
           autoFocus
-          className={`w-full h-full resize-none bg-transparent text-sm text-foreground focus:outline-none font-mono ${
+          className={`w-full h-full max-w-[680px] resize-none bg-transparent px-4 py-5 text-sm leading-relaxed text-foreground focus:outline-none ${
             effectiveReadOnly ? 'opacity-60 cursor-default' : ''
           }`}
-          placeholder="Write your draft here..."
-          spellCheck={false}
+          placeholder=""
+          aria-label="Draft message"
+          spellCheck={!effectiveReadOnly}
         />
+        {content.length === 0 && !effectiveReadOnly && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+            <p className="max-w-xs text-sm text-muted-foreground">
+              This draft auto-saves and syncs across your devices — come back anytime.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Close this window to return your draft to the chat.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
