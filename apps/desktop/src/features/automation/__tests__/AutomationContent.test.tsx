@@ -53,16 +53,29 @@ describe('AutomationContent', () => {
     });
   });
 
-  it('does not refetch automations on every render', async () => {
-    render(<AutomationContent tab="automations" backendId="b1" />);
+  it('does not refetch automations when re-rendered with the same props', async () => {
+    const { rerender } = render(<AutomationContent tab="automations" backendId="b1" />);
     await waitFor(() => {
       expect(screen.getByText('Build')).toBeTruthy();
     });
-    const automationCalls = mockFetch.mock.calls.filter(
+    const countAfterLoad = mockFetch.mock.calls.filter(
       ([input]) => String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method,
-    );
-    expect(automationCalls.length).toBeGreaterThanOrEqual(1);
-    expect(automationCalls.length).toBeLessThanOrEqual(2);
+    ).length;
+
+    rerender(<AutomationContent tab="automations" backendId="b1" />);
+    await new Promise((r) => setTimeout(r, 0));
+
+    const countAfterRerender = mockFetch.mock.calls.filter(
+      ([input]) => String(input).includes('/api/automations') && !(input as RequestInit | undefined)?.method,
+    ).length;
+    expect(countAfterRerender).toBe(countAfterLoad);
+  });
+
+  it('does not fetch when no backend is selected', async () => {
+    render(<AutomationContent tab="automations" backendId={null} />);
+    expect(screen.getByRole('heading', { name: 'Automations' })).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 
   it('sends onceAt when creating a one-time automation', async () => {

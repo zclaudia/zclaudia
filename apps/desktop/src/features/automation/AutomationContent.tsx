@@ -6,7 +6,7 @@
  * title header — no tab strip and no backend dropdown (both live in the sidebar).
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Zap, Clock, History, Server } from 'lucide-react';
 import { getBaseUrlForBackend } from '../../services/api/base';
 import { useAutomationApi } from './useAutomationApi';
@@ -33,14 +33,15 @@ const TAB_META: Record<AutomationTab, { label: string; Icon: typeof Zap }> = {
 export function AutomationContent({ tab, projectId, backendId }: AutomationContentProps) {
   const api = useAutomationApi(backendId, '', '');
 
-  let serverUrl = '';
-  if (backendId) {
+  const serverUrl = useMemo(() => {
+    if (!backendId) return '';
     try {
-      serverUrl = getBaseUrlForBackend(backendId);
+      return getBaseUrlForBackend(backendId);
     } catch {
       // Registry not warm yet; WorkflowsTab popouts will resolve once it is.
+      return '';
     }
-  }
+  }, [backendId]);
 
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [globalPermissionWorkflowOverrideId, setGlobalPermissionWorkflowOverrideId] = useState<string | null>(null);
@@ -73,7 +74,7 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
       <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
         <MetaIcon size={17} className="text-primary" />
         <h1 className="text-sm font-semibold">{meta.label}</h1>
-        {projectId && (
+        {projectId && projects.length > 0 && (
           <span className="text-xs text-muted-foreground">· {projectName(projectId)}</span>
         )}
       </div>
