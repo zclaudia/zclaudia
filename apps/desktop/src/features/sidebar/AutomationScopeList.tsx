@@ -40,7 +40,7 @@ export function AutomationScopeList({
   onSelectBackend,
   onSelectProject,
 }: AutomationScopeListProps) {
-  const rowBase = 'w-full text-left px-2 py-1.5 rounded-md text-sm flex items-center gap-2 transition-colors';
+  const rowBase = 'w-full text-left px-2 py-1.5 rounded-md text-sm flex items-center gap-2 hover:bg-secondary hover:text-foreground transition-colors';
 
   if (backends.length === 0) {
     return <p className="text-sm text-muted-foreground px-2">No backends online</p>;

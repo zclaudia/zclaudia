@@ -51,12 +51,12 @@ describe('AutomationScopeList', () => {
 
   it('marks the selected project active', () => {
     setup({ selectedProjectId: 'p1' });
-    expect(screen.getByRole('button', { name: 'openclaw' }).className).toContain('bg-secondary');
-    expect(screen.getByRole('button', { name: 'hermes-agent' }).className).not.toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'openclaw' }).className).not.toContain('text-muted-foreground');
+    expect(screen.getByRole('button', { name: 'hermes-agent' }).className).toContain('text-muted-foreground');
   });
 
   it('marks All projects active when no project is selected', () => {
     setup({ selectedProjectId: undefined });
-    expect(screen.getByRole('button', { name: 'All projects' }).className).toContain('bg-secondary');
+    expect(screen.getByRole('button', { name: 'All projects' }).className).not.toContain('text-muted-foreground');
   });
 });
