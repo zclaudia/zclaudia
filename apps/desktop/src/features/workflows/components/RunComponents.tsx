@@ -1,6 +1,6 @@
 /**
  * Shared presentational components for workflow run display.
- * Used by both WorkflowRunViewer (Zustand-based) and AutomationWindow RunsTab (direct API).
+ * Used by both WorkflowRunViewer (Zustand-based) and the automations runs view (direct API).
  */
 import { useState } from 'react';
 import { CheckCircle2, XCircle, Loader2, SkipForward, Pause, Clock, ChevronDown, ChevronUp } from 'lucide-react';

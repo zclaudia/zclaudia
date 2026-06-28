@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { Project } from '@zclaudia/shared';
 import * as api from '../../services/api';
 import { WindowContextBar } from '../../components/window/WindowContextBar';
@@ -6,7 +6,6 @@ import { useProjectStore } from '../../stores/projectStore';
 import { useGatewayStore } from '../../stores/gatewayStore';
 import { useServerStore } from '../../stores/serverStore';
 import { ProjectDashboard } from './ProjectDashboard';
-import { openAutomationWindow } from '../automation/openAutomationWindow';
 
 interface ProjectDashboardWindowProps {
   projectId: string;
@@ -79,13 +78,6 @@ export function ProjectDashboardWindow({
     };
   }, [projectId, serverId]);
 
-  const automationOpener = useMemo(
-    () => (opts?: Parameters<typeof openAutomationWindow>[0]) => {
-      void openAutomationWindow(opts ?? {});
-    },
-    [],
-  );
-
   return (
     <div className="flex h-dvh flex-col bg-background text-foreground safe-top-pad">
       {serverName && (
@@ -100,7 +92,6 @@ export function ProjectDashboardWindow({
           <ProjectDashboard
             projectId={project.id}
             projectRootPath={project.rootPath}
-            onOpenAutomations={automationOpener}
           />
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">

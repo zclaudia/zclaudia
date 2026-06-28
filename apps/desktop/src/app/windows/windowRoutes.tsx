@@ -5,7 +5,6 @@ const FileViewerWindow = lazy(() => import('../../components/fileviewer/FileView
 const ProjectDashboardWindow = lazy(() => import('../../features/dashboard/ProjectDashboardWindow').then(m => ({ default: m.ProjectDashboardWindow })));
 const WorkflowEditorWindow = lazy(() => import('../../features/workflows/components/WorkflowEditorWindow').then(m => ({ default: m.WorkflowEditorWindow })));
 const AIReviewLogsWindow = lazy(() => import('../../features/permissions/AIReviewLogsWindow').then(m => ({ default: m.AIReviewLogsWindow })));
-const AutomationWindow = lazy(() => import('../../features/automation/AutomationWindow').then(m => ({ default: m.AutomationWindow })));
 const SessionChatWindow = lazy(() => import('../../features/chat/SessionChatWindow').then(m => ({ default: m.SessionChatWindow })));
 const TerminalWindow = lazy(() => import('../../components/terminal/TerminalWindow').then(m => ({ default: m.TerminalWindow })));
 const DraftWindow = lazy(() => import('../../components/draft/DraftWindow').then(m => ({ default: m.DraftWindow })));
@@ -39,31 +38,6 @@ export const standaloneWindowRoutes: StandaloneWindowRoute[] = [
             serverUrl={params.get('serverUrl') || ''}
             authToken={params.get('authToken') || ''}
             serverName={optionalParam(params, 'serverName')}
-          />
-        </WindowShell>
-      );
-    },
-  },
-  {
-    id: 'automation',
-    render: (params) => {
-      if (!params.get('automationWindow')) return null;
-      return (
-        <WindowShell
-          label="Automation"
-          connection={{
-            standaloneServerUrl: params.get('serverUrl') || '',
-            standaloneServerId: optionalParam(params, 'serverId'),
-            standaloneGatewayUrl: optionalParam(params, 'gatewayUrl'),
-            standaloneGatewaySecret: optionalParam(params, 'gatewaySecret'),
-          }}
-        >
-          <AutomationWindow
-            serverUrl={params.get('serverUrl') || ''}
-            authToken={params.get('authToken') || ''}
-            serverId={optionalParam(params, 'serverId')}
-            initialTab={(params.get('initialTab') as 'automations' | 'workflows') || undefined}
-            initialProjectId={optionalParam(params, 'initialProjectId')}
           />
         </WindowShell>
       );

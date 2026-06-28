@@ -15,7 +15,7 @@ import { GitPanel } from '../../features/git/components/GitPanel';
 import { OpenSpecPanel } from '../../features/openspec/components/OpenSpecPanel';
 import { DashboardHome } from './DashboardHome';
 import { useSelectionStore } from '../../stores/selectionStore';
-import type { OpenAutomationWindowOptions } from '../automation/openAutomationWindow';
+import type { OpenAutomationsOptions } from '../automation/automation-types';
 
 export type DashboardView = 'home' | 'tasks' | 'local-prs' | 'issues' | 'spec' | 'supervisor' | 'git';
 
@@ -32,7 +32,7 @@ const VIEW_LABELS: Record<DashboardView, string> = {
 interface ProjectDashboardProps {
   projectId: string;
   projectRootPath?: string;
-  onOpenAutomations?: (opts: OpenAutomationWindowOptions) => void;
+  onOpenAutomations?: (opts: OpenAutomationsOptions) => void;
   onOpenDashboardWindow?: (projectId: string) => void;
 }
 
