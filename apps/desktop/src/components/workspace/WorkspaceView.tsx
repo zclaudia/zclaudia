@@ -75,7 +75,7 @@ export function WorkspaceView({ sessionId, projectId, projectRoot, workingDirect
   return (
     // `absolute inset-0` fills the (position: relative) sidebar content container.
     // The container is a plain block, so a flex-grow here would be inert — fill explicitly.
-    <div ref={containerRef} className="absolute inset-0 flex min-w-0 min-h-0 bg-muted p-1">
+    <div ref={containerRef} className="absolute inset-0 flex min-w-0 min-h-0 p-1.5">
       {renderNode(root)}
     </div>
   );

@@ -37,7 +37,7 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
     <div
       data-tab-strip
       data-pane-id={pane.id}
-      className={`flex items-stretch px-1 h-8 border-b border-border flex-shrink-0 select-none ${focused ? '' : 'opacity-90'}`}
+      className={`flex items-stretch px-1 h-8 border-b border-border/50 flex-shrink-0 select-none ${focused ? '' : 'opacity-90'}`}
     >
       {/* Only the tab list scrolls; the launcher + drag spacer stay outside so the
           launcher dropdown isn't clipped by overflow (overflow-x:auto → overflow-y:auto). */}

@@ -163,6 +163,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { useProcessMonitorStore } from '../../stores/processMonitorStore';
 import { useRecoveryStore } from '../../stores/recoveryStore';
+import { useSidebarWidthStore } from '../../stores/sidebarWidthStore';
 import * as api from '../../services/api';
 import { clearLogs, getLogCount, exportLogs } from '../../services/logger';
 import { invoke } from '@tauri-apps/api/core';
@@ -284,6 +285,7 @@ describe('SettingsPanel', () => {
   beforeEach(() => {
     setupStores();
     useProcessMonitorStore.getState().clearCleanupResult();
+    useSidebarWidthStore.setState({ widthPx: 240 });
     vi.clearAllMocks();
     mockRestartEmbeddedServer.mockResolvedValue(undefined);
     vi.mocked(isAndroid).mockReturnValue(false);
@@ -337,6 +339,25 @@ describe('SettingsPanel', () => {
     await clickAsync(getByText('Back to app'));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('resizes the desktop settings sidebar with a drag handle', async () => {
+    const { getByTestId } = await renderSettingsPanel();
+    const sidebar = getByTestId('settings-sidebar') as HTMLElement;
+    const resizeHandle = getByTestId('settings-sidebar-resize-handle');
+
+    expect(sidebar.style.width).toBe('240px');
+
+    await act(async () => {
+      fireEvent.mouseDown(resizeHandle, { clientX: 240 });
+      fireEvent.mouseMove(document, { clientX: 280 });
+      await Promise.resolve();
+    });
+
+    expect(useSidebarWidthStore.getState().widthPx).toBe(280);
+    expect(sidebar.style.width).toBe('280px');
+
+    fireEvent.mouseUp(document);
   });
 
   // ---- Tab navigation ----

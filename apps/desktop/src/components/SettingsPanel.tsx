@@ -1,10 +1,18 @@
-import { useState, useEffect, useCallback } from 'react';
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from 'react';
 import { useServerStore } from '../stores/serverStore';
 import { useFacadeStore } from '../stores/facadeStore';
 import { useGatewayStore } from '../stores/gatewayStore';
 import { useConnection } from '../contexts/ConnectionContext';
 import { useIsMobile } from '../hooks/useMediaQuery';
 import { useAndroidBack } from '../hooks/useAndroidBack';
+import { useSidebarWidthStore, SIDEBAR_WIDTH_LIMITS } from '../stores/sidebarWidthStore';
 import { LlmProfileManager } from '../features/settings/LlmProfileManager';
 import { AgentManager } from '../features/settings/AgentManager';
 import { ServerGatewayConfig } from '../features/settings/ServerGatewayConfig';
@@ -90,6 +98,12 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
 
   const appTabs = getAppTabs(!!isMobile);
   const serverTabs = getServerTabs({ isActiveLocalBackend, pluginSettingsTabs });
+  const sidebarWidth = useSidebarWidthStore((s) => s.widthPx);
+  const setSidebarWidth = useSidebarWidthStore((s) => s.setWidth);
+  const resizeDragging = useRef(false);
+  const resizeStartX = useRef(0);
+  const resizeStartWidth = useRef(0);
+  const resizeCleanupRef = useRef<(() => void) | null>(null);
 
   const navQ = navQuery.trim().toLowerCase();
   const filterTabs = (tabs: SettingsTabDef[]) =>
@@ -125,7 +139,46 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
 
   useAndroidBack(handleSwipeBack, isMobile && isOpen, mobileShowContent ? 30 : 20);
 
+  useEffect(() => () => resizeCleanupRef.current?.(), []);
+
+  const onResizeStart = useCallback((e: ReactMouseEvent | ReactTouchEvent) => {
+    e.preventDefault();
+    resizeDragging.current = true;
+    resizeStartX.current = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    resizeStartWidth.current = useSidebarWidthStore.getState().widthPx;
+
+    const onMove = (ev: MouseEvent | TouchEvent) => {
+      if (!resizeDragging.current) return;
+      const clientX = 'touches' in ev ? ev.touches[0].clientX : ev.clientX;
+      setSidebarWidth(resizeStartWidth.current + (clientX - resizeStartX.current));
+    };
+
+    const cleanup = () => {
+      resizeDragging.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('touchmove', onMove);
+      document.removeEventListener('touchend', onUp);
+      resizeCleanupRef.current = null;
+    };
+
+    const onUp = () => cleanup();
+    resizeCleanupRef.current = cleanup;
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove);
+    document.addEventListener('touchend', onUp);
+  }, [setSidebarWidth]);
+
   if (!isOpen) return null;
+
+  const clampedSettingsSidebarWidth = Math.max(
+    SIDEBAR_WIDTH_LIMITS.MIN_WIDTH_PX,
+    Math.min(
+      (typeof window !== 'undefined' ? window.innerWidth : 1920) * (SIDEBAR_WIDTH_LIMITS.MAX_WIDTH_VW / 100),
+      sidebarWidth,
+    ),
+  );
 
   const renderTabButton = (tab: SettingsTabDef) => (
     <button
@@ -210,71 +263,84 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
 
           {/* Desktop: Tabs vertical sidebar */}
           {!isMobile && (
-            <div className="flex flex-col w-60 border-r border-border bg-[hsl(var(--sidebar))] px-3 pb-3 gap-0.5 shrink-0 overflow-y-auto">
-              <div className="h-9 -mx-3 flex-shrink-0" data-tauri-drag-region />
-              <button
-                onClick={onClose}
-                className="self-start flex items-center gap-1.5 -ml-1.5 mt-1 mb-2 px-2 py-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-sm">Back to app</span>
-              </button>
-              <div className="relative mb-2">
-                <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
-                </svg>
-                <input
-                  type="text"
-                  value={navQuery}
-                  onChange={(e) => setNavQuery(e.target.value)}
-                  placeholder="Search settings…"
-                  className="w-full pl-8 pr-2 py-1.5 text-sm bg-secondary/50 rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
-                />
-              </div>
-
-              {visibleAppTabs.length > 0 && (
-                <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  App
+            <div
+              data-testid="settings-sidebar"
+              className="relative flex flex-col border-r border-border bg-[hsl(var(--sidebar))] shrink-0"
+              style={{ width: clampedSettingsSidebarWidth }}
+            >
+              <div
+                data-testid="settings-sidebar-resize-handle"
+                className="absolute top-0 right-0 z-20 h-full w-1 cursor-ew-resize hover:bg-muted"
+                onMouseDown={onResizeStart}
+                onTouchStart={onResizeStart}
+                aria-hidden
+              />
+              <div className="flex h-full flex-col px-3 pb-3 gap-0.5 overflow-y-auto">
+                <div className="h-9 -mx-3 flex-shrink-0" data-tauri-drag-region />
+                <button
+                  onClick={onClose}
+                  className="self-start flex items-center gap-1.5 -ml-1.5 mt-1 mb-2 px-2 py-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span className="text-sm">Back to app</span>
+                </button>
+                <div className="relative mb-2">
+                  <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z" />
+                  </svg>
+                  <input
+                    type="text"
+                    value={navQuery}
+                    onChange={(e) => setNavQuery(e.target.value)}
+                    placeholder="Search settings…"
+                    className="w-full pl-8 pr-2 py-1.5 text-sm bg-secondary/50 rounded-md placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-border"
+                  />
                 </div>
-              )}
-              {visibleAppTabs.map(renderTabButton)}
 
-              {visibleServerTabs.length > 0 && (
-                <div className="relative border-t border-border mt-2">
-                  <button
-                    onClick={() => setServerPickerOpen(!serverPickerOpen)}
-                    className="w-full px-3 pt-3 pb-1.5 flex items-center justify-between group"
-                  >
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate" title={activeServer?.name || 'Server'}>
-                      {activeServer?.name || 'Server'}
-                    </span>
-                    <svg
-                      className={`w-3 h-3 text-muted-foreground group-hover:text-foreground transition-transform ${serverPickerOpen ? 'rotate-180' : ''}`}
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
+                {visibleAppTabs.length > 0 && (
+                  <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    App
+                  </div>
+                )}
+                {visibleAppTabs.map(renderTabButton)}
+
+                {visibleServerTabs.length > 0 && (
+                  <div className="relative border-t border-border mt-2">
+                    <button
+                      onClick={() => setServerPickerOpen(!serverPickerOpen)}
+                      className="w-full px-3 pt-3 pb-1.5 flex items-center justify-between group"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </button>
+                      <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate" title={activeServer?.name || 'Server'}>
+                        {activeServer?.name || 'Server'}
+                      </span>
+                      <svg
+                        className={`w-3 h-3 text-muted-foreground group-hover:text-foreground transition-transform ${serverPickerOpen ? 'rotate-180' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
 
-                  {serverPickerOpen && (
-                    <ServerPickerDropdown
-                      isGatewayConnected={isGatewayConnected}
-                      visibleGatewayBackends={visibleGatewayBackends}
-                      activeServerId={activeServerId}
-                      facadeConnectionState={facadeConnectionState}
-                      facadeBackends={facadeBackends}
-                      onClose={() => setServerPickerOpen(false)}
-                      onSwitch={handleBackendSwitch}
-                    />
-                  )}
-                </div>
-              )}
+                    {serverPickerOpen && (
+                      <ServerPickerDropdown
+                        isGatewayConnected={isGatewayConnected}
+                        visibleGatewayBackends={visibleGatewayBackends}
+                        activeServerId={activeServerId}
+                        facadeConnectionState={facadeConnectionState}
+                        facadeBackends={facadeBackends}
+                        onClose={() => setServerPickerOpen(false)}
+                        onSwitch={handleBackendSwitch}
+                      />
+                    )}
+                  </div>
+                )}
 
-              {visibleServerTabs.map(renderTabButton)}
+                {visibleServerTabs.map(renderTabButton)}
+              </div>
             </div>
           )}
 

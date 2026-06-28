@@ -125,7 +125,7 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
   return (
     <div
       ref={rootRef}
-      className="flex flex-col flex-shrink-0 bg-card border-l border-border relative"
+      className="flex flex-col flex-shrink-0 relative"
       style={{
         width: `${widthFraction * 100}%`,
         minWidth: `${RIGHT_SIDEBAR_LIMITS.MIN_WIDTH_PX}px`,
@@ -135,10 +135,12 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
       }}
     >
       <div
-        className="absolute top-0 left-0 w-1 h-full cursor-ew-resize hover:bg-muted z-10"
+        className="group absolute top-0 left-0 w-1.5 h-full flex items-center justify-center cursor-ew-resize z-10"
         onMouseDown={onDragStart}
         onTouchStart={onDragStart}
-      />
+      >
+        <div className="h-8 w-1 rounded-full bg-muted-foreground/0 transition-colors group-hover:bg-muted-foreground/30 group-active:bg-muted-foreground/50" />
+      </div>
 
       <div
         ref={contentRef}

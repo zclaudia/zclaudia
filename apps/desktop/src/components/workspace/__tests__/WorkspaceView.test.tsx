@@ -64,13 +64,13 @@ describe('WorkspaceView', () => {
     expect(pane.className).toContain('flex-1');
   });
 
-  it('renders panes as cards on a recessed canvas', () => {
+  it('renders panes as cards on a seamless (non-recessed) canvas', () => {
     useRightWorkspaceStore.getState().openTool('A', 'memory', { openMode: 'shared' });
     const { container } = render(<WorkspaceView sessionId="A" />);
     const rootEl = container.firstChild as HTMLElement;
-    expect(rootEl.className).toContain('bg-muted'); // recessed canvas
-    expect(rootEl.className).toContain('p-1');      // gutter padding
-    expect(rootEl.className).toContain('inset-0');  // still fills container
+    expect(rootEl.className).not.toContain('bg-muted'); // canvas shares the chat background
+    expect(rootEl.className).toContain('p-1.5');        // gutter padding around cards
+    expect(rootEl.className).toContain('inset-0');      // still fills container
     const pane = container.querySelector('[data-pane-id]') as HTMLElement;
     expect(pane.className).toContain('rounded-lg'); // card
     expect(pane.className).toContain('border');
