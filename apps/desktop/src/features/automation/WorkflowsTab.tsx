@@ -6,8 +6,7 @@ import {
 import type { Workflow, WorkflowTemplate } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { ProjectInfo } from './automation-types';
-import { isInternalProject, projectSelectOptions, CATEGORY_COLORS } from './automation-types';
-import { Select } from '../../components/ui/Select';
+import { isInternalProject, CATEGORY_COLORS } from './automation-types';
 import { isDesktopTauri } from '../../utils/platform';
 import { buildPopoutUrl, openPopoutWindow } from '../../utils/popoutWindow';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
@@ -21,16 +20,15 @@ interface WorkflowsTabProps {
   projectName: (id?: string) => string;
   serverUrl: string;
   selectedBackendId: string | null;
-  initialProjectId?: string;
+  projectId?: string;
 }
 
-export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId, projectName, serverUrl, selectedBackendId, initialProjectId }: WorkflowsTabProps) {
+export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId, projectName, serverUrl, selectedBackendId, projectId }: WorkflowsTabProps) {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [createProjectId, setCreateProjectId] = useState(initialProjectId ?? '');
 
-  const effectiveProjectId = createProjectId || projects[0]?.id || '';
+  const effectiveProjectId = projectId ?? '';
   const selectedProject = projects.find(p => p.id === effectiveProjectId);
   const selectedIsGlobal = selectedProject ? isInternalProject(selectedProject.name) : false;
 
@@ -127,19 +125,11 @@ export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-medium text-muted-foreground">{workflows.length} workflow{workflows.length !== 1 ? 's' : ''}</h2>
         <div className="flex items-center gap-1.5">
-          {projects.length > 0 && (
-            <Select
-              value={effectiveProjectId}
-              onChange={setCreateProjectId}
-              size="md"
-              align="right"
-              triggerClassName="min-w-[160px]"
-              options={projectSelectOptions(projects)}
-            />
-          )}
           <button
             onClick={handleCreate}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors"
+            disabled={!effectiveProjectId}
+            title={!effectiveProjectId ? 'Select a project to create a workflow' : undefined}
+            className="flex items-center gap-1 px-2.5 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-muted/60"
           >
             <Plus size={12} />
             New

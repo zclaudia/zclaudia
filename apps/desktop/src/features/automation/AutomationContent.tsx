@@ -98,7 +98,7 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
             projectName={projectName}
             serverUrl={serverUrl}
             selectedBackendId={backendId}
-            initialProjectId={projectId}
+            projectId={projectId}
           />
         )}
         {tab === 'runs' && (

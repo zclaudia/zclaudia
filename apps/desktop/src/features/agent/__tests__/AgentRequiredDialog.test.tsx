@@ -5,7 +5,7 @@ import { AgentRequiredDialog } from '../AgentRequiredDialog';
 describe('AgentRequiredDialog', () => {
   it('renders the body for the given reason', () => {
     render(<AgentRequiredDialog open reason="no_credential" onClose={() => {}} onConfigure={() => {}} />);
-    expect(screen.getByText(/API Key/)).toBeTruthy();
+    expect(screen.getByText(/API key/i)).toBeTruthy();
   });
 
   it('does not render when closed', () => {

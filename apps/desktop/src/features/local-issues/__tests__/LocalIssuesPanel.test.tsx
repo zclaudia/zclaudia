@@ -96,7 +96,9 @@ describe('LocalIssuesPanel - actionable filter', () => {
     expect(screen.getByText('Regular bug')).toBeInTheDocument();
     expect(screen.getByText('Saved plan')).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Actionable/i }));
+    // Exact name match targets the filter chip; an issue card carrying the
+    // "actionable" label is also a button whose name contains "actionable".
+    fireEvent.click(screen.getByRole('button', { name: 'Actionable' }));
 
     expect(screen.queryByText('Regular bug')).not.toBeInTheDocument();
     expect(screen.getByText('Saved plan')).toBeInTheDocument();
