@@ -855,6 +855,49 @@ describe('ProviderManager', () => {
       expect(screen.queryByText('Provider Management')).not.toBeInTheDocument();
       expect(document.querySelector('.bg-black\\/50')).not.toBeInTheDocument();
     });
+
+    it('keeps the inline view rendered after save while the background reload is pending', async () => {
+      const initialProfile = {
+        id: 'p1',
+        name: 'Before Save',
+        providerType: 'anthropic' as const,
+        isDefault: true,
+        models: [{ modelId: 'm1' }],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+      const updatedProfile = {
+        ...initialProfile,
+        name: 'After Save',
+        updatedAt: initialProfile.updatedAt + 1,
+      };
+      vi.mocked(api.listLlmProfiles)
+        .mockResolvedValueOnce([initialProfile])
+        .mockReturnValueOnce(new Promise(() => {}));
+      vi.mocked(api.updateLlmProfile).mockResolvedValueOnce(updatedProfile);
+
+      await renderProviderManager({ onClose: mockOnClose, inline: true });
+
+      await waitForFast(() => {
+        expect(screen.getByText('Before Save')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+      fireEvent.change(screen.getByDisplayValue('Before Save'), {
+        target: { value: 'After Save' },
+      });
+      await clickAsync(screen.getByText('Update'));
+
+      await waitForFast(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'p1',
+          expect.objectContaining({ name: 'After Save' }),
+        );
+      });
+
+      expect(screen.queryByText('Loading...')).not.toBeInTheDocument();
+      expect(screen.getByText('After Save')).toBeInTheDocument();
+    });
   });
 
   describe('TypeSelector dropdown', () => {

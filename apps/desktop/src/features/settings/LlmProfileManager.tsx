@@ -125,6 +125,18 @@ function draftsToEntries(drafts: ModelRowDraft[]): LlmProfileModelEntry[] {
   return out;
 }
 
+function upsertSavedProfile(profiles: LlmProfileConfig[], saved: LlmProfileConfig): LlmProfileConfig[] {
+  const index = profiles.findIndex((profile) => profile.id === saved.id);
+  const next = saved.isDefault
+    ? profiles.map((profile) => (profile.id === saved.id ? saved : { ...profile, isDefault: false }))
+    : profiles.map((profile) => (profile.id === saved.id ? saved : profile));
+
+  if (index >= 0) return next;
+  return saved.isDefault
+    ? [saved, ...profiles.map((profile) => ({ ...profile, isDefault: false }))]
+    : [...profiles, saved];
+}
+
 function CapabilityTags({ providerType }: { providerType: string }) {
   const caps = PROVIDER_CAPABILITIES[providerType];
   if (!caps) return null;
@@ -213,13 +225,14 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     setPendingDeleteProfileId(null);
   };
 
-  const loadProfiles = async () => {
+  const loadProfiles = async (options: { showLoading?: boolean } = {}) => {
     if (!isConnected) return;
+    const showLoading = options.showLoading ?? true;
     const current = useLlmProfileMetaStore.getState().getProviders(activeServerId);
     if (current.length > 0) {
       setProfiles(current);
     }
-    setLoading(true);
+    if (showLoading) setLoading(true);
     try {
       const data = await api.listLlmProfiles();
       setProfiles(data);
@@ -231,8 +244,17 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     } catch (error) {
       console.error('Failed to load providers:', error);
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
+  };
+
+  const applySavedProfile = (saved: LlmProfileConfig) => {
+    setProfiles((current) => upsertSavedProfile(current, saved));
+
+    const metaStore = useLlmProfileMetaStore.getState();
+    const currentStoreProfiles = metaStore.getProviders(activeServerId);
+    const baseProfiles = currentStoreProfiles.length > 0 ? currentStoreProfiles : profiles;
+    metaStore.setProviders(upsertSavedProfile(baseProfiles, saved), activeServerId);
   };
 
   useEffect(() => {
@@ -499,14 +521,18 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
         });
       }
 
-      await loadProfiles();
+      const savedProfile = saved && typeof saved.id === 'string' ? saved : null;
+      if (savedProfile) {
+        applySavedProfile(savedProfile);
+      }
       void useAgentReadinessStore.getState().refresh();
-      if (opts.keepEditing) {
-        setEditingProfile(saved);
+      if (opts.keepEditing && savedProfile) {
+        setEditingProfile(savedProfile);
       } else {
         resetForm();
       }
-      return saved;
+      void loadProfiles({ showLoading: false });
+      return savedProfile;
     } catch (error) {
       console.error('Failed to save provider:', error);
       const message = error instanceof Error ? error.message : String(error);
