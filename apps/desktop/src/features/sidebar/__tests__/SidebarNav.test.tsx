@@ -38,4 +38,48 @@ describe('SidebarNav', () => {
     render(<SidebarNav onHome={vi.fn()} isHomeActive={false} />);
     expect(screen.queryByRole('button', { name: 'Automations' })).toBeNull();
   });
+
+  const automationMode = {
+    tab: 'automations' as const,
+    onSelectTab: vi.fn(),
+    onBack: vi.fn(),
+  };
+
+  it('renders the automation nav when automationMode is provided', () => {
+    render(<SidebarNav onHome={vi.fn()} isHomeActive={false} automationMode={automationMode} />);
+    expect(screen.getByRole('button', { name: 'Back to app' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Workflows' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Runs' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'System' })).toBeDefined();
+    // The app Home row is replaced in automation mode.
+    expect(screen.queryByRole('button', { name: 'Home' })).toBeNull();
+  });
+
+  it('fires onBack and onSelectTab from the automation nav', () => {
+    const onBack = vi.fn();
+    const onSelectTab = vi.fn();
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        automationMode={{ tab: 'automations', onBack, onSelectTab }}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Back to app' }));
+    expect(onBack).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Runs' }));
+    expect(onSelectTab).toHaveBeenCalledWith('runs');
+  });
+
+  it('marks the active automation tab', () => {
+    render(
+      <SidebarNav
+        onHome={vi.fn()}
+        isHomeActive={false}
+        automationMode={{ tab: 'workflows', onBack: vi.fn(), onSelectTab: vi.fn() }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: 'Workflows' }).className).not.toContain('text-muted-foreground');
+    expect(screen.getByRole('button', { name: 'Runs' }).className).toContain('text-muted-foreground');
+  });
 });
