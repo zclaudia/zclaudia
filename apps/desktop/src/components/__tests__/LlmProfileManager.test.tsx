@@ -357,7 +357,7 @@ describe('ProviderManager', () => {
       fireEvent.change(screen.getByPlaceholderText(/model id \(e\.g\./), {
         target: { value: 'gpt-4o' },
       });
-      await clickAsync(screen.getByLabelText(/supports images/));
+      await clickAsync(screen.getByLabelText(/supports image input/));
       await clickAsync(screen.getByText('Create'));
 
       await waitForFast(() => {
@@ -473,7 +473,73 @@ describe('ProviderManager', () => {
 
       await clickAsync(screen.getByTitle('Edit'));
 
-      expect(screen.getByLabelText(/model gpt-4o supports images/)).toBeChecked();
+      expect(screen.getByLabelText(/model gpt-4o supports image input/)).toBeChecked();
+    });
+
+    it('updates image input support on an existing provider model', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'OpenAI',
+          providerType: 'openai' as const,
+          isDefault: true,
+          models: [{ modelId: 'gpt-4o' }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('OpenAI')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+      await clickAsync(screen.getByLabelText(/model gpt-4o supports image input/));
+      await clickAsync(screen.getByText('Update'));
+
+      await waitForFast(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'p1',
+          expect.objectContaining({
+            models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
+          })
+        );
+      });
+    });
+
+    it('clears image input support on an existing provider model', async () => {
+      vi.mocked(api.listLlmProfiles).mockResolvedValue([
+        {
+          id: 'p1',
+          name: 'OpenAI',
+          providerType: 'openai' as const,
+          isDefault: true,
+          models: [{ modelId: 'gpt-4o', inputModalities: ['text', 'image'] }],
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+      ]);
+
+      await renderProviderManager({ onClose: mockOnClose });
+
+      await waitForFast(() => {
+        expect(screen.getByText('OpenAI')).toBeInTheDocument();
+      });
+
+      await clickAsync(screen.getByTitle('Edit'));
+      await clickAsync(screen.getByLabelText(/model gpt-4o supports image input/));
+      await clickAsync(screen.getByText('Update'));
+
+      await waitForFast(() => {
+        expect(api.updateLlmProfile).toHaveBeenCalledWith(
+          'p1',
+          expect.objectContaining({
+            models: [{ modelId: 'gpt-4o', inputModalities: ['text'] }],
+          })
+        );
+      });
     });
   });
 

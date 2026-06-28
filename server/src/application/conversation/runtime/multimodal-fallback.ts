@@ -52,7 +52,7 @@ export function resolveMultimodalFallbackForRun(input: {
   }
   if (!modelSupportsImage(fallbackProfile, fallback.model)) {
     throw new Error(
-      `Multimodal fallback model "${fallback.model}" on LLM profile "${fallbackProfile.name}" does not support image input. Enable Images on that model or choose another fallback.`,
+      `Multimodal fallback model "${fallback.model}" on LLM profile "${fallbackProfile.name}" does not support image input. Enable Vision on that model or choose another fallback.`,
     );
   }
 

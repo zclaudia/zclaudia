@@ -60,12 +60,12 @@ const EDITABLE_BUILTIN_TOOL_SET_IDS = (Object.keys(BUILTIN_TOOL_SETS) as Builtin
 
 type LlmProfileModelEntry = NonNullable<LlmProfileConfig['models']>[number];
 
-function modelSupportsImages(entry: LlmProfileModelEntry): boolean {
+function modelSupportsVision(entry: LlmProfileModelEntry): boolean {
   return entry.inputModalities?.includes('image') ?? false;
 }
 
-function imageCapableModels(profile: LlmProfileConfig | undefined): LlmProfileModelEntry[] {
-  return (profile?.models ?? []).filter(modelSupportsImages);
+function visionCapableModels(profile: LlmProfileConfig | undefined): LlmProfileModelEntry[] {
+  return (profile?.models ?? []).filter(modelSupportsVision);
 }
 
 function fallbackModelValidForProfile(model: string, profile: LlmProfileConfig | undefined): boolean {
@@ -73,7 +73,7 @@ function fallbackModelValidForProfile(model: string, profile: LlmProfileConfig |
   if (!trimmed) return false;
   const models = profile?.models;
   if (!models || models.length === 0) return true;
-  return models.some((entry) => entry.modelId === trimmed && modelSupportsImages(entry));
+  return models.some((entry) => entry.modelId === trimmed && modelSupportsVision(entry));
 }
 
 function isBuiltinRefForTools(ref: ToolSelection['include'][number], tools: readonly ToolName[]): boolean {
@@ -478,7 +478,7 @@ export function AgentManager({ isOpen, onClose, inline = false, readOnly = false
     const fallbackProfile = llmProfiles.find((p) => p.id === formFallbackLlmProfileId);
     const trimmedFallbackModel = formFallbackModel.trim();
     if (formFallbackLlmProfileId && !fallbackModelValidForProfile(trimmedFallbackModel, fallbackProfile)) {
-      setFormError('Fallback model must be image-capable on the selected LLM profile');
+      setFormError('Fallback model must support image input on the selected LLM profile');
       return;
     }
 
@@ -1267,7 +1267,7 @@ function MultimodalFallbackSelector({
 }) {
   const selectedProfile = profiles.find((profile) => profile.id === profileId);
   const declaredModels = selectedProfile?.models ?? [];
-  const visionModels = imageCapableModels(selectedProfile);
+  const visionModels = visionCapableModels(selectedProfile);
   const hasDeclaredModels = declaredModels.length > 0;
   const modelValue = hasDeclaredModels && !visionModels.some((entry) => entry.modelId === model) ? '' : model;
 
@@ -1300,7 +1300,7 @@ function MultimodalFallbackSelector({
               disabled={visionModels.length === 0}
               className="w-full rounded-lg border border-border bg-secondary px-3 py-2 text-sm text-foreground focus:outline-none focus:border-primary disabled:opacity-50"
             >
-              <option value="">Select an image-capable model</option>
+              <option value="">Select a Vision-capable model</option>
               {visionModels.map((entry) => {
                 const label = entry.displayName || entry.modelId;
                 return (
@@ -1328,7 +1328,7 @@ function MultimodalFallbackSelector({
         )}
       </div>
       {profileId && hasDeclaredModels && visionModels.length === 0 && (
-        <p className="text-xs text-amber-600">No image-capable models declared on this LLM profile.</p>
+        <p className="text-xs text-amber-600">No Vision-capable models declared on this LLM profile.</p>
       )}
     </div>
   );

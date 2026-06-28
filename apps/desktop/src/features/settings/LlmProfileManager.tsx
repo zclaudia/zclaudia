@@ -43,6 +43,7 @@ interface ModelRowDraft {
   contextWindowStr: string;
   maxTokensStr: string;
   supportsImage: boolean;
+  inputModalitiesTouched: boolean;
   /** Last probe result; cleared after a few seconds via a setTimeout. */
   testStatus?:
     | { kind: 'running' }
@@ -65,6 +66,7 @@ function entryToDraft(entry: LlmProfileModelEntry): ModelRowDraft {
     contextWindowStr: entry.contextWindow != null ? String(entry.contextWindow) : '',
     maxTokensStr: entry.maxTokens != null ? String(entry.maxTokens) : '',
     supportsImage: entry.inputModalities?.includes('image') ?? false,
+    inputModalitiesTouched: entry.inputModalities !== undefined,
   };
 }
 
@@ -117,6 +119,7 @@ function draftsToEntries(drafts: ModelRowDraft[]): LlmProfileModelEntry[] {
     const mt = parsePositiveInteger(d.maxTokensStr);
     if (mt.value !== undefined) entry.maxTokens = mt.value;
     if (d.supportsImage) entry.inputModalities = ['text', 'image'];
+    else if (d.inputModalitiesTouched) entry.inputModalities = ['text'];
     out.push(entry);
   }
   return out;
@@ -518,7 +521,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
     if (formModelsSaveError) setFormModelsSaveError(null);
     setFormModels((rows) => [
       ...rows,
-      { rowUid: generateRowUid(), modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '', supportsImage: false },
+      { rowUid: generateRowUid(), modelId: '', displayName: '', contextWindowStr: '', maxTokensStr: '', supportsImage: false, inputModalitiesTouched: false },
     ]);
   };
 
@@ -600,6 +603,7 @@ export function LlmProfileManager({ isOpen, onClose, inline = false, readOnly = 
           contextWindowStr: '',
           maxTokensStr: '',
           supportsImage: false,
+          inputModalitiesTouched: false,
         })),
       ]);
     }
@@ -1387,11 +1391,11 @@ function ModelRow({ index, row, allRows, providerType, onChange, onRemove, onPro
             <input
               type="checkbox"
               checked={row.supportsImage}
-              onChange={(e) => onChange({ supportsImage: e.target.checked })}
-              aria-label={`model ${row.modelId.trim() || index + 1} supports images`}
+              onChange={(e) => onChange({ supportsImage: e.target.checked, inputModalitiesTouched: true })}
+              aria-label={`model ${row.modelId.trim() || index + 1} supports image input`}
               className="h-3.5 w-3.5 rounded border-border"
             />
-            Images
+            Vision
           </label>
         </div>
         <div className="flex items-center gap-1">
