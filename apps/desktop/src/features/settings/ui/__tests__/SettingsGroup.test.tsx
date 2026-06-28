@@ -32,4 +32,14 @@ describe('SettingsGroup / SettingsRow', () => {
     );
     expect(screen.getByText('Version')).toBeTruthy();
   });
+
+  it('omits the label heading when no label is given', () => {
+    const { container } = render(
+      <SettingsGroup>
+        <SettingsRow title="Master" />
+      </SettingsGroup>
+    );
+    expect(container.querySelector('h4')).toBeNull();
+    expect(screen.getByText('Master')).toBeTruthy();
+  });
 });
