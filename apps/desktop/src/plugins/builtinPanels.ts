@@ -11,6 +11,7 @@ import { usePluginStore } from '../stores/pluginStore';
 import { TerminalPanel, TerminalActions } from '../components/terminal/TerminalPanel';
 import { FileViewerPanel, FileViewerActions } from '../components/fileviewer/FileViewerPanel';
 import { DraftPanel } from '../components/draft/DraftPanel';
+import { DraftActions } from '../components/draft/DraftActions';
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel';
 import { ChangesPanel } from '../features/changes/ChangesPanel';
 import { MemoryPanel } from '../features/memory/MemoryPanel';
@@ -87,7 +88,7 @@ export function initBuiltinPanels() {
     label: 'Draft',
     icon: 'FileEdit',
     component: DraftPanel,
-    actions: undefined,
+    actions: DraftActions,
     order: 2,
     platforms: ['desktop', 'mobile'],
     defaultPlacement: 'right',

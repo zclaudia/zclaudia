@@ -13,6 +13,8 @@ vi.mock('../../components/fileviewer/FileViewerPanel', () => ({
 }));
 vi.mock('../../components/draft/DraftPanel', () => ({
   DraftPanel: () => null,
+}));
+vi.mock('../../components/draft/DraftActions', () => ({
   DraftActions: () => null,
 }));
 vi.mock('../../components/notifications/NotificationsPanel', () => ({
