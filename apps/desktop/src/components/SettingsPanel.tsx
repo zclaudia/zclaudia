@@ -279,7 +279,7 @@ export function SettingsPanel({ isOpen, onClose, initialTab }: SettingsPanelProp
                 <div className="h-9 -mx-3 flex-shrink-0" data-tauri-drag-region />
                 <button
                   onClick={onClose}
-                  className="self-start flex items-center gap-1.5 -ml-1.5 mt-1 mb-2 px-2 py-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
+                  className="flex items-center gap-1.5 mt-1 mb-2 px-3 py-2 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
