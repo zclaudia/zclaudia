@@ -579,7 +579,7 @@ describe('SettingsPanel', () => {
     await clickAsync(debugTab!);
 
     expect(container.textContent).toContain('Debug');
-    expect(container.textContent).toContain('Client Logs');
+    expect(container.textContent).toContain('Client logs');
     expect(container.textContent).toContain('42 entries in buffer');
   });
 
