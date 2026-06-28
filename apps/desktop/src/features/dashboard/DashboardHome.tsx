@@ -294,47 +294,51 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
           </div>
         </button>
 
-        {/* Workflows Card */}
-        <button
-          onClick={() => onOpenAutomations?.({ tab: 'workflows', projectId })}
-          className="text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors group"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Workflow className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Workflows</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="space-y-1">
-            <div className="text-2xl font-bold">{activeWorkflows.length}</div>
-            <div className="text-xs text-muted-foreground">active</div>
-            {workflows.length > activeWorkflows.length && (
-              <div className="text-xs text-muted-foreground">{workflows.length - activeWorkflows.length} disabled</div>
-            )}
-          </div>
-        </button>
+        {onOpenAutomations && (
+          <>
+            {/* Workflows Card */}
+            <button
+              onClick={() => onOpenAutomations?.({ tab: 'workflows', projectId })}
+              className="text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors group"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Workflow className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Workflows</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold">{activeWorkflows.length}</div>
+                <div className="text-xs text-muted-foreground">active</div>
+                {workflows.length > activeWorkflows.length && (
+                  <div className="text-xs text-muted-foreground">{workflows.length - activeWorkflows.length} disabled</div>
+                )}
+              </div>
+            </button>
 
-        {/* Automations Card */}
-        <button
-          onClick={() => onOpenAutomations?.({ tab: 'automations', projectId })}
-          className="text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors group"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <Zap className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm font-medium">Automations</span>
-            </div>
-            <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="space-y-1">
-            <div className="text-2xl font-bold">{activeAutomations.length}</div>
-            <div className="text-xs text-muted-foreground">active</div>
-            {simpleAutomations.length > activeAutomations.length && (
-              <div className="text-xs text-muted-foreground">{simpleAutomations.length - activeAutomations.length} disabled</div>
-            )}
-          </div>
-        </button>
+            {/* Automations Card */}
+            <button
+              onClick={() => onOpenAutomations?.({ tab: 'automations', projectId })}
+              className="text-left bg-card border border-border rounded-lg p-4 hover:border-primary/40 transition-colors group"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Automations</span>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-bold">{activeAutomations.length}</div>
+                <div className="text-xs text-muted-foreground">active</div>
+                {simpleAutomations.length > activeAutomations.length && (
+                  <div className="text-xs text-muted-foreground">{simpleAutomations.length - activeAutomations.length} disabled</div>
+                )}
+              </div>
+            </button>
+          </>
+        )}
       </div>
 
       {/* Local Pull Requests Preview */}

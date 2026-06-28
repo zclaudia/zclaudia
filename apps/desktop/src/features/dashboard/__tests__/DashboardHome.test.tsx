@@ -45,12 +45,20 @@ describe('DashboardHome', () => {
 
   it('renders summary cards', () => {
     const { container } = render(
-      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
+      <DashboardHome projectId={projectId} onNavigate={onNavigate} onOpenAutomations={vi.fn()} />,
     );
     expect(container.textContent).toContain('Supervisor');
     expect(container.textContent).toContain('Tasks');
     expect(container.textContent).toContain('Local Pull Requests');
     expect(container.textContent).toContain('Workflows');
+  });
+
+  it('hides the workflows and automations cards when onOpenAutomations is omitted', () => {
+    const { container } = render(
+      <DashboardHome projectId={projectId} onNavigate={onNavigate} />,
+    );
+    expect(container.textContent).not.toContain('Workflows');
+    expect(container.textContent).not.toContain('Automations');
   });
 
   it('shows empty state when no data', () => {
