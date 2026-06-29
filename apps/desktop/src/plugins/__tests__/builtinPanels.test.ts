@@ -29,6 +29,9 @@ vi.mock('../../features/memory/MemoryPanel', () => ({
 vi.mock('../../features/lineage/LineagePanel', () => ({
   LineagePanel: () => null,
 }));
+vi.mock('../../features/git/components/GitSidebarPanel', () => ({
+  GitSidebarPanel: () => null,
+}));
 vi.mock('../../stores/terminalStore', () => ({
   useTerminalStore: { getState: () => ({ drawerOpen: {}, setDrawerOpen: vi.fn() }) },
 }));
@@ -46,7 +49,7 @@ describe('initBuiltinPanels', () => {
     } as any);
   });
 
-  it('registers terminal, file-viewer, draft, session-changes, memory, and notifications panels', async () => {
+  it('registers terminal, file-viewer, draft, session-changes, memory, notifications, lineage, and git panels', async () => {
     const registerSpy = vi.fn();
     usePluginStore.setState({ registerPanel: registerSpy } as any);
 
@@ -54,7 +57,7 @@ describe('initBuiltinPanels', () => {
     const { initBuiltinPanels } = await import('../builtinPanels');
     initBuiltinPanels();
 
-    expect(registerSpy).toHaveBeenCalledTimes(7);
+    expect(registerSpy).toHaveBeenCalledTimes(8);
     expect(registerSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'terminal', pluginId: 'com.claudia.terminal' })
     );
@@ -72,6 +75,9 @@ describe('initBuiltinPanels', () => {
     );
     expect(registerSpy).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'notifications', pluginId: 'com.claudia.notifications' })
+    );
+    expect(registerSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'git', pluginId: 'com.zclaudia.git' })
     );
   });
 
@@ -125,12 +131,13 @@ describe('builtinPanels openMode', () => {
     expect(byId('lineage')?.openMode).toBe('dedicated');
   });
 
-  it('marks file-viewer / draft / session-changes / memory as shared', () => {
+  it('marks file-viewer / draft / session-changes / memory / git as shared', () => {
     const panels = usePluginStore.getState().panels;
     const byId = (id: string) => panels.find((p) => p.id === id);
     expect(byId('file-viewer')?.openMode).toBe('shared');
     expect(byId('draft')?.openMode).toBe('shared');
     expect(byId('session-changes')?.openMode).toBe('shared');
     expect(byId('memory')?.openMode).toBe('shared');
+    expect(byId('git')?.openMode).toBe('shared');
   });
 });

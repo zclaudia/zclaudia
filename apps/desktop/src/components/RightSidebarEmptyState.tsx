@@ -12,7 +12,7 @@ interface RightSidebarEmptyStateProps {
   projectRoot: string | undefined;
 }
 
-type EmptyTile = { id: string; label: string; iconKey: 'draft' | 'file' | 'changes' | 'terminal' | 'lineage' };
+type EmptyTile = { id: string; label: string; iconKey: 'draft' | 'file' | 'changes' | 'terminal' | 'lineage' | 'git' };
 
 /** Maps panel id → iconKey for the known 5 tool tiles. */
 const PANEL_ICON_MAP: Record<string, EmptyTile['iconKey']> = {
@@ -21,6 +21,7 @@ const PANEL_ICON_MAP: Record<string, EmptyTile['iconKey']> = {
   'session-changes': 'changes',
   terminal: 'terminal',
   lineage: 'lineage',
+  git: 'git',
 };
 
 /** Static subtitle per tool iconKey. The 'changes' tile is dynamic (count) and
@@ -31,6 +32,7 @@ const SUBTITLES = {
   file: 'Browse working directory',
   terminal: 'Run commands',
   lineage: 'Session branch graph',
+  git: 'Status, branches, history & sync',
 } satisfies Record<Exclude<EmptyTile['iconKey'], 'changes'>, string>;
 
 /**

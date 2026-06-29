@@ -16,6 +16,7 @@ import { NotificationsPanel } from '../components/notifications/NotificationsPan
 import { ChangesPanel } from '../features/changes/ChangesPanel';
 import { MemoryPanel } from '../features/memory/MemoryPanel';
 import { LineagePanel } from '../features/lineage/LineagePanel';
+import { GitSidebarPanel } from '../features/git/components/GitSidebarPanel';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useFileViewerStore } from '../stores/fileViewerStore';
 import { useDraftEditorStore } from '../stores/draftEditorStore';
@@ -173,6 +174,24 @@ export function initBuiltinPanels() {
     visible: false,
     onClose: () => {
       usePluginStore.getState().updatePanelVisibility('lineage', false);
+    },
+  });
+
+  registerPanel({
+    id: 'git',
+    pluginId: 'com.zclaudia.git',
+    type: 'panel',
+    label: 'Git',
+    icon: 'GitBranch',
+    component: GitSidebarPanel,
+    order: 7,
+    platforms: ['desktop'],
+    defaultPlacement: 'right',
+    openMode: 'shared',
+    alwaysMount: false,
+    visible: false,
+    onClose: () => {
+      usePluginStore.getState().updatePanelVisibility('git', false);
     },
   });
 
