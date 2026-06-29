@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { SidebarNav } from '../SidebarNav';
@@ -81,5 +82,33 @@ describe('SidebarNav', () => {
     );
     expect(screen.getByRole('button', { name: 'Workflows' }).className).not.toContain('text-muted-foreground');
     expect(screen.getByRole('button', { name: 'Runs' }).className).toContain('text-muted-foreground');
+  });
+});
+
+const base = { onHome: () => {}, isHomeActive: false };
+
+describe('SidebarNav automation mode', () => {
+  it('renders the 4 tabs as icon buttons with accessible names', () => {
+    render(<SidebarNav {...base} automationMode={{ tab: 'workflows', onSelectTab: () => {}, onBack: () => {} }} />);
+    for (const name of ['Automations', 'Workflows', 'Runs', 'System']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument();
+    }
+  });
+
+  it('calls onSelectTab when a tab icon is clicked', () => {
+    const onSelectTab = vi.fn();
+    render(<SidebarNav {...base} automationMode={{ tab: 'workflows', onSelectTab, onBack: () => {} }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Runs' }));
+    expect(onSelectTab).toHaveBeenCalledWith('runs');
+  });
+
+  it('renders the scopeSlot between Back and the tabs', () => {
+    render(
+      <SidebarNav
+        {...base}
+        automationMode={{ tab: 'workflows', onSelectTab: () => {}, onBack: () => {}, scopeSlot: <div data-testid="scope-slot" /> }}
+      />,
+    );
+    expect(screen.getByTestId('scope-slot')).toBeInTheDocument();
   });
 });
