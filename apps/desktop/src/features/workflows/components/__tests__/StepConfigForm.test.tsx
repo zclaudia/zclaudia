@@ -113,6 +113,17 @@ describe('StepConfigForm', () => {
     expect((textarea as HTMLTextAreaElement).value).toBe('review code');
   });
 
+  it('renders ai_prompt runtime controls without the legacy session name field', () => {
+    const step = makeStep({ type: 'ai_prompt', config: { prompt: 'review code' } });
+    const { container } = render(
+      <StepConfigForm step={step} onChange={onChange} onDelete={onDelete} />,
+    );
+
+    expect(container.textContent).toContain('Toolset');
+    expect(container.textContent).toContain('Max Turns');
+    expect(container.textContent).not.toContain('Session Name');
+  });
+
   it('renders on-error options', () => {
     const step = makeStep();
     const { container } = render(

@@ -106,11 +106,40 @@ function renderTypeConfig(step: WorkflowNodeDef, onChange: (s: WorkflowNodeDef) 
             rows={5}
           />
           <TextInput
-            label="Session Name"
-            value={(step.config.sessionName as string) ?? ''}
-            onChange={(v) => onChange(updateConfig(step, 'sessionName', v))}
-            placeholder="(auto-generated)"
+            label="Working Directory"
+            value={(step.config.workingDirectory as string) ?? ''}
+            onChange={(v) => onChange(updateConfig(step, 'workingDirectory', v))}
+            placeholder="(project root)"
           />
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Toolset</label>
+            <Select
+              value={(step.config.toolset as string) || 'workflow-prompt'}
+              onChange={(v) => onChange(updateConfig(step, 'toolset', v))}
+              options={[
+                { value: 'workflow-prompt', label: 'Read / Write' },
+                { value: 'workflow-prompt-readonly', label: 'Read Only' },
+                { value: 'none', label: 'None' },
+              ]}
+              size="md"
+              block
+              triggerClassName="rounded-md"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">Max Turns</label>
+            <input
+              type="number"
+              min={1}
+              value={typeof step.config.maxTurns === 'number' ? step.config.maxTurns : ''}
+              onChange={(e) => onChange(updateConfig(
+                step,
+                'maxTurns',
+                e.target.value ? (parseInt(e.target.value) || 1) : undefined,
+              ))}
+              className="w-24 px-2.5 py-1.5 text-sm rounded-md border border-border bg-background"
+            />
+          </div>
         </>
       );
 

@@ -166,7 +166,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'ai_prompt',
           config: {
             prompt: 'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
-            sessionName: 'Conflict Resolution',
           },
           position: { x: 0, y: 600 },
         },
@@ -195,7 +194,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'ai_prompt',
           config: {
             prompt: 'Review the recent git changes. Run "git log --oneline --since=\'24 hours ago\'" and "git diff HEAD~5" (or fewer if less than 5 commits exist). Provide a summary and any potential issues.',
-            sessionName: 'Daily AI Review',
           },
           position: { x: 300, y: 0 },
         },
@@ -218,7 +216,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'ai_prompt',
           config: {
             prompt: 'Check if there are uncommitted changes using "git status". If there are changes, review with "git diff", stage all, write a conventional commit message, and commit. If no changes, respond "No uncommitted changes found."',
-            sessionName: 'Auto Commit',
           },
           position: { x: 300, y: 0 },
         },
@@ -249,7 +246,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'ai_prompt',
           config: {
             prompt: 'Here are the lint/typecheck results:\n${lint.output.stdout}\n\nAnalyze the errors and suggest fixes for the most critical issues.',
-            sessionName: 'Code Quality Check',
           },
           position: { x: 300, y: 150 },
         },
@@ -297,7 +293,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'ai_prompt',
           config: {
             prompt: 'The following tests failed. Fix the source code to make tests pass. Do NOT modify test files.\n\nTest command: pnpm test\nTest output:\n${run_tests.output.stderr}\n${run_tests.output.stdout}',
-            sessionName: 'Nightly: Fix Test Failures',
             workingDirectory: '${create_wt.output.worktreePath}',
           },
           position: { x: 500, y: 300 },
@@ -410,7 +405,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
           type: 'ai_prompt',
           config: {
             prompt: 'There is a merge conflict. Run "git status" to see conflicted files. Resolve all conflicts, stage changes, and complete the merge.',
-            sessionName: 'Nightly: Conflict Resolution',
             workingDirectory: '${create_wt.output.worktreePath}',
           },
           position: { x: -200, y: 1150 },
