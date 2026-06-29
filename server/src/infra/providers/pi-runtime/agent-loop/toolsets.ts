@@ -45,6 +45,12 @@ const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, MutableAgentLoopToo
     permissionMode: 'allow-declared-tools',
     sandboxReadOnly: true,
   },
+  'workflow-prompt': {
+    id: 'workflow-prompt',
+    tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash', 'Edit', 'MultiEdit', 'Write'],
+    permissionMode: 'allow-declared-tools',
+    sandboxReadOnly: false,
+  },
 };
 
 function freezeBuiltinToolsetDescriptor(descriptor: MutableAgentLoopToolsetDescriptor): AgentLoopToolsetDescriptor {

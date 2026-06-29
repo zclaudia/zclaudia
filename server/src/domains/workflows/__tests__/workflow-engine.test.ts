@@ -1314,7 +1314,7 @@ describe('WorkflowEngine', () => {
       }));
       expect(mockAgentLoopRunner.run).toHaveBeenCalledWith(expect.objectContaining({
         purpose: 'workflow.ai_prompt',
-        toolset: { id: 'workflow-prompt-readonly' },
+        toolset: { id: 'workflow-prompt' },
         context: { policy: 'workflow-artifacts', key: 'n1' },
       }));
       expect(mockWorkflowAiRunPort.startVirtualRun).not.toHaveBeenCalled();

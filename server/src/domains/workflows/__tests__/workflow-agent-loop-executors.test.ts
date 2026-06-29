@@ -60,7 +60,7 @@ describe('workflow agent-loop AI executors', () => {
       cwd: '/repo',
       systemPrompt: expect.any(String),
       input: expect.stringContaining('Analyze ${lint.output.stdout}'),
-      toolset: { id: 'workflow-prompt-readonly' },
+      toolset: { id: 'workflow-prompt' },
       outputContract: {
         type: 'json',
         schema: {
@@ -126,6 +126,27 @@ describe('workflow agent-loop AI executors', () => {
       limits: { maxTurns: 6, timeoutMs: 4321 },
       permissionMode: 'deny-external',
       context: { policy: 'workflow-artifacts', key: 'prompt-none' },
+    }));
+  });
+
+  it('allows workflow prompts to opt into the readonly toolset', async () => {
+    const run = vi.fn(async () => ({
+      status: 'completed' as const,
+      output: { result: 'readonly complete' },
+      contextId: 'ctx-4',
+    }));
+    const executor = new AIPromptStepExecutor({ run } as unknown as AgentLoopRunnerPort);
+
+    await executor.execute(
+      makeNode({ id: 'prompt-readonly' }),
+      { prompt: 'Summarize repo', toolset: 'workflow-prompt-readonly' },
+      makeContext(),
+    );
+
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      toolset: { id: 'workflow-prompt-readonly' },
+      permissionMode: 'allow-declared-tools',
+      context: { policy: 'workflow-artifacts', key: 'prompt-readonly' },
     }));
   });
 });

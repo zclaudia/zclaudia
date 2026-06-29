@@ -3,7 +3,7 @@ import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import { getAgentLoopToolsetDescriptor } from '../../../infra/providers/pi-runtime/agent-loop/index.js';
 
 const DEFAULT_STEP_TIMEOUT_MS = 10 * 60 * 1000;
-const DEFAULT_TOOLSET_ID = 'workflow-prompt-readonly';
+const DEFAULT_TOOLSET_ID = 'workflow-prompt';
 const DEFAULT_MAX_TURNS = 6;
 
 export class AIPromptStepExecutor implements StepExecutorPort {

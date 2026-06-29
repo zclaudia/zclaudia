@@ -28,6 +28,12 @@ describe('agent-loop builtin toolsets', () => {
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: true,
     });
+
+    expect(getAgentLoopToolsetDescriptor('workflow-prompt')).toMatchObject({
+      tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash', 'Edit', 'MultiEdit', 'Write'],
+      permissionMode: 'allow-declared-tools',
+      sandboxReadOnly: false,
+    });
   });
 
   it('rejects unknown toolsets', () => {
@@ -48,5 +54,18 @@ describe('agent-loop builtin toolsets', () => {
 
     expect(getAgentLoopToolsetDescriptor('permission-review')?.tools).toEqual(['Read', 'Glob', 'Grep', 'LS']);
     expect(buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'permission-review' })).toHaveLength(4);
+  });
+
+  it('builds writable tools for workflow prompts', () => {
+    expect(buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'workflow-prompt' }).map((tool) => tool.name)).toEqual([
+      'Read',
+      'Glob',
+      'Grep',
+      'LS',
+      'Bash',
+      'Edit',
+      'MultiEdit',
+      'Write',
+    ]);
   });
 });
