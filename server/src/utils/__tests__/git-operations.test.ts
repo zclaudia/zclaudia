@@ -22,6 +22,9 @@ import {
   mergeBranch,
   abortMerge,
   removeWorktree,
+  checkoutBranch,
+  createBranch,
+  deleteBranch,
 } from '../git-operations.js';
 
 type ExecFileCallback = (
@@ -321,6 +324,68 @@ describe('git-operations', () => {
     it('handles worktree remove failure gracefully', async () => {
       mockGitSequence([new Error('not a worktree'), '']);
       await expect(removeWorktree('/main', '/worktree', 'branch')).resolves.not.toThrow();
+    });
+  });
+
+  describe('checkoutBranch', () => {
+    it('runs git checkout <branch>', async () => {
+      mockGitSuccess('');
+      await checkoutBranch('/repo', 'feature');
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'git', ['checkout', 'feature'], expect.anything(), expect.any(Function),
+      );
+    });
+
+    it('throws on empty branch name', async () => {
+      await expect(checkoutBranch('/repo', '   ')).rejects.toThrow('Branch name is required');
+    });
+
+    it('surfaces git errors (e.g. dirty tree)', async () => {
+      const err = Object.assign(new Error('checkout failed'), {
+        stderr: 'error: Your local changes would be overwritten by checkout.',
+      });
+      mockGitError(err);
+      await expect(checkoutBranch('/repo', 'feature')).rejects.toThrow(/local changes would be overwritten/);
+    });
+  });
+
+  describe('createBranch', () => {
+    it('creates a branch without checkout', async () => {
+      mockGitSuccess('');
+      await createBranch('/repo', 'feature');
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'git', ['branch', 'feature'], expect.anything(), expect.any(Function),
+      );
+    });
+
+    it('creates and checks out with a start point', async () => {
+      mockGitSuccess('');
+      await createBranch('/repo', 'feature', { checkout: true, startPoint: 'main' });
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'git', ['checkout', '-b', 'feature', 'main'], expect.anything(), expect.any(Function),
+      );
+    });
+
+    it('throws on empty name', async () => {
+      await expect(createBranch('/repo', '  ')).rejects.toThrow('Branch name is required');
+    });
+  });
+
+  describe('deleteBranch', () => {
+    it('safe-deletes with -d', async () => {
+      mockGitSuccess('');
+      await deleteBranch('/repo', 'feature');
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'git', ['branch', '-d', 'feature'], expect.anything(), expect.any(Function),
+      );
+    });
+
+    it('force-deletes with -D', async () => {
+      mockGitSuccess('');
+      await deleteBranch('/repo', 'feature', { force: true });
+      expect(mockExecFile).toHaveBeenCalledWith(
+        'git', ['branch', '-D', 'feature'], expect.anything(), expect.any(Function),
+      );
     });
   });
 });

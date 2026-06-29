@@ -517,3 +517,50 @@ export async function pushRemote(
   if (branch) args.push(branch);
   await git(args, repoPath);
 }
+
+/**
+ * Checks out an existing branch in the given worktree. Surfaces git's own
+ * error (e.g. uncommitted changes that would be overwritten).
+ */
+export async function checkoutBranch(repoPath: string, branch: string): Promise<void> {
+  const name = branch.trim();
+  if (!name) {
+    throw new GitOperationError('Branch name is required', '');
+  }
+  await git(['checkout', name], repoPath);
+}
+
+/**
+ * Creates a new branch. When `checkout` is true, switches to it (`git checkout -b`),
+ * otherwise creates it in place (`git branch`). Optional `startPoint` sets the base ref.
+ */
+export async function createBranch(
+  repoPath: string,
+  name: string,
+  opts: { checkout?: boolean; startPoint?: string } = {},
+): Promise<void> {
+  const branch = name.trim();
+  if (!branch) {
+    throw new GitOperationError('Branch name is required', '');
+  }
+  const args = opts.checkout ? ['checkout', '-b', branch] : ['branch', branch];
+  if (opts.startPoint && opts.startPoint.trim()) {
+    args.push(opts.startPoint.trim());
+  }
+  await git(args, repoPath);
+}
+
+/**
+ * Deletes a local branch. Uses `-d` (safe) unless `force` is set (`-D`).
+ */
+export async function deleteBranch(
+  repoPath: string,
+  name: string,
+  opts: { force?: boolean } = {},
+): Promise<void> {
+  const branch = name.trim();
+  if (!branch) {
+    throw new GitOperationError('Branch name is required', '');
+  }
+  await git(['branch', opts.force ? '-D' : '-d', branch], repoPath);
+}
