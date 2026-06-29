@@ -9,10 +9,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Zap, Clock, History, Server } from 'lucide-react';
 import { useAutomationApi } from './useAutomationApi';
-import type { ProjectInfo, AgentConfigInfo, AutomationTab } from './automation-types';
+import type { ProjectInfo, AutomationTab } from './automation-types';
 import { isInternalProject } from './automation-types';
 import { AutomationsTab } from './AutomationsTab';
-import { WorkflowsTab } from './WorkflowsTab';
+import { AutomationWorkflowDetail } from './AutomationWorkflowDetail';
 import { RunsTab } from './RunsTab';
 import { SystemTasksTab } from './SystemTasksTab';
 
@@ -33,17 +33,11 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
   const api = useAutomationApi(backendId, '', '');
 
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
-  const [globalPermissionWorkflowOverrideId, setGlobalPermissionWorkflowOverrideId] = useState<string | null>(null);
 
   useEffect(() => {
     setProjects([]);
-    setGlobalPermissionWorkflowOverrideId(null);
-    Promise.all([
-      api.get('/api/projects'),
-      api.get('/api/agent/config').catch(() => null),
-    ]).then(([projectData, agentConfig]) => {
+    api.get('/api/projects').then((projectData) => {
       setProjects(projectData);
-      setGlobalPermissionWorkflowOverrideId((agentConfig as AgentConfigInfo | null)?.permissionWorkflowOverrideId ?? null);
     }).catch(() => {});
   }, [api]);
 
@@ -78,12 +72,10 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
           />
         )}
         {tab === 'workflows' && (
-          <WorkflowsTab
+          <AutomationWorkflowDetail
             key={`workflows-${scopeKey}`}
             api={api}
             projects={projects}
-            globalPermissionWorkflowOverrideId={globalPermissionWorkflowOverrideId}
-            projectName={projectName}
             projectId={projectId}
           />
         )}

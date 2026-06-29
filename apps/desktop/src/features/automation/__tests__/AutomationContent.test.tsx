@@ -8,6 +8,9 @@ vi.mock('../../../services/api/base', () => ({
   getAuthHeadersForBackend: () => ({ Authorization: '' }),
 }));
 
+vi.mock('../AutomationWorkflowDetail', () => ({ AutomationWorkflowDetail: () => <div data-testid="wf-detail" /> }));
+vi.mock('../RunsTab', () => ({ RunsTab: () => <div data-testid="runs-tab" /> }));
+
 import { AutomationContent } from '../AutomationContent';
 
 const mockFetch = vi.fn();
@@ -129,5 +132,21 @@ describe('AutomationContent', () => {
     expect(payload.trigger.type).toBe('once');
     expect(typeof payload.trigger.onceAt).toBe('number');
     expect(Number.isFinite(payload.trigger.onceAt)).toBe(true);
+  });
+
+  it('renders AutomationWorkflowDetail for the workflows tab', async () => {
+    render(<AutomationContent tab="workflows" backendId="b1" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('wf-detail')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('runs-tab')).toBeNull();
+  });
+
+  it('renders RunsTab for the runs tab', async () => {
+    render(<AutomationContent tab="runs" backendId="b1" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('runs-tab')).toBeTruthy();
+    });
+    expect(screen.queryByTestId('wf-detail')).toBeNull();
   });
 });
