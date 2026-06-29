@@ -92,7 +92,9 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
       <div className="flex-1 overflow-hidden">
         {tab === 'status' && <GitStatusView projectId={projectId} worktreePath={worktree.path} />}
         {tab === 'commits' && <GitLogView projectId={projectId} worktreePath={worktree.path} />}
-        {tab === 'branches' && <GitBranchesView projectId={projectId} worktreePath={worktree.path} />}
+        {tab === 'branches' && (
+          <GitBranchesView projectId={projectId} worktreePath={worktree.path} onAfterMutation={onAfterSync} />
+        )}
         {tab === 'stash' && (
           <GitStashView
             projectId={projectId}
