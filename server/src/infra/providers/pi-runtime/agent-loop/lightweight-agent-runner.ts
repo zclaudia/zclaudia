@@ -36,6 +36,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
   }
 
   async run(request: LightweightAgentRunRequest): Promise<LightweightAgentRunResult> {
+    let accumulatedUsage: Record<string, unknown> | undefined;
     const resolvedContext = this.contextRepository.resolveContextForRun({
       owner: request.owner,
       policy: request.context.policy,
@@ -51,6 +52,11 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       const descriptor = getAgentLoopToolsetDescriptor(request.toolset.id);
       if (!descriptor) {
         throw new Error(`Unknown agent-loop toolset: ${request.toolset.id}`);
+      }
+      if (permissionMode !== descriptor.permissionMode) {
+        throw new Error(
+          `Permission mode ${permissionMode} does not match toolset ${descriptor.id} (${descriptor.permissionMode})`,
+        );
       }
 
       const llmProfile = request.llmProfileId
@@ -120,6 +126,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         });
 
         latestText = agentResult.text;
+        accumulatedUsage = accumulateUsage(accumulatedUsage, agentResult.usage);
         this.contextRepository.appendEvent({
           contextId: resolvedContext.contextId,
           kind: 'assistant_message',
@@ -136,7 +143,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
           return {
             status: 'completed',
             output: parsed.output,
-            usage: agentResult.usage,
+            usage: accumulatedUsage,
             traceId: resolvedContext.contextId,
             contextId: resolvedContext.contextId,
           };
@@ -151,6 +158,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
           return {
             status: 'contract_failed',
             output: {},
+            usage: accumulatedUsage,
             traceId: resolvedContext.contextId,
             contextId: resolvedContext.contextId,
             error: parsed.error,
@@ -181,6 +189,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       return {
         status,
         output: {},
+        usage: accumulatedUsage,
         traceId: resolvedContext.contextId,
         contextId: resolvedContext.contextId,
         error: message,
@@ -229,4 +238,34 @@ function validatePermissionMode(mode: unknown): AgentLoopPermissionMode {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function accumulateUsage(
+  current: Record<string, unknown> | undefined,
+  next: unknown,
+): Record<string, unknown> | undefined {
+  if (!isRecord(next)) {
+    return current;
+  }
+
+  return addNumericUsage(current ?? {}, next);
+}
+
+function addNumericUsage(
+  current: Record<string, unknown>,
+  next: Record<string, unknown>,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = { ...current };
+  for (const [key, value] of Object.entries(next)) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      const previous = typeof result[key] === 'number' ? result[key] : 0;
+      result[key] = previous + value;
+    } else if (isRecord(value)) {
+      result[key] = addNumericUsage(
+        isRecord(result[key]) ? result[key] : {},
+        value,
+      );
+    }
+  }
+  return result;
 }

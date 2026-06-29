@@ -70,8 +70,8 @@ describe('LightweightAgentRunner', () => {
 
   it('uses one repair attempt for invalid JSON output', async () => {
     const execute = vi.fn()
-      .mockResolvedValueOnce({ text: 'not json', messages: [] })
-      .mockResolvedValueOnce({ text: '{"result":"repaired"}', messages: [] });
+      .mockResolvedValueOnce({ text: 'not json', messages: [], usage: { input: 3, output: 1 } })
+      .mockResolvedValueOnce({ text: '{"result":"repaired"}', messages: [], usage: { input: 5, output: 2 } });
     const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
 
     const result = await runner.run({
@@ -97,6 +97,7 @@ describe('LightweightAgentRunner', () => {
     });
 
     expect(result.output).toEqual({ result: 'repaired' });
+    expect(result.usage).toEqual({ input: 8, output: 3 });
     expect(execute).toHaveBeenCalledTimes(2);
     expect(execute.mock.calls[1]?.[0]?.userInput).toContain('Return valid JSON only');
   });
@@ -136,7 +137,7 @@ describe('LightweightAgentRunner', () => {
   it('returns contract_failed when repair still fails', async () => {
     const runner = new LightweightAgentRunner({
       db,
-      executeAgentLoop: vi.fn(async () => ({ text: 'still bad', messages: [] })),
+      executeAgentLoop: vi.fn(async () => ({ text: 'still bad', messages: [], usage: { totalTokens: 7 } })),
     });
 
     const result = await runner.run({
@@ -163,6 +164,7 @@ describe('LightweightAgentRunner', () => {
 
     expect(result.status).toBe('contract_failed');
     expect(result.error).toContain('valid JSON');
+    expect(result.usage).toEqual({ totalTokens: 14 });
   });
 
   it('fails unknown toolsets before calling the model', async () => {
@@ -283,9 +285,9 @@ describe('LightweightAgentRunner', () => {
     });
 
     expect(execute).toHaveBeenCalledTimes(2);
-    expect(execute.mock.calls[1]?.[0]?.userInput).toContain('input: {"purpose":"workflow.ai_prompt","input":"first run"}');
     expect(execute.mock.calls[1]?.[0]?.userInput).toContain('assistant_message: {"text":"{\\"result\\":\\"done\\"}"}');
-    expect(execute.mock.calls[1]?.[0]?.userInput).not.toContain('contract_result');
+    expect(execute.mock.calls[1]?.[0]?.userInput).toContain('contract_result: {"result":"done"}');
+    expect(execute.mock.calls[1]?.[0]?.userInput).not.toContain('input: {"purpose":"workflow.ai_prompt","input":"first run"}');
   });
 
   it('does not persist rendered workflow-thread context into later history', async () => {
@@ -373,6 +375,29 @@ describe('LightweightAgentRunner', () => {
 
     expect(result.status).toBe('completed');
     expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it('fails permission modes that do not match the toolset descriptor', async () => {
+    const execute = vi.fn();
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'permission-review' },
+      outputContract: { type: 'json', schema: { type: 'object' } },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('Permission mode deny-external does not match toolset permission-review');
+    expect(execute).not.toHaveBeenCalled();
   });
 
   it('fails unsupported permission modes before calling the model', async () => {

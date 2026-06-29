@@ -71,10 +71,14 @@ export class AgentLoopContextRepository {
       .prepare(
         `
       SELECT id, context_id, kind, payload, created_at
-      FROM agent_loop_events
-      WHERE context_id = ?
-      ORDER BY created_at ASC, rowid ASC
-      LIMIT ?
+      FROM (
+        SELECT rowid AS event_rowid, id, context_id, kind, payload, created_at
+        FROM agent_loop_events
+        WHERE context_id = ?
+        ORDER BY created_at DESC, rowid DESC
+        LIMIT ?
+      )
+      ORDER BY created_at ASC, event_rowid ASC
     `,
       )
       .all(contextId, limit) as Array<{

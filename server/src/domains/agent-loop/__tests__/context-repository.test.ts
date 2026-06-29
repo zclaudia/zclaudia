@@ -82,4 +82,26 @@ describe('AgentLoopContextRepository', () => {
 
     expect(repo.loadEvents(resolved.contextId).map((event) => event.payload.seq)).toEqual([1, 2]);
   });
+
+  it('loads the latest event window in insertion order', () => {
+    const resolved = repo.resolveContextForRun({
+      owner: { type: 'workflow_run', id: 'run-2' },
+      policy: 'workflow-thread',
+      key: 'thread',
+    });
+
+    repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 1 } });
+    repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 2 } });
+    repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 3 } });
+    repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 4 } });
+
+    const replay = repo.resolveContextForRun({
+      owner: { type: 'workflow_run', id: 'run-2' },
+      policy: 'workflow-thread',
+      key: 'thread',
+      maxEvents: 2,
+    });
+
+    expect(replay.loadedEvents.map((event) => event.payload.seq)).toEqual([3, 4]);
+  });
 });
