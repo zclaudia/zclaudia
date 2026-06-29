@@ -20,3 +20,8 @@ export {
   type ResolveAgentLoopContextArgs,
   type ResolvedAgentLoopContext,
 } from './context-repository.js';
+export {
+  buildJsonRepairPrompt,
+  createObjectJsonContract,
+  parseJsonOutput,
+} from './output-contract.js';

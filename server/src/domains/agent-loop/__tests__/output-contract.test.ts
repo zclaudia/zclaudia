@@ -1,0 +1,61 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildJsonRepairPrompt,
+  createObjectJsonContract,
+  parseJsonOutput,
+} from '../output-contract.js';
+import type { JsonOutputContract } from '../types.js';
+
+const reviewContract: JsonOutputContract = {
+  type: 'json',
+  schema: {
+    type: 'object',
+    required: ['reviewPassed', 'reviewNotes'],
+    properties: {
+      reviewPassed: { type: 'boolean' },
+      reviewNotes: { type: 'string' },
+      confidence: { type: 'number' },
+      decision: { enum: ['approve', 'deny', 'uncertain'] },
+    },
+  },
+  repairAttempts: 1,
+};
+
+describe('parseJsonOutput', () => {
+  it('parses fenced JSON and validates required fields', () => {
+    const parsed = parseJsonOutput('```json\n{"reviewPassed":true,"reviewNotes":"ok"}\n```', reviewContract);
+    expect(parsed).toEqual({
+      ok: true,
+      output: { reviewPassed: true, reviewNotes: 'ok' },
+    });
+  });
+
+  it('rejects invalid JSON with a repairable error', () => {
+    const parsed = parseJsonOutput('review passed', reviewContract);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('valid JSON object');
+    expect(buildJsonRepairPrompt('review passed', [parsed.error])).toContain('Return valid JSON only');
+  });
+
+  it('rejects missing required fields', () => {
+    const parsed = parseJsonOutput('{"reviewPassed":true}', reviewContract);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('reviewNotes');
+  });
+
+  it('rejects enum values outside the contract', () => {
+    const parsed = parseJsonOutput('{"reviewPassed":true,"reviewNotes":"ok","decision":"maybe"}', reviewContract);
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error).toContain('decision');
+  });
+});
+
+describe('createObjectJsonContract', () => {
+  it('creates a JSON contract with a default repair attempt budget', () => {
+    expect(createObjectJsonContract({ type: 'object' })).toEqual({
+      type: 'json',
+      schema: { type: 'object' },
+      repairAttempts: 1,
+    });
+  });
+});
