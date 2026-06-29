@@ -9,14 +9,18 @@ export interface ToolsetContext {
 }
 
 export interface AgentLoopToolsetDescriptor {
-  id: string;
-  tools: ToolName[];
-  createOverrides?: (ctx: ToolsetContext) => Record<string, AgentTool>;
-  permissionMode: AgentLoopPermissionMode;
-  sandboxReadOnly: boolean;
+  readonly id: string;
+  readonly tools: readonly ToolName[];
+  readonly createOverrides?: (ctx: ToolsetContext) => Record<string, AgentTool>;
+  readonly permissionMode: AgentLoopPermissionMode;
+  readonly sandboxReadOnly: boolean;
 }
 
-const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, AgentLoopToolsetDescriptor> = {
+type MutableAgentLoopToolsetDescriptor = {
+  -readonly [K in keyof AgentLoopToolsetDescriptor]: AgentLoopToolsetDescriptor[K];
+};
+
+const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, MutableAgentLoopToolsetDescriptor> = {
   none: {
     id: 'none',
     tools: [],
@@ -43,10 +47,10 @@ const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, AgentLoopToolsetDes
   },
 };
 
-function freezeBuiltinToolsetDescriptor(descriptor: AgentLoopToolsetDescriptor): AgentLoopToolsetDescriptor {
+function freezeBuiltinToolsetDescriptor(descriptor: MutableAgentLoopToolsetDescriptor): AgentLoopToolsetDescriptor {
   return Object.freeze({
     ...descriptor,
-    tools: Object.freeze([...descriptor.tools]),
+    tools: Object.freeze([...descriptor.tools]) as readonly ToolName[],
   });
 }
 
@@ -60,7 +64,7 @@ export const BUILTIN_AGENT_LOOP_TOOLSETS: Readonly<Record<string, AgentLoopTools
 );
 
 export function getAgentLoopToolsetDescriptor(id: string): AgentLoopToolsetDescriptor | undefined {
-  return BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS[id];
+  return BUILTIN_AGENT_LOOP_TOOLSETS[id];
 }
 
 export function buildAgentLoopTools(args: {
@@ -76,7 +80,7 @@ export function buildAgentLoopTools(args: {
 
   const descriptorOverrides = descriptor.createOverrides?.({ cwd: args.cwd, db: args.db });
   return buildTools(args.cwd, {
-    enabled: descriptor.tools,
+    enabled: [...descriptor.tools],
     overrides: {
       ...(descriptorOverrides ?? {}),
       ...(args.overrides ?? {}),

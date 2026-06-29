@@ -49,3 +49,7 @@
 ## Review Fix
 - Command: `cd /Users/zhvala/SourceCode/zclaudia/.worktrees/lightweight-agent-runner-workflow-migration/server && bash ../scripts/with-project-node.sh ../node_modules/.bin/vitest run --config vitest.config.ts src/infra/providers/pi-runtime/agent-loop/__tests__/toolsets.test.ts`
 - Output summary: Vitest completed successfully with `1 passed` test file and `3 passed` tests. The run also printed the pre-existing `test.poolOptions` deprecation warning.
+
+## Review Fix
+- Command: `cd /Users/zhvala/SourceCode/zclaudia/.worktrees/lightweight-agent-runner-workflow-migration/server && bash ../scripts/with-project-node.sh ../node_modules/.bin/vitest run --config vitest.config.ts src/infra/providers/pi-runtime/agent-loop/__tests__/toolsets.test.ts`
+- Output summary: Vitest completed successfully with `1 passed` test file and `4 passed` tests. The run also printed the pre-existing `test.poolOptions` deprecation warning.
