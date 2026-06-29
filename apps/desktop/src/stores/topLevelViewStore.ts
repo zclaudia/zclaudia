@@ -9,15 +9,21 @@ export type TopLevelView =
 
 interface TopLevelViewState {
   view: TopLevelView;
+  selectedAutomationItemId: string | null;
+  automationListRefreshNonce: number;
   openSettings: (initialTab?: SettingsTab) => void;
   openAutomations: (opts?: OpenAutomationsOptions) => void;
   setAutomationTab: (tab: AutomationTab) => void;
   setAutomationProjectFilter: (projectId?: string) => void;
   returnToApp: () => void;
+  selectAutomationItem: (id: string | null) => void;
+  bumpAutomationListRefresh: () => void;
 }
 
 export const useTopLevelViewStore = create<TopLevelViewState>((set) => ({
   view: { kind: 'app' },
+  selectedAutomationItemId: null,
+  automationListRefreshNonce: 0,
   openSettings: (initialTab) => set({
     view: initialTab ? { kind: 'settings', initialTab } : { kind: 'settings' },
   }),
@@ -27,10 +33,11 @@ export const useTopLevelViewStore = create<TopLevelViewState>((set) => ({
       tab: opts?.tab ?? 'automations',
       ...(opts?.projectId ? { projectId: opts.projectId } : {}),
     },
+    selectedAutomationItemId: null,
   }),
   setAutomationTab: (tab) => set((state) =>
     state.view.kind === 'automations'
-      ? { view: { ...state.view, tab } }
+      ? { view: { ...state.view, tab }, selectedAutomationItemId: null }
       : state,
   ),
   setAutomationProjectFilter: (projectId) => set((state) =>
@@ -39,4 +46,6 @@ export const useTopLevelViewStore = create<TopLevelViewState>((set) => ({
       : state,
   ),
   returnToApp: () => set({ view: { kind: 'app' } }),
+  selectAutomationItem: (id) => set({ selectedAutomationItemId: id }),
+  bumpAutomationListRefresh: () => set((s) => ({ automationListRefreshNonce: s.automationListRefreshNonce + 1 })),
 }));

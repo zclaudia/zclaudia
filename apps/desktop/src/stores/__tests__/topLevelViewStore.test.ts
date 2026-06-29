@@ -3,7 +3,11 @@ import { useTopLevelViewStore } from '../topLevelViewStore';
 
 describe('topLevelViewStore', () => {
   beforeEach(() => {
-    useTopLevelViewStore.setState({ view: { kind: 'app' } });
+    useTopLevelViewStore.setState({
+      view: { kind: 'app' },
+      selectedAutomationItemId: null,
+      automationListRefreshNonce: 0,
+    });
   });
 
   it('starts on the normal app shell', () => {
@@ -76,5 +80,39 @@ describe('topLevelViewStore', () => {
     useTopLevelViewStore.getState().setAutomationTab('runs');
     useTopLevelViewStore.getState().setAutomationProjectFilter('p1');
     expect(useTopLevelViewStore.getState().view).toEqual({ kind: 'settings' });
+  });
+});
+
+describe('topLevelViewStore automation selection', () => {
+  beforeEach(() => {
+    useTopLevelViewStore.setState({
+      view: { kind: 'app' },
+      selectedAutomationItemId: null,
+      automationListRefreshNonce: 0,
+    });
+  });
+
+  it('selectAutomationItem sets the id', () => {
+    useTopLevelViewStore.getState().selectAutomationItem('wf-1');
+    expect(useTopLevelViewStore.getState().selectedAutomationItemId).toBe('wf-1');
+  });
+
+  it('setAutomationTab resets the selection to null', () => {
+    useTopLevelViewStore.getState().openAutomations({ tab: 'workflows' });
+    useTopLevelViewStore.getState().selectAutomationItem('wf-1');
+    useTopLevelViewStore.getState().setAutomationTab('runs');
+    expect(useTopLevelViewStore.getState().selectedAutomationItemId).toBeNull();
+  });
+
+  it('openAutomations initializes selection to null', () => {
+    useTopLevelViewStore.getState().selectAutomationItem('wf-1');
+    useTopLevelViewStore.getState().openAutomations({ tab: 'workflows' });
+    expect(useTopLevelViewStore.getState().selectedAutomationItemId).toBeNull();
+  });
+
+  it('bumpAutomationListRefresh increments the nonce', () => {
+    const before = useTopLevelViewStore.getState().automationListRefreshNonce;
+    useTopLevelViewStore.getState().bumpAutomationListRefresh();
+    expect(useTopLevelViewStore.getState().automationListRefreshNonce).toBe(before + 1);
   });
 });
