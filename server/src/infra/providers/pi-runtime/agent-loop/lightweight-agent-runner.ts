@@ -100,6 +100,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       });
 
       let latestText = '';
+      let latestParseError = 'JSON contract failed';
       const maxAttempts = (request.outputContract.repairAttempts ?? 0) + 1;
 
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -107,7 +108,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
           systemPrompt: request.systemPrompt,
           userInput: attempt === 0
             ? renderedInput
-            : buildJsonRepairPrompt(latestText, [parseJsonOutput(latestText, request.outputContract).error]),
+            : buildJsonRepairPrompt(latestText, [latestParseError]),
           history: [],
           modelInfo,
           tools,
@@ -155,6 +156,8 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
             error: parsed.error,
           };
         }
+
+        latestParseError = parsed.error;
       }
 
       return {

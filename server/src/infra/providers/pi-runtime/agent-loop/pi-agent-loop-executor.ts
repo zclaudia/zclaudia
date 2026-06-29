@@ -1,10 +1,12 @@
 import { streamSimple } from '@earendil-works/pi-ai';
 import {
-  Agent,
   type AgentEvent,
+  type AgentContext,
+  type AgentLoopConfig,
   type AgentMessage,
   type AgentTool,
-  type ShouldStopAfterTurnContext,
+  convertToLlm,
+  runAgentLoop,
   type StreamFn,
 } from '@earendil-works/pi-agent-core';
 import type { BuiltModel } from '../build-model.js';
@@ -49,33 +51,33 @@ export const runPiAgentLoop: AgentLoopExecutor = async (input) => {
     : baseStreamFn;
 
   let completedTurns = 0;
-  const agentOptions: ConstructorParameters<typeof Agent>[0] = {
-    initialState: {
-      systemPrompt: input.systemPrompt,
-      model: input.modelInfo.model,
-      messages: input.history,
-      tools: input.tools,
-    },
+  const context: AgentContext = {
+    systemPrompt: input.systemPrompt,
+    messages: input.history,
+    tools: input.tools,
+  };
+  const config: AgentLoopConfig = {
+    model: input.modelInfo.model,
     beforeToolCall: input.hooks.beforeToolCall,
     afterToolCall: input.hooks.afterToolCall,
-    shouldStopAfterTurn: async (context: ShouldStopAfterTurnContext) => {
+    shouldStopAfterTurn: async (context) => {
       completedTurns += 1;
       const hookStop = await input.hooks.shouldStopAfterTurn?.(context);
       return Boolean(hookStop) || completedTurns >= input.maxTurns;
     },
     sessionId: input.sessionId,
-    streamFn: withStreamRetry(cachedStreamFn),
+    convertToLlm,
     ...(input.hooks.transformContext ? { transformContext: input.hooks.transformContext } : {}),
     ...(input.modelInfo.getApiKey ? { getApiKey: input.modelInfo.getApiKey } : {}),
   };
 
-  const agent = new Agent(agentOptions);
   let finalMessages: AgentMessage[] = [];
   let finalText = '';
   let finalUsage: unknown;
   let terminalError: Error | undefined;
+  const abortController = new AbortController();
 
-  const unsubscribe = agent.subscribe((event: AgentEvent) => {
+  const emit = (event: AgentEvent) => {
     if (event.type !== 'agent_end') return;
 
     finalMessages = event.messages;
@@ -86,22 +88,36 @@ export const runPiAgentLoop: AgentLoopExecutor = async (input) => {
       return;
     }
     finalText = extractAssistantText(finalMessages);
-  });
+  };
 
-  try {
-    await withTimeout(agent.prompt(input.userInput), input.timeoutMs, () => {
-      agent.abort();
-    });
-    if (terminalError) throw terminalError;
-    return {
-      text: finalText,
-      messages: finalMessages,
-      usage: finalUsage,
-    };
-  } finally {
-    unsubscribe();
-    agent.abort();
+  const returnedMessages = await withTimeout(
+    runAgentLoop(
+      [createUserMessage(input.userInput)],
+      context,
+      config,
+      emit,
+      abortController.signal,
+      withStreamRetry(cachedStreamFn),
+    ),
+    input.timeoutMs,
+    () => abortController.abort(),
+  );
+  if (finalMessages.length === 0) {
+    finalMessages = returnedMessages;
+    finalUsage = extractUsage(finalMessages) ?? extractLastCallUsage(finalMessages);
+    const errorReason = extractErrorStop(finalMessages);
+    if (errorReason) {
+      terminalError = new Error(`LLM call failed: ${errorReason}`);
+    } else {
+      finalText = extractAssistantText(finalMessages);
+    }
   }
+  if (terminalError) throw terminalError;
+  return {
+    text: finalText,
+    messages: finalMessages,
+    usage: finalUsage,
+  };
 };
 
 async function withTimeout<T>(
@@ -123,6 +139,14 @@ async function withTimeout<T>(
   } finally {
     if (timeout) clearTimeout(timeout);
   }
+}
+
+function createUserMessage(input: string): AgentMessage {
+  return {
+    role: 'user',
+    content: [{ type: 'text', text: input }],
+    timestamp: Date.now(),
+  } as AgentMessage;
 }
 
 function extractAssistantText(messages: AgentMessage[]): string {

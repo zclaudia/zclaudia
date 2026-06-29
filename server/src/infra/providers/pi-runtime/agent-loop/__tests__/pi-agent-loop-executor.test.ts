@@ -2,45 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentMessage, StreamFn } from '@earendil-works/pi-agent-core';
 
 const testState = vi.hoisted(() => ({
-  agentInstances: [] as Array<{
-    options: Record<string, unknown>;
-    abort: ReturnType<typeof vi.fn>;
-    emitEnd: (messages: AgentMessage[]) => void;
-  }>,
-  promptImpl: undefined as undefined | ((agent: {
-    options: Record<string, unknown>;
-    abort: ReturnType<typeof vi.fn>;
-    emitEnd: (messages: AgentMessage[]) => void;
-  }, input: string) => Promise<void>),
+  runAgentLoop: vi.fn(),
+  lastSignal: undefined as AbortSignal | undefined,
   withStreamRetry: vi.fn((streamFn: StreamFn) => streamFn),
 }));
 
 vi.mock('@earendil-works/pi-agent-core', () => ({
-  Agent: class FakeAgent {
-    private subscriber: ((event: { type: string; messages: AgentMessage[] }) => void) | undefined;
-    readonly abort = vi.fn();
-    readonly options: Record<string, unknown>;
-
-    constructor(options: Record<string, unknown>) {
-      this.options = options;
-      testState.agentInstances.push(this);
-    }
-
-    subscribe(callback: (event: { type: string; messages: AgentMessage[] }) => void) {
-      this.subscriber = callback;
-      return () => {
-        this.subscriber = undefined;
-      };
-    }
-
-    async prompt(input: string) {
-      await testState.promptImpl?.(this, input);
-    }
-
-    emitEnd(messages: AgentMessage[]) {
-      this.subscriber?.({ type: 'agent_end', messages });
-    }
-  },
+  convertToLlm: vi.fn((messages: AgentMessage[]) => messages),
+  runAgentLoop: testState.runAgentLoop,
 }));
 
 vi.mock('../../retry-stream.js', () => ({
@@ -55,8 +24,8 @@ import { AgentLoopTimeoutError, runPiAgentLoop } from '../pi-agent-loop-executor
 
 describe('runPiAgentLoop', () => {
   beforeEach(() => {
-    testState.agentInstances.length = 0;
-    testState.promptImpl = undefined;
+    testState.runAgentLoop.mockReset();
+    testState.lastSignal = undefined;
     testState.withStreamRetry.mockClear();
     vi.useFakeTimers();
   });
@@ -66,7 +35,10 @@ describe('runPiAgentLoop', () => {
   });
 
   it('aborts and throws AgentLoopTimeoutError when the loop times out', async () => {
-    testState.promptImpl = () => new Promise(() => {});
+    testState.runAgentLoop.mockImplementation((_prompts, _context, _config, _emit, signal) => {
+      testState.lastSignal = signal;
+      return new Promise(() => {});
+    });
 
     const runPromise = runPiAgentLoop({
       systemPrompt: 'system',
@@ -85,20 +57,22 @@ describe('runPiAgentLoop', () => {
     await vi.advanceTimersByTimeAsync(50);
 
     await rejection;
-    expect(testState.agentInstances[0]?.abort).toHaveBeenCalled();
+    expect(testState.lastSignal?.aborted).toBe(true);
   });
 
   it('stops at the maxTurns cap when shouldStopAfterTurn reaches the limit', async () => {
     const hookStop = vi.fn().mockResolvedValue(false);
     let stopResults: boolean[] = [];
-    testState.promptImpl = async (agent) => {
-      const shouldStopAfterTurn = agent.options.shouldStopAfterTurn as (context: unknown) => Promise<boolean>;
+    testState.runAgentLoop.mockImplementation(async (_prompts, _context, config, emit) => {
+      const shouldStopAfterTurn = config.shouldStopAfterTurn as (context: unknown) => Promise<boolean>;
       stopResults = [
         await shouldStopAfterTurn({ turn: 1 }),
         await shouldStopAfterTurn({ turn: 2 }),
       ];
-      agent.emitEnd([{ role: 'assistant', content: 'done' } as never]);
-    };
+      const messages = [{ role: 'assistant', content: 'done' } as never];
+      await emit({ type: 'agent_end', messages });
+      return messages;
+    });
 
     const result = await runPiAgentLoop({
       systemPrompt: 'system',
@@ -121,11 +95,12 @@ describe('runPiAgentLoop', () => {
   it('passes cacheRetention into the wrapped stream function', async () => {
     const baseStreamFn = vi.fn(() => ({ [Symbol.asyncIterator]: async function* () {} }) as never);
 
-    testState.promptImpl = async (agent) => {
-      const streamFn = agent.options.streamFn as StreamFn;
+    testState.runAgentLoop.mockImplementation(async (_prompts, _context, _config, emit, _signal, streamFn) => {
       streamFn({ id: 'model' } as never, { messages: [] } as never, { temperature: 0 } as never);
-      agent.emitEnd([{ role: 'assistant', content: 'done' } as never]);
-    };
+      const messages = [{ role: 'assistant', content: 'done' } as never];
+      await emit({ type: 'agent_end', messages });
+      return messages;
+    });
 
     await runPiAgentLoop({
       systemPrompt: 'system',
