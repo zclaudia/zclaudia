@@ -10,7 +10,9 @@ import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
 import { SidebarNav } from './SidebarNav';
-import { AutomationScopeList } from './AutomationScopeList';
+import { AutomationScopeDropdown } from './AutomationScopeDropdown';
+import { AutomationListPanel } from '../automation/AutomationListPanel';
+import { useAutomationApi } from '../automation/useAutomationApi';
 import type { AutomationTab } from '../automation/automation-types';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
 import { SidebarSearch } from './SidebarSearch';
@@ -20,7 +22,6 @@ import { BackendRow } from './BackendRow';
 import { useOnlineBackends } from './onlineBackends';
 import { useBackendConnectionLifecycle } from './useBackendConnectionLifecycle';
 import { useSidebarExpansionStore } from '../../stores/sidebarExpansionStore';
-import { useServerStore } from '../../stores/serverStore';
 import { NewProjectForm } from './NewProjectForm';
 import { SidebarFooter } from './SidebarFooter';
 import { useSidebarData } from './useSidebarData';
@@ -58,6 +59,7 @@ interface SidebarProps {
   automationMode?: {
     tab: AutomationTab;
     projectId?: string;
+    activeBackendId: string | null;
     onSelectTab: (tab: AutomationTab) => void;
     onBack: () => void;
     /** projectId omitted = scope to the whole backend (global). */
@@ -125,7 +127,6 @@ export function Sidebar({
   } = data;
 
   const onlineBackends = useOnlineBackends();
-  const activeServerId = useServerStore((s) => s.activeServerId);
   const expandedBackendIds = useSidebarExpansionStore((s) => s.expandedBackendIds);
   const toggleBackend = useSidebarExpansionStore((s) => s.toggleBackend);
   const expandBackend = useSidebarExpansionStore((s) => s.expandBackend);
@@ -247,6 +248,13 @@ export function Sidebar({
     }
   }, [agentLoaded, agentLoading, loadAllAgents]);
   const agents = Object.values(agentProfiles);
+
+  // --- Automation mode wiring ---
+  // Hook must run unconditionally; only consumed when automationMode is present.
+  const automationApi = useAutomationApi(automationMode?.activeBackendId ?? null, '', '');
+  const scopeLabel = automationMode?.projectId
+    ? (getProjectsForBackend(automationMode.activeBackendId ?? '').find(p => p.id === automationMode!.projectId)?.name ?? automationMode.projectId)
+    : 'All projects';
 
   const showAgentRequiredDialog = useCallback((reason: AgentReadinessReason | undefined) => {
     setAgentDialogReason(reason);
@@ -597,20 +605,29 @@ export function Sidebar({
               tab: automationMode.tab,
               onSelectTab: automationMode.onSelectTab,
               onBack: automationMode.onBack,
+              scopeSlot: (
+                <AutomationScopeDropdown
+                  label={scopeLabel}
+                  backends={onlineBackends}
+                  getProjectsForBackend={getProjectsForBackend}
+                  expandedBackendIds={expandedBackendIds}
+                  onToggleBackend={toggleBackend}
+                  activeBackendId={automationMode.activeBackendId}
+                  selectedProjectId={automationMode.projectId}
+                  onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
+                  onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
+                />
+              ),
             } : undefined}
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
             {automationMode ? (
-              <AutomationScopeList
-                backends={onlineBackends}
-                getProjectsForBackend={getProjectsForBackend}
-                expandedBackendIds={expandedBackendIds}
-                onToggleBackend={toggleBackend}
-                activeBackendId={activeServerId}
-                selectedProjectId={automationMode.projectId}
-                onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
-                onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
+              <AutomationListPanel
+                tab={automationMode.tab}
+                api={automationApi}
+                projects={getProjectsForBackend(automationMode.activeBackendId ?? '').map(p => ({ id: p.id, name: p.name }))}
+                projectId={automationMode.projectId}
               />
             ) : (
               renderProjectList()
@@ -695,20 +712,29 @@ export function Sidebar({
           tab: automationMode.tab,
           onSelectTab: automationMode.onSelectTab,
           onBack: automationMode.onBack,
+          scopeSlot: (
+            <AutomationScopeDropdown
+              label={scopeLabel}
+              backends={onlineBackends}
+              getProjectsForBackend={getProjectsForBackend}
+              expandedBackendIds={expandedBackendIds}
+              onToggleBackend={toggleBackend}
+              activeBackendId={automationMode.activeBackendId}
+              selectedProjectId={automationMode.projectId}
+              onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
+              onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
+            />
+          ),
         } : undefined}
       />
 
       <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
         {automationMode ? (
-          <AutomationScopeList
-            backends={onlineBackends}
-            getProjectsForBackend={getProjectsForBackend}
-            expandedBackendIds={expandedBackendIds}
-            onToggleBackend={toggleBackend}
-            activeBackendId={activeServerId}
-            selectedProjectId={automationMode.projectId}
-            onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
-            onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
+          <AutomationListPanel
+            tab={automationMode.tab}
+            api={automationApi}
+            projects={getProjectsForBackend(automationMode.activeBackendId ?? '').map(p => ({ id: p.id, name: p.name }))}
+            projectId={automationMode.projectId}
           />
         ) : (
           renderProjectList()

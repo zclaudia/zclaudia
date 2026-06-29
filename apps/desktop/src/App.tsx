@@ -165,6 +165,7 @@ function AppContent() {
     ? {
         tab: topLevelView.tab,
         projectId: topLevelView.projectId,
+        activeBackendId: activeServerId ?? localBackendId,
         onSelectTab: setAutomationTab,
         onBack: closeTopLevelView,
         onSelectScope: (backendId: string, projectId?: string) => {
