@@ -3,6 +3,7 @@ import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import type { AgentLoopRunnerPort } from '../../agent-loop/index.js';
 import type { StepContext, WorkflowAgentRuntimePort } from '../ports/step-executor.js';
 import { AIPromptStepExecutor } from '../step-executors/ai-prompt-executor.js';
+import { AIReviewStepExecutor } from '../step-executors/ai-review-executor.js';
 
 function makeNode(overrides: Partial<WorkflowNodeDef> = {}): WorkflowNodeDef {
   return {
@@ -239,5 +240,55 @@ describe('workflow agent-loop AI executors', () => {
         toolSessionId: 'run-1',
       },
     }));
+  });
+
+  it('runs ai_review through AgentLoopRunnerPort and returns structured review output', async () => {
+    const run = vi.fn(async () => ({
+      status: 'completed' as const,
+      output: {
+        reviewPassed: true,
+        reviewNotes: 'looks good',
+        findings: [],
+      },
+      contextId: 'ctx-review',
+    }));
+    const executor = new AIReviewStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+    );
+    const ctx = makeContext();
+
+    const result = await executor.execute(
+      makeNode({ id: 'review', name: 'Review', type: 'ai_review', timeoutMs: 2222 }),
+      {},
+      ctx,
+    );
+
+    expect(result).toEqual({
+      status: 'completed',
+      output: {
+        reviewPassed: true,
+        reviewNotes: 'looks good',
+        findings: [],
+        contextId: 'ctx-review',
+      },
+    });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_review',
+      llmProfileId: 'llm-1',
+      cwd: '/repo',
+      toolset: { id: 'code-review-readonly' },
+      context: { policy: 'workflow-artifacts', key: 'review' },
+      limits: { maxTurns: 8, timeoutMs: 2222 },
+      permissionMode: 'allow-declared-tools',
+      outputContract: expect.objectContaining({
+        type: 'json',
+        schema: expect.objectContaining({
+          required: ['reviewPassed', 'reviewNotes'],
+        }),
+      }),
+    }));
+    expect(run.mock.calls[0]?.[0].input).toContain('lint ok');
+    expect(ctx.setSessionId).not.toHaveBeenCalled();
   });
 });

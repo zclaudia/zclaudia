@@ -87,17 +87,15 @@ import {
   GitStepExecutor,
   PluginStepExecutor,
 } from '../step-executors/index.js';
-import { VirtualClientAIRunner } from '../step-executors/virtual-client-ai-runner.js';
 
 function createEngineWithDb(mockDb: any, mockBroadcast: ReturnType<typeof vi.fn>): WorkflowEngine {
-  const aiRunner = new VirtualClientAIRunner(mockDb, mockWorkflowAiRunPort as any);
   const composite = new CompositeStepExecutor();
   composite.register(new ShellStepExecutor());
   composite.register(new WebhookStepExecutor());
   composite.register(new NotifyStepExecutor());
   composite.register(new ConditionStepExecutor());
   composite.register(new AIPromptStepExecutor(mockAgentLoopRunner, mockAgentRuntime));
-  composite.register(new AIReviewStepExecutor(aiRunner));
+  composite.register(new AIReviewStepExecutor(mockAgentLoopRunner));
   composite.register(new GitStepExecutor());
   composite.registerPlugin(new PluginStepExecutor(mockWorkflowStepRegistry as any));
 
@@ -1417,23 +1415,33 @@ describe('WorkflowEngine', () => {
       // Re-create engine with mockDb
       const engineWithDb = createEngineWithDb(mockDb as any, mockBroadcast);
 
-      mockWorkflowAiRunPort.startVirtualRun.mockImplementation(({ onMessage }: any) => {
-        setTimeout(() => onMessage({ type: 'run_completed' }), 20);
+      mockAgentLoopRunner.run.mockResolvedValueOnce({
+        status: 'completed',
+        output: {
+          reviewPassed: true,
+          reviewNotes: 'Code looks good.',
+          findings: [],
+        },
+        contextId: 'ctx-review',
       });
 
       await engineWithDb.startRun('wf-review-pass', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(200);
 
       expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        sessionId: 'sess1',
-      }));
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
         status: 'completed',
         output: expect.objectContaining({
           reviewPassed: true,
-          sessionId: 'sess1',
+          reviewNotes: 'Code looks good.',
+          contextId: 'ctx-review',
         }),
       }));
+      expect(mockAgentLoopRunner.run).toHaveBeenCalledWith(expect.objectContaining({
+        purpose: 'workflow.ai_review',
+        toolset: { id: 'code-review-readonly' },
+        context: { policy: 'workflow-artifacts', key: 'n1' },
+      }));
+      expect(mockWorkflowAiRunPort.startVirtualRun).not.toHaveBeenCalled();
     });
   });
 
