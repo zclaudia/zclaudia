@@ -1,12 +1,14 @@
-import type { StepExecutorPort, StepResult, StepContext, AIRunnerPort } from '../ports/step-executor.js';
+import type { StepExecutorPort, StepResult, StepContext, AgentLoopRunnerPort } from '../ports/step-executor.js';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 
 const DEFAULT_STEP_TIMEOUT_MS = 10 * 60 * 1000;
+const DEFAULT_TOOLSET_ID = 'workflow-prompt-readonly';
+const DEFAULT_MAX_TURNS = 6;
 
 export class AIPromptStepExecutor implements StepExecutorPort {
   readonly supportedTypes = ['ai_prompt'] as const;
 
-  constructor(private aiRunner: AIRunnerPort) {}
+  constructor(private readonly agentLoopRunner: AgentLoopRunnerPort) {}
 
   async execute(
     node: WorkflowNodeDef,
@@ -19,22 +21,55 @@ export class AIPromptStepExecutor implements StepExecutorPort {
     const llmProfileId = (config.llmProfileId as string) ?? ctx.llmProfileId;
     if (!llmProfileId) return { status: 'failed', output: {}, error: 'No provider configured' };
 
-    const workingDirectory = (config.workingDirectory as string) ?? ctx.projectRootPath;
+    const cwd = (config.workingDirectory as string) ?? ctx.projectRootPath;
+    if (!cwd) return { status: 'failed', output: {}, error: 'No working directory configured' };
+
+    const toolsetId = typeof config.toolset === 'string' ? config.toolset : DEFAULT_TOOLSET_ID;
+    const maxTurns = typeof config.maxTurns === 'number' ? config.maxTurns : DEFAULT_MAX_TURNS;
 
     try {
-      const result = await this.aiRunner.runPrompt({
-        projectId: ctx.projectId,
+      const result = await this.agentLoopRunner.run({
+        owner: { type: 'workflow_run', id: ctx.runId },
+        purpose: 'workflow.ai_prompt',
         llmProfileId,
-        prompt,
-        workingDirectory,
-        sessionName: (config.sessionName as string) ?? `Workflow: ${node.name}`,
-        timeoutMs: node.timeoutMs ?? DEFAULT_STEP_TIMEOUT_MS,
-        onSessionCreated: (sessionId) => ctx.setSessionId(sessionId),
+        model: typeof config.model === 'string' ? config.model : undefined,
+        cwd,
+        systemPrompt: 'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
+        input: buildWorkflowPromptInput(prompt, ctx),
+        toolset: { id: toolsetId },
+        outputContract: {
+          type: 'json',
+          schema: {
+            type: 'object',
+            required: ['result'],
+            additionalProperties: false,
+            properties: {
+              result: { type: 'string' },
+            },
+          },
+        },
+        context: { policy: 'workflow-artifacts', key: node.id },
+        limits: {
+          maxTurns,
+          timeoutMs: node.timeoutMs ?? DEFAULT_STEP_TIMEOUT_MS,
+        },
+        permissionMode: toolsetId === 'none' ? 'deny-external' : 'allow-declared-tools',
       });
+
+      if (result.status !== 'completed') {
+        return {
+          status: 'failed',
+          output: {},
+          error: result.error ?? `AI prompt failed: ${result.status}`,
+        };
+      }
 
       return {
         status: 'completed',
-        output: { sessionId: result.sessionId, result: 'Prompt completed' },
+        output: {
+          result: String(result.output.result ?? ''),
+          contextId: result.contextId,
+        },
       };
     } catch (err) {
       return {
@@ -44,4 +79,16 @@ export class AIPromptStepExecutor implements StepExecutorPort {
       };
     }
   }
+}
+
+function buildWorkflowPromptInput(prompt: string, ctx: StepContext): string {
+  const artifacts = [...ctx.results.entries()]
+    .filter(([, result]) => result.status === 'completed')
+    .map(([stepId, result]) => `${stepId}: ${JSON.stringify(result.output)}`);
+
+  if (artifacts.length === 0) {
+    return prompt;
+  }
+
+  return `# Workflow Artifacts\n${artifacts.join('\n')}\n\n# Prompt\n${prompt}`;
 }

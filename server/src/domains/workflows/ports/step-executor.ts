@@ -6,6 +6,7 @@
  */
 
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
+export type { AgentLoopRunnerPort } from '../../agent-loop/index.js';
 
 export interface StepResult {
   status: 'completed' | 'failed' | 'skipped';

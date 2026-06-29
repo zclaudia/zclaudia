@@ -14,6 +14,7 @@ import { WorkflowGeneratorService } from './generator.js';
 import { createWorkflowRoutes } from './routes.js';
 import type { NotificationSender } from '../../infra/push/notification-sender.js';
 import type { WorkflowAiRunPort, WorkflowSchedulingPort } from './ports/runtime.js';
+import { LightweightAgentRunner } from '../../infra/providers/pi-runtime/agent-loop/index.js';
 
 import {
   CompositeStepExecutor,
@@ -73,13 +74,14 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
 
   // -- Assemble step executors --
   const aiRunner = new VirtualClientAIRunner(db, aiRunPort);
+  const agentLoopRunner = new LightweightAgentRunner({ db });
   const composite = new CompositeStepExecutor();
 
   composite.register(new ShellStepExecutor());
   composite.register(new WebhookStepExecutor());
   composite.register(new NotifyStepExecutor(notificationService));
   composite.register(new ConditionStepExecutor());
-  composite.register(new AIPromptStepExecutor(aiRunner));
+  composite.register(new AIPromptStepExecutor(agentLoopRunner));
   composite.register(new AIReviewStepExecutor(aiRunner));
   composite.register(new GitStepExecutor());
   composite.register(new TaskWorkflowStepExecutor(
