@@ -118,6 +118,7 @@ import {
   createWorkflowFromTemplate,
 } from '../../features/workflows/api';
 import { useServerStore } from '../../stores/serverStore';
+import { checkoutGitBranch, createGitBranch, deleteGitBranch } from '../api/git';
 
 let mockControlPlaneMode = 'embedded-local';
 
@@ -1423,6 +1424,40 @@ describe('api', () => {
           headers: expect.objectContaining({ Authorization: 'Bearer gw-token' }),
         })
       );
+    });
+  });
+
+  describe('git branch api', () => {
+    const okResponse = () =>
+      mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => Promise.resolve({ success: true }) });
+
+    it('checkoutGitBranch POSTs worktree + branch', async () => {
+      okResponse();
+      await checkoutGitBranch('project-1', '/wt', 'feature');
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(String(url)).toContain('/api/projects/project-1/git/checkout');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body as string)).toEqual({ worktree: '/wt', branch: 'feature' });
+    });
+
+    it('createGitBranch POSTs name with options', async () => {
+      okResponse();
+      await createGitBranch('project-1', '/wt', 'feature', { checkout: true, startPoint: 'main' });
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(String(url)).toContain('/api/projects/project-1/git/branch');
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body as string)).toMatchObject({
+        worktree: '/wt', name: 'feature', checkout: true, startPoint: 'main',
+      });
+    });
+
+    it('deleteGitBranch sends DELETE with force', async () => {
+      okResponse();
+      await deleteGitBranch('project-1', '/wt', 'feature', true);
+      const [url, init] = mockFetch.mock.calls[0];
+      expect(String(url)).toContain('/api/projects/project-1/git/branch');
+      expect(init.method).toBe('DELETE');
+      expect(JSON.parse(init.body as string)).toMatchObject({ worktree: '/wt', name: 'feature', force: true });
     });
   });
 

@@ -176,3 +176,38 @@ export async function pushGit(
     body: JSON.stringify({ worktree: worktreePath, force }),
   });
 }
+
+export async function checkoutGitBranch(
+  projectId: string,
+  worktreePath: string,
+  branch: string,
+): Promise<void> {
+  return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/checkout`, {
+    method: 'POST',
+    body: JSON.stringify({ worktree: worktreePath, branch }),
+  });
+}
+
+export async function createGitBranch(
+  projectId: string,
+  worktreePath: string,
+  name: string,
+  opts: { checkout?: boolean; startPoint?: string } = {},
+): Promise<void> {
+  return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/branch`, {
+    method: 'POST',
+    body: JSON.stringify({ worktree: worktreePath, name, checkout: opts.checkout, startPoint: opts.startPoint }),
+  });
+}
+
+export async function deleteGitBranch(
+  projectId: string,
+  worktreePath: string,
+  name: string,
+  force: boolean = false,
+): Promise<void> {
+  return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/branch`, {
+    method: 'DELETE',
+    body: JSON.stringify({ worktree: worktreePath, name, force }),
+  });
+}
