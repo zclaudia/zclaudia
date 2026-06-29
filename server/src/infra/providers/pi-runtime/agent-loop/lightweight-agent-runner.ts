@@ -1,6 +1,7 @@
 import type Database from 'better-sqlite3';
 import {
   AgentLoopContextRepository,
+  buildJsonContractPrompt,
   buildJsonRepairPrompt,
   parseJsonOutput,
   type AgentLoopEvent,
@@ -98,6 +99,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       });
 
       const renderedInput = renderInput(currentInput, resolvedContext.loadedEvents);
+      const contractedInput = buildJsonContractPrompt(renderedInput, outputContract);
       this.contextRepository.appendEvent({
         contextId: resolvedContext.contextId,
         kind: 'input',
@@ -115,8 +117,8 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         const agentResult = await this.executeAgentLoop({
           systemPrompt: request.systemPrompt,
           userInput: attempt === 0
-            ? renderedInput
-            : buildJsonRepairPrompt(latestText, [latestParseError]),
+            ? contractedInput
+            : buildJsonRepairPrompt(latestText, [latestParseError], outputContract),
           history: [],
           modelInfo,
           tools,

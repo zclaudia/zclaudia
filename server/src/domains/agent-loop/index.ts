@@ -21,6 +21,7 @@ export {
   type ResolvedAgentLoopContext,
 } from './context-repository.js';
 export {
+  buildJsonContractPrompt,
   buildJsonRepairPrompt,
   createObjectJsonContract,
   parseJsonOutput,

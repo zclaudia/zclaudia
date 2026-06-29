@@ -55,8 +55,11 @@ describe('LightweightAgentRunner', () => {
       output: { result: 'done' },
       usage: { output: 5 },
     });
+    const firstInput = (execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]?.userInput;
+    expect(firstInput).toContain('say done');
+    expect(firstInput).toContain('Required JSON Output');
+    expect(firstInput).toContain('"result"');
     expect(execute).toHaveBeenCalledWith(expect.objectContaining({
-      userInput: 'say done',
       maxTurns: 2,
       timeoutMs: 1_000,
     }));
@@ -139,6 +142,7 @@ describe('LightweightAgentRunner', () => {
     expect(result.usage).toEqual({ input: 8, output: 3 });
     expect(execute).toHaveBeenCalledTimes(2);
     expect(execute.mock.calls[1]?.[0]?.userInput).toContain('Return valid JSON only');
+    expect(execute.mock.calls[1]?.[0]?.userInput).toContain('"result"');
   });
 
   it('includes the specific schema validation error in the repair prompt', async () => {

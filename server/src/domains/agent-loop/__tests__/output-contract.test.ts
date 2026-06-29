@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildJsonContractPrompt,
   buildJsonRepairPrompt,
   createObjectJsonContract,
   parseJsonOutput,
@@ -34,7 +35,7 @@ describe('parseJsonOutput', () => {
     const parsed = parseJsonOutput('review passed', reviewContract);
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toContain('valid JSON object');
-    expect(buildJsonRepairPrompt('review passed', [parsed.error])).toContain('Return valid JSON only');
+    expect(buildJsonRepairPrompt('review passed', [parsed.error], reviewContract)).toContain('Return valid JSON only');
   });
 
   it('rejects missing required fields', () => {
@@ -47,6 +48,25 @@ describe('parseJsonOutput', () => {
     const parsed = parseJsonOutput('{"reviewPassed":true,"reviewNotes":"ok","decision":"maybe"}', reviewContract);
     expect(parsed.ok).toBe(false);
     expect(parsed.error).toContain('decision');
+  });
+});
+
+describe('buildJsonContractPrompt', () => {
+  it('shows the requested schema on the first model attempt', () => {
+    const prompt = buildJsonContractPrompt('Review the diff', reviewContract);
+
+    expect(prompt).toContain('Review the diff');
+    expect(prompt).toContain('Required JSON Output');
+    expect(prompt).toContain('"reviewPassed"');
+    expect(prompt).toContain('"reviewNotes"');
+  });
+
+  it('keeps the schema in repair prompts', () => {
+    const prompt = buildJsonRepairPrompt('review passed', ['$.reviewPassed is required'], reviewContract);
+
+    expect(prompt).toContain('"reviewPassed"');
+    expect(prompt).toContain('$.reviewPassed is required');
+    expect(prompt).toContain('Previous output:');
   });
 });
 

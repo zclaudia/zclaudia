@@ -49,13 +49,29 @@ export function parseJsonOutput(text: string, contract: JsonOutputContract): Par
   return { ok: true, output: parsed };
 }
 
-export function buildJsonRepairPrompt(previousOutput: string, errors: string[]): string {
+export function buildJsonContractPrompt(input: string, contract: JsonOutputContract): string {
   return [
-    'Return valid JSON only. Do not include Markdown fences or commentary.',
+    input,
+    buildJsonContractInstruction(contract),
+  ].filter(Boolean).join('\n\n');
+}
+
+export function buildJsonRepairPrompt(previousOutput: string, errors: string[], contract: JsonOutputContract): string {
+  return [
+    buildJsonContractInstruction(contract),
     `The previous output failed validation: ${errors.join('; ')}`,
     'Previous output:',
     previousOutput,
   ].join('\n\n');
+}
+
+function buildJsonContractInstruction(contract: JsonOutputContract): string {
+  return [
+    '# Required JSON Output',
+    'Return valid JSON only. Do not include Markdown fences or commentary.',
+    'The JSON object must satisfy this schema:',
+    JSON.stringify(contract.schema, null, 2),
+  ].join('\n');
 }
 
 function extractJsonObject(text: string): string | undefined {
