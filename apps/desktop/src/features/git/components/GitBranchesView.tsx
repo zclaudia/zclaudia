@@ -168,10 +168,10 @@ function BranchSection({
   if (branches.length === 0) return null;
   return (
     <div>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">
-        {title} ({branches.length})
+      <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground mb-1">
+        {title} <span className="text-muted-foreground">({branches.length})</span>
       </div>
-      <div className="bg-card border border-border rounded divide-y divide-border">
+      <div className="bg-secondary/30 border border-border rounded-lg divide-y divide-border overflow-hidden">
         {branches.map((b) => (
           <div key={b.name} className="flex items-center justify-between px-2 py-1.5 group">
             <button

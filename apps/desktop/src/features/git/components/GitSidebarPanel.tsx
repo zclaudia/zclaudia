@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { GitBranch as BranchIcon } from 'lucide-react';
+import { GitBranch as BranchIcon, ChevronDown } from 'lucide-react';
 import * as api from '../../../services/api';
 import { useGitStore } from '../store';
 import { resolveEffectiveWorktree } from '../resolveWorktree';
@@ -77,17 +77,20 @@ export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: Gi
         <div className="flex items-center gap-2">
           <BranchIcon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
           {worktrees.length > 1 ? (
-            <select
-              value={effectivePath}
-              onChange={(e) => setOverride(e.target.value)}
-              className="min-w-0 flex-1 bg-background border border-border rounded px-1.5 py-1 text-xs"
-            >
-              {worktrees.map((w) => (
-                <option key={w.path} value={w.path}>
-                  {w.branch}{w.isMain ? ' (main)' : ''}
-                </option>
-              ))}
-            </select>
+            <div className="relative min-w-0 flex-1">
+              <select
+                value={effectivePath}
+                onChange={(e) => setOverride(e.target.value)}
+                className="w-full appearance-none bg-background border border-border rounded-lg pl-2 pr-7 py-1 text-xs cursor-pointer outline-none transition-colors hover:bg-secondary focus:border-primary"
+              >
+                {worktrees.map((w) => (
+                  <option key={w.path} value={w.path}>
+                    {w.branch}{w.isMain ? ' (main)' : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            </div>
           ) : (
             <span className="text-sm font-semibold truncate">{currentBranch ?? 'git'}</span>
           )}

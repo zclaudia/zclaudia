@@ -162,17 +162,23 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
           onChange={(e) => setMessage(e.target.value)}
           placeholder="Commit message…"
           rows={2}
-          className="w-full text-xs px-2 py-1.5 rounded bg-background border border-border focus:border-primary outline-none resize-none"
+          className="w-full text-xs px-2 py-1.5 rounded-lg bg-background border border-border focus:border-primary outline-none resize-none"
         />
         <button
           type="button"
           onClick={commit}
           disabled={committing || !message.trim() || !status || status.staged.length === 0}
-          className="w-full text-xs py-1.5 rounded bg-muted/60 text-foreground disabled:opacity-50 hover:opacity-90 flex items-center justify-center gap-1.5"
+          className="w-full text-xs py-1.5 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
           title={status && status.staged.length === 0 ? 'Stage files first' : 'git commit -m'}
         >
           <Check className="w-3 h-3" />
-          {committing ? 'Committing…' : 'Commit Staged'}
+          {committing
+            ? 'Committing…'
+            : !status || status.staged.length === 0
+              ? 'Stage files to commit'
+              : !message.trim()
+                ? 'Enter a commit message'
+                : 'Commit Staged'}
         </button>
       </div>
     </div>
@@ -205,8 +211,8 @@ function FileSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-          {title} ({files.length})
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+          {title} <span className="text-muted-foreground">({files.length})</span>
         </span>
         {onAll && (
           <button
@@ -218,7 +224,7 @@ function FileSection({
           </button>
         )}
       </div>
-      <div className="bg-card border border-border rounded divide-y divide-border">
+      <div className="bg-secondary/30 border border-border rounded-lg divide-y divide-border overflow-hidden">
         {files.map((file) => {
           const key = `${diffKind}:${file}`;
           const isExpanded = expandedDiff?.file === file && expandedDiff.kind === diffKind;
