@@ -76,7 +76,7 @@ export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: Ri
   };
 
   return (
-    <div className="h-full overflow-y-auto p-3">
+    <div className="h-full overflow-y-auto p-3 flex flex-col">
       {showStatus && (
         <div className="flex items-center gap-2 mb-3 px-2.5 py-1.5 rounded-md bg-secondary text-xs text-muted-foreground">
           {branch && (
@@ -94,7 +94,11 @@ export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: Ri
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex-1 flex flex-col items-center justify-center gap-1.5">
+        <div className="mb-2 text-center px-2">
+          <p className="text-sm font-medium text-foreground">Open a tool</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Pick a tool below to open it in the workspace</p>
+        </div>
         {orderedTiles.map((tile) => {
           const Icon = TOOL_ICONS[tile.iconKey];
           const subtitle = subtitleFor(tile);
@@ -102,16 +106,12 @@ export function RightSidebarEmptyState({ sessionId, projectId, projectRoot }: Ri
             <button
               key={tile.id}
               onClick={() => openToolInWorkspace(sessionId, tile.id, { projectId, backendId })}
-              className="flex items-center gap-2.5 px-2.5 py-2 rounded-md border border-border text-left hover:bg-secondary"
+              title={subtitle ?? undefined}
+              className="flex items-center justify-center gap-1.5 w-full max-w-[220px] px-2.5 py-1.5 rounded-md border border-border hover:bg-secondary"
             >
-              {Icon && <Icon className="w-4 h-4 text-muted-foreground flex-shrink-0" />}
-              <span className="min-w-0">
-                <span data-testid="empty-tile-label" className="block text-[13px] font-medium text-foreground truncate">
-                  {tile.label}
-                </span>
-                {subtitle && (
-                  <span className="block text-[11px] text-muted-foreground truncate">{subtitle}</span>
-                )}
+              {Icon && <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />}
+              <span data-testid="empty-tile-label" className="text-xs font-medium text-foreground truncate">
+                {tile.label}
               </span>
             </button>
           );

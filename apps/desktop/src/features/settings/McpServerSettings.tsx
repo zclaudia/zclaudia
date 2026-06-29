@@ -421,7 +421,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
 
         <div className="space-y-2">
           <div>
-            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tools</div>
+            <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">Tools</div>
             {tools.length === 0 ? (
               <p className="rounded-md bg-secondary/30 px-2 py-1 text-xs text-muted-foreground">No tools match.</p>
             ) : tools.map((tool) => (
@@ -459,7 +459,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
           </div>
 
           <div>
-            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Resources</div>
+            <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">Resources</div>
             {resources.length === 0 ? (
               <p className="rounded-md bg-secondary/30 px-2 py-1 text-xs text-muted-foreground">No resources match.</p>
             ) : resources.map((resource) => (
@@ -473,7 +473,7 @@ export function McpServerSettings({ readOnly = false }: { readOnly?: boolean }) 
           </div>
 
           <div>
-            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Prompts</div>
+            <div className="mb-1 text-[10px] font-semibold tracking-wide text-muted-foreground">Prompts</div>
             {prompts.length === 0 ? (
               <p className="rounded-md bg-secondary/30 px-2 py-1 text-xs text-muted-foreground">No prompts match.</p>
             ) : prompts.map((prompt) => (

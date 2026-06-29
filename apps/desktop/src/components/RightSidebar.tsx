@@ -151,8 +151,10 @@ export function RightSidebar({ sessionId, projectId, projectRoot, workingDirecto
         {root != null ? (
           <WorkspaceView sessionId={sessionId} projectId={projectId} projectRoot={projectRoot} workingDirectory={workingDirectory} />
         ) : (
-          <div className="absolute inset-0">
-            <RightSidebarEmptyState sessionId={sessionId} projectId={projectId} projectRoot={projectRoot} />
+          <div className="absolute inset-0 flex min-w-0 min-h-0 p-1.5">
+            <div className="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden rounded-lg border border-border/50 bg-card shadow-sm">
+              <RightSidebarEmptyState sessionId={sessionId} projectId={projectId} projectRoot={projectRoot} />
+            </div>
           </div>
         )}
       </div>

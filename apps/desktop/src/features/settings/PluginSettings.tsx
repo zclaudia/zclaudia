@@ -180,7 +180,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
       {/* Built-in Plugins */}
       {builtinPanels.length > 0 && (
         <div>
-          <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-medium text-muted-foreground tracking-wider mb-2">
             Built-in ({builtinPanels.length})
           </h4>
           <div className="space-y-2">
@@ -222,7 +222,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
           {/* Active Plugins */}
           {activePlugins.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+              <h4 className="text-xs font-medium text-muted-foreground tracking-wider mb-2">
                 Active ({activePlugins.length})
               </h4>
               <div className="space-y-2">
@@ -243,7 +243,7 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
           {/* Inactive Plugins */}
           {inactivePlugins.length > 0 && (
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+              <h4 className="text-xs font-medium text-muted-foreground tracking-wider mb-2">
                 Inactive ({inactivePlugins.length})
               </h4>
               <div className="space-y-2">
@@ -530,7 +530,7 @@ function PluginDirsManager() {
     <div>
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground tracking-wider mb-2 hover:text-foreground transition-colors"
       >
         <svg
           className={`w-3 h-3 transition-transform ${collapsed ? '' : 'rotate-90'}`}
@@ -538,7 +538,7 @@ function PluginDirsManager() {
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        Plugin Directories ({allDirs.length})
+        Plugin directories ({allDirs.length})
       </button>
 
       {!collapsed && (

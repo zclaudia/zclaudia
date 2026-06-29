@@ -20,7 +20,7 @@ export async function ensureServerConnection(page: Page): Promise<boolean> {
   const connectionStatus = page.locator('[data-testid="connection-status"]').first();
   const statusText = await connectionStatus.textContent().catch(() => '');
 
-  if (statusText.toLowerCase().includes('connected')) {
+  if (statusText?.toLowerCase().includes('connected')) {
     return true;
   }
 
@@ -43,7 +43,7 @@ export async function ensureServerConnection(page: Page): Promise<boolean> {
 
       // Verify connection
       const newStatus = await connectionStatus.textContent().catch(() => '');
-      return newStatus.toLowerCase().includes('connected');
+      return (newStatus ?? '').toLowerCase().includes('connected');
     }
   }
 
@@ -73,7 +73,7 @@ export async function ensureServerConnection(page: Page): Promise<boolean> {
 
         // Verify connection
         const newStatus = await connectionStatus.textContent().catch(() => '');
-        return newStatus.toLowerCase().includes('connected');
+        return (newStatus ?? '').toLowerCase().includes('connected');
       }
     }
   }
