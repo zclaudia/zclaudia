@@ -16,7 +16,7 @@ export interface AgentLoopToolsetDescriptor {
   sandboxReadOnly: boolean;
 }
 
-export const BUILTIN_AGENT_LOOP_TOOLSETS: Record<string, AgentLoopToolsetDescriptor> = {
+const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, AgentLoopToolsetDescriptor> = {
   none: {
     id: 'none',
     tools: [],
@@ -43,8 +43,24 @@ export const BUILTIN_AGENT_LOOP_TOOLSETS: Record<string, AgentLoopToolsetDescrip
   },
 };
 
+function freezeBuiltinToolsetDescriptor(descriptor: AgentLoopToolsetDescriptor): AgentLoopToolsetDescriptor {
+  return Object.freeze({
+    ...descriptor,
+    tools: Object.freeze([...descriptor.tools]),
+  });
+}
+
+export const BUILTIN_AGENT_LOOP_TOOLSETS: Readonly<Record<string, AgentLoopToolsetDescriptor>> = Object.freeze(
+  Object.fromEntries(
+    Object.entries(BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS).map(([id, descriptor]) => [
+      id,
+      freezeBuiltinToolsetDescriptor(descriptor),
+    ]),
+  ),
+);
+
 export function getAgentLoopToolsetDescriptor(id: string): AgentLoopToolsetDescriptor | undefined {
-  return BUILTIN_AGENT_LOOP_TOOLSETS[id];
+  return BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS[id];
 }
 
 export function buildAgentLoopTools(args: {
