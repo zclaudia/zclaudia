@@ -58,6 +58,9 @@ const mockWorkflowAiRunPort = {
 const mockAgentLoopRunner = {
   run: vi.fn(),
 };
+const mockAgentRuntime = {
+  resolve: vi.fn(),
+};
 
 // Use vi.hoisted to make mockExecFileAsync available in the hoisted vi.mock
 const { mockExecFileAsync } = vi.hoisted(() => ({
@@ -93,7 +96,7 @@ function createEngineWithDb(mockDb: any, mockBroadcast: ReturnType<typeof vi.fn>
   composite.register(new WebhookStepExecutor());
   composite.register(new NotifyStepExecutor());
   composite.register(new ConditionStepExecutor());
-  composite.register(new AIPromptStepExecutor(mockAgentLoopRunner));
+  composite.register(new AIPromptStepExecutor(mockAgentLoopRunner, mockAgentRuntime));
   composite.register(new AIReviewStepExecutor(aiRunner));
   composite.register(new GitStepExecutor());
   composite.registerPlugin(new PluginStepExecutor(mockWorkflowStepRegistry as any));
@@ -139,6 +142,12 @@ describe('WorkflowEngine', () => {
     mockSessionRepo.create.mockReturnValue({ id: 'sess1' });
     mockWorkflowAiRunPort.startVirtualRun.mockReset();
     mockAgentLoopRunner.run.mockReset();
+    mockAgentRuntime.resolve.mockReset();
+    mockAgentRuntime.resolve.mockResolvedValue({
+      llmProfileId: 'runtime-llm',
+      model: 'runtime-model',
+      systemPrompt: 'runtime system prompt',
+    });
     mockAgentLoopRunner.run.mockResolvedValue({
       status: 'completed',
       output: { result: 'Prompt completed' },

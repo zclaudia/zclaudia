@@ -5,6 +5,7 @@ export { NotifyStepExecutor } from './notify-executor.js';
 export { ConditionStepExecutor } from './condition-executor.js';
 export { WaitStepExecutor } from './wait-executor.js';
 export { AIPromptStepExecutor } from './ai-prompt-executor.js';
+export { DefaultWorkflowAgentRuntimeResolver } from './workflow-agent-runtime-resolver.js';
 export { AIReviewStepExecutor } from './ai-review-executor.js';
 export { GitStepExecutor } from './git-executor.js';
 export { PluginStepExecutor } from './plugin-executor.js';

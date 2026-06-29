@@ -1,4 +1,10 @@
-import type { StepExecutorPort, StepResult, StepContext, AgentLoopRunnerPort } from '../ports/step-executor.js';
+import type {
+  StepExecutorPort,
+  StepResult,
+  StepContext,
+  AgentLoopRunnerPort,
+  WorkflowAgentRuntimePort,
+} from '../ports/step-executor.js';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import { getAgentLoopToolsetDescriptor } from '../../../infra/providers/pi-runtime/agent-loop/index.js';
 
@@ -9,7 +15,10 @@ const DEFAULT_MAX_TURNS = 6;
 export class AIPromptStepExecutor implements StepExecutorPort {
   readonly supportedTypes = ['ai_prompt'] as const;
 
-  constructor(private readonly agentLoopRunner: AgentLoopRunnerPort) {}
+  constructor(
+    private readonly agentLoopRunner: AgentLoopRunnerPort,
+    private readonly agentRuntime: WorkflowAgentRuntimePort,
+  ) {}
 
   async execute(
     node: WorkflowNodeDef,
@@ -32,13 +41,24 @@ export class AIPromptStepExecutor implements StepExecutorPort {
     const maxTurns = typeof config.maxTurns === 'number' ? config.maxTurns : DEFAULT_MAX_TURNS;
 
     try {
+      const runtime = await this.agentRuntime.resolve({
+        purpose: 'workflow.ai_prompt',
+        runId: ctx.runId,
+        projectId: ctx.projectId,
+        projectRootPath: ctx.projectRootPath,
+        cwd,
+        llmProfileId,
+        model: typeof config.model === 'string' ? config.model : undefined,
+        baseSystemPrompt: typeof config.systemPrompt === 'string' ? config.systemPrompt : undefined,
+        systemContext: 'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
+      });
       const result = await this.agentLoopRunner.run({
         owner: { type: 'workflow_run', id: ctx.runId },
         purpose: 'workflow.ai_prompt',
-        llmProfileId,
-        model: typeof config.model === 'string' ? config.model : undefined,
+        llmProfileId: runtime.llmProfileId,
+        model: runtime.model,
         cwd,
-        systemPrompt: 'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
+        systemPrompt: runtime.systemPrompt,
         input: buildWorkflowPromptInput(prompt, ctx),
         toolset: { id: toolsetId },
         outputContract: {

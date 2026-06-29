@@ -52,6 +52,28 @@ export interface AIRunnerPort {
   }): Promise<{ sessionId: string; content: string }>;
 }
 
+export interface WorkflowAgentRuntimeRequest {
+  purpose: string;
+  runId: string;
+  projectId?: string;
+  projectRootPath?: string;
+  cwd: string;
+  llmProfileId?: string;
+  model?: string;
+  baseSystemPrompt?: string;
+  systemContext?: string;
+}
+
+export interface WorkflowAgentRuntime {
+  llmProfileId: string;
+  model?: string;
+  systemPrompt: string;
+}
+
+export interface WorkflowAgentRuntimePort {
+  resolve(request: WorkflowAgentRuntimeRequest): Promise<WorkflowAgentRuntime>;
+}
+
 export interface NotificationPort {
   notify(event: {
     type: string;

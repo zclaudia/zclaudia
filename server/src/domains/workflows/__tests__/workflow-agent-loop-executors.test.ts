@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import type { AgentLoopRunnerPort } from '../../agent-loop/index.js';
-import type { StepContext } from '../ports/step-executor.js';
+import type { StepContext, WorkflowAgentRuntimePort } from '../ports/step-executor.js';
 import { AIPromptStepExecutor } from '../step-executors/ai-prompt-executor.js';
 
 function makeNode(overrides: Partial<WorkflowNodeDef> = {}): WorkflowNodeDef {
@@ -32,6 +32,19 @@ function makeContext(overrides: Partial<StepContext> = {}): StepContext {
   };
 }
 
+function makeRuntimeResolver(
+  overrides: Partial<Awaited<ReturnType<WorkflowAgentRuntimePort['resolve']>>> = {},
+): WorkflowAgentRuntimePort {
+  return {
+    resolve: vi.fn(async () => ({
+      llmProfileId: 'runtime-llm',
+      model: 'runtime-model',
+      systemPrompt: 'runtime system prompt',
+      ...overrides,
+    })),
+  };
+}
+
 describe('workflow agent-loop AI executors', () => {
   it('runs ai_prompt through AgentLoopRunnerPort with workflow artifacts context', async () => {
     const run = vi.fn(async () => ({
@@ -39,7 +52,11 @@ describe('workflow agent-loop AI executors', () => {
       output: { result: 'analysis complete' },
       contextId: 'ctx-1',
     }));
-    const executor = new AIPromptStepExecutor({ run } as unknown as AgentLoopRunnerPort);
+    const runtimeResolver = makeRuntimeResolver();
+    const executor = new AIPromptStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+      runtimeResolver,
+    );
     const ctx = makeContext();
 
     const result = await executor.execute(
@@ -55,10 +72,10 @@ describe('workflow agent-loop AI executors', () => {
     expect(run).toHaveBeenCalledWith({
       owner: { type: 'workflow_run', id: 'run-1' },
       purpose: 'workflow.ai_prompt',
-      llmProfileId: 'llm-1',
-      model: undefined,
+      llmProfileId: 'runtime-llm',
+      model: 'runtime-model',
       cwd: '/repo',
-      systemPrompt: expect.any(String),
+      systemPrompt: 'runtime system prompt',
       input: expect.stringContaining('Analyze ${lint.output.stdout}'),
       toolset: { id: 'workflow-prompt' },
       outputContract: {
@@ -79,6 +96,17 @@ describe('workflow agent-loop AI executors', () => {
     });
     expect(run.mock.calls[0]?.[0].input).toContain('lint ok');
     expect(run.mock.calls[0]?.[0].input).toContain('Analyze ${lint.output.stdout}');
+    expect(runtimeResolver.resolve).toHaveBeenCalledWith({
+      purpose: 'workflow.ai_prompt',
+      runId: 'run-1',
+      projectId: 'project-1',
+      projectRootPath: '/repo',
+      cwd: '/repo',
+      llmProfileId: 'llm-1',
+      model: undefined,
+      baseSystemPrompt: undefined,
+      systemContext: 'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
+    });
     expect(ctx.resolveTemplate).not.toHaveBeenCalled();
     expect(ctx.setSessionId).not.toHaveBeenCalled();
   });
@@ -90,7 +118,10 @@ describe('workflow agent-loop AI executors', () => {
       error: 'schema mismatch',
       contextId: 'ctx-2',
     }));
-    const executor = new AIPromptStepExecutor({ run } as unknown as AgentLoopRunnerPort);
+    const executor = new AIPromptStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+      makeRuntimeResolver(),
+    );
     const ctx = makeContext();
 
     const result = await executor.execute(
@@ -113,7 +144,10 @@ describe('workflow agent-loop AI executors', () => {
       output: { result: 'no tools used' },
       contextId: 'ctx-3',
     }));
-    const executor = new AIPromptStepExecutor({ run } as unknown as AgentLoopRunnerPort);
+    const executor = new AIPromptStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+      makeRuntimeResolver(),
+    );
 
     await executor.execute(
       makeNode({ id: 'prompt-none', timeoutMs: 4321 }),
@@ -135,7 +169,10 @@ describe('workflow agent-loop AI executors', () => {
       output: { result: 'readonly complete' },
       contextId: 'ctx-4',
     }));
-    const executor = new AIPromptStepExecutor({ run } as unknown as AgentLoopRunnerPort);
+    const executor = new AIPromptStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+      makeRuntimeResolver(),
+    );
 
     await executor.execute(
       makeNode({ id: 'prompt-readonly' }),

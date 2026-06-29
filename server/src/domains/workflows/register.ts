@@ -24,6 +24,7 @@ import {
   ConditionStepExecutor,
   WaitStepExecutor,
   AIPromptStepExecutor,
+  DefaultWorkflowAgentRuntimeResolver,
   AIReviewStepExecutor,
   GitStepExecutor,
   PluginStepExecutor,
@@ -75,13 +76,14 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
   // -- Assemble step executors --
   const aiRunner = new VirtualClientAIRunner(db, aiRunPort);
   const agentLoopRunner = new LightweightAgentRunner({ db });
+  const agentRuntime = new DefaultWorkflowAgentRuntimeResolver(db);
   const composite = new CompositeStepExecutor();
 
   composite.register(new ShellStepExecutor());
   composite.register(new WebhookStepExecutor());
   composite.register(new NotifyStepExecutor(notificationService));
   composite.register(new ConditionStepExecutor());
-  composite.register(new AIPromptStepExecutor(agentLoopRunner));
+  composite.register(new AIPromptStepExecutor(agentLoopRunner, agentRuntime));
   composite.register(new AIReviewStepExecutor(aiRunner));
   composite.register(new GitStepExecutor());
   composite.register(new TaskWorkflowStepExecutor(
