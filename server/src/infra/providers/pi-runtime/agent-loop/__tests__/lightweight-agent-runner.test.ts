@@ -68,6 +68,45 @@ describe('LightweightAgentRunner', () => {
     ]);
   });
 
+  it('uses the first LLM profile model when request.model is omitted', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async () => ({
+      text: '{"result":"done"}',
+      messages: [],
+    }));
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    expect(result.status).toBe('completed');
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({
+      modelInfo: expect.objectContaining({
+        model: expect.objectContaining({
+          id: 'gpt-4o',
+          input: ['text', 'image'],
+        }),
+      }),
+    }));
+  });
+
   it('uses one repair attempt for invalid JSON output', async () => {
     const execute = vi.fn()
       .mockResolvedValueOnce({ text: 'not json', messages: [], usage: { input: 3, output: 1 } })

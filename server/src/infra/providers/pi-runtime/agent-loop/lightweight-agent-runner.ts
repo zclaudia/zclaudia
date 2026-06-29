@@ -11,6 +11,7 @@ import {
   type LightweightAgentRunResult,
 } from '../../../../domains/agent-loop/index.js';
 import { LlmProfileRepository } from '../../../../domains/llm-profiles/repository.js';
+import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import { buildAgentHooks } from '../agent-hooks.js';
 import { buildModel } from '../build-model.js';
 import { AgentLoopTimeoutError, runPiAgentLoop, type AgentLoopExecutor } from './pi-agent-loop-executor.js';
@@ -66,10 +67,11 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         throw new Error('No LLM profile configured for lightweight agent run');
       }
 
-      const modelEntry = request.model
-        ? llmProfile.models?.find((entry) => entry.modelId === request.model)
+      const modelOverride = resolveModelOverride(llmProfile, request.model);
+      const modelEntry = modelOverride
+        ? llmProfile.models?.find((entry) => entry.modelId === modelOverride)
         : undefined;
-      const modelInfo = buildModel(llmProfile, request.model, modelEntry);
+      const modelInfo = buildModel(llmProfile, modelOverride, modelEntry);
       const tools = buildAgentLoopTools({
         cwd: request.cwd,
         toolsetId: request.toolset.id,
@@ -216,6 +218,14 @@ function validateInput(input: unknown): string {
   }
 
   throw new Error('Structured agent messages are not supported by LightweightAgentRunner; pass a plain string input.');
+}
+
+function resolveModelOverride(profile: LlmProfileConfig, requestModel: string | undefined): string | undefined {
+  if (requestModel) {
+    return requestModel;
+  }
+
+  return profile.models?.[0]?.modelId;
 }
 
 function validateJsonOutputContract(contract: unknown): JsonOutputContract {
