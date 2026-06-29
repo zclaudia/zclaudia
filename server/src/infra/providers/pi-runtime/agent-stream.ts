@@ -1,5 +1,5 @@
 import { streamSimple } from '@earendil-works/pi-ai';
-import { Agent, type AgentEvent, type AgentMessage, type AgentTool, type StreamFn } from '@earendil-works/pi-agent-core';
+import { Agent, convertToLlm, type AgentEvent, type AgentMessage, type AgentTool, type StreamFn } from '@earendil-works/pi-agent-core';
 import type { ProviderRuntimeEvent, RunOptions } from '../types.js';
 import { CodexOAuthError } from '../../../domains/llm-profiles/codex-oauth-errors.js';
 import type { AgentHooksOutput } from './agent-hooks.js';
@@ -61,6 +61,15 @@ export async function* runPiAgentStream(input: {
     // pi-ai uses this for session-scoped cache routing on providers that
     // support it; the zclaudia session id is stable across runs.
     sessionId: options.claudiaSessionId ?? sessionId,
+    // Use pi's harness converter, NOT the Agent's `defaultConvertToLlm`. The
+    // default merely FILTERS to user/assistant/toolResult and silently DROPS
+    // `compactionSummary` / `branchSummary` messages — so after any compaction
+    // the post-cut summary built by buildContext() never reaches the provider
+    // and the model loses all pre-compaction memory (looks like total amnesia).
+    // The harness converter renders those summary messages into a `user` turn
+    // (COMPACTION_SUMMARY_PREFIX + summary). See agent.js `defaultConvertToLlm`
+    // vs harness/messages.js `convertToLlm`.
+    convertToLlm,
   };
   if (modelInfo.getApiKey) agentOpts.getApiKey = modelInfo.getApiKey;
   if (hooks.transformContext) agentOpts.transformContext = hooks.transformContext;
