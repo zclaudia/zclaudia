@@ -20,8 +20,7 @@ export type AgentLoopContextPolicy =
 
 export type AgentLoopPermissionMode =
   | 'deny-external'
-  | 'allow-declared-tools'
-  | 'custom';
+  | 'allow-declared-tools';
 
 export type AgentLoopRunStatus =
   | 'completed'
@@ -90,7 +89,7 @@ export interface LightweightAgentRunRequest {
   systemPrompt: string;
   input: string;
   toolset: AgentLoopToolsetRequest;
-  outputContract: OutputContract;
+  outputContract: JsonOutputContract;
   context: {
     policy: AgentLoopContextPolicy;
     key?: string;

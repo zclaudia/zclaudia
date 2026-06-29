@@ -4,7 +4,9 @@ import {
   buildJsonRepairPrompt,
   parseJsonOutput,
   type AgentLoopEvent,
+  type AgentLoopPermissionMode,
   type AgentLoopRunnerPort,
+  type JsonOutputContract,
   type LightweightAgentRunRequest,
   type LightweightAgentRunResult,
 } from '../../../../domains/agent-loop/index.js';
@@ -43,10 +45,8 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
 
     try {
       const currentInput = validateInput(request.input);
-
-      if (request.outputContract.type !== 'json') {
-        throw new Error(`Unsupported lightweight agent output contract: ${request.outputContract.type}`);
-      }
+      const outputContract = validateJsonOutputContract(request.outputContract);
+      const permissionMode = validatePermissionMode(request.permissionMode);
 
       const descriptor = getAgentLoopToolsetDescriptor(request.toolset.id);
       if (!descriptor) {
@@ -72,7 +72,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       });
       const hooks = buildAgentHooks({
         permissionCallback: async (permissionRequest) => {
-          if (request.permissionMode === 'deny-external') {
+          if (permissionMode === 'deny-external') {
             return { behavior: 'deny', message: 'Lightweight agent run does not allow external tools' } as const;
           }
 
@@ -95,13 +95,13 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         kind: 'input',
         payload: {
           purpose: request.purpose,
-          input: renderedInput,
+          input: currentInput,
         },
       });
 
       let latestText = '';
       let latestParseError = 'JSON contract failed';
-      const maxAttempts = (request.outputContract.repairAttempts ?? 0) + 1;
+      const maxAttempts = (outputContract.repairAttempts ?? 0) + 1;
 
       for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
         const agentResult = await this.executeAgentLoop({
@@ -126,7 +126,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
           payload: { text: latestText },
         });
 
-        const parsed = parseJsonOutput(latestText, request.outputContract);
+        const parsed = parseJsonOutput(latestText, outputContract);
         if (parsed.ok) {
           this.contextRepository.appendEvent({
             contextId: resolvedContext.contextId,
@@ -207,4 +207,26 @@ function validateInput(input: unknown): string {
   }
 
   throw new Error('Structured agent messages are not supported by LightweightAgentRunner; pass a plain string input.');
+}
+
+function validateJsonOutputContract(contract: unknown): JsonOutputContract {
+  if (isRecord(contract) && contract.type === 'json') {
+    return contract as JsonOutputContract;
+  }
+
+  const type = isRecord(contract) && typeof contract.type === 'string' ? contract.type : 'unknown';
+  throw new Error(`Unsupported lightweight agent output contract: ${type}`);
+}
+
+function validatePermissionMode(mode: unknown): AgentLoopPermissionMode {
+  if (mode === 'deny-external' || mode === 'allow-declared-tools') {
+    return mode;
+  }
+
+  const rendered = typeof mode === 'string' ? mode : 'unknown';
+  throw new Error(`Unsupported lightweight agent permission mode: ${rendered}`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

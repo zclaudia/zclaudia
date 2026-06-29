@@ -187,6 +187,29 @@ describe('LightweightAgentRunner', () => {
     expect(execute).not.toHaveBeenCalled();
   });
 
+  it('fails future output contracts before calling the model', async () => {
+    const execute = vi.fn();
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'none' },
+      outputContract: { type: 'text' } as never,
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('Unsupported lightweight agent output contract: text');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
   it('fails fast for structured input arrays and never calls the executor', async () => {
     const execute = vi.fn();
     const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
@@ -265,6 +288,44 @@ describe('LightweightAgentRunner', () => {
     expect(execute.mock.calls[1]?.[0]?.userInput).not.toContain('contract_result');
   });
 
+  it('does not persist rendered workflow-thread context into later history', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async () => ({
+      text: '{"result":"done"}',
+      messages: [],
+    }));
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute, now: () => 2_000 });
+
+    const request = (input: string) => runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input,
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'workflow-thread', key: 'thread-1', maxEvents: 20 },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    await request('first run');
+    await request('second run');
+    await request('third run');
+
+    const thirdInput = execute.mock.calls[2]?.[0]?.userInput ?? '';
+    expect(thirdInput.match(/# Prior Agent Loop Context/g)).toHaveLength(1);
+    expect(thirdInput).toContain('input: {"purpose":"workflow.ai_prompt","input":"second run"}');
+    expect(thirdInput).not.toContain('"input":"# Prior Agent Loop Context');
+  });
+
   it('allows declared permission-review tools and rejects undeclared ones', async () => {
     const execute: AgentLoopExecutor = vi.fn(async (input) => {
       const readDecision = await input.hooks.beforeToolCall?.({
@@ -312,5 +373,28 @@ describe('LightweightAgentRunner', () => {
 
     expect(result.status).toBe('completed');
     expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it('fails unsupported permission modes before calling the model', async () => {
+    const execute = vi.fn();
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'permission-review' },
+      outputContract: { type: 'json', schema: { type: 'object' } },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'custom' as never,
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('Unsupported lightweight agent permission mode: custom');
+    expect(execute).not.toHaveBeenCalled();
   });
 });
