@@ -52,9 +52,9 @@ export function GitBranchesView({ projectId, worktreePath, onAfterMutation }: Gi
       // If the status check fails, proceed and let git surface any error.
     }
     setBusy(true);
-    await runWithToast(`Switch to ${name}`, projectId, () => api.checkoutGitBranch(projectId, worktreePath, name));
+    const result = await runWithToast(`Switch to ${name}`, projectId, () => api.checkoutGitBranch(projectId, worktreePath, name));
     setBusy(false);
-    await afterChange();
+    if (result !== null) await afterChange();
   }, [busy, projectId, worktreePath, afterChange]);
 
   const createBranch = useCallback(async () => {
@@ -67,33 +67,38 @@ export function GitBranchesView({ projectId, worktreePath, onAfterMutation }: Gi
       () => api.createGitBranch(projectId, worktreePath, name, { checkout: true }),
     );
     setBusy(false);
-    if (result !== null) setNewName('');
-    await afterChange();
+    if (result !== null) {
+      setNewName('');
+      await afterChange();
+    }
   }, [newName, busy, projectId, worktreePath, afterChange]);
 
   const deleteBranch = useCallback(async (name: string) => {
     if (busy) return;
     if (!window.confirm(`Delete branch "${name}"?`)) return;
     setBusy(true);
+    let mutated = false;
     try {
       await api.deleteGitBranch(projectId, worktreePath, name, false);
+      mutated = true;
       useToastStore.getState().add({ title: `Deleted ${name}`, type: 'success', projectId, icon: 'system' });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (/not fully merged/i.test(message)) {
         if (window.confirm(`"${name}" is not fully merged. Force delete?`)) {
-          await runWithToast(
+          const r = await runWithToast(
             `Force delete ${name}`,
             projectId,
             () => api.deleteGitBranch(projectId, worktreePath, name, true),
           );
+          if (r !== null) mutated = true;
         }
       } else {
         useToastStore.getState().add({ title: `Delete ${name} failed`, message, type: 'error', projectId, icon: 'error' });
       }
     } finally {
       setBusy(false);
-      await afterChange();
+      if (mutated) await afterChange();
     }
   }, [busy, projectId, worktreePath, afterChange]);
 
