@@ -275,7 +275,15 @@ describe('createPermissionCallback workflow routing', () => {
     expect(permissionWorkflowResolverMock.triggerPermissionEscalation).toHaveBeenCalledWith(
       'project-1',
       expect.objectContaining({
-        eventPayload: expect.objectContaining({ requestId: 'req-1', toolName: 'Bash' }),
+        eventPayload: expect.objectContaining({
+          requestId: 'req-1',
+          toolName: 'Bash',
+          aiReview: expect.objectContaining({
+            enabled: true,
+            confidenceThreshold: 0.8,
+            maxAutoApprovalsPerMinute: 10,
+          }),
+        }),
       }),
     );
     expect(broadcastRunMessageMock).toHaveBeenCalledWith(

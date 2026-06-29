@@ -12,7 +12,7 @@ const ZCLAUDIA_CAPABILITIES: ProviderCapabilities = {
   ],
   modelLabel: 'Runtime',
   models: [],
-  supportsAIReview: false,
+  supportsAIReview: true,
 };
 
 export function mountCapabilityRoutes(router: Router, db: Database.Database): void {

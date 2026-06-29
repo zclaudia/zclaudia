@@ -4,6 +4,7 @@ import type { AgentLoopRunnerPort } from '../../agent-loop/index.js';
 import type { StepContext, WorkflowAgentRuntimePort } from '../ports/step-executor.js';
 import { AIPromptStepExecutor } from '../step-executors/ai-prompt-executor.js';
 import { AIReviewStepExecutor } from '../step-executors/ai-review-executor.js';
+import { AIRiskAnalysisStepExecutor } from '../step-executors/ai-risk-analysis-executor.js';
 
 function makeNode(overrides: Partial<WorkflowNodeDef> = {}): WorkflowNodeDef {
   return {
@@ -290,5 +291,166 @@ describe('workflow agent-loop AI executors', () => {
     }));
     expect(run.mock.calls[0]?.[0].input).toContain('lint ok');
     expect(ctx.setSessionId).not.toHaveBeenCalled();
+  });
+
+  it('ai_risk_analysis uses permission policy AI review settings and step-local context', async () => {
+    const run = vi.fn(async () => ({
+      status: 'completed' as const,
+      output: {
+        decision: 'approve',
+        reasoning: 'safe command',
+        confidence: 0.95,
+        metadata: { rule: 'test' },
+      },
+      contextId: 'ctx-risk',
+    }));
+    const executor = new AIRiskAnalysisStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+    );
+
+    const result = await executor.execute(
+      makeNode({ id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis', timeoutMs: 120000 }),
+      {},
+      makeContext({
+        eventPayload: {
+          requestId: 'req-1',
+          toolName: 'Bash',
+          toolInput: { command: 'npm test' },
+          detail: 'npm test',
+          cwd: '/repo',
+          aiReview: {
+            enabled: true,
+            confidenceThreshold: 0.92,
+            maxAutoApprovalsPerMinute: 3,
+            analysisLlmProfileId: 'review-llm',
+          },
+        },
+      }),
+    );
+
+    expect(result).toMatchObject({
+      status: 'completed',
+      output: {
+        decision: 'approve',
+        reasoning: 'safe command',
+        confidence: 0.95,
+        approved: true,
+        metadata: { rule: 'test' },
+        contextId: 'ctx-risk',
+      },
+    });
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      purpose: 'workflow.ai_risk_analysis',
+      llmProfileId: 'review-llm',
+      cwd: '/repo',
+      toolset: { id: 'permission-review' },
+      context: { policy: 'step-local', key: 'permission:req-1:ai_review' },
+      limits: { maxTurns: 4, timeoutMs: 120000 },
+      permissionMode: 'allow-declared-tools',
+    }));
+    expect(run.mock.calls[0]?.[0].input).toContain('"confidenceThreshold":0.92');
+  });
+
+  it('ai_risk_analysis returns uncertain without model call when AI review is disabled', async () => {
+    const run = vi.fn();
+    const executor = new AIRiskAnalysisStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+    );
+
+    const result = await executor.execute(
+      makeNode({ id: 'ai_review', name: 'AI Review', type: 'ai_risk_analysis' }),
+      {},
+      makeContext({
+        eventPayload: {
+          requestId: 'req-disabled',
+          toolName: 'Bash',
+          toolInput: { command: 'rm -rf build' },
+          detail: 'rm -rf build',
+          cwd: '/repo',
+          aiReview: { enabled: false },
+        },
+      }),
+    );
+
+    expect(result).toMatchObject({
+      status: 'completed',
+      output: {
+        decision: 'uncertain',
+        confidence: 0,
+        approved: false,
+      },
+    });
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('ai_risk_analysis resolves configured toolName and detail templates', async () => {
+    const run = vi.fn(async () => ({
+      status: 'completed' as const,
+      output: {
+        decision: 'uncertain',
+        reasoning: 'needs user',
+        confidence: 0.2,
+      },
+      contextId: 'ctx-risk-template',
+    }));
+    const executor = new AIRiskAnalysisStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+    );
+
+    await executor.execute(
+      makeNode({ id: 'ai_review', type: 'ai_risk_analysis' }),
+      { toolName: '${event.toolName}', detail: '${event.detail}' },
+      makeContext({
+        eventPayload: {
+          requestId: 'req-template',
+          toolName: 'Bash',
+          toolInput: { command: 'npm test' },
+          detail: 'npm test',
+          cwd: '/repo',
+        },
+      }),
+    );
+
+    expect(run.mock.calls[0]?.[0].input).toContain('"toolName":"resolved:${event.toolName}"');
+    expect(run.mock.calls[0]?.[0].input).toContain('"detail":"resolved:${event.detail}"');
+  });
+
+  it('ai_risk_analysis does not approve below the configured confidence threshold', async () => {
+    const run = vi.fn(async () => ({
+      status: 'completed' as const,
+      output: {
+        decision: 'approve',
+        reasoning: 'probably safe',
+        confidence: 0.4,
+      },
+    }));
+    const executor = new AIRiskAnalysisStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+    );
+
+    const result = await executor.execute(
+      makeNode({ id: 'ai_review', type: 'ai_risk_analysis' }),
+      {},
+      makeContext({
+        eventPayload: {
+          requestId: 'req-low-confidence',
+          toolName: 'Bash',
+          toolInput: { command: 'npm publish' },
+          detail: 'npm publish',
+          cwd: '/repo',
+          aiReview: { enabled: true, confidenceThreshold: 0.9 },
+        },
+      }),
+    );
+
+    expect(result).toMatchObject({
+      status: 'completed',
+      output: {
+        decision: 'uncertain',
+        confidence: 0.4,
+        approved: false,
+      },
+    });
+    expect(String(result.output.reasoning)).toContain('below threshold');
   });
 });

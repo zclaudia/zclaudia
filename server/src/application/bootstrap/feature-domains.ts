@@ -35,7 +35,6 @@ import type { NotificationSender } from '../../infra/push/notification-sender.js
 import type { NotificationService } from '../../domains/notification-feed/index.js';
 import { PermissionBridge } from '../conversation/agent/permission-bridge.js';
 import { recomputePhase, computeBlockers } from '../conversation/runtime/active-run-phase.js';
-import { AIRiskAnalysisAdapter } from '../conversation/agent/ai-risk-analysis-adapter.js';
 import type { WorkflowRunEvent } from '../../domains/workflows/run-events.js';
 import { ExecutorRegistry, ManualAdapter, ExecutorInstanceRepository } from '../../domains/executor/index.js';
 import { ClassicAdapter } from '../../domains/executor/adapters/classic-adapter.js';
@@ -274,7 +273,6 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     },
   });
 
-  const aiRiskAnalysisPort = new AIRiskAnalysisAdapter(db);
   let permissionWorkflowResolver: PermissionWorkflowResolver;
 
   const { workflowService, workflowEngine } = registerWorkflowDomain({
@@ -289,7 +287,6 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     aiRunPort: workflowAiRunPort,
     permissionBridge,
     getPermissionWorkflowResolver: () => permissionWorkflowResolver,
-    aiRiskAnalysisPort,
     taskExecutorRegistry,
   });
   permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);

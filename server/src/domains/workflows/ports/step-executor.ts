@@ -6,6 +6,7 @@
  */
 
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
+import type { AIReviewConfig } from '@zclaudia/shared/interaction/permissions';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 export type { AgentLoopPermissionCallback, AgentLoopPermissionDecision, AgentLoopRunnerPort } from '../../agent-loop/index.js';
 import type { AgentLoopPermissionCallback, AgentLoopPermissionDecision } from '../../agent-loop/index.js';
@@ -104,6 +105,7 @@ export interface PermissionEscalationContext {
   isEscalateAlways: boolean;
   sessionType: 'regular' | 'background' | 'agent';
   aiInitiatedPlanMode?: boolean;
+  aiReview?: AIReviewConfig;
 }
 
 export interface PermissionBridgePort {

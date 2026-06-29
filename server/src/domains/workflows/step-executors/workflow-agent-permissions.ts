@@ -122,6 +122,7 @@ async function escalateWorkflowPermission(input: {
       matchedRule,
       isEscalateAlways: policy.escalateAlways?.includes(request.toolName) ?? false,
       sessionType: 'background',
+      aiReview: policy.aiReview,
     });
 
     timeout = setTimeout(() => {
@@ -146,6 +147,7 @@ async function escalateWorkflowPermission(input: {
         matchedRule,
         isEscalateAlways: policy.escalateAlways?.includes(request.toolName) ?? false,
         sessionType: 'background',
+        aiReview: policy.aiReview,
       },
       triggerContext: {
         type: 'event',
