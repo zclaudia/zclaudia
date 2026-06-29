@@ -1,0 +1,131 @@
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { GitBranch as BranchIcon } from 'lucide-react';
+import * as api from '../../../services/api';
+import { useGitStore } from '../store';
+import { resolveEffectiveWorktree } from '../resolveWorktree';
+import { SyncButtons } from './SyncButtons';
+import { GitStatusView } from './GitStatusView';
+import { GitLogView } from './GitLogView';
+import { GitBranchesView } from './GitBranchesView';
+import { GitStashView } from './GitStashView';
+
+type SubTab = 'status' | 'commits' | 'branches' | 'stash';
+
+interface GitSidebarPanelProps {
+  projectId?: string;
+  projectRoot?: string;
+  workingDirectory?: string;
+  panelId?: string;
+}
+
+export function GitSidebarPanel({ projectId, projectRoot, workingDirectory }: GitSidebarPanelProps) {
+  const [override, setOverride] = useState<string | null>(null);
+  const [tab, setTab] = useState<SubTab>('status');
+
+  const worktrees = useGitStore((s) => (projectId ? s.worktrees[projectId] ?? [] : []));
+  const setWorktrees = useGitStore((s) => s.setWorktrees);
+  const setStatus = useGitStore((s) => s.setStatus);
+
+  // Reset the manual override whenever the active session's worktree changes,
+  // so the panel follows the session by default.
+  useEffect(() => {
+    setOverride(null);
+  }, [workingDirectory, projectRoot]);
+
+  // Load the project's worktrees for the switcher.
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    api.getProjectWorktrees(projectId)
+      .then((list) => { if (!cancelled) setWorktrees(projectId, list); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [projectId, setWorktrees]);
+
+  const effectivePath = resolveEffectiveWorktree(override, workingDirectory, projectRoot);
+
+  const refreshStatus = useCallback(async () => {
+    if (!projectId || !effectivePath) return;
+    try {
+      const next = await api.getWorktreeStatus(projectId, effectivePath);
+      setStatus(projectId, effectivePath, next);
+    } catch {
+      // ignore
+    }
+  }, [projectId, effectivePath, setStatus]);
+
+  const currentBranch = useMemo(
+    () => worktrees.find((w) => w.path === effectivePath)?.branch,
+    [worktrees, effectivePath],
+  );
+
+  if (!projectId || !effectivePath) {
+    return (
+      <div className="flex h-full items-center justify-center p-6 text-center text-muted-foreground">
+        <div>
+          <p className="text-sm">No git worktree available.</p>
+          <p className="text-xs mt-1">Open a session in a project with a local path to use git.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Header: worktree switcher + sync */}
+      <div className="border-b border-border px-3 py-2 space-y-2">
+        <div className="flex items-center gap-2">
+          <BranchIcon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+          {worktrees.length > 1 ? (
+            <select
+              value={effectivePath}
+              onChange={(e) => setOverride(e.target.value)}
+              className="min-w-0 flex-1 bg-background border border-border rounded px-1.5 py-1 text-xs"
+            >
+              {worktrees.map((w) => (
+                <option key={w.path} value={w.path}>
+                  {w.branch}{w.isMain ? ' (main)' : ''}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <span className="text-sm font-semibold truncate">{currentBranch ?? 'git'}</span>
+          )}
+        </div>
+        <SyncButtons projectId={projectId} worktreePath={effectivePath} onAfter={refreshStatus} />
+      </div>
+
+      {/* Tabs */}
+      <div className="border-b border-border px-3 py-2">
+        <div className="inline-flex items-center gap-0.5 rounded-lg bg-secondary/60 p-1">
+          {(['status', 'commits', 'branches', 'stash'] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
+                tab === t
+                  ? 'bg-background text-foreground shadow-apple-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {t}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-hidden">
+        {tab === 'status' && <GitStatusView projectId={projectId} worktreePath={effectivePath} />}
+        {tab === 'commits' && <GitLogView projectId={projectId} worktreePath={effectivePath} />}
+        {tab === 'branches' && (
+          <GitBranchesView projectId={projectId} worktreePath={effectivePath} onAfterMutation={refreshStatus} />
+        )}
+        {tab === 'stash' && (
+          <GitStashView projectId={projectId} worktreePath={effectivePath} onAfterMutation={refreshStatus} />
+        )}
+      </div>
+    </div>
+  );
+}
