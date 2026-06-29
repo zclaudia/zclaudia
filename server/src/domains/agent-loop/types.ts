@@ -1,4 +1,4 @@
-import type { AgentMessage, AgentTool } from '@earendil-works/pi-agent-core';
+import type { AgentTool } from '@earendil-works/pi-agent-core';
 
 export type AgentLoopOwnerType =
   | 'workflow_run'
@@ -88,13 +88,13 @@ export interface LightweightAgentRunRequest {
   model?: string;
   cwd: string;
   systemPrompt: string;
-  input: string | AgentMessage[];
+  input: string;
   toolset: AgentLoopToolsetRequest;
   outputContract: OutputContract;
   context: {
     policy: AgentLoopContextPolicy;
     key?: string;
-    maxTokens?: number;
+    maxEvents?: number;
   };
   limits: {
     maxTurns: number;

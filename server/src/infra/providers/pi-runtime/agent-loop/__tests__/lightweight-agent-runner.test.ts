@@ -101,6 +101,38 @@ describe('LightweightAgentRunner', () => {
     expect(execute.mock.calls[1]?.[0]?.userInput).toContain('Return valid JSON only');
   });
 
+  it('includes the specific schema validation error in the repair prompt', async () => {
+    const execute = vi.fn()
+      .mockResolvedValueOnce({ text: '{}', messages: [] })
+      .mockResolvedValueOnce({ text: '{"result":"repaired"}', messages: [] });
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+        repairAttempts: 1,
+      },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1]?.[0]?.userInput).toContain('$.result is required');
+  });
+
   it('returns contract_failed when repair still fails', async () => {
     const runner = new LightweightAgentRunner({
       db,
@@ -153,5 +185,132 @@ describe('LightweightAgentRunner', () => {
 
     expect(result.status).toBe('failed');
     expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('fails fast for structured input arrays and never calls the executor', async () => {
+    const execute = vi.fn();
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: [{ role: 'user', content: 'say done' }] as never,
+      toolset: { id: 'none' },
+      outputContract: { type: 'json', schema: { type: 'object' } },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    expect(result.status).toBe('failed');
+    expect(result.error).toContain('Structured agent messages are not supported');
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('replays workflow-thread context using context.maxEvents', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async () => ({
+      text: '{"result":"done"}',
+      messages: [],
+    }));
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute, now: () => 2_000 });
+
+    await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'first run',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'workflow-thread', key: 'thread-1' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'second run',
+      toolset: { id: 'none' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'workflow-thread', key: 'thread-1', maxEvents: 2 },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'deny-external',
+    });
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(execute.mock.calls[1]?.[0]?.userInput).toContain('input: {"purpose":"workflow.ai_prompt","input":"first run"}');
+    expect(execute.mock.calls[1]?.[0]?.userInput).toContain('assistant_message: {"text":"{\\"result\\":\\"done\\"}"}');
+    expect(execute.mock.calls[1]?.[0]?.userInput).not.toContain('contract_result');
+  });
+
+  it('allows declared permission-review tools and rejects undeclared ones', async () => {
+    const execute: AgentLoopExecutor = vi.fn(async (input) => {
+      const readDecision = await input.hooks.beforeToolCall?.({
+        toolCall: { id: 'read-1', name: 'Read', arguments: { path: '/tmp/file.ts' } },
+        args: { path: '/tmp/file.ts' },
+      } as never);
+      const writeDecision = await input.hooks.beforeToolCall?.({
+        toolCall: { id: 'write-1', name: 'Write', arguments: { path: '/tmp/file.ts', content: 'x' } },
+        args: { path: '/tmp/file.ts', content: 'x' },
+      } as never);
+
+      expect(readDecision).toBeUndefined();
+      expect(writeDecision).toEqual({
+        block: true,
+        reason: 'Tool Write is not declared by permission-review',
+      });
+
+      return {
+        text: '{"result":"done"}',
+        messages: [],
+      };
+    });
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'permission-review' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { maxTurns: 2, timeoutMs: 1_000 },
+      permissionMode: 'allow-declared-tools',
+    });
+
+    expect(result.status).toBe('completed');
+    expect(execute).toHaveBeenCalledOnce();
   });
 });

@@ -1,5 +1,4 @@
 import type Database from 'better-sqlite3';
-import type { AgentMessage } from '@earendil-works/pi-agent-core';
 import {
   AgentLoopContextRepository,
   buildJsonRepairPrompt,
@@ -39,10 +38,12 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
       owner: request.owner,
       policy: request.context.policy,
       key: request.context.key,
-      maxEvents: request.context.maxTokens,
+      maxEvents: request.context.maxEvents,
     });
 
     try {
+      const currentInput = validateInput(request.input);
+
       if (request.outputContract.type !== 'json') {
         throw new Error(`Unsupported lightweight agent output contract: ${request.outputContract.type}`);
       }
@@ -88,7 +89,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         sessionId: resolvedContext.contextId,
       });
 
-      const renderedInput = renderInput(request, resolvedContext.loadedEvents);
+      const renderedInput = renderInput(currentInput, resolvedContext.loadedEvents);
       this.contextRepository.appendEvent({
         contextId: resolvedContext.contextId,
         kind: 'input',
@@ -106,7 +107,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
           systemPrompt: request.systemPrompt,
           userInput: attempt === 0
             ? renderedInput
-            : buildJsonRepairPrompt(latestText, ['Output did not satisfy the JSON contract']),
+            : buildJsonRepairPrompt(latestText, [parseJsonOutput(latestText, request.outputContract).error]),
           history: [],
           modelInfo,
           tools,
@@ -185,13 +186,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
   }
 }
 
-function renderInput(request: LightweightAgentRunRequest, loadedEvents: AgentLoopEvent[]): string {
-  const currentInput = typeof request.input === 'string'
-    ? request.input
-    : request.input
-      .map((message) => `${message.role}: ${JSON.stringify(message.content)}`)
-      .join('\n');
-
+function renderInput(currentInput: string, loadedEvents: AgentLoopEvent[]): string {
   if (loadedEvents.length === 0) {
     return currentInput;
   }
@@ -201,4 +196,12 @@ function renderInput(request: LightweightAgentRunRequest, loadedEvents: AgentLoo
     .join('\n');
 
   return `# Prior Agent Loop Context\n${renderedHistory}\n\n# Current Input\n${currentInput}`;
+}
+
+function validateInput(input: unknown): string {
+  if (typeof input === 'string') {
+    return input;
+  }
+
+  throw new Error('Structured agent messages are not supported by LightweightAgentRunner; pass a plain string input.');
 }
