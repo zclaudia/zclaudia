@@ -79,6 +79,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         overrides: request.toolset.overrides,
         db: this.deps.db,
       });
+      const runtimePermissionCallback = request.permissions?.permissionCallback;
       const hooks = buildAgentHooks({
         permissionCallback: async (permissionRequest) => {
           if (permissionMode === 'deny-external') {
@@ -92,8 +93,13 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
             } as const;
           }
 
+          if (runtimePermissionCallback) {
+            return runtimePermissionCallback(permissionRequest);
+          }
+
           return { behavior: 'allow' } as const;
         },
+        userHooks: request.permissions?.userHooks,
         cwd: request.cwd,
         sessionId: resolvedContext.contextId,
       });

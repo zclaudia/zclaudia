@@ -52,6 +52,12 @@ describe('DefaultWorkflowAgentRuntimeResolver', () => {
   });
 
   it('uses the project default agent profile and appends workflow system context', async () => {
+    db.prepare('UPDATE agent_config SET hooks = ? WHERE id = 1').run(JSON.stringify([
+      { event: 'PreToolUse', command: 'echo global' },
+    ]));
+    db.prepare('UPDATE projects SET hooks_override = ? WHERE id = ?').run(JSON.stringify([
+      { event: 'PostToolUse', command: 'echo project' },
+    ]), projectId);
     const resolver = new DefaultWorkflowAgentRuntimeResolver(db);
 
     const runtime = await resolver.resolve({
@@ -71,6 +77,10 @@ describe('DefaultWorkflowAgentRuntimeResolver', () => {
     expect(runtime.systemPrompt).toContain('agent instructions');
     expect(runtime.systemPrompt).toContain('workspace instructions');
     expect(runtime.systemPrompt).toContain('Return JSON only.');
+    expect(runtime.userHooks).toEqual([
+      { event: 'PreToolUse', command: 'echo global' },
+      { event: 'PostToolUse', command: 'echo project' },
+    ]);
     expect(workspaceService.assembleSystemPrompt).toHaveBeenCalledWith({
       projectId,
       projectPath: '/repo',

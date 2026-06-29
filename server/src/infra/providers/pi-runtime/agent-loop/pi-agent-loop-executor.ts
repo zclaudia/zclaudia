@@ -22,7 +22,7 @@ export interface AgentLoopExecutorInput {
   tools: AgentTool[];
   hooks: AgentHooksOutput;
   timeoutMs: number;
-  maxTurns: number;
+  maxTurns?: number;
   sessionId: string;
   cacheRetention?: 'none' | 'short' | 'long';
   streamFn?: StreamFn;
@@ -63,7 +63,7 @@ export const runPiAgentLoop: AgentLoopExecutor = async (input) => {
     shouldStopAfterTurn: async (context) => {
       completedTurns += 1;
       const hookStop = await input.hooks.shouldStopAfterTurn?.(context);
-      return Boolean(hookStop) || completedTurns >= input.maxTurns;
+      return Boolean(hookStop) || (typeof input.maxTurns === 'number' && completedTurns >= input.maxTurns);
     },
     sessionId: input.sessionId,
     convertToLlm,

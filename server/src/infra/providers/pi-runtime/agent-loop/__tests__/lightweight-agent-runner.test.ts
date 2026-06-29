@@ -145,6 +145,53 @@ describe('LightweightAgentRunner', () => {
     expect(execute.mock.calls[1]?.[0]?.userInput).toContain('"result"');
   });
 
+  it('delegates declared tool permission decisions to the runtime callback', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'deny' as const, message: 'blocked by workflow policy' }));
+    const execute: AgentLoopExecutor = vi.fn(async (input) => {
+      const decision = await input.hooks.beforeToolCall?.({
+        toolCall: { name: 'Bash' },
+        args: { command: 'git status' },
+      } as never);
+      expect(decision).toMatchObject({
+        block: true,
+        reason: 'blocked by workflow policy',
+      });
+      return {
+        text: '{"result":"done"}',
+        messages: [],
+      };
+    });
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'workflow-prompt' },
+      permissions: { permissionCallback },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { timeoutMs: 1_000 },
+      permissionMode: 'allow-declared-tools',
+    });
+
+    expect(result.status).toBe('completed');
+    expect(permissionCallback).toHaveBeenCalledWith(expect.objectContaining({
+      toolName: 'Bash',
+      toolInput: { command: 'git status' },
+    }));
+  });
+
   it('includes the specific schema validation error in the repair prompt', async () => {
     const execute = vi.fn()
       .mockResolvedValueOnce({ text: '{}', messages: [] })

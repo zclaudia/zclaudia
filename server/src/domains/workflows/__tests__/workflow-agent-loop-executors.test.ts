@@ -91,7 +91,7 @@ describe('workflow agent-loop AI executors', () => {
         repairAttempts: 1,
       },
       context: { policy: 'workflow-artifacts', key: 'prompt' },
-      limits: { maxTurns: 6, timeoutMs: 1234 },
+      limits: { timeoutMs: 1234 },
       permissionMode: 'allow-declared-tools',
     });
     expect(run.mock.calls[0]?.[0].input).toContain('lint ok');
@@ -157,9 +157,31 @@ describe('workflow agent-loop AI executors', () => {
 
     expect(run).toHaveBeenCalledWith(expect.objectContaining({
       toolset: { id: 'none' },
-      limits: { maxTurns: 6, timeoutMs: 4321 },
+      limits: { timeoutMs: 4321 },
       permissionMode: 'deny-external',
       context: { policy: 'workflow-artifacts', key: 'prompt-none' },
+    }));
+  });
+
+  it('falls back to process cwd when the workflow has no project root', async () => {
+    const run = vi.fn(async () => ({
+      status: 'completed' as const,
+      output: { result: 'done' },
+      contextId: 'ctx-cwd',
+    }));
+    const executor = new AIPromptStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+      makeRuntimeResolver(),
+    );
+
+    await executor.execute(
+      makeNode({ id: 'prompt-cwd' }),
+      { prompt: 'Run from current cwd' },
+      makeContext({ projectRootPath: undefined }),
+    );
+
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      cwd: process.cwd(),
     }));
   });
 
@@ -184,6 +206,36 @@ describe('workflow agent-loop AI executors', () => {
       toolset: { id: 'workflow-prompt-readonly' },
       permissionMode: 'allow-declared-tools',
       context: { policy: 'workflow-artifacts', key: 'prompt-readonly' },
+    }));
+  });
+
+  it('passes explicit maxTurns and runtime permission hooks to the agent loop', async () => {
+    const run = vi.fn(async () => ({
+      status: 'completed' as const,
+      output: { result: 'done' },
+      contextId: 'ctx-5',
+    }));
+    const permissionCallback = vi.fn(async () => ({ behavior: 'allow' as const }));
+    const executor = new AIPromptStepExecutor(
+      { run } as unknown as AgentLoopRunnerPort,
+      makeRuntimeResolver({
+        userHooks: [{ event: 'PreToolUse', command: 'echo ok' }],
+        permissionCallback,
+      }),
+    );
+
+    await executor.execute(
+      makeNode({ id: 'prompt-permissions', timeoutMs: 9999 }),
+      { prompt: 'Fix it', maxTurns: 12 },
+      makeContext(),
+    );
+
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({
+      limits: { maxTurns: 12, timeoutMs: 9999 },
+      permissions: {
+        userHooks: [{ event: 'PreToolUse', command: 'echo ok' }],
+        permissionCallback,
+      },
     }));
   });
 });

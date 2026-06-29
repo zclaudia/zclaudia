@@ -6,7 +6,9 @@
  */
 
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
-export type { AgentLoopRunnerPort } from '../../agent-loop/index.js';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
+export type { AgentLoopPermissionCallback, AgentLoopRunnerPort } from '../../agent-loop/index.js';
+import type { AgentLoopPermissionCallback } from '../../agent-loop/index.js';
 
 export interface StepResult {
   status: 'completed' | 'failed' | 'skipped';
@@ -68,6 +70,8 @@ export interface WorkflowAgentRuntime {
   llmProfileId: string;
   model?: string;
   systemPrompt: string;
+  userHooks?: UserHookDefinition[];
+  permissionCallback?: AgentLoopPermissionCallback;
 }
 
 export interface WorkflowAgentRuntimePort {

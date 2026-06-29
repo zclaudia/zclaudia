@@ -10,7 +10,6 @@ import { getAgentLoopToolsetDescriptor } from '../../../infra/providers/pi-runti
 
 const DEFAULT_STEP_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_TOOLSET_ID = 'workflow-prompt';
-const DEFAULT_MAX_TURNS = 6;
 
 export class AIPromptStepExecutor implements StepExecutorPort {
   readonly supportedTypes = ['ai_prompt'] as const;
@@ -31,14 +30,13 @@ export class AIPromptStepExecutor implements StepExecutorPort {
     const llmProfileId = (config.llmProfileId as string) ?? ctx.llmProfileId;
     if (!llmProfileId) return { status: 'failed', output: {}, error: 'No provider configured' };
 
-    const cwd = (config.workingDirectory as string) ?? ctx.projectRootPath;
-    if (!cwd) return { status: 'failed', output: {}, error: 'No working directory configured' };
+    const cwd = (config.workingDirectory as string) ?? ctx.projectRootPath ?? process.cwd();
 
     const toolsetId = typeof config.toolset === 'string' ? config.toolset : DEFAULT_TOOLSET_ID;
     const toolsetDescriptor = getAgentLoopToolsetDescriptor(toolsetId);
     if (!toolsetDescriptor) return { status: 'failed', output: {}, error: `Unknown agent-loop toolset: ${toolsetId}` };
 
-    const maxTurns = typeof config.maxTurns === 'number' ? config.maxTurns : DEFAULT_MAX_TURNS;
+    const maxTurns = typeof config.maxTurns === 'number' ? config.maxTurns : undefined;
 
     try {
       const runtime = await this.agentRuntime.resolve({
@@ -52,6 +50,7 @@ export class AIPromptStepExecutor implements StepExecutorPort {
         baseSystemPrompt: typeof config.systemPrompt === 'string' ? config.systemPrompt : undefined,
         systemContext: 'You are executing a workflow AI prompt. Return JSON that satisfies the requested contract.',
       });
+      const permissions = buildRuntimePermissions(runtime);
       const result = await this.agentLoopRunner.run({
         owner: { type: 'workflow_run', id: ctx.runId },
         purpose: 'workflow.ai_prompt',
@@ -61,6 +60,7 @@ export class AIPromptStepExecutor implements StepExecutorPort {
         systemPrompt: runtime.systemPrompt,
         input: buildWorkflowPromptInput(prompt, ctx),
         toolset: { id: toolsetId },
+        ...(permissions ? { permissions } : {}),
         outputContract: {
           type: 'json',
           schema: {
@@ -75,8 +75,8 @@ export class AIPromptStepExecutor implements StepExecutorPort {
         },
         context: { policy: 'workflow-artifacts', key: node.id },
         limits: {
-          maxTurns,
           timeoutMs: node.timeoutMs ?? DEFAULT_STEP_TIMEOUT_MS,
+          ...(maxTurns !== undefined ? { maxTurns } : {}),
         },
         permissionMode: toolsetDescriptor.permissionMode,
       });
@@ -104,6 +104,17 @@ export class AIPromptStepExecutor implements StepExecutorPort {
       };
     }
   }
+}
+
+function buildRuntimePermissions(
+  runtime: Awaited<ReturnType<WorkflowAgentRuntimePort['resolve']>>,
+) {
+  const userHooks = runtime.userHooks?.length ? runtime.userHooks : undefined;
+  if (!userHooks && !runtime.permissionCallback) return undefined;
+  return {
+    ...(userHooks ? { userHooks } : {}),
+    ...(runtime.permissionCallback ? { permissionCallback: runtime.permissionCallback } : {}),
+  };
 }
 
 function buildWorkflowPromptInput(prompt: string, ctx: StepContext): string {

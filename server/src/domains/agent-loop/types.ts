@@ -1,4 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
+import type { PermissionRequest } from '@zclaudia/shared/interaction/permissions';
+import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
 
 export type AgentLoopOwnerType =
   | 'workflow_run'
@@ -80,6 +82,21 @@ export interface AgentLoopToolsetRequest {
   overrides?: Record<string, AgentTool>;
 }
 
+export interface AgentLoopPermissionDecision {
+  behavior: 'allow' | 'deny';
+  updatedInput?: unknown;
+  message?: string;
+}
+
+export type AgentLoopPermissionCallback = (
+  request: PermissionRequest
+) => Promise<AgentLoopPermissionDecision>;
+
+export interface AgentLoopRuntimePermissions {
+  userHooks?: UserHookDefinition[];
+  permissionCallback?: AgentLoopPermissionCallback;
+}
+
 export interface LightweightAgentRunRequest {
   owner: AgentLoopOwner;
   purpose: string;
@@ -89,6 +106,7 @@ export interface LightweightAgentRunRequest {
   systemPrompt: string;
   input: string;
   toolset: AgentLoopToolsetRequest;
+  permissions?: AgentLoopRuntimePermissions;
   outputContract: JsonOutputContract;
   context: {
     policy: AgentLoopContextPolicy;
@@ -96,7 +114,7 @@ export interface LightweightAgentRunRequest {
     maxEvents?: number;
   };
   limits: {
-    maxTurns: number;
+    maxTurns?: number;
     timeoutMs: number;
   };
   permissionMode: AgentLoopPermissionMode;

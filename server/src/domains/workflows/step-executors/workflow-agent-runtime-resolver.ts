@@ -3,6 +3,7 @@ import { buildSkillDirectoryHint } from '../../../application/plugins/index.js';
 import { createContextEngine } from '../../../application/conversation/context/engine.js';
 import { buildMemoryContext } from '../../../application/conversation/context/memory-context.js';
 import { workspaceService } from '../../../application/services/workspace.js';
+import { resolveUserHooks } from '../../../application/conversation/runtime/resolve-user-hooks.js';
 import { resolveProjectMemoryDir } from '../../../utils/memory-paths.js';
 import { NoAgentAvailableError, resolveAgentForSession } from '../../agent-profiles/agent-resolver.js';
 import { LlmProfileRepository } from '../../llm-profiles/repository.js';
@@ -11,6 +12,8 @@ import type {
   WorkflowAgentRuntimePort,
   WorkflowAgentRuntimeRequest,
 } from '../ports/step-executor.js';
+
+type UserHookDb = Parameters<typeof resolveUserHooks>[0];
 
 export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntimePort {
   private readonly llmProfileRepository: LlmProfileRepository;
@@ -38,6 +41,7 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
       llmProfileId,
       model,
       systemPrompt: await this.buildSystemPrompt(request, resolved.systemPrompt),
+      userHooks: request.projectId ? resolveUserHooks(this.db as unknown as UserHookDb, request.projectId) : undefined,
     };
   }
 
