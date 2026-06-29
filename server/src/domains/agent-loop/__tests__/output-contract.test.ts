@@ -58,4 +58,10 @@ describe('createObjectJsonContract', () => {
       repairAttempts: 1,
     });
   });
+
+  it('rejects non-object schema roots', () => {
+    expect(() => createObjectJsonContract({ type: 'array' })).toThrow(
+      /object schema root/i,
+    );
+  });
 });

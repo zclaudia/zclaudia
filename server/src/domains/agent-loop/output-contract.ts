@@ -8,6 +8,12 @@ export function createObjectJsonContract(
   schema: Record<string, unknown>,
   repairAttempts = 1,
 ): JsonOutputContract {
+  if (schema.type !== 'object') {
+    throw new Error(
+      "createObjectJsonContract expects an object schema root; schema.type must be 'object'",
+    );
+  }
+
   return {
     type: 'json',
     schema,
