@@ -55,6 +55,9 @@ const mockWorkflowStepRegistry = {
 const mockWorkflowAiRunPort = {
   startVirtualRun: vi.fn(),
 };
+const mockAgentLoopRunner = {
+  run: vi.fn(),
+};
 
 // Use vi.hoisted to make mockExecFileAsync available in the hoisted vi.mock
 const { mockExecFileAsync } = vi.hoisted(() => ({
@@ -90,7 +93,7 @@ function createEngineWithDb(mockDb: any, mockBroadcast: ReturnType<typeof vi.fn>
   composite.register(new WebhookStepExecutor());
   composite.register(new NotifyStepExecutor());
   composite.register(new ConditionStepExecutor());
-  composite.register(new AIPromptStepExecutor(aiRunner));
+  composite.register(new AIPromptStepExecutor(mockAgentLoopRunner));
   composite.register(new AIReviewStepExecutor(aiRunner));
   composite.register(new GitStepExecutor());
   composite.registerPlugin(new PluginStepExecutor(mockWorkflowStepRegistry as any));
@@ -135,6 +138,12 @@ describe('WorkflowEngine', () => {
     mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
     mockSessionRepo.create.mockReturnValue({ id: 'sess1' });
     mockWorkflowAiRunPort.startVirtualRun.mockReset();
+    mockAgentLoopRunner.run.mockReset();
+    mockAgentLoopRunner.run.mockResolvedValue({
+      status: 'completed',
+      output: { result: 'Prompt completed' },
+      contextId: 'ctx-ai-prompt',
+    });
     mockWorkflowStepRegistry.get.mockReset();
     mockWorkflowStepRegistry.has.mockReset();
     mockWorkflowStepRegistry.execute.mockReset();
@@ -1277,7 +1286,7 @@ describe('WorkflowEngine', () => {
       mockProjectRepo.findById.mockReturnValue({ id: 'p1', defaultAgentProfileId: 'prov1', rootPath: '/test' });
     });
 
-    it('completes when run_completed message received', async () => {
+    it('completes when agent loop returns JSON result', async () => {
       const def = {
         triggers: [],
         nodes: [{ id: 'n1', type: 'ai_prompt', name: 'AI', config: { prompt: 'test prompt' } }],
@@ -1287,27 +1296,31 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      mockWorkflowAiRunPort.startVirtualRun.mockImplementation(({ onMessage }: any) => {
-        setTimeout(() => onMessage({ type: 'run_completed' }), 20);
+      mockAgentLoopRunner.run.mockResolvedValueOnce({
+        status: 'completed',
+        output: { result: 'analysis complete' },
+        contextId: 'ctx-ai-prompt',
       });
 
       await engine.startRun('wf-ai-complete', 'p1', def as any, 'manual');
       await vi.advanceTimersByTimeAsync(200);
 
       expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
-        sessionId: 'sess1',
-      }));
-      expect(mockStepRunRepo.update).toHaveBeenCalledWith('sr1', expect.objectContaining({
         status: 'completed',
-        output: expect.objectContaining({ sessionId: 'sess1' }),
+        output: expect.objectContaining({
+          result: 'analysis complete',
+          contextId: 'ctx-ai-prompt',
+        }),
       }));
-      expect(mockWorkflowAiRunPort.startVirtualRun).toHaveBeenCalledWith(expect.objectContaining({
-        clientId: expect.stringContaining('workflow_ai_sess1_'),
-        sessionId: 'sess1',
+      expect(mockAgentLoopRunner.run).toHaveBeenCalledWith(expect.objectContaining({
+        purpose: 'workflow.ai_prompt',
+        toolset: { id: 'workflow-prompt-readonly' },
+        context: { policy: 'workflow-artifacts', key: 'n1' },
       }));
+      expect(mockWorkflowAiRunPort.startVirtualRun).not.toHaveBeenCalled();
     });
 
-    it('fails when run_failed message received', async () => {
+    it('fails when agent loop fails', async () => {
       const def = {
         triggers: [],
         nodes: [{ id: 'n1', type: 'ai_prompt', name: 'AI', config: { prompt: 'test prompt' } }],
@@ -1317,8 +1330,10 @@ describe('WorkflowEngine', () => {
       stepRunStore.set('sr1', { id: 'sr1', runId: 'r1', stepId: 'n1', status: 'pending' });
       mockRunRepo.findById.mockReturnValue({ id: 'r1', status: 'running', projectId: 'p1' });
 
-      mockWorkflowAiRunPort.startVirtualRun.mockImplementation(({ onMessage }: any) => {
-        setTimeout(() => onMessage({ type: 'run_failed', error: 'AI failed' }), 20);
+      mockAgentLoopRunner.run.mockResolvedValueOnce({
+        status: 'failed',
+        output: {},
+        error: 'AI failed',
       });
 
       await engine.startRun('wf-ai-fail', 'p1', def as any, 'manual');

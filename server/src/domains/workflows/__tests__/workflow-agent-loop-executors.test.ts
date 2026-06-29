@@ -71,6 +71,7 @@ describe('workflow agent-loop AI executors', () => {
             result: { type: 'string' },
           },
         },
+        repairAttempts: 1,
       },
       context: { policy: 'workflow-artifacts', key: 'prompt' },
       limits: { maxTurns: 6, timeoutMs: 1234 },

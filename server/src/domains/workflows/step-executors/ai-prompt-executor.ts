@@ -1,5 +1,6 @@
 import type { StepExecutorPort, StepResult, StepContext, AgentLoopRunnerPort } from '../ports/step-executor.js';
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
+import { getAgentLoopToolsetDescriptor } from '../../../infra/providers/pi-runtime/agent-loop/index.js';
 
 const DEFAULT_STEP_TIMEOUT_MS = 10 * 60 * 1000;
 const DEFAULT_TOOLSET_ID = 'workflow-prompt-readonly';
@@ -25,6 +26,9 @@ export class AIPromptStepExecutor implements StepExecutorPort {
     if (!cwd) return { status: 'failed', output: {}, error: 'No working directory configured' };
 
     const toolsetId = typeof config.toolset === 'string' ? config.toolset : DEFAULT_TOOLSET_ID;
+    const toolsetDescriptor = getAgentLoopToolsetDescriptor(toolsetId);
+    if (!toolsetDescriptor) return { status: 'failed', output: {}, error: `Unknown agent-loop toolset: ${toolsetId}` };
+
     const maxTurns = typeof config.maxTurns === 'number' ? config.maxTurns : DEFAULT_MAX_TURNS;
 
     try {
@@ -47,13 +51,14 @@ export class AIPromptStepExecutor implements StepExecutorPort {
               result: { type: 'string' },
             },
           },
+          repairAttempts: 1,
         },
         context: { policy: 'workflow-artifacts', key: node.id },
         limits: {
           maxTurns,
           timeoutMs: node.timeoutMs ?? DEFAULT_STEP_TIMEOUT_MS,
         },
-        permissionMode: toolsetId === 'none' ? 'deny-external' : 'allow-declared-tools',
+        permissionMode: toolsetDescriptor.permissionMode,
       });
 
       if (result.status !== 'completed') {
