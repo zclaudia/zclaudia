@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ToolName } from '@zclaudia/shared/core/tools';
 import { buildAgentLoopTools, getAgentLoopToolsetDescriptor } from '../toolsets.js';
 
@@ -67,5 +67,30 @@ describe('agent-loop builtin toolsets', () => {
       'MultiEdit',
       'Write',
     ]);
+  });
+
+  it('passes permission callbacks into tool construction', async () => {
+    const permissionCallback = vi.fn(async () => ({
+      behavior: 'deny' as const,
+      message: 'blocked',
+    }));
+    const bash = buildAgentLoopTools({
+      cwd: '/tmp',
+      toolsetId: 'workflow-prompt',
+      permissionCallback,
+    }).find((tool) => tool.name === 'Bash') as { execute: (id: string, args: unknown) => Promise<unknown> } | undefined;
+
+    expect(bash).toBeDefined();
+    const result = await bash!.execute('bash-1', { command: 'rm -rf /' }) as {
+      details?: Record<string, unknown>;
+    };
+
+    expect(permissionCallback).toHaveBeenCalledWith(expect.objectContaining({
+      toolName: 'CriticalBashCommand',
+    }));
+    expect(result.details).toMatchObject({
+      ok: false,
+      error: 'critical_command_blocked',
+    });
   });
 });

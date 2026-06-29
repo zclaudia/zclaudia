@@ -275,6 +275,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   });
 
   const aiRiskAnalysisPort = new AIRiskAnalysisAdapter(db);
+  let permissionWorkflowResolver: PermissionWorkflowResolver;
 
   const { workflowService, workflowEngine } = registerWorkflowDomain({
     db,
@@ -287,10 +288,11 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     systemTaskRegistry: workflowScheduling,
     aiRunPort: workflowAiRunPort,
     permissionBridge,
+    getPermissionWorkflowResolver: () => permissionWorkflowResolver,
     aiRiskAnalysisPort,
     taskExecutorRegistry,
   });
-  const permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
+  permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
   app.use('/api/automations', authMiddleware, createAutomationRoutes(workflowService));
 
   // ── Permission workflow progress broadcasting ──

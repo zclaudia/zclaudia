@@ -7,8 +7,8 @@
 
 import type { WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
 import type { UserHookDefinition } from '@zclaudia/shared/interaction/user-hooks';
-export type { AgentLoopPermissionCallback, AgentLoopRunnerPort } from '../../agent-loop/index.js';
-import type { AgentLoopPermissionCallback } from '../../agent-loop/index.js';
+export type { AgentLoopPermissionCallback, AgentLoopPermissionDecision, AgentLoopRunnerPort } from '../../agent-loop/index.js';
+import type { AgentLoopPermissionCallback, AgentLoopPermissionDecision } from '../../agent-loop/index.js';
 
 export interface StepResult {
   status: 'completed' | 'failed' | 'skipped';
@@ -106,8 +106,15 @@ export interface PermissionEscalationContext {
 }
 
 export interface PermissionBridgePort {
+  register(
+    requestId: string,
+    resolve: (decision: AgentLoopPermissionDecision) => void,
+    context: PermissionEscalationContext,
+  ): void;
+  setWorkflowRunId(requestId: string, workflowRunId: string): void;
   resolvePermission(requestId: string, decision: 'allow' | 'deny', reason?: string): boolean;
   getPermissionContext(requestId: string): PermissionEscalationContext | undefined;
+  remove(requestId: string): boolean;
 }
 
 export interface AIRiskAnalysisPort {

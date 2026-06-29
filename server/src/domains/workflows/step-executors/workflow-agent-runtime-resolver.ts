@@ -12,13 +12,21 @@ import type {
   WorkflowAgentRuntimePort,
   WorkflowAgentRuntimeRequest,
 } from '../ports/step-executor.js';
+import type { WorkflowAgentPermissionCallbackFactory } from './workflow-agent-permissions.js';
 
 type UserHookDb = Parameters<typeof resolveUserHooks>[0];
+
+export interface DefaultWorkflowAgentRuntimeResolverOptions {
+  permissionCallbackFactory?: WorkflowAgentPermissionCallbackFactory;
+}
 
 export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntimePort {
   private readonly llmProfileRepository: LlmProfileRepository;
 
-  constructor(private readonly db: Database.Database) {
+  constructor(
+    private readonly db: Database.Database,
+    private readonly options: DefaultWorkflowAgentRuntimeResolverOptions = {},
+  ) {
     this.llmProfileRepository = new LlmProfileRepository(db);
   }
 
@@ -42,6 +50,12 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
       model,
       systemPrompt: await this.buildSystemPrompt(request, resolved.systemPrompt),
       userHooks: request.projectId ? resolveUserHooks(this.db as unknown as UserHookDb, request.projectId) : undefined,
+      permissionCallback: this.options.permissionCallbackFactory?.({
+        projectId: request.projectId,
+        runId: request.runId,
+        cwd: request.cwd,
+        purpose: request.purpose,
+      }),
     };
   }
 

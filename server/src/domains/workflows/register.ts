@@ -25,6 +25,7 @@ import {
   WaitStepExecutor,
   AIPromptStepExecutor,
   DefaultWorkflowAgentRuntimeResolver,
+  createWorkflowAgentPermissionCallbackFactory,
   AIReviewStepExecutor,
   GitStepExecutor,
   PluginStepExecutor,
@@ -34,6 +35,7 @@ import {
   TaskWorkflowStepExecutor,
 } from './step-executors/index.js';
 import type { PermissionBridgePort, AIRiskAnalysisPort } from './ports/step-executor.js';
+import type { PermissionWorkflowResolver } from './permission-workflow-resolver.js';
 import { VirtualClientAIRunner } from './step-executors/virtual-client-ai-runner.js';
 import { TaskRepository } from '../tasks/repository.js';
 import { TaskService } from '../tasks/task-service.js';
@@ -60,6 +62,7 @@ export interface WorkflowDomainDeps {
   systemTaskRegistry: WorkflowSchedulingPort;
   aiRunPort: WorkflowAiRunPort;
   permissionBridge?: PermissionBridgePort;
+  getPermissionWorkflowResolver?: () => PermissionWorkflowResolver | undefined;
   aiRiskAnalysisPort?: AIRiskAnalysisPort;
   taskExecutorRegistry?: TaskExecutorRegistry;
 }
@@ -71,12 +74,18 @@ export interface WorkflowDomainResult {
 }
 
 export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomainResult {
-  const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, systemTaskRegistry, aiRunPort, permissionBridge, aiRiskAnalysisPort } = deps;
+  const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, systemTaskRegistry, aiRunPort, permissionBridge, getPermissionWorkflowResolver, aiRiskAnalysisPort } = deps;
 
   // -- Assemble step executors --
   const aiRunner = new VirtualClientAIRunner(db, aiRunPort);
   const agentLoopRunner = new LightweightAgentRunner({ db });
-  const agentRuntime = new DefaultWorkflowAgentRuntimeResolver(db);
+  const agentRuntime = new DefaultWorkflowAgentRuntimeResolver(db, {
+    permissionCallbackFactory: createWorkflowAgentPermissionCallbackFactory({
+      db,
+      permissionBridge,
+      getPermissionWorkflowResolver,
+    }),
+  });
   const composite = new CompositeStepExecutor();
 
   composite.register(new ShellStepExecutor());

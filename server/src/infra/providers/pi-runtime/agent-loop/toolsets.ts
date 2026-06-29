@@ -1,6 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core';
 import type { ToolName } from '@zclaudia/shared/core/tools';
-import type { AgentLoopPermissionMode } from '../../../../domains/agent-loop/index.js';
+import type { AgentLoopPermissionCallback, AgentLoopPermissionMode } from '../../../../domains/agent-loop/index.js';
 import { buildTools } from '../tool-bridge.js';
 
 export interface ToolsetContext {
@@ -78,6 +78,9 @@ export function buildAgentLoopTools(args: {
   toolsetId: string;
   overrides?: Record<string, AgentTool>;
   db?: import('better-sqlite3').Database;
+  permissionCallback?: AgentLoopPermissionCallback;
+  sessionId?: string;
+  runId?: string;
 }): AgentTool[] {
   const descriptor = getAgentLoopToolsetDescriptor(args.toolsetId);
   if (!descriptor) {
@@ -92,6 +95,9 @@ export function buildAgentLoopTools(args: {
       ...(args.overrides ?? {}),
     },
     db: args.db,
+    permissionCallback: args.permissionCallback,
+    sessionId: args.sessionId,
+    runId: args.runId,
     sandboxReadOnly: descriptor.sandboxReadOnly,
   });
 }

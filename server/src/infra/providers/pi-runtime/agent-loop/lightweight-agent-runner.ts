@@ -73,32 +73,36 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         ? llmProfile.models?.find((entry) => entry.modelId === modelOverride)
         : undefined;
       const modelInfo = buildModel(llmProfile, modelOverride, modelEntry);
+      const runtimePermissionCallback = request.permissions?.permissionCallback;
+      const permissionCallback = async (permissionRequest: Parameters<NonNullable<typeof runtimePermissionCallback>>[0]) => {
+        if (permissionMode === 'deny-external') {
+          return { behavior: 'deny', message: 'Lightweight agent run does not allow external tools' } as const;
+        }
+
+        if (!descriptor.tools.includes(permissionRequest.toolName as never)) {
+          return {
+            behavior: 'deny',
+            message: `Tool ${permissionRequest.toolName} is not declared by ${descriptor.id}`,
+          } as const;
+        }
+
+        if (runtimePermissionCallback) {
+          return runtimePermissionCallback(permissionRequest);
+        }
+
+        return { behavior: 'allow' } as const;
+      };
       const tools = buildAgentLoopTools({
         cwd: request.cwd,
         toolsetId: request.toolset.id,
         overrides: request.toolset.overrides,
         db: this.deps.db,
+        permissionCallback,
+        sessionId: resolvedContext.contextId,
+        runId: request.owner.id,
       });
-      const runtimePermissionCallback = request.permissions?.permissionCallback;
       const hooks = buildAgentHooks({
-        permissionCallback: async (permissionRequest) => {
-          if (permissionMode === 'deny-external') {
-            return { behavior: 'deny', message: 'Lightweight agent run does not allow external tools' } as const;
-          }
-
-          if (!descriptor.tools.includes(permissionRequest.toolName as never)) {
-            return {
-              behavior: 'deny',
-              message: `Tool ${permissionRequest.toolName} is not declared by ${descriptor.id}`,
-            } as const;
-          }
-
-          if (runtimePermissionCallback) {
-            return runtimePermissionCallback(permissionRequest);
-          }
-
-          return { behavior: 'allow' } as const;
-        },
+        permissionCallback,
         userHooks: request.permissions?.userHooks,
         cwd: request.cwd,
         sessionId: resolvedContext.contextId,
