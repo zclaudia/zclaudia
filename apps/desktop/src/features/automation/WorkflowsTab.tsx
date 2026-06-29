@@ -7,9 +7,8 @@ import type { Workflow, WorkflowTemplate } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { ProjectInfo } from './automation-types';
 import { isInternalProject, CATEGORY_COLORS } from './automation-types';
-import { isDesktopTauri } from '../../utils/platform';
-import { buildPopoutUrl, openPopoutWindow } from '../../utils/popoutWindow';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
+import { WorkflowEditor } from '../workflows/components/WorkflowEditor';
 
 const PERMISSION_FALLBACK_TEMPLATE_ID = 'permission-escalation-default';
 
@@ -18,15 +17,14 @@ interface WorkflowsTabProps {
   projects: ProjectInfo[];
   globalPermissionWorkflowOverrideId: string | null;
   projectName: (id?: string) => string;
-  serverUrl: string;
-  selectedBackendId: string | null;
   projectId?: string;
 }
 
-export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId, projectName, serverUrl, selectedBackendId, projectId }: WorkflowsTabProps) {
+export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId, projectName, projectId }: WorkflowsTabProps) {
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [templates, setTemplates] = useState<WorkflowTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState<{ workflow: Workflow; readOnly: boolean } | null>(null);
 
   const effectiveProjectId = projectId ?? '';
   const selectedProject = projects.find(p => p.id === effectiveProjectId);
@@ -97,25 +95,22 @@ export function WorkflowsTab({ api, projects, globalPermissionWorkflowOverrideId
   };
 
   const handleEdit = (w: Workflow, readOnly?: boolean) => {
-    const params: Record<string, string> = {
-      workflowEditor: w.projectId || effectiveProjectId,
-      workflowId: w.id,
-      ...(serverUrl ? { serverUrl } : {}),
-      ...(readOnly ? { readOnly: '1' } : {}),
-    };
-    if (isDesktopTauri()) {
-      void openPopoutWindow({
-        type: 'workflow-editor',
-        params,
-        title: readOnly ? `View: ${w.name}` : `Edit: ${w.name}`,
-        width: 1200,
-        height: 800,
-        connectionTarget: { backendId: selectedBackendId },
-      });
-      return;
-    }
-    window.open(buildPopoutUrl(params, { backendId: selectedBackendId }), '_blank', 'width=1200,height=800');
+    setEditing({ workflow: w, readOnly: !!readOnly });
   };
+
+  if (editing) {
+    return (
+      <div className="h-full">
+        <WorkflowEditor
+          workflow={editing.workflow}
+          projectId={editing.workflow.projectId || effectiveProjectId}
+          readOnly={editing.readOnly}
+          onBack={() => setEditing(null)}
+          onSaved={() => { setEditing(null); void refresh(); }}
+        />
+      </div>
+    );
+  }
 
   if (loading) return <LoadingState />;
 

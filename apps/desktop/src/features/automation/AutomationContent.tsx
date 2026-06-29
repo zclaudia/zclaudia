@@ -6,9 +6,8 @@
  * title header — no tab strip and no backend dropdown (both live in the sidebar).
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Zap, Clock, History, Server } from 'lucide-react';
-import { getBaseUrlForBackend } from '../../services/api/base';
 import { useAutomationApi } from './useAutomationApi';
 import type { ProjectInfo, AgentConfigInfo, AutomationTab } from './automation-types';
 import { isInternalProject } from './automation-types';
@@ -32,16 +31,6 @@ const TAB_META: Record<AutomationTab, { label: string; Icon: typeof Zap }> = {
 
 export function AutomationContent({ tab, projectId, backendId }: AutomationContentProps) {
   const api = useAutomationApi(backendId, '', '');
-
-  const serverUrl = useMemo(() => {
-    if (!backendId) return '';
-    try {
-      return getBaseUrlForBackend(backendId);
-    } catch {
-      // Registry not warm yet; WorkflowsTab popouts will resolve once it is.
-      return '';
-    }
-  }, [backendId]);
 
   const [projects, setProjects] = useState<ProjectInfo[]>([]);
   const [globalPermissionWorkflowOverrideId, setGlobalPermissionWorkflowOverrideId] = useState<string | null>(null);
@@ -95,8 +84,6 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
             projects={projects}
             globalPermissionWorkflowOverrideId={globalPermissionWorkflowOverrideId}
             projectName={projectName}
-            serverUrl={serverUrl}
-            selectedBackendId={backendId}
             projectId={projectId}
           />
         )}
