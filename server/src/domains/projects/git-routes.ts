@@ -26,6 +26,9 @@ import {
   fetchRemote,
   pullRemote,
   pushRemote,
+  checkoutBranch,
+  createBranch,
+  deleteBranch,
 } from '../../utils/git-operations.js';
 
 function sendError(res: Response, error: unknown, fallbackMessage: string): void {
@@ -279,6 +282,58 @@ export function createGitRoutes(db: Database.Database): Router {
       res.json({ success: true, data: { sha } });
     } catch (error) {
       sendError(res, error, 'Failed to commit changes');
+    }
+  });
+
+  // --- Branch mutations ---
+
+  router.post('/:id/git/checkout', async (req: Request, res: Response) => {
+    const wt = getWorktreeParam(req);
+    const { branch } = (req.body ?? {}) as { branch?: string };
+    if (!wt || !branch || !branch.trim()) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and branch are required' } });
+      return;
+    }
+    try {
+      const { worktreePath } = service.resolveWorktreeForGitOp(req.params.id, wt);
+      await checkoutBranch(worktreePath, branch);
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, 'Failed to checkout branch');
+    }
+  });
+
+  router.post('/:id/git/branch', async (req: Request, res: Response) => {
+    const wt = getWorktreeParam(req);
+    const { name, checkout, startPoint } = (req.body ?? {}) as {
+      name?: string; checkout?: boolean; startPoint?: string;
+    };
+    if (!wt || !name || !name.trim()) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and name are required' } });
+      return;
+    }
+    try {
+      const { worktreePath } = service.resolveWorktreeForGitOp(req.params.id, wt);
+      await createBranch(worktreePath, name, { checkout: !!checkout, startPoint });
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, 'Failed to create branch');
+    }
+  });
+
+  router.delete('/:id/git/branch', async (req: Request, res: Response) => {
+    const wt = getWorktreeParam(req);
+    const { name, force } = (req.body ?? {}) as { name?: string; force?: boolean };
+    if (!wt || !name || !name.trim()) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree and name are required' } });
+      return;
+    }
+    try {
+      const { worktreePath } = service.resolveWorktreeForGitOp(req.params.id, wt);
+      await deleteBranch(worktreePath, name, { force: !!force });
+      res.json({ success: true });
+    } catch (error) {
+      sendError(res, error, 'Failed to delete branch');
     }
   });
 
