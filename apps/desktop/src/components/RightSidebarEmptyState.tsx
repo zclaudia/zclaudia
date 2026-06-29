@@ -14,7 +14,7 @@ interface RightSidebarEmptyStateProps {
 
 type EmptyTile = { id: string; label: string; iconKey: 'draft' | 'file' | 'changes' | 'terminal' | 'lineage' | 'git' };
 
-/** Maps panel id → iconKey for the known 5 tool tiles. */
+/** Maps panel id → iconKey for the known built-in tool tiles. */
 const PANEL_ICON_MAP: Record<string, EmptyTile['iconKey']> = {
   draft: 'draft',
   'file-viewer': 'file',
