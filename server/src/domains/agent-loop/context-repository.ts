@@ -73,7 +73,7 @@ export class AgentLoopContextRepository {
       SELECT id, context_id, kind, payload, created_at
       FROM agent_loop_events
       WHERE context_id = ?
-      ORDER BY created_at ASC
+      ORDER BY created_at ASC, rowid ASC
       LIMIT ?
     `,
       )

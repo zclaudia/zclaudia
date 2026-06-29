@@ -64,7 +64,17 @@ export type JsonOutputContract = {
   repairAttempts?: number;
 };
 
-export type OutputContract = JsonOutputContract;
+export type FutureOutputContract =
+  | {
+      type: 'finish_tool';
+      toolName: string;
+      schema: Record<string, unknown>;
+    }
+  | {
+      type: 'text';
+    };
+
+export type OutputContract = JsonOutputContract | FutureOutputContract;
 
 export interface AgentLoopToolsetRequest {
   id: string;

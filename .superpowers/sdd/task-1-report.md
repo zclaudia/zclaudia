@@ -65,3 +65,19 @@ Checked:
 ## Concerns
 
 - The repository currently treats `workflow-artifacts` as non-reusable and generates unique trace keys each time. That is consistent with the current task scope, but later workflow tasks should confirm whether that policy needs additional reuse semantics or summary handling.
+
+## Review Fix
+
+Addressed the two review findings without changing `workflow-artifacts` semantics:
+- Expanded `OutputContract` to include a future discriminator union with `finish_tool` and `text` shapes, and exported the new type surface.
+- Made `AgentLoopContextRepository.loadEvents()` deterministic for identical timestamps by ordering `created_at ASC, rowid ASC`.
+- Added a regression test that appends two events under the fixed clock and verifies insertion order.
+
+Verification command:
+```bash
+cd /Users/zhvala/SourceCode/zclaudia/.worktrees/lightweight-agent-runner-workflow-migration/server && bash ../scripts/with-project-node.sh ../node_modules/.bin/vitest run --config vitest.config.ts src/domains/agent-loop/__tests__/context-repository.test.ts
+```
+
+Result:
+- `Test Files  1 passed (1)`
+- `Tests       4 passed (4)`

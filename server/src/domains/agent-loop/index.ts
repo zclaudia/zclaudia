@@ -9,6 +9,7 @@ export type {
   AgentLoopRunStatus,
   AgentLoopRunnerPort,
   AgentLoopToolsetRequest,
+  FutureOutputContract,
   JsonOutputContract,
   LightweightAgentRunRequest,
   LightweightAgentRunResult,

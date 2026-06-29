@@ -70,4 +70,16 @@ describe('AgentLoopContextRepository', () => {
       { kind: 'input', payload: { text: 'hello' } },
     ]);
   });
+
+  it('loads events in insertion order when timestamps are identical', () => {
+    const resolved = repo.resolveContextForRun({
+      owner: { type: 'manual', id: 'manual-2' },
+      policy: 'none',
+    });
+
+    repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 1 } });
+    repo.appendEvent({ contextId: resolved.contextId, kind: 'input', payload: { seq: 2 } });
+
+    expect(repo.loadEvents(resolved.contextId).map((event) => event.payload.seq)).toEqual([1, 2]);
+  });
 });
