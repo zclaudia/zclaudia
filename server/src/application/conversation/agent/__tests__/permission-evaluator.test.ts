@@ -231,11 +231,12 @@ describe('classify', () => {
     expect(isInternalInteractionTool('SomeUnknownTool')).toBe(false);
   });
 
-  it('should NOT treat provider built-in ExitPlanMode as internal (must escalate for user approval)', () => {
-    // ExitPlanMode (PascalCase, SDK built-in) has no custom handler — auto-approving
-    // it at the permission layer would exit plan mode silently without approval.
-    expect(isInternalInteractionTool('ExitPlanMode')).toBe(false);
-    // The snake_case MCP variant keeps its handler-driven approval flow.
+  it('treats provider built-in ExitPlanMode as internal (handles its own plan-review approval)', () => {
+    // PascalCase ExitPlanMode (pi-runtime mode-tools) runs its own interaction_plan_review
+    // flow for user approval, so it must bypass the permission/AI-review escalation and
+    // not surface a generic permission card.
+    expect(isInternalInteractionTool('ExitPlanMode')).toBe(true);
+    // The snake_case MCP variant keeps the same handler-driven approval flow.
     expect(isInternalInteractionTool('exit_plan_mode')).toBe(true);
     expect(isInternalInteractionTool('mcp__claudia-plugins__exit_plan_mode')).toBe(true);
   });

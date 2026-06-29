@@ -132,21 +132,46 @@ function hasToolNameSuffix(toolName: string, suffix: string): boolean {
     || toolName.endsWith(`:${suffix}`);
 }
 
+/**
+ * Tools that drive their own user-facing flow (todos, plan review, approval
+ * forms) and therefore must bypass the generic permission/AI-review escalation.
+ *
+ * Single source of truth for {@link isInternalInteractionTool} and
+ * {@link isBlockingInteractionTool}. Each entry pairs the snake_case `suffix`
+ * (the MCP/app-bridged variant, matched via {@link hasToolNameSuffix}) with the
+ * optional PascalCase `literal` built-in name — because `hasToolNameSuffix` is
+ * case- and separator-sensitive, the literal would NOT be matched by its suffix
+ * (e.g. `ExitPlanMode` vs `exit_plan_mode`). Keeping both forms on one row is
+ * what prevents the asymmetry where a built-in's PascalCase name gets forgotten.
+ *
+ * `blocking: true` means the tool blocks the agent waiting for a user response
+ * (so it's also classified as a `userQuestions` permission category).
+ *
+ * NOTE: `AskUserQuestion` is intentionally NOT here. It is a distinct
+ * "user-answer channel" handled earlier and separately (the
+ * `isProviderNativeQuestion` path in run-permissions + the beforeToolCall
+ * early-return in pi-runtime/agent-hooks), and must not be folded into this
+ * gate — doing so would subject it to remembered/category/plan-mode denial.
+ */
+const INTERACTION_TOOLS: ReadonlyArray<{ suffix: string; literal?: string; blocking: boolean }> = [
+  { suffix: 'update_todo_list', blocking: false },
+  { suffix: 'ask_user_form', blocking: true },
+  { suffix: 'request_approval', blocking: true },
+  { suffix: 'push_file', blocking: false },
+  { suffix: 'enter_plan_mode', literal: 'EnterPlanMode', blocking: false },
+  { suffix: 'exit_plan_mode', literal: 'ExitPlanMode', blocking: true },
+];
+
+function matchesInteractionTool(toolName: string, entry: { suffix: string; literal?: string }): boolean {
+  return hasToolNameSuffix(toolName, entry.suffix) || (entry.literal !== undefined && toolName === entry.literal);
+}
+
 export function isInternalInteractionTool(toolName: string): boolean {
-  return hasToolNameSuffix(toolName, 'update_todo_list')
-    || hasToolNameSuffix(toolName, 'ask_user_form')
-    || hasToolNameSuffix(toolName, 'request_approval')
-    || hasToolNameSuffix(toolName, 'push_file')
-    || hasToolNameSuffix(toolName, 'enter_plan_mode')
-    || hasToolNameSuffix(toolName, 'exit_plan_mode')
-    || toolName === 'EnterPlanMode';
+  return INTERACTION_TOOLS.some((entry) => matchesInteractionTool(toolName, entry));
 }
 
 function isBlockingInteractionTool(toolName: string): boolean {
-  return hasToolNameSuffix(toolName, 'ask_user_form')
-    || hasToolNameSuffix(toolName, 'request_approval')
-    || hasToolNameSuffix(toolName, 'exit_plan_mode')
-    || toolName === 'ExitPlanMode';
+  return INTERACTION_TOOLS.some((entry) => entry.blocking && matchesInteractionTool(toolName, entry));
 }
 
 // ============================================
