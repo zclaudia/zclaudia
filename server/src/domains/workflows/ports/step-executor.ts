@@ -72,6 +72,7 @@ export interface WorkflowAgentRuntime {
   systemPrompt: string;
   userHooks?: UserHookDefinition[];
   permissionCallback?: AgentLoopPermissionCallback;
+  toolSessionId?: string;
 }
 
 export interface WorkflowAgentRuntimePort {

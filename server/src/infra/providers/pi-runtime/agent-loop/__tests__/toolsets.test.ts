@@ -19,18 +19,21 @@ describe('agent-loop builtin toolsets', () => {
 
     expect(getAgentLoopToolsetDescriptor('code-review-readonly')).toMatchObject({
       tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
+      permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: true,
     });
 
     expect(getAgentLoopToolsetDescriptor('workflow-prompt-readonly')).toMatchObject({
       tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
+      permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: true,
     });
 
     expect(getAgentLoopToolsetDescriptor('workflow-prompt')).toMatchObject({
       tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash', 'Edit', 'MultiEdit', 'Write'],
+      permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
       permissionMode: 'allow-declared-tools',
       sandboxReadOnly: false,
     });
@@ -51,9 +54,24 @@ describe('agent-loop builtin toolsets', () => {
 
     const mutableTools = descriptor!.tools as ToolName[];
     expect(() => mutableTools.push('Memory' as ToolName)).toThrow();
+    const mutablePermissionTools = descriptor!.permissionTools as string[] | undefined;
+    expect(mutablePermissionTools).toBeUndefined();
 
     expect(getAgentLoopToolsetDescriptor('permission-review')?.tools).toEqual(['Read', 'Glob', 'Grep', 'LS']);
     expect(buildAgentLoopTools({ cwd: '/tmp', toolsetId: 'permission-review' })).toHaveLength(4);
+  });
+
+  it('isolates returned internal permission tool descriptors from mutation', () => {
+    const descriptor = getAgentLoopToolsetDescriptor('workflow-prompt');
+    expect(descriptor?.permissionTools).toEqual(['CriticalBashCommand', 'SandboxNetworkAccess']);
+
+    const mutablePermissionTools = descriptor!.permissionTools as string[];
+    expect(() => mutablePermissionTools.push('AskUserQuestion')).toThrow();
+
+    expect(getAgentLoopToolsetDescriptor('workflow-prompt')?.permissionTools).toEqual([
+      'CriticalBashCommand',
+      'SandboxNetworkAccess',
+    ]);
   });
 
   it('builds writable tools for workflow prompts', () => {

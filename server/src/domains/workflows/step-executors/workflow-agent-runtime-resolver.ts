@@ -33,6 +33,9 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
   async resolve(request: WorkflowAgentRuntimeRequest): Promise<WorkflowAgentRuntime> {
     const resolved = this.resolveAgent(request);
     const explicitLlmProfileId = normalizeOptionalString(request.llmProfileId);
+    const explicitLlmProfile = explicitLlmProfileId
+      ? this.llmProfileRepository.findById(explicitLlmProfileId)
+      : undefined;
     const llmProfileId = explicitLlmProfileId
       ?? resolved.llmProfileId
       ?? this.llmProfileRepository.findDefault()?.id;
@@ -50,11 +53,13 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
       model,
       systemPrompt: await this.buildSystemPrompt(request, resolved.systemPrompt),
       userHooks: request.projectId ? resolveUserHooks(this.db as unknown as UserHookDb, request.projectId) : undefined,
+      toolSessionId: request.runId,
       permissionCallback: this.options.permissionCallbackFactory?.({
         projectId: request.projectId,
         runId: request.runId,
         cwd: request.cwd,
         purpose: request.purpose,
+        providerType: explicitLlmProfile?.providerType ?? resolved.providerType,
       }),
     };
   }
@@ -63,6 +68,7 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
     llmProfileId?: string;
     model?: string;
     systemPrompt?: string;
+    providerType?: string;
   } {
     try {
       const { agent, llm } = resolveAgentForSession(this.db, { projectId: request.projectId });
@@ -70,6 +76,7 @@ export class DefaultWorkflowAgentRuntimeResolver implements WorkflowAgentRuntime
         llmProfileId: llm?.id ?? agent.llmProfileId,
         model: agent.model,
         systemPrompt: agent.systemPrompt,
+        providerType: llm?.providerType,
       };
     } catch (err) {
       if (err instanceof NoAgentAvailableError && request.llmProfileId) {

@@ -79,7 +79,11 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
           return { behavior: 'deny', message: 'Lightweight agent run does not allow external tools' } as const;
         }
 
-        if (!descriptor.tools.includes(permissionRequest.toolName as never)) {
+        const declaredPermissionTools = descriptor.permissionTools ?? [];
+        if (
+          !descriptor.tools.includes(permissionRequest.toolName as never)
+          && !declaredPermissionTools.includes(permissionRequest.toolName)
+        ) {
           return {
             behavior: 'deny',
             message: `Tool ${permissionRequest.toolName} is not declared by ${descriptor.id}`,
@@ -98,7 +102,7 @@ export class LightweightAgentRunner implements AgentLoopRunnerPort {
         overrides: request.toolset.overrides,
         db: this.deps.db,
         permissionCallback,
-        sessionId: resolvedContext.contextId,
+        sessionId: request.permissions?.toolSessionId,
         runId: request.owner.id,
       });
       const hooks = buildAgentHooks({

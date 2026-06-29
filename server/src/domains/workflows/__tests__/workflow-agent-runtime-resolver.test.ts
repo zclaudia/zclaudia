@@ -73,6 +73,7 @@ describe('DefaultWorkflowAgentRuntimeResolver', () => {
     expect(runtime).toMatchObject({
       llmProfileId: llmId,
       model: 'agent-model',
+      toolSessionId: 'run-1',
     });
     expect(runtime.systemPrompt).toContain('agent instructions');
     expect(runtime.systemPrompt).toContain('workspace instructions');
@@ -109,5 +110,33 @@ describe('DefaultWorkflowAgentRuntimeResolver', () => {
     expect(runtime.llmProfileId).toBe(otherLlm.id);
     expect(runtime.model).toBeUndefined();
     expect(runtime.systemPrompt).toContain('agent instructions');
+  });
+
+  it('passes provider type into workflow permission callbacks', async () => {
+    const permissionCallback = vi.fn();
+    const permissionCallbackFactory = vi.fn(() => permissionCallback);
+    const resolver = new DefaultWorkflowAgentRuntimeResolver(db, {
+      permissionCallbackFactory,
+    });
+
+    const runtime = await resolver.resolve({
+      purpose: 'workflow.ai_prompt',
+      runId: 'run-1',
+      projectId,
+      projectRootPath: '/repo',
+      cwd: '/repo',
+      llmProfileId: llmId,
+      systemContext: 'Return JSON only.',
+    });
+
+    expect(runtime.permissionCallback).toBe(permissionCallback);
+    expect(runtime.toolSessionId).toBe('run-1');
+    expect(permissionCallbackFactory).toHaveBeenCalledWith({
+      projectId,
+      runId: 'run-1',
+      cwd: '/repo',
+      purpose: 'workflow.ai_prompt',
+      providerType: 'anthropic',
+    });
   });
 });

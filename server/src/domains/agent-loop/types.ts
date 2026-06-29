@@ -95,6 +95,7 @@ export type AgentLoopPermissionCallback = (
 export interface AgentLoopRuntimePermissions {
   userHooks?: UserHookDefinition[];
   permissionCallback?: AgentLoopPermissionCallback;
+  toolSessionId?: string;
 }
 
 export interface LightweightAgentRunRequest {

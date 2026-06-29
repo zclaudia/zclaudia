@@ -84,4 +84,8 @@ export class PermissionWorkflowResolver {
     );
     return { resolved, run };
   }
+
+  getRun(runId: string): ReturnType<WorkflowService['getRun']> {
+    return this.workflowService.getRun(runId);
+  }
 }

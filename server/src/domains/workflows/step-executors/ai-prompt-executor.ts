@@ -110,10 +110,11 @@ function buildRuntimePermissions(
   runtime: Awaited<ReturnType<WorkflowAgentRuntimePort['resolve']>>,
 ) {
   const userHooks = runtime.userHooks?.length ? runtime.userHooks : undefined;
-  if (!userHooks && !runtime.permissionCallback) return undefined;
+  if (!userHooks && !runtime.permissionCallback && !runtime.toolSessionId) return undefined;
   return {
     ...(userHooks ? { userHooks } : {}),
     ...(runtime.permissionCallback ? { permissionCallback: runtime.permissionCallback } : {}),
+    ...(runtime.toolSessionId ? { toolSessionId: runtime.toolSessionId } : {}),
   };
 }
 

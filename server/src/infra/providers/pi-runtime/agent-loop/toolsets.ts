@@ -11,6 +11,7 @@ export interface ToolsetContext {
 export interface AgentLoopToolsetDescriptor {
   readonly id: string;
   readonly tools: readonly ToolName[];
+  readonly permissionTools?: readonly string[];
   readonly createOverrides?: (ctx: ToolsetContext) => Record<string, AgentTool>;
   readonly permissionMode: AgentLoopPermissionMode;
   readonly sandboxReadOnly: boolean;
@@ -36,18 +37,21 @@ const BUILTIN_AGENT_LOOP_TOOLSET_DEFINITIONS: Record<string, MutableAgentLoopToo
   'code-review-readonly': {
     id: 'code-review-readonly',
     tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
+    permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
     permissionMode: 'allow-declared-tools',
     sandboxReadOnly: true,
   },
   'workflow-prompt-readonly': {
     id: 'workflow-prompt-readonly',
     tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash'],
+    permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
     permissionMode: 'allow-declared-tools',
     sandboxReadOnly: true,
   },
   'workflow-prompt': {
     id: 'workflow-prompt',
     tools: ['Read', 'Glob', 'Grep', 'LS', 'Bash', 'Edit', 'MultiEdit', 'Write'],
+    permissionTools: ['CriticalBashCommand', 'SandboxNetworkAccess'],
     permissionMode: 'allow-declared-tools',
     sandboxReadOnly: false,
   },
@@ -57,6 +61,7 @@ function freezeBuiltinToolsetDescriptor(descriptor: MutableAgentLoopToolsetDescr
   return Object.freeze({
     ...descriptor,
     tools: Object.freeze([...descriptor.tools]) as readonly ToolName[],
+    ...(descriptor.permissionTools ? { permissionTools: Object.freeze([...descriptor.permissionTools]) } : {}),
   });
 }
 

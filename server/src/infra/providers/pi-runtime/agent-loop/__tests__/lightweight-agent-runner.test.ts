@@ -192,6 +192,56 @@ describe('LightweightAgentRunner', () => {
     }));
   });
 
+  it('delegates declared Bash internal permission requests through the runner gate', async () => {
+    const permissionCallback = vi.fn(async () => ({ behavior: 'deny' as const, message: 'blocked by workflow policy' }));
+    const execute: AgentLoopExecutor = vi.fn(async (input) => {
+      const bash = input.tools.find((tool) => tool.name === 'Bash') as
+        | { execute: (id: string, args: unknown) => Promise<{ details?: Record<string, unknown> }> }
+        | undefined;
+
+      expect(bash).toBeDefined();
+      const result = await bash!.execute('bash-critical', { command: 'rm -rf /' });
+
+      expect(result.details).toMatchObject({
+        ok: false,
+        error: 'critical_command_blocked',
+      });
+      return {
+        text: '{"result":"done"}',
+        messages: [],
+      };
+    });
+    const runner = new LightweightAgentRunner({ db, executeAgentLoop: execute });
+
+    const result = await runner.run({
+      owner: { type: 'workflow_run', id: 'run-1' },
+      purpose: 'workflow.ai_prompt',
+      llmProfileId: 'llm-1',
+      cwd: '/tmp',
+      systemPrompt: 'system',
+      input: 'say done',
+      toolset: { id: 'workflow-prompt' },
+      permissions: { permissionCallback, toolSessionId: 'run-1' },
+      outputContract: {
+        type: 'json',
+        schema: {
+          type: 'object',
+          required: ['result'],
+          properties: { result: { type: 'string' } },
+        },
+      },
+      context: { policy: 'none' },
+      limits: { timeoutMs: 1_000 },
+      permissionMode: 'allow-declared-tools',
+    });
+
+    expect(result.status).toBe('completed');
+    expect(permissionCallback).toHaveBeenCalledWith(expect.objectContaining({
+      toolName: 'CriticalBashCommand',
+      toolInput: expect.objectContaining({ command: 'rm -rf /' }),
+    }));
+  });
+
   it('includes the specific schema validation error in the repair prompt', async () => {
     const execute = vi.fn()
       .mockResolvedValueOnce({ text: '{}', messages: [] })

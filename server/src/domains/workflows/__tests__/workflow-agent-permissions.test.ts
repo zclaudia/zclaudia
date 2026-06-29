@@ -54,6 +54,7 @@ describe('createWorkflowAgentPermissionCallbackFactory', () => {
         resolved: { workflowId: 'wf-1' },
         run: { id: 'wf-run-1' },
       })),
+      getRun: vi.fn(() => ({ run: { status: 'running' } })),
     };
 
     const callback = createWorkflowAgentPermissionCallbackFactory({
@@ -102,5 +103,114 @@ describe('createWorkflowAgentPermissionCallbackFactory', () => {
       updatedInput: { command: 'npm publish' },
     });
     expect(permissionBridge.setWorkflowRunId).toHaveBeenCalledWith('req-1', 'wf-run-1');
+  });
+
+  it('unions provider-specific always-escalate tools into workflow policy', async () => {
+    let resolvePermission!: (decision: AgentLoopPermissionDecision) => void;
+    const permissionBridge = {
+      register: vi.fn((_requestId: string, resolve: typeof resolvePermission) => {
+        resolvePermission = resolve;
+      }),
+      setWorkflowRunId: vi.fn(),
+      resolvePermission: vi.fn(),
+      getPermissionContext: vi.fn(),
+      remove: vi.fn(),
+    };
+    const permissionWorkflowResolver = {
+      triggerPermissionEscalation: vi.fn(async () => ({
+        resolved: { workflowId: 'wf-1' },
+        run: { id: 'wf-run-1' },
+      })),
+      getRun: vi.fn(() => ({ run: { status: 'running' } })),
+    };
+
+    const callback = createWorkflowAgentPermissionCallbackFactory({
+      db,
+      permissionBridge,
+      getPermissionWorkflowResolver: () => permissionWorkflowResolver as never,
+    })({
+      projectId: 'project-1',
+      runId: 'run-1',
+      cwd: '/repo',
+      purpose: 'workflow.ai_prompt',
+      providerType: 'zclaudia',
+    });
+
+    const decisionPromise = callback!({
+      requestId: 'req-provider',
+      toolName: 'SandboxNetworkAccess',
+      toolInput: { command: 'curl https://example.com', hosts: ['example.com'] },
+      detail: 'network allow-list escalation',
+      timeoutSeconds: 0,
+    });
+
+    await vi.waitFor(() => {
+      expect(permissionBridge.register).toHaveBeenCalledWith(
+        'req-provider',
+        expect.any(Function),
+        expect.objectContaining({
+          requestId: 'req-provider',
+          toolName: 'SandboxNetworkAccess',
+          isEscalateAlways: true,
+          matchedRule: 'Always escalate',
+        }),
+      );
+    });
+
+    resolvePermission({ behavior: 'deny', message: 'blocked' });
+
+    await expect(decisionPromise).resolves.toEqual({
+      behavior: 'deny',
+      message: 'blocked',
+    });
+    expect(permissionWorkflowResolver.triggerPermissionEscalation).toHaveBeenCalled();
+  });
+
+  it('denies when the permission workflow finishes without a decision', async () => {
+    db.prepare('UPDATE agent_config SET permission_policy = ? WHERE id = 1').run(JSON.stringify({
+      ...DEFAULT_UNIFIED_POLICY,
+      customRules: [{ toolName: 'Bash', action: 'escalate' }],
+    }));
+
+    const permissionBridge = {
+      register: vi.fn(),
+      setWorkflowRunId: vi.fn(),
+      resolvePermission: vi.fn(),
+      getPermissionContext: vi.fn(),
+      remove: vi.fn(),
+    };
+    const permissionWorkflowResolver = {
+      triggerPermissionEscalation: vi.fn(async () => ({
+        resolved: { workflowId: 'wf-1' },
+        run: { id: 'wf-run-without-decision' },
+      })),
+      getRun: vi.fn(() => ({ run: { status: 'completed' } })),
+    };
+
+    const callback = createWorkflowAgentPermissionCallbackFactory({
+      db,
+      permissionBridge,
+      getPermissionWorkflowResolver: () => permissionWorkflowResolver as never,
+      workflowDecisionTimeoutMs: 1_000,
+      workflowDecisionPollMs: 1,
+    })({
+      projectId: 'project-1',
+      runId: 'run-1',
+      cwd: '/repo',
+      purpose: 'workflow.ai_prompt',
+    });
+
+    await expect(callback!({
+      requestId: 'req-without-decision',
+      toolName: 'Bash',
+      toolInput: { command: 'npm publish' },
+      detail: 'npm publish',
+      timeoutSeconds: 0,
+    })).resolves.toEqual({
+      behavior: 'deny',
+      message: 'Permission workflow completed without a decision (completed)',
+    });
+    expect(permissionBridge.remove).toHaveBeenCalledWith('req-without-decision');
+    expect(permissionWorkflowResolver.getRun).toHaveBeenCalledWith('wf-run-without-decision');
   });
 });

@@ -221,6 +221,7 @@ describe('workflow agent-loop AI executors', () => {
       makeRuntimeResolver({
         userHooks: [{ event: 'PreToolUse', command: 'echo ok' }],
         permissionCallback,
+        toolSessionId: 'run-1',
       }),
     );
 
@@ -235,6 +236,7 @@ describe('workflow agent-loop AI executors', () => {
       permissions: {
         userHooks: [{ event: 'PreToolUse', command: 'echo ok' }],
         permissionCallback,
+        toolSessionId: 'run-1',
       },
     }));
   });
