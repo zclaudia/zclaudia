@@ -11,9 +11,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     category: 'permission',
     definition: {
       entryNodeId: 'classify',
-      triggers: [
-        { type: 'event', event: 'permission.escalated' },
-      ],
       nodes: [
         {
           id: 'classify',
@@ -111,9 +108,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     category: 'git',
     definition: {
       entryNodeId: 'commit',
-      triggers: [
-        { type: 'event', event: 'run.completed' },
-      ],
       nodes: [
         {
           id: 'commit',
@@ -186,7 +180,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     category: 'ai',
     definition: {
       entryNodeId: 'review',
-      triggers: [{ type: 'cron', cron: '0 9 * * *' }],
       nodes: [
         {
           id: 'review',
@@ -208,7 +201,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     category: 'git',
     definition: {
       entryNodeId: 'commit',
-      triggers: [{ type: 'interval', intervalMinutes: 30 }],
       nodes: [
         {
           id: 'commit',
@@ -230,7 +222,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     category: 'ci',
     definition: {
       entryNodeId: 'lint',
-      triggers: [{ type: 'cron', cron: '0 12 * * 1-5' }],
       nodes: [
         {
           id: 'lint',
@@ -262,7 +253,6 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
     category: 'ci',
     definition: {
       entryNodeId: 'create_wt',
-      triggers: [{ type: 'cron', cron: '0 2 * * *' }],
       nodes: [
         {
           id: 'create_wt',
