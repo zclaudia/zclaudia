@@ -11,6 +11,15 @@ interface UseSendQueueConsumerParams {
 }
 
 /**
+ * If a shipped run never registers as active (server rejected the run_start,
+ * the socket dropped, or the run finished before the store observed its active
+ * phase), the active transition that releases the lock never fires. Without a
+ * fallback the queue would wedge forever. After this long we force-release the
+ * lock and re-attempt the drain if the session still reads idle.
+ */
+const SHIP_ACTIVE_TIMEOUT_MS = 10_000;
+
+/**
  * Drains a session's send queue whenever its run transitions from active to
  * idle. Items pop one at a time and each becomes its own run_start, so they
  * execute serially: send item → run starts → run ends → send next item.
@@ -20,12 +29,18 @@ interface UseSendQueueConsumerParams {
  * where, between dispatching run_start and the server's `run_started`, the
  * session can still read as idle and a spurious transition would drain again.
  *
+ * The lock is released by whichever comes first: the shipped run going active,
+ * or a `SHIP_ACTIVE_TIMEOUT_MS` fallback timer (so a run_start that silently
+ * never goes active can't permanently wedge the queue).
+ *
  * Scope: client-only, per-session. The session must be mounted (ChatInterface
  * is open) for the queue to drain. Queue items are held in-memory only.
  */
 export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueConsumerParams): void {
   // True between "decided to ship an item" and "the shipped run went active".
   const consumingRef = useRef(false);
+  // Fallback timer that force-releases the lock if no active transition arrives.
+  const unlockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Re-bind latest sendAsNewRun without re-subscribing.
   const sendRef = useRef(sendAsNewRun);
@@ -37,6 +52,18 @@ export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueCo
     const sessionIsActive = (records: Record<string, SessionRunRecord>): boolean =>
       Object.values(records).some((r) => r.sessionId === sessionId && isSessionRunActive(r));
 
+    const clearUnlockTimer = (): void => {
+      if (unlockTimerRef.current !== null) {
+        clearTimeout(unlockTimerRef.current);
+        unlockTimerRef.current = null;
+      }
+    };
+
+    const releaseLock = (): void => {
+      clearUnlockTimer();
+      consumingRef.current = false;
+    };
+
     const drainOne = async (): Promise<void> => {
       if (consumingRef.current) return;
       const store = useSendQueueStore.getState();
@@ -47,15 +74,26 @@ export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueCo
       if (sessionIsActive(useSessionRunStateStore.getState().records)) return;
 
       consumingRef.current = true; // lock until the new run becomes active
+      // Arm the fallback: if the run we're about to start never registers as
+      // active, release the lock and retry so the queue can't wedge forever.
+      clearUnlockTimer();
+      unlockTimerRef.current = setTimeout(() => {
+        unlockTimerRef.current = null;
+        consumingRef.current = false;
+        if (!sessionIsActive(useSessionRunStateStore.getState().records)) {
+          void drainOne();
+        }
+      }, SHIP_ACTIVE_TIMEOUT_MS);
+
       const item = useSendQueueStore.getState().popFirst(sessionId, 'queue');
       if (!item) {
-        consumingRef.current = false;
+        releaseLock();
         return;
       }
       try {
         await sendRef.current(item.content, item.attachments);
-        // Lock stays held; the active transition (below) unlocks it so the
-        // NEXT idle transition is treated as a fresh, distinct run end.
+        // Lock stays held; the active transition (or the fallback timer) unlocks
+        // it so the NEXT idle transition is treated as a fresh, distinct run end.
       } catch (err) {
         console.error('[useSendQueueConsumer] failed to ship queued item:', err);
         useToastStore.getState().add({
@@ -63,7 +101,7 @@ export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueCo
           title: 'Failed to send queued message',
           message: err instanceof Error ? err.message : 'Please retry manually.',
         });
-        consumingRef.current = false;
+        releaseLock();
       }
     };
 
@@ -71,10 +109,11 @@ export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueCo
       const wasActive = sessionIsActive(prev.records);
       const nowActive = sessionIsActive(state.records);
 
-      // A run we kicked off just registered as active → unlock for the next
-      // drain cycle (the run's eventual end will fire the idle branch).
+      // A run we kicked off just registered as active → release the lock (and
+      // cancel the fallback timer) for the next drain cycle; the run's eventual
+      // end fires the idle branch below.
       if (nowActive) {
-        consumingRef.current = false;
+        releaseLock();
       }
 
       // Active → idle: a run ended. Try to ship the next queued item.
@@ -89,6 +128,9 @@ export function useSendQueueConsumer({ sessionId, sendAsNewRun }: UseSendQueueCo
       void drainOne();
     }
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      clearUnlockTimer();
+    };
   }, [sessionId]);
 }

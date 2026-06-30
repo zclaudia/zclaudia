@@ -252,7 +252,12 @@ export async function handleRunSteer(
     return;
   }
 
-  const now = Date.now();
+  // Monotonic per run: guarantees the derived steer id stays unique even if two
+  // steers land in the same millisecond (else the second collides on the
+  // messages PRIMARY KEY and is dropped from history). The client mirrors this
+  // exact value from the broadcast `timestamp`, so the ids stay in lockstep.
+  const now = Math.max(Date.now(), (run.lastSteerAt ?? 0) + 1);
+  run.lastSteerAt = now;
   const agentMessage: AgentMessage = {
     role: 'user',
     content: [{ type: 'text', text: trimmed }],

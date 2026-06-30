@@ -275,4 +275,30 @@ describe('handleRunSteer — persistence', () => {
     expect(db.__stmts.find((s) => s.sql.includes('INSERT INTO messages'))).toBeUndefined();
     expect(db.__stmts.find((s) => s.sql.includes('INSERT INTO session_entries'))).toBeUndefined();
   });
+
+  it('keeps steer ids unique when two steers land in the same millisecond', async () => {
+    const { client } = makeClient();
+    const db = makeMockDb();
+    const activeRuns = new Map<string, ActiveRun>();
+    const run = makeRun(db);
+    activeRuns.set('r1', run);
+
+    // Freeze the wall clock so both steers would otherwise derive the same id.
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    try {
+      await handleRunSteer(client, { type: 'run_steer', runId: 'r1', content: 'first' }, activeRuns, vi.fn());
+      await handleRunSteer(client, { type: 'run_steer', runId: 'r1', content: 'second' }, activeRuns, vi.fn());
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    const ids = db.__stmts
+      .filter((s) => s.sql.includes('INSERT INTO messages'))
+      .map((s) => s.args[0]);
+    expect(ids).toHaveLength(2);
+    expect(ids[0]).not.toBe(ids[1]);
+    // Second id is bumped one ms past the first so the PRIMARY KEY can't collide.
+    expect(ids[0]).toBe('steer-r1-1000');
+    expect(ids[1]).toBe('steer-r1-1001');
+  });
 });

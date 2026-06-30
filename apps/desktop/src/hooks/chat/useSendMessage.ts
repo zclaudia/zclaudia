@@ -225,23 +225,27 @@ export function useSendMessage({
   }, [isConnected, isLoading, sessionId, sendAsNewRun]);
 
   // ── Steer now: inject a queued item into the live run mid-flight. ──
-  // Used by the queue UI's "Steer" action. No-op if there's no active run.
-  const steerNow = useCallback((content: string) => {
+  // Used by the queue UI's "Steer" action. Returns true when the steer was
+  // dispatched, false when it couldn't (no content / no active run) — callers
+  // must check this before removing the item from the queue, otherwise a
+  // failed steer would silently drop the message.
+  const steerNow = useCallback((content: string): boolean => {
     const trimmed = content.trim();
-    if (!trimmed) return;
+    if (!trimmed) return false;
     if (!sessionRunId) {
       useToastStore.getState().add({
         type: 'info',
         title: 'No active run',
-        message: 'This run has finished — the message will be sent next instead.',
+        message: 'This run has finished — the message stays queued and will send next.',
       });
-      return;
+      return false;
     }
     wsSendMessage({
       type: 'run_steer',
       runId: sessionRunId,
       content: trimmed,
     });
+    return true;
   }, [sessionRunId, wsSendMessage]);
 
   // ── Resend last message ──
@@ -260,14 +264,12 @@ export function useSendMessage({
         });
         return;
       }
+      // Resend re-runs the trailing user message that's already rendered
+      // (`resendTargetMessage` === the last session message). The server does
+      // NOT persist a new user row for a resend, so adding an optimistic copy
+      // here just duplicates the visible message and then vanishes on the next
+      // history sync. Reuse the existing message instead of re-adding it.
       const messageInput: MessageInputData = { text: resendText };
-      addMessage(sessionId, {
-        id: crypto.randomUUID(),
-        sessionId,
-        role: 'user',
-        content: resendText,
-        createdAt: Date.now(),
-      });
       await startRun({
         type: 'run_start',
         clientRequestId: crypto.randomUUID(),

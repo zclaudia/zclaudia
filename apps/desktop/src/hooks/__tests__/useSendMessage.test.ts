@@ -3,6 +3,11 @@ import { act, renderHook } from '@testing-library/react';
 import { reconcileStaleLoadingRun, useSendMessage } from '../chat/useSendMessage';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { useSendQueueStore } from '../../stores/sendQueueStore';
+import * as api from '../../services/api';
+
+vi.mock('../../services/api', () => ({
+  getSessionRunState: vi.fn().mockResolvedValue({ isRunning: false }),
+}));
 
 type HookProps = Parameters<typeof useSendMessage>[0];
 
@@ -184,10 +189,12 @@ describe('handleSendMessage — mid-run queueing', () => {
       wsSendMessage,
     })));
 
+    let returned: boolean | undefined;
     await act(async () => {
-      result.current.steerNow('  inject this  ');
+      returned = result.current.steerNow('  inject this  ');
     });
 
+    expect(returned).toBe(true);
     expect(wsSendMessage).toHaveBeenCalledTimes(1);
     expect(wsSendMessage).toHaveBeenCalledWith({
       type: 'run_steer',
@@ -196,7 +203,7 @@ describe('handleSendMessage — mid-run queueing', () => {
     });
   });
 
-  it('steerNow is a no-op without an active sessionRunId', async () => {
+  it('steerNow is a no-op and returns false without an active sessionRunId', async () => {
     const wsSendMessage = vi.fn();
     const { result } = renderHook(() => useSendMessage(makeHookProps({
       isLoading: true,
@@ -205,10 +212,13 @@ describe('handleSendMessage — mid-run queueing', () => {
       wsSendMessage,
     })));
 
+    let returned: boolean | undefined;
     await act(async () => {
-      result.current.steerNow('x');
+      returned = result.current.steerNow('x');
     });
 
+    // False so the caller keeps the item queued instead of dropping it.
+    expect(returned).toBe(false);
     expect(wsSendMessage).not.toHaveBeenCalled();
   });
 
@@ -227,5 +237,47 @@ describe('handleSendMessage — mid-run queueing', () => {
 
     expect(wsSendMessage).not.toHaveBeenCalled();
     expect(useSendQueueStore.getState().queues['session-1']).toBeUndefined();
+  });
+});
+
+describe('handleResendLastMessage', () => {
+  beforeEach(() => {
+    vi.mocked(api.getSessionRunState).mockResolvedValue({ isRunning: false } as never);
+  });
+
+  it('re-runs the trailing user message without adding a duplicate optimistic copy', async () => {
+    const wsSendMessage = vi.fn();
+    const addMessage = vi.fn();
+    const { result } = renderHook(() => useSendMessage(makeHookProps({
+      isLoading: false,
+      isSessionRunning: false,
+      sessionRunId: null,
+      lastSessionMessage: {
+        id: 'm1',
+        sessionId: 'session-1',
+        role: 'user',
+        content: 'redo this',
+        createdAt: 1,
+      } as never,
+      wsSendMessage,
+      addMessage,
+    })));
+
+    await act(async () => {
+      await result.current.handleResendLastMessage();
+    });
+
+    // Kicks off a resend run...
+    expect(wsSendMessage).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'run_start',
+      resend: true,
+      sessionId: 'session-1',
+    }));
+    // ...but does NOT re-add the already-rendered user message (would duplicate
+    // it in the view and then vanish on history sync since resend isn't persisted).
+    expect(addMessage).not.toHaveBeenCalledWith(
+      'session-1',
+      expect.objectContaining({ role: 'user' }),
+    );
   });
 });

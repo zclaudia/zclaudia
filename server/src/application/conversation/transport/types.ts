@@ -168,6 +168,13 @@ export interface RunSteeringState {
    * Cleared on turn_start (onSteerConsumed) or cancel.
    */
   pendingSteers: AgentMessage[];
+  /**
+   * Timestamp (ms) of the most recent steer persisted for this run. Used to
+   * keep the derived steer message id (`steer-${runId}-${ts}`) unique even when
+   * two steers land in the same millisecond, which would otherwise collide on
+   * the messages PRIMARY KEY and drop the second steer from history.
+   */
+  lastSteerAt?: number;
 }
 
 // Track active runs and their permission callbacks.

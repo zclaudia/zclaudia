@@ -118,10 +118,14 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
     resetSendState,
   } = send;
 
-  // Steer a queued item into the live run, then drop it from the queue.
+  // Steer a queued item into the live run, then drop it from the queue — but
+  // only if the steer actually dispatched. If the run ended between render and
+  // click (steerNow returns false), the item stays queued to ship next instead
+  // of being silently lost.
   const handleSteerQueueItem = useCallback((item: QueueItem) => {
-    steerNow(item.content);
-    useSendQueueStore.getState().removeItem(item.sessionId, item.id);
+    if (steerNow(item.content)) {
+      useSendQueueStore.getState().removeItem(item.sessionId, item.id);
+    }
   }, [steerNow]);
 
   // Auto-ship queued messages one at a time as the session's run cycles.

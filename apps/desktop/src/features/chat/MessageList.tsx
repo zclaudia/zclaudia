@@ -3,7 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Brain, ChevronRight, Image, Copy, Check, Terminal, MoreHorizontal, GitFork, GitBranch } from 'lucide-react';
+import { Brain, ChevronRight, Image, Copy, Check, Terminal, MoreHorizontal, GitFork, GitBranch, Compass, Target } from 'lucide-react';
 import { ToolCallList } from './tool-call/ToolCallList';
 import { FilePushCard } from './FilePushNotification';
 import { FilePreviewModal } from './FilePreviewModal';
@@ -994,21 +994,23 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
             {/* Goal-auto badge: shown when the GoalCoordinator injected this message */}
             {message.metadata?.source === 'goal-auto' && (
               <span
-                className="text-xs mr-2 inline-flex items-center opacity-70"
+                className="mr-2 inline-flex items-center gap-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground align-middle"
                 aria-label="auto goal turn"
                 title="Auto-continued by goal"
               >
-                🎯
+                <Target size={10} className="flex-shrink-0" />
+                Goal
               </span>
             )}
             {/* Steered badge: this user message was injected mid-run via steering */}
             {message.metadata?.steered && (
               <span
-                className="text-xs mr-2 inline-flex items-center opacity-70"
+                className="mr-2 inline-flex items-center gap-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground align-middle"
                 aria-label="steered mid-run"
                 title="Injected mid-run (delivered next turn)"
               >
-                🧭
+                <Compass size={10} className="flex-shrink-0" />
+                Steered
               </span>
             )}
             {/* Display attachments */}
