@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
-import type { Workflow } from '@zclaudia/shared';
+import type { Automation } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { AutomationItem } from './automation-types';
-import { simpleWorkflowToItem } from './automation-types';
+import { automationToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
@@ -15,7 +15,7 @@ interface AutomationsTabProps {
 }
 
 export function AutomationsTab({ api, projectName, projectId }: AutomationsTabProps) {
-  const [simpleWorkflows, setSimpleWorkflows] = useState<Workflow[]>([]);
+  const [automations, setAutomations] = useState<Automation[]>([]);
   const [loading, setLoading] = useState(true);
   const selectedItemId = useTopLevelViewStore((s) => s.selectedAutomationItemId);
 
@@ -38,8 +38,8 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
     setLoading(true);
     try {
       const query = effectiveProjectId ? `?projectId=${encodeURIComponent(effectiveProjectId)}` : '';
-      const allWorkflows: Workflow[] = await api.get(`/api/automations${query}`).catch(() => []);
-      setSimpleWorkflows(allWorkflows);
+      const allAutomations: Automation[] = await api.get(`/api/automations${query}`).catch(() => []);
+      setAutomations(allAutomations);
     } catch { /* ignore */ }
     setLoading(false);
   }, [api, effectiveProjectId]);
@@ -48,10 +48,10 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
 
   // Build unified list
   const items: AutomationItem[] = useMemo(() => {
-    return simpleWorkflows.map(simpleWorkflowToItem).sort((a, b) =>
+    return automations.map(automationToItem).sort((a, b) =>
       (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)
     );
-  }, [simpleWorkflows]);
+  }, [automations]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
@@ -79,7 +79,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
         name: newName.trim(),
         projectId: effectiveProjectId || undefined,
         trigger,
-        action: { type: newActionType, config: actionConfig },
+        action: { kind: 'activity', ref: newActionType, input: actionConfig },
       });
 
       setShowCreate(false);
@@ -96,7 +96,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   };
 
   const handleToggle = async (item: AutomationItem) => {
-    await api.patch(`/api/workflows/${item.id}`, { status: item.enabled ? 'disabled' : 'active' }).catch(() => {});
+    await api.patch(`/api/automations/${item.id}`, { enabled: !item.enabled }).catch(() => {});
     refresh();
   };
 
@@ -106,7 +106,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   };
 
   const handleDelete = async (item: AutomationItem) => {
-    await api.del(`/api/workflows/${item.id}`).catch(() => {});
+    await api.del(`/api/automations/${item.id}`).catch(() => {});
     refresh();
   };
 
@@ -194,6 +194,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
               options={[
                 { value: 'ai_prompt', label: 'AI Prompt' },
                 { value: 'shell', label: 'Shell Command' },
+                { value: 'git_commit', label: 'Git Commit' },
                 { value: 'webhook', label: 'Webhook' },
               ]}
             />

@@ -35,14 +35,12 @@ describe('AutomationContent', () => {
         return ok([{
           id: 'w1',
           name: 'Build',
-          status: 'active',
-          authoringMode: 'simple',
-          definition: {
-            nodes: [{ id: 'n1', type: 'shell' }],
-            edges: [],
-            entryNodeId: 'n1',
-            triggers: [{ type: 'interval', intervalMinutes: 60 }],
-          },
+          enabled: true,
+          projectId: 'p1',
+          trigger: { type: 'interval', intervalMinutes: 60 },
+          action: { kind: 'activity', ref: 'shell', input: {} },
+          createdAt: 0,
+          updatedAt: 0,
         }]);
       }
       throw new Error(`Unhandled fetch: ${url}`);

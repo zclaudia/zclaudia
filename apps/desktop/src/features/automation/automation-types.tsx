@@ -1,4 +1,4 @@
-import type { Project, Workflow } from '@zclaudia/shared';
+import type { Project, Automation } from '@zclaudia/shared';
 
 export type AutomationTab = 'automations' | 'workflows' | 'runs' | 'system';
 
@@ -21,7 +21,7 @@ export interface AutomationItem {
   projectId?: string;
   triggerSummary: string;
   actionSummary: string;
-  source: 'workflow';
+  source: 'automation';
   status: string;
   runCount: number;
   lastError?: string;
@@ -54,9 +54,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   plugin: 'bg-muted text-muted-foreground',
 };
 
-export function simpleWorkflowToItem(w: Workflow): AutomationItem {
-  const trigger = w.definition.triggers[0];
-  const node = w.definition.nodes[0];
+export function automationToItem(a: Automation): AutomationItem {
+  const trigger = a.trigger;
   const triggerSummary = !trigger ? 'manual'
     : trigger.type === 'cron' ? `cron: ${trigger.cron}`
     : trigger.type === 'interval' ? `every ${trigger.intervalMinutes}m`
@@ -64,15 +63,15 @@ export function simpleWorkflowToItem(w: Workflow): AutomationItem {
     : trigger.type === 'event' ? `event: ${trigger.event}`
     : trigger.type;
   return {
-    id: w.id,
-    name: w.name,
-    description: w.description,
-    enabled: w.status === 'active',
-    projectId: w.projectId,
+    id: a.id,
+    name: a.name,
+    description: a.description,
+    enabled: a.enabled,
+    projectId: a.projectId,
     triggerSummary,
-    actionSummary: node?.type ?? 'unknown',
-    source: 'workflow',
-    status: w.status === 'active' ? 'idle' : 'disabled',
+    actionSummary: a.action.ref,
+    source: 'automation',
+    status: a.enabled ? 'idle' : 'disabled',
     runCount: 0,
   };
 }
