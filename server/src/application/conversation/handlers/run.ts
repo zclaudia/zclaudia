@@ -17,6 +17,8 @@ import { sendMessage } from '../transport/broadcast.js';
 import { AgentProfileRepository } from '../../../domains/agent-profiles/repository.js';
 import { LlmProfileRepository } from '../../../domains/llm-profiles/repository.js';
 import { isTerminalPhase } from '../runtime/active-run-phase.js';
+import { getNextOffset } from '../runtime/run-lifecycle.js';
+import { appendMessagesToTree, buildUserMessage } from '../../../infra/providers/pi-runtime/session-tree/write-path.js';
 
 function sendSteerError(client: ConnectedClient, code: string, message: string): void {
   sendMessage(client.ws, {
@@ -222,9 +224,11 @@ export async function handleAgentCancel(
  *
  * Validates (in order): non-empty content; active run exists and isn't
  * completed; SteerHandle has been registered by the adapter (onAgentReady).
- * On accept: forwards to handle.steer, tracks in pendingSteers for cancel-time
- * draft recovery, and broadcasts MessageAppendedMessage so every connected
- * client renders the user message immediately.
+ * On accept: forwards to handle.steer, persists the user message to both the
+ * `messages` table and the session-tree (so the next `buildContext` sees it and
+ * history stays complete), tracks in pendingSteers for cancel-time draft
+ * recovery, and broadcasts MessageAppendedMessage so every connected client
+ * renders the user message immediately.
  */
 export async function handleRunSteer(
   client: ConnectedClient,
@@ -264,10 +268,45 @@ export async function handleRunSteer(
     return;
   }
 
-  // 2. Track in memory so cancel can hand the text back as restoreDraft
+  // 2. Persist the steered user message so the next run's `buildContext`
+  //    (tree-backed) sees it AND the history/UI projection stays complete.
+  //    Without this the agent "forgets" the steer on the next turn and the
+  //    client's optimistic render becomes an orphan that history sync drops.
+  //    The message id is `steer-${runId}-${now}` so it matches the client's
+  //    optimistic `stableId` (steer-<runId>-<timestamp>) and dedupes cleanly.
+  //    Appending to the leaf *now* orders it ahead of this run's eventual
+  //    assistant turn, matching how pi's steering queue interleaves it.
+  const steerMessageId = `steer-${msg.runId}-${now}`;
+  try {
+    const db = run.db;
+    if (db) {
+      const offset = getNextOffset(db, run.sessionId);
+      db.transaction(() => {
+        db.prepare(`
+          INSERT INTO messages (id, session_id, role, content, metadata, created_at, offset)
+          VALUES (?, ?, 'user', ?, ?, ?, ?)
+        `).run(
+          steerMessageId,
+          run.sessionId,
+          trimmed,
+          JSON.stringify({ steered: true }),
+          now,
+          offset,
+        );
+        const entryIds = appendMessagesToTree(db, run.sessionId, [buildUserMessage(trimmed, [])]);
+        db.prepare(`UPDATE messages SET tree_entry_id = ? WHERE id = ?`).run(entryIds[0], steerMessageId);
+      })();
+    }
+  } catch (err) {
+    // Persistence failure must NOT block the steer (agent already accepted it).
+    // Log so the integrity gap is visible; the run proceeds with a partial write.
+    console.error('[handleRunSteer] failed to persist steered user message:', err);
+  }
+
+  // 3. Track in memory so cancel can hand the text back as restoreDraft
   run.pendingSteers.push(agentMessage);
 
-  // 3. Broadcast to all session clients so UI shows the user message immediately
+  // 4. Broadcast to all session clients so UI shows the user message immediately
   broadcastRunMessage(run, {
     type: 'message_appended',
     sessionId: run.sessionId,

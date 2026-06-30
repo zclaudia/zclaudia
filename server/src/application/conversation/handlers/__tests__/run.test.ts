@@ -153,3 +153,126 @@ describe('handleRunSteer', () => {
     expect(sent[0]).toMatchObject({ type: 'error', code: 'STEER_FAILED' });
   });
 });
+
+describe('handleRunSteer — persistence', () => {
+  /**
+   * Mock DB (no native binding needed) that records every prepared statement
+   * and its bound args. `transaction(fn)` runs `fn` immediately so the wrapped
+   * persistence block executes synchronously during the test.
+   */
+  function makeMockDb() {
+    const stmts: { sql: string; args: unknown[] }[] = [];
+    const mockDb = {
+      prepare: vi.fn((sql: string) => ({
+        // Offset query for getNextOffset.
+        get: vi.fn((...args: unknown[]) => {
+          if (sql.includes('COALESCE(MAX(offset)')) {
+            stmts.push({ sql, args });
+            return { next: 5 };
+          }
+          // session_leaf leaf read inside appendMessagesToTree.
+          if (sql.includes('FROM session_leaf')) {
+            stmts.push({ sql, args });
+            return undefined;
+          }
+          stmts.push({ sql, args });
+          return undefined;
+        }),
+        run: vi.fn((...args: unknown[]) => {
+          stmts.push({ sql, args });
+          return { changes: 1 };
+        }),
+        all: vi.fn((...args: unknown[]) => {
+          stmts.push({ sql, args });
+          return [];
+        }),
+      })),
+      transaction: vi.fn(<T>(fn: (...a: unknown[]) => T) => (...args: unknown[]) => fn(...args)),
+      __stmts: stmts,
+    };
+    return mockDb;
+  }
+
+  /** Builds an ActiveRun wired to the mock DB. */
+  function makeRun(db: ReturnType<typeof makeMockDb>, overrides: Partial<ActiveRun> = {}): ActiveRun {
+    return {
+      runId: 'r1',
+      sessionId: 's1',
+      phase: 'running',
+      steerHandle: { steer: vi.fn() },
+      pendingSteers: [],
+      db: db as unknown as ActiveRun['db'],
+      ...overrides,
+    } as never as ActiveRun;
+  }
+
+  it('persists the steered user message row + tree turn, and broadcasts the message', async () => {
+    const { client } = makeClient();
+    const db = makeMockDb();
+    const steerSpy = vi.fn();
+    const broadcastMock = vi.fn();
+    const activeRuns = new Map<string, ActiveRun>();
+    activeRuns.set('r1', makeRun(db, { steerHandle: { steer: steerSpy } }));
+
+    await handleRunSteer(
+      client,
+      { type: 'run_steer', runId: 'r1', content: 'fix the typo too' },
+      activeRuns,
+      broadcastMock,
+    );
+
+    // steer was accepted first (persistence only happens after a successful steer).
+    expect(steerSpy).toHaveBeenCalledTimes(1);
+
+    // messages-table INSERT for the user message. Note `'user'` is a SQL literal
+    // (VALUES (?, ?, 'user', ...)), so only id/sessionId/content/metadata/time/offset
+    // arrive as bound args.
+    const insertCall = db.__stmts.find((s) => s.sql.includes('INSERT INTO messages'));
+    expect(insertCall).toBeTruthy();
+    expect(insertCall!.sql).toContain("'user'");
+    const [id, , content, metadataJson, createdAt] = insertCall!.args;
+    expect(content).toBe('fix the typo too');
+    expect(createdAt).toEqual(expect.any(Number));
+    expect(JSON.parse(metadataJson as string)).toEqual({ steered: true });
+    // Id is the client's optimistic stableId (steer-<runId>-<timestamp>) so the
+    // later history-sync dedup lands on the same row instead of a duplicate.
+    expect(id).toBe(`steer-r1-${createdAt}`);
+
+    // session-tree was appended (session_entries write + leaf advance).
+    const treeWrite = db.__stmts.find((s) => s.sql.includes('INSERT INTO session_entries'));
+    expect(treeWrite).toBeTruthy();
+
+    // messages row back-linked to the tree entry.
+    const treeLink = db.__stmts.find((s) => s.sql.includes('UPDATE messages SET tree_entry_id'));
+    expect(treeLink).toBeTruthy();
+
+    // The steered message was broadcast so every client renders it immediately.
+    expect(broadcastMock).toHaveBeenCalledWith(
+      activeRuns.get('r1'),
+      expect.objectContaining({
+        type: 'message_appended',
+        role: 'user',
+        content: 'fix the typo too',
+        steered: true,
+      }),
+    );
+  });
+
+  it('does NOT persist when steer is rejected, even with a DB attached', async () => {
+    const { client } = makeClient();
+    const db = makeMockDb();
+    const activeRuns = new Map<string, ActiveRun>();
+    // terminal phase → STEER_NO_ACTIVE_RUN, before any DB write.
+    activeRuns.set('r1', makeRun(db, { phase: 'completed' }));
+
+    await handleRunSteer(
+      client,
+      { type: 'run_steer', runId: 'r1', content: 'x' },
+      activeRuns,
+      vi.fn(),
+    );
+
+    expect(db.__stmts.find((s) => s.sql.includes('INSERT INTO messages'))).toBeUndefined();
+    expect(db.__stmts.find((s) => s.sql.includes('INSERT INTO session_entries'))).toBeUndefined();
+  });
+});
