@@ -18,13 +18,6 @@ const mockRunRepo = {
 const mockStepRunRepo = {
   findByRun: vi.fn().mockReturnValue([]),
 };
-const mockScheduleRepo = {
-  findDue: vi.fn().mockReturnValue([]),
-  upsert: vi.fn(),
-  deleteByWorkflow: vi.fn(),
-  updateNextRun: vi.fn(),
-  findByWorkflow: vi.fn(),
-};
 const mockEngine = {
   startRun: vi.fn(),
   cancelRun: vi.fn(),
@@ -42,16 +35,7 @@ vi.mock('../workflow-run-repository.js', () => ({
 vi.mock('../workflow-step-run-repository.js', () => ({
   WorkflowStepRunRepository: class { constructor() { Object.assign(this, mockStepRunRepo); } },
 }));
-vi.mock('../workflow-schedule-repository.js', () => ({
-  WorkflowScheduleRepository: class { constructor() { Object.assign(this, mockScheduleRepo); } },
-}));
 vi.mock('../engine.js', () => ({}));
-vi.mock('../../../utils/cron.js', () => ({
-  computeNextCronRun: vi.fn().mockReturnValue(99999),
-}));
-vi.mock('../../../infra/events/index.js', () => ({
-  pluginEvents: { on: vi.fn().mockReturnValue(() => {}), emit: vi.fn() },
-}));
 vi.mock('../templates.js', () => ({
   PERMISSION_WORKFLOW_TEMPLATE_ID: 'permission-escalation-default',
   SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY: 'permission_escalation_fallback',
@@ -62,9 +46,6 @@ vi.mock('../templates.js', () => ({
 }));
 
 import { ImmutableSystemWorkflowError, WorkflowService } from '../service.js';
-import { pluginEvents } from '../../../infra/events/index.js';
-
-const emptyDefinition = { triggers: [], nodes: [], edges: [], entryNodeId: '' };
 
 describe('WorkflowService', () => {
   let service: WorkflowService;
@@ -79,7 +60,6 @@ describe('WorkflowService', () => {
     mockWorkflowRepo.findAllActive.mockReturnValue([]);
     mockRunRepo.findByWorkflow.mockReturnValue([]);
     mockStepRunRepo.findByRun.mockReturnValue([]);
-    mockScheduleRepo.findDue.mockReturnValue([]);
     mockEngine.isRunning.mockReturnValue(false);
 
     mockBroadcast = vi.fn();
@@ -120,16 +100,16 @@ describe('WorkflowService', () => {
       expect(mockBroadcast).toHaveBeenCalledWith('p1', expect.objectContaining({ type: 'workflow_update' }));
     });
 
-    it('does not sync schedule when status is not active', () => {
+    it('creates and broadcasts a disabled workflow without scheduling side effects', () => {
       const mockWorkflow = { id: 'w1', projectId: 'p1', status: 'disabled', definition: { triggers: [] } };
       mockWorkflowRepo.create.mockReturnValue(mockWorkflow);
 
-      service.createWorkflow({
+      const result = service.createWorkflow({
         projectId: 'p1', name: 'flow', definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } as any, status: 'disabled',
       });
 
-      // Schedule sync not called for inactive
-      expect(mockScheduleRepo.upsert).not.toHaveBeenCalled();
+      expect(result).toEqual(mockWorkflow);
+      expect(mockBroadcast).toHaveBeenCalledWith('p1', expect.objectContaining({ type: 'workflow_update' }));
     });
   });
 
@@ -155,7 +135,6 @@ describe('WorkflowService', () => {
       const result = service.deleteWorkflow('w1', 'p1');
       expect(result).toBe(true);
       expect(mockBroadcast).toHaveBeenCalledWith('p1', expect.objectContaining({ type: 'workflow_deleted' }));
-      expect(mockScheduleRepo.deleteByWorkflow).toHaveBeenCalledWith('w1');
     });
 
     it('returns false when not found', () => {
@@ -226,13 +205,32 @@ describe('WorkflowService', () => {
       await expect(service.triggerWorkflow('w1')).rejects.toThrow('not active');
     });
 
-    it('delegates to engine.startRun', async () => {
+    it('delegates to engine.startRun with the options object', async () => {
       const wf = { id: 'w1', projectId: 'p1', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } };
       mockWorkflowRepo.findById.mockReturnValue(wf);
       mockEngine.startRun.mockResolvedValue({ id: 'r1' });
 
       await service.triggerWorkflow('w1', 'manual', 'detail');
-      expect(mockEngine.startRun).toHaveBeenCalledWith('w1', 'p1', wf.definition, 'manual', 'detail', undefined);
+      expect(mockEngine.startRun).toHaveBeenCalledWith(expect.objectContaining({
+        workflowId: 'w1',
+        projectId: 'p1',
+        definition: wf.definition,
+        triggerSource: 'manual',
+        initiator: 'manual',
+        actionKind: 'workflow',
+        actionRef: 'w1',
+        triggerDetail: 'detail',
+        trackingKey: 'w1',
+      }));
+    });
+
+    it('uses the supplied initiator when provided', async () => {
+      const wf = { id: 'w1', projectId: 'p1', status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] } };
+      mockWorkflowRepo.findById.mockReturnValue(wf);
+      mockEngine.startRun.mockResolvedValue({ id: 'r1' });
+
+      await service.triggerWorkflow('w1', 'event', 'detail', undefined, 'automation:abc');
+      expect(mockEngine.startRun).toHaveBeenCalledWith(expect.objectContaining({ initiator: 'automation:abc' }));
     });
   });
 
@@ -267,88 +265,13 @@ describe('WorkflowService', () => {
     });
   });
 
-  describe('tick', () => {
-    it('handles empty due schedules', async () => {
-      mockScheduleRepo.findDue.mockReturnValue([]);
-      await service.tick();
-      expect(mockScheduleRepo.findDue).toHaveBeenCalled();
-    });
-
-    it('catches tick errors', async () => {
-      mockScheduleRepo.findDue.mockImplementation(() => { throw new Error('db'); });
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      await service.tick();
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('tick error'), expect.any(Error));
-      spy.mockRestore();
-    });
-
-    it('skips inactive workflows during tick', async () => {
-      mockScheduleRepo.findDue.mockReturnValue([{ workflowId: 'w1', triggerIndex: 0 }]);
-      mockWorkflowRepo.findById.mockReturnValue({ id: 'w1', status: 'disabled' });
-
-      await service.tick();
-      expect(mockEngine.startRun).not.toHaveBeenCalled();
-    });
-
-    it('skips already running workflows', async () => {
-      mockScheduleRepo.findDue.mockReturnValue([{ workflowId: 'w1', triggerIndex: 0 }]);
-      mockWorkflowRepo.findById.mockReturnValue({ id: 'w1', status: 'active', definition: { triggers: [{ type: 'cron', cron: '* * * * *' }] } });
-      mockEngine.isRunning.mockReturnValue(true);
-
-      await service.tick();
-      expect(mockEngine.startRun).not.toHaveBeenCalled();
-    });
-
-    it('triggers active workflow and updates next run', async () => {
-      const trigger = { type: 'cron', cron: '* * * * *' };
-      mockScheduleRepo.findDue.mockReturnValue([{ workflowId: 'w1', triggerIndex: 0 }]);
-      mockWorkflowRepo.findById.mockReturnValue({
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: { ...emptyDefinition, triggers: [trigger] },
-      });
-      mockEngine.isRunning.mockReturnValue(false);
-      mockEngine.startRun.mockResolvedValue({ id: 'r1' });
-
-      await service.tick();
-
-      expect(mockEngine.startRun).toHaveBeenCalledWith(
-        'w1',
-        'p1',
-        expect.any(Object),
-        'schedule',
-        expect.stringContaining('cron'),
-        expect.objectContaining({
-          triggerContext: expect.objectContaining({ type: 'cron', cron: '* * * * *' }),
-        }),
-      );
-      expect(mockScheduleRepo.updateNextRun).toHaveBeenCalledWith('w1', 99999);
-    });
-
-    it('handles trigger failure gracefully', async () => {
-      const trigger = { type: 'interval', intervalMinutes: 10 };
-      mockScheduleRepo.findDue.mockReturnValue([{ workflowId: 'w1', triggerIndex: 0 }]);
-      mockWorkflowRepo.findById.mockReturnValue({
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: { ...emptyDefinition, triggers: [trigger] },
-      });
-      mockEngine.isRunning.mockReturnValue(false);
-      mockEngine.startRun.mockRejectedValue(new Error('engine error'));
-
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      await service.tick();
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Schedule trigger failed'), expect.any(Error));
-      spy.mockRestore();
-    });
-
-    it('skips schedules with invalid trigger index', async () => {
-      mockScheduleRepo.findDue.mockReturnValue([{ workflowId: 'w1', triggerIndex: 5 }]);
-      mockWorkflowRepo.findById.mockReturnValue({
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: { triggers: [] },
-      });
-
-      await service.tick();
-      expect(mockEngine.startRun).not.toHaveBeenCalled();
+  describe('scheduling/event-bridge removal', () => {
+    it('no longer exposes scheduling or event-bridge methods', () => {
+      expect((service as any).tick).toBeUndefined();
+      expect((service as any).syncSchedule).toBeUndefined();
+      expect((service as any).rebuildEventSubscriptions).toBeUndefined();
+      expect((service as any).computeNextRun).toBeUndefined();
+      expect((service as any).matchesFilter).toBeUndefined();
     });
   });
 
@@ -369,12 +292,6 @@ describe('WorkflowService', () => {
   });
 
   describe('initialize', () => {
-    it('rebuilds event subscriptions', () => {
-      mockWorkflowRepo.findAllActive.mockReturnValue([]);
-      service.initialize();
-      expect(mockWorkflowRepo.findAllActive).toHaveBeenCalled();
-    });
-
     it('creates system fallback when missing', () => {
       mockWorkflowRepo.findBySystemKey.mockReturnValue(null);
       mockWorkflowRepo.findGlobalByTemplate.mockReturnValue(null);
@@ -418,239 +335,6 @@ describe('WorkflowService', () => {
         isSystem: true,
         systemKey: 'permission_escalation_fallback',
       }));
-    });
-
-    it('sets up event subscriptions for active workflows with event triggers', () => {
-
-      mockWorkflowRepo.findAllActive.mockReturnValue([
-        {
-          id: 'w1', projectId: 'p1', status: 'active',
-          definition: { triggers: [{ type: 'event', event: 'run.completed' }] },
-        },
-      ]);
-
-      service.initialize();
-
-      expect(pluginEvents.on).toHaveBeenCalledWith('run.completed', expect.any(Function), 'workflow-engine');
-    });
-
-    it('unsubscribes old event subscriptions before rebuilding', () => {
-      const unsub = vi.fn();
-
-      pluginEvents.on.mockReturnValue(unsub);
-
-      mockWorkflowRepo.findAllActive.mockReturnValue([
-        {
-          id: 'w1', projectId: 'p1', status: 'active',
-          definition: { triggers: [{ type: 'event', event: 'test.event' }] },
-        },
-      ]);
-
-      // First initialize
-      service.initialize();
-      expect(pluginEvents.on).toHaveBeenCalled();
-
-      // Second initialize should call unsub on previous subscriptions
-      service.initialize();
-      expect(unsub).toHaveBeenCalled();
-    });
-  });
-
-  describe('matchesFilter (via event trigger)', () => {
-    it('triggers workflow when event data matches filter', async () => {
-
-      let eventHandler: (data: any) => Promise<void>;
-
-      pluginEvents.on.mockImplementation((event: string, handler: any) => {
-        eventHandler = handler;
-        return () => {};
-      });
-
-      mockWorkflowRepo.findAllActive.mockReturnValue([
-        {
-          id: 'w1', projectId: 'p1', status: 'active',
-          definition: {
-            ...emptyDefinition,
-            triggers: [{ type: 'event', event: 'run.completed', eventFilter: { status: 'success' } }],
-          },
-        },
-      ]);
-      mockWorkflowRepo.findById.mockReturnValue({
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: {
-          ...emptyDefinition,
-          triggers: [{ type: 'event', event: 'run.completed', eventFilter: { status: 'success' } }],
-        },
-      });
-      mockEngine.isRunning.mockReturnValue(false);
-      mockEngine.startRun.mockResolvedValue({ id: 'r1' });
-
-      service.initialize();
-
-      // Trigger the event with matching data
-      await eventHandler!({ status: 'success' });
-
-      expect(mockEngine.startRun).toHaveBeenCalledWith(
-        'w1',
-        'p1',
-        expect.any(Object),
-        'event',
-        'event: run.completed',
-        expect.objectContaining({
-          eventPayload: { status: 'success' },
-          triggerContext: expect.objectContaining({ type: 'event', event: 'run.completed' }),
-        }),
-      );
-    });
-
-    it('does not trigger workflow when filter does not match', async () => {
-
-      let eventHandler: (data: any) => Promise<void>;
-
-      pluginEvents.on.mockImplementation((event: string, handler: any) => {
-        eventHandler = handler;
-        return () => {};
-      });
-
-      mockWorkflowRepo.findAllActive.mockReturnValue([
-        {
-          id: 'w1', projectId: 'p1', status: 'active',
-          definition: {
-            ...emptyDefinition,
-            triggers: [{ type: 'event', event: 'run.completed', eventFilter: { status: 'success' } }],
-          },
-        },
-      ]);
-
-      service.initialize();
-
-      // Trigger the event with non-matching data
-      await eventHandler!({ status: 'failed' });
-
-      expect(mockEngine.startRun).not.toHaveBeenCalled();
-    });
-
-    it('allows concurrent runs for event-triggered workflows', async () => {
-
-      let eventHandler: (data: any) => Promise<void>;
-
-      pluginEvents.on.mockImplementation((event: string, handler: any) => {
-        eventHandler = handler;
-        return () => {};
-      });
-
-      mockWorkflowRepo.findAllActive.mockReturnValue([
-        {
-          id: 'w1', projectId: 'p1', status: 'active',
-          definition: {
-            ...emptyDefinition,
-            triggers: [{ type: 'event', event: 'run.completed' }],
-          },
-        },
-      ]);
-      mockWorkflowRepo.findById.mockReturnValue({
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: {
-          ...emptyDefinition,
-          triggers: [{ type: 'event', event: 'run.completed' }],
-        },
-      });
-      mockEngine.isRunning.mockReturnValue(true);
-      mockEngine.startRun.mockResolvedValue({ id: 'r1' });
-
-      service.initialize();
-      await eventHandler!({});
-
-      // Event-triggered workflows should NOT be skipped even when already running
-      expect(mockEngine.startRun).toHaveBeenCalled();
-    });
-
-    it('handles trigger error gracefully on event', async () => {
-
-      let eventHandler: (data: any) => Promise<void>;
-
-      pluginEvents.on.mockImplementation((event: string, handler: any) => {
-        eventHandler = handler;
-        return () => {};
-      });
-
-      mockWorkflowRepo.findAllActive.mockReturnValue([
-        {
-          id: 'w1', projectId: 'p1', status: 'active',
-          definition: {
-            ...emptyDefinition,
-            triggers: [{ type: 'event', event: 'run.completed' }],
-          },
-        },
-      ]);
-      mockWorkflowRepo.findById.mockReturnValue({
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: { ...emptyDefinition, triggers: [{ type: 'event', event: 'run.completed' }] },
-      });
-      mockEngine.isRunning.mockReturnValue(false);
-      mockEngine.startRun.mockRejectedValue(new Error('Engine error'));
-
-      const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      service.initialize();
-      await eventHandler!({});
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('Event trigger failed'), expect.any(Error));
-      spy.mockRestore();
-    });
-  });
-
-  describe('createWorkflow with cron trigger', () => {
-    it('syncs schedule for active workflow with cron trigger', () => {
-      const mockWorkflow = {
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: { triggers: [{ type: 'cron', cron: '0 9 * * *' }] },
-      };
-      mockWorkflowRepo.create.mockReturnValue(mockWorkflow);
-
-      service.createWorkflow({
-        projectId: 'p1', name: 'flow',
-        definition: { ...emptyDefinition, triggers: [{ type: 'cron', cron: '0 9 * * *' }] } as any,
-      });
-
-      expect(mockScheduleRepo.upsert).toHaveBeenCalledWith('w1', 0, 99999, true);
-    });
-
-    it('syncs schedule for active workflow with interval trigger', () => {
-      const mockWorkflow = {
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: { triggers: [{ type: 'interval', intervalMinutes: 30 }] },
-      };
-      mockWorkflowRepo.create.mockReturnValue(mockWorkflow);
-
-      service.createWorkflow({
-        projectId: 'p1', name: 'flow',
-        definition: { ...emptyDefinition, triggers: [{ type: 'interval', intervalMinutes: 30 }] } as any,
-      });
-
-      expect(mockScheduleRepo.upsert).toHaveBeenCalled();
-    });
-
-    it('deletes schedule when updating workflow to disabled', () => {
-      const updated = {
-        id: 'w1', projectId: 'p1', status: 'disabled',
-        definition: { triggers: [{ type: 'cron', cron: '0 9 * * *' }] },
-      };
-      mockWorkflowRepo.update.mockReturnValue(updated);
-
-      service.updateWorkflow('w1', { status: 'disabled' });
-
-      expect(mockScheduleRepo.deleteByWorkflow).toHaveBeenCalledWith('w1');
-    });
-
-    it('deletes schedule when no cron/interval trigger', () => {
-      const updated = {
-        id: 'w1', projectId: 'p1', status: 'active',
-        definition: { triggers: [{ type: 'event', event: 'test' }] },
-      };
-      mockWorkflowRepo.update.mockReturnValue(updated);
-
-      service.updateWorkflow('w1', { name: 'updated' });
-
-      expect(mockScheduleRepo.deleteByWorkflow).toHaveBeenCalledWith('w1');
     });
   });
 });

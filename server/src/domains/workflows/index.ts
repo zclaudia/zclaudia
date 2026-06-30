@@ -5,7 +5,6 @@ export { WorkflowGeneratorService } from './generator.js';
 export { WorkflowRepository } from './repository.js';
 export { WorkflowRunRepository } from './workflow-run-repository.js';
 export { WorkflowStepRunRepository } from './workflow-step-run-repository.js';
-export { WorkflowScheduleRepository } from './workflow-schedule-repository.js';
 export { BUILTIN_WORKFLOW_TEMPLATES } from './templates.js';
 export type { WorkflowAiRunPort, WorkflowSchedulingPort } from './ports/runtime.js';
 export { registerWorkflowDomain, type WorkflowDomainDeps, type WorkflowDomainResult } from './register.js';

@@ -1,7 +1,7 @@
 /**
  * Workflow domain registration.
  *
- * Assembles step executors (DI), wires engine + service, mounts routes, starts scheduler.
+ * Assembles step executors (DI), wires engine + service, mounts routes.
  */
 
 import type { Express } from 'express';
@@ -75,7 +75,7 @@ export interface WorkflowDomainResult {
 }
 
 export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomainResult {
-  const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, systemTaskRegistry, aiRunPort, permissionBridge, getPermissionWorkflowResolver, activityRegistry } = deps;
+  const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, aiRunPort, permissionBridge, getPermissionWorkflowResolver, activityRegistry } = deps;
 
   // -- Assemble step executors --
   const agentLoopRunner = new LightweightAgentRunner({ db });
@@ -130,25 +130,7 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
     triggerRegistry: workflowTriggerRegistry,
   }));
 
-  // -- Scheduler --
-  systemTaskRegistry.register({
-    id: 'system:workflow_scheduler',
-    name: 'Workflow Scheduler',
-    description: 'Checks for due workflow schedules and starts runs',
-    category: 'scheduling',
-    intervalMs: 10000,
-  });
-  setInterval(async () => {
-    systemTaskRegistry.markRunStart('system:workflow_scheduler');
-    const start = Date.now();
-    try {
-      await workflowService.tick();
-      systemTaskRegistry.markRunComplete('system:workflow_scheduler', Date.now() - start);
-    } catch (err) {
-      systemTaskRegistry.markRunComplete('system:workflow_scheduler', Date.now() - start, String(err));
-      console.error('[Workflow] Tick error:', err);
-    }
-  }, 10000);
+  // Scheduling + event subscriptions are owned by AutomationService.
 
   return { workflowService, workflowGeneratorService, workflowEngine: engine };
 }

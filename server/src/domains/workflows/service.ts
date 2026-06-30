@@ -1,8 +1,9 @@
 /**
  * Workflow Service (Facade)
  *
- * Orchestrates the workflow engine, scheduler, and event bridge.
- * Provides CRUD operations and manages lifecycle.
+ * Provides CRUD operations, system-workflow management, run queries, and
+ * manual/triggered runs. Scheduling + event subscriptions are owned by
+ * AutomationService.
  */
 
 import type { Database } from 'better-sqlite3';
@@ -11,16 +12,12 @@ import type {
   WorkflowRun,
   WorkflowStepRun,
   WorkflowDefinition,
-  WorkflowTrigger,
 } from '@zclaudia/shared/features/workflows';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { WorkflowRepository } from './repository.js';
 import { WorkflowRunRepository } from './workflow-run-repository.js';
 import { WorkflowStepRunRepository } from './workflow-step-run-repository.js';
-import { WorkflowScheduleRepository } from './workflow-schedule-repository.js';
 import type { WorkflowEngine } from './engine.js';
-import { computeNextCronRun } from '../../utils/cron.js';
-import { pluginEvents } from '../../infra/events/index.js';
 import {
   BUILTIN_WORKFLOW_TEMPLATES,
   PERMISSION_WORKFLOW_TEMPLATE_ID,
@@ -38,8 +35,6 @@ export class WorkflowService {
   private workflowRepo: WorkflowRepository;
   private runRepo: WorkflowRunRepository;
   private stepRunRepo: WorkflowStepRunRepository;
-  private scheduleRepo: WorkflowScheduleRepository;
-  private eventSubscriptions: Array<() => void> = [];
 
   constructor(
     private db: Database,
@@ -49,14 +44,12 @@ export class WorkflowService {
     this.workflowRepo = new WorkflowRepository(db);
     this.runRepo = new WorkflowRunRepository(db);
     this.stepRunRepo = new WorkflowStepRunRepository(db);
-    this.scheduleRepo = new WorkflowScheduleRepository(db);
   }
 
   // ── Initialization ────────────────────────────────────────────
 
   initialize(): void {
     this.ensureBuiltinWorkflows();
-    this.rebuildEventSubscriptions();
   }
 
   private ensureBuiltinWorkflows(): void {
@@ -144,7 +137,7 @@ export class WorkflowService {
     status?: 'active' | 'disabled';
     sourcePluginId?: string;
     sourceType?: 'user' | 'plugin' | 'template';
-    authoringMode?: 'simple' | 'graph' | 'event-trigger';
+    authoringMode?: 'graph' | 'event-trigger';
   }): Workflow {
     const workflow = this.workflowRepo.create({
       projectId: data.projectId,
@@ -158,12 +151,6 @@ export class WorkflowService {
       authoringMode: data.authoringMode,
     });
 
-    // Set up schedule if needed
-    if (workflow.status === 'active') {
-      this.syncSchedule(workflow);
-      this.rebuildEventSubscriptions();
-    }
-
     this.broadcastWorkflowUpdate(workflow);
     return workflow;
   }
@@ -175,10 +162,6 @@ export class WorkflowService {
     }
     const workflow = this.workflowRepo.update(workflowId, data);
 
-    // Re-sync schedule
-    this.syncSchedule(workflow);
-    this.rebuildEventSubscriptions();
-
     this.broadcastWorkflowUpdate(workflow);
     return workflow;
   }
@@ -188,10 +171,8 @@ export class WorkflowService {
     if (existing?.isSystem) {
       throw new ImmutableSystemWorkflowError();
     }
-    this.scheduleRepo.deleteByWorkflow(workflowId);
     const deleted = this.workflowRepo.delete(workflowId);
     if (deleted) {
-      this.rebuildEventSubscriptions();
       this.broadcastFn(projectId, {
         type: 'workflow_deleted',
         projectId,
@@ -238,23 +219,25 @@ export class WorkflowService {
     workflowId: string,
     triggerSource: 'manual' | 'schedule' | 'event' = 'manual',
     triggerDetail?: string,
-    triggerData?: {
-      eventPayload?: Record<string, unknown>;
-      triggerContext?: Record<string, unknown>;
-    },
+    triggerData?: { eventPayload?: Record<string, unknown>; triggerContext?: Record<string, unknown> },
+    initiator?: string,
   ): Promise<WorkflowRun> {
     const workflow = this.workflowRepo.findById(workflowId);
     if (!workflow) throw new Error(`Workflow not found: ${workflowId}`);
     if (workflow.status !== 'active') throw new Error(`Workflow is not active: ${workflowId}`);
 
-    return this.engine.startRun(
+    return this.engine.startRun({
       workflowId,
-      workflow.projectId,
-      workflow.definition,
+      projectId: workflow.projectId,
+      definition: workflow.definition,
       triggerSource,
+      initiator: initiator ?? (triggerSource === 'event' ? 'event' : 'manual'),
+      actionKind: 'workflow',
+      actionRef: workflowId,
       triggerDetail,
       triggerData,
-    );
+      trackingKey: workflowId,
+    });
   }
 
   getRuns(workflowId: string, limit?: number): WorkflowRun[] {
@@ -284,158 +267,6 @@ export class WorkflowService {
 
   rejectStep(stepRunId: string): boolean {
     return this.engine.rejectStep(stepRunId);
-  }
-
-  // ── Scheduler Tick ────────────────────────────────────────────
-
-  async tick(): Promise<void> {
-    try {
-      const now = Date.now();
-      const dueSchedules = this.scheduleRepo.findDue(now);
-
-      for (const schedule of dueSchedules) {
-        const workflow = this.workflowRepo.findById(schedule.workflowId);
-        if (!workflow || workflow.status !== 'active') continue;
-
-        // Skip if already running
-        if (this.engine.isRunning(workflow.id)) continue;
-
-        // Find the trigger config
-        const trigger = workflow.definition.triggers[schedule.triggerIndex];
-        if (!trigger) continue;
-
-        const triggerDetail = trigger.type === 'cron'
-          ? `cron: ${trigger.cron}`
-          : trigger.type === 'once'
-          ? `once: ${new Date(trigger.onceAt || 0).toISOString()}`
-          : `interval: ${trigger.intervalMinutes}min`;
-
-        // Start the run
-        try {
-          await this.triggerWorkflow(workflow.id, 'schedule', triggerDetail, {
-            triggerContext: {
-              type: trigger.type,
-              cron: trigger.cron,
-              intervalMinutes: trigger.intervalMinutes,
-              onceAt: trigger.onceAt,
-            },
-          });
-        } catch (err) {
-          console.error(`[Workflow] Schedule trigger failed for ${workflow.id}:`, err);
-        }
-
-        // Compute next run
-        const nextRun = this.computeNextRun(trigger);
-        this.scheduleRepo.updateNextRun(workflow.id, nextRun);
-      }
-    } catch (err) {
-      console.error('[Workflow] tick error:', err);
-    }
-  }
-
-  // ── Event Bridge ──────────────────────────────────────────────
-
-  private rebuildEventSubscriptions(): void {
-    // Unsubscribe old
-    for (const unsub of this.eventSubscriptions) {
-      unsub();
-    }
-    this.eventSubscriptions = [];
-
-    // Find all active workflows with event triggers
-    const workflows = this.workflowRepo.findAllActive();
-    const eventWorkflows = new Map<string, Workflow[]>();
-
-    for (const wf of workflows) {
-      for (const trigger of wf.definition.triggers) {
-        if (trigger.type === 'event' && trigger.event) {
-          const list = eventWorkflows.get(trigger.event) ?? [];
-          list.push(wf);
-          eventWorkflows.set(trigger.event, list);
-        }
-      }
-    }
-
-    // Subscribe once per event pattern (supports exact matches and globs)
-    for (const [event, wfs] of eventWorkflows) {
-      const isPattern = event.includes('*');
-      const handler = async (data: unknown, _sourcePluginId?: string) => {
-        for (const wf of wfs) {
-          if (wf.status !== 'active') continue;
-          // Allow concurrent runs for event-triggered workflows (e.g., permission escalation).
-          // Only skip for scheduled/cron workflows where duplicates are undesirable.
-
-          // Check event filter
-          const trigger = wf.definition.triggers.find(
-            t => t.type === 'event' && t.event === event
-          );
-          if (trigger?.eventFilter && !this.matchesFilter(data, trigger.eventFilter)) continue;
-
-          try {
-            await this.triggerWorkflow(wf.id, 'event', `event: ${event}`, {
-              eventPayload: data && typeof data === 'object' ? data as Record<string, unknown> : { value: data },
-              triggerContext: {
-                type: 'event',
-                event,
-              },
-            });
-          } catch (err) {
-            console.error(`[Workflow] Event trigger failed for ${wf.id}:`, err);
-          }
-        }
-      };
-
-      const unsub = isPattern
-        ? pluginEvents.onPattern(event, handler, 'workflow-engine')
-        : pluginEvents.on(event, handler, 'workflow-engine');
-
-      this.eventSubscriptions.push(unsub);
-    }
-  }
-
-  private matchesFilter(data: unknown, filter: Record<string, unknown>): boolean {
-    if (!data || typeof data !== 'object') return false;
-    const record = data as Record<string, unknown>;
-    for (const [key, value] of Object.entries(filter)) {
-      if (record[key] !== value) return false;
-    }
-    return true;
-  }
-
-  // ── Schedule Sync ─────────────────────────────────────────────
-
-  private syncSchedule(workflow: Workflow): void {
-    if (workflow.status !== 'active') {
-      this.scheduleRepo.deleteByWorkflow(workflow.id);
-      return;
-    }
-
-    // Find first schedulable trigger (cron/interval/once)
-    const triggerIndex = workflow.definition.triggers.findIndex(
-      t => t.type === 'cron' || t.type === 'interval' || t.type === 'once'
-    );
-
-    if (triggerIndex === -1) {
-      this.scheduleRepo.deleteByWorkflow(workflow.id);
-      return;
-    }
-
-    const trigger = workflow.definition.triggers[triggerIndex];
-    const nextRun = this.computeNextRun(trigger);
-    this.scheduleRepo.upsert(workflow.id, triggerIndex, nextRun, true);
-  }
-
-  private computeNextRun(trigger: WorkflowTrigger): number | null {
-    if (trigger.type === 'cron' && trigger.cron) {
-      return computeNextCronRun(trigger.cron);
-    }
-    if (trigger.type === 'interval' && trigger.intervalMinutes) {
-      return Date.now() + trigger.intervalMinutes * 60 * 1000;
-    }
-    if (trigger.type === 'once' && trigger.onceAt) {
-      return trigger.onceAt > Date.now() ? trigger.onceAt : null;
-    }
-    return null;
   }
 
   // ── Broadcast ─────────────────────────────────────────────────
