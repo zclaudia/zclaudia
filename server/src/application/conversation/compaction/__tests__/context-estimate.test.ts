@@ -82,6 +82,25 @@ describe('estimateContextTokensForThreshold', () => {
     const msgs = [asst({ input: 100_000, cacheRead: 0, cacheWrite: 0 })];
     expect(estimateContextTokensForThreshold(msgs, WINDOW, chars(150_000))).toBe(150_000);
   });
+
+  // Regression: a local openai-compat proxy (new-api) reported a CUMULATIVE
+  // cacheRead far larger than the window on a single response. The bogus anchor
+  // was correctly rejected (> window), but the DEFAULT chars estimator was pi's
+  // usage-anchored estimateContextTokens, which re-derived the same poison from
+  // usage and leaked it back through Math.max — so proactive compaction fired on
+  // essentially every turn. The default estimator must be poison-proof.
+  it('does not leak a proxy-poisoned usage anchor through the DEFAULT chars estimator', () => {
+    const window = 1_000_000;
+    const realText = 'x'.repeat(4_000); // ~1k tokens of genuine content
+    const msgs = [
+      { role: 'user', content: realText },
+      asst({ input: 134_180, cacheRead: 11_262_848, cacheWrite: 0, totalTokens: 11_409_032 }),
+    ];
+    // No injected estimator — exercises the real default.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const estimate = estimateContextTokensForThreshold(msgs as any, window);
+    expect(estimate).toBeLessThan(compactionTriggerThreshold(window));
+  });
 });
 
 describe('historyTokenBudget', () => {

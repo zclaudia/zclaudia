@@ -1,4 +1,17 @@
-import { estimateContextTokens, type AgentMessage } from '@earendil-works/pi-agent-core';
+import { estimateTokens, type AgentMessage } from '@earendil-works/pi-agent-core';
+
+/**
+ * Pure character-based context estimate (chars/4 over message content), summed
+ * per message. Unlike pi's `estimateContextTokens` it NEVER consults the last
+ * assistant `usage`, so a proxy that reports cumulative/bogus cache tokens
+ * cannot poison it. This is the default basis for the proactive-compaction
+ * estimate; see `estimateContextTokensForThreshold`.
+ */
+export function structuralContextTokens(messages: readonly AgentMessage[]): number {
+  let total = 0;
+  for (const m of messages) total += estimateTokens(m as AgentMessage);
+  return total;
+}
 
 /**
  * Output tokens reserved for the compaction summary itself (matches the budget
@@ -57,14 +70,17 @@ export function lastAssistantPromptTokens(messages: readonly AgentMessage[]): nu
  * candidates so neither an undercount nor a stale anchor can suppress a needed
  * compaction.
  *
- * `charsEstimator` is injectable for tests; it defaults to pi's
- * `estimateContextTokens` (chars/4 with a usage-anchored fast path).
+ * Both candidates are window-safe against a misbehaving provider: the `anchor`
+ * is dropped when it exceeds the window, and `charsEstimator` defaults to the
+ * usage-free {@link structuralContextTokens} (NOT pi's usage-anchored
+ * `estimateContextTokens`). Together this means a proxy reporting cumulative or
+ * otherwise bogus cache tokens can no longer inflate the estimate and trigger
+ * compaction on every turn. `charsEstimator` stays injectable for tests.
  */
 export function estimateContextTokensForThreshold(
   messages: readonly AgentMessage[],
   contextWindow: number,
-  charsEstimator: (m: readonly AgentMessage[]) => number = (m) =>
-    estimateContextTokens(m as AgentMessage[]).tokens,
+  charsEstimator: (m: readonly AgentMessage[]) => number = structuralContextTokens,
 ): number {
   const charsEstimate = charsEstimator(messages);
   const anchor = lastAssistantPromptTokens(messages);
