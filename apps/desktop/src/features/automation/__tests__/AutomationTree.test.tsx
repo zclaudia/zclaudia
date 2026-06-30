@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AutomationTree } from '../AutomationTree';
 
 const api = {
@@ -53,5 +53,16 @@ describe('AutomationTree', () => {
     render(<AutomationTree {...baseProps} tab="system" />);
     expect(screen.getByText('Local Server')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'gen-token' })).toBeNull();
+  });
+
+  it('workflows tab: clicking a leaf selects it in the store', async () => {
+    api.get.mockResolvedValue([
+      { id: 'w1', name: 'Daily backup', status: 'active', projectId: 'p1' },
+    ]);
+    const { useTopLevelViewStore } = await import('../../../stores/topLevelViewStore');
+    render(<AutomationTree {...baseProps} tab="workflows" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'gen-token' }));
+    fireEvent.click(await screen.findByText('Daily backup'));
+    expect(useTopLevelViewStore.getState().selectedAutomationItemId).toBe('w1');
   });
 });

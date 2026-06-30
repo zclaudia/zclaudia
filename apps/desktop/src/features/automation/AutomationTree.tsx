@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Folder, Globe, ChevronRight, Shield } from 'lucide-react';
 import type { Workflow } from '@zclaudia/shared';
 import { BackendRow } from '../sidebar/BackendRow';
-import { isInternalProject } from './automation-types';
+import { isInternalProject, displayProjectName } from './automation-types';
 import type { AutomationApiType } from './useAutomationApi';
 import type { AutomationTab } from './automation-types';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
@@ -122,6 +122,7 @@ export function AutomationTree({
                   // 只有 active backend 的项目能展开条目(api 绑定 active backend)。
                   const canExpand = expandable && isActive;
                   const isOpen = canExpand && expandedProjects.has(key);
+                  const leaves = leavesFor(project);
                   return (
                     <div key={project.id}>
                       <button
@@ -146,12 +147,12 @@ export function AutomationTree({
                         ) : (
                           <Folder className="w-4 h-4 flex-shrink-0" strokeWidth={1.75} />
                         )}
-                        <span className="truncate">{project.name}</span>
+                        <span className="truncate">{displayProjectName(project.name)}</span>
                       </button>
 
                       {isOpen && (
                         <div className="pl-4 space-y-0.5">
-                          {leavesFor(project).map((w) => {
+                          {leaves.map((w) => {
                             const leafSelected = selectedItemId === w.id;
                             return (
                               <button
@@ -174,7 +175,7 @@ export function AutomationTree({
                               </button>
                             );
                           })}
-                          {leavesFor(project).length === 0 && (
+                          {leaves.length === 0 && (
                             <p className="px-2 py-1 text-xs text-muted-foreground">No items</p>
                           )}
                         </div>
