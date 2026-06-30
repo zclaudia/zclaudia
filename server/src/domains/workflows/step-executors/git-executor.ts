@@ -1,5 +1,5 @@
 /**
- * Git Step Executors — git_commit, git_merge, create_worktree, create_pr.
+ * Git Step Executors — git_merge, create_worktree, create_pr.
  */
 
 import type { StepExecutorPort, StepResult, StepContext } from '../ports/step-executor.js';
@@ -10,7 +10,7 @@ import { promisify } from 'util';
 const execFileAsync = promisify(execFileCb);
 
 export class GitStepExecutor implements StepExecutorPort {
-  readonly supportedTypes = ['git_commit', 'git_merge', 'create_worktree', 'create_pr'] as const;
+  readonly supportedTypes = ['git_merge', 'create_worktree', 'create_pr'] as const;
 
   async execute(
     node: WorkflowNodeDef,
@@ -18,33 +18,10 @@ export class GitStepExecutor implements StepExecutorPort {
     ctx: StepContext,
   ): Promise<StepResult> {
     switch (node.type) {
-      case 'git_commit': return this.handleGitCommit(config, ctx);
       case 'git_merge': return this.handleGitMerge(config, ctx);
       case 'create_worktree': return this.handleCreateWorktree(config, ctx);
       case 'create_pr': return this.handleCreatePR(config, ctx);
       default: return { status: 'failed', output: {}, error: `Unknown git step type: ${node.type}` };
-    }
-  }
-
-  private async handleGitCommit(config: Record<string, unknown>, ctx: StepContext): Promise<StepResult> {
-    const cwd = (config.worktreePath as string) ?? ctx.projectRootPath;
-    if (!cwd) return { status: 'failed', output: {}, error: 'No working directory' };
-
-    try {
-      const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd });
-      if (!status.trim()) {
-        return { status: 'completed', output: { commitSha: null, message: 'No changes to commit' } };
-      }
-
-      await execFileAsync('git', ['add', '-A'], { cwd });
-      const { stdout: diffStat } = await execFileAsync('git', ['diff', '--cached', '--stat'], { cwd });
-      const message = (config.message as string) ?? `auto: ${diffStat.trim().split('\n').pop() ?? 'changes'}`;
-      await execFileAsync('git', ['commit', '-m', message], { cwd });
-      const { stdout: sha } = await execFileAsync('git', ['rev-parse', 'HEAD'], { cwd });
-
-      return { status: 'completed', output: { commitSha: sha.trim(), message } };
-    } catch (err: unknown) {
-      return { status: 'failed', output: {}, error: err instanceof Error ? err.message : String(err) };
     }
   }
 

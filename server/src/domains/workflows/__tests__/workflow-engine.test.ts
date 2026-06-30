@@ -86,7 +86,9 @@ import {
   AIReviewStepExecutor,
   GitStepExecutor,
   PluginStepExecutor,
+  ActivityStepExecutorAdapter,
 } from '../step-executors/index.js';
+import { ActivityRegistry, GitCommitActivity } from '../../activities/index.js';
 
 function createEngineWithDb(mockDb: any, mockBroadcast: ReturnType<typeof vi.fn>): WorkflowEngine {
   const composite = new CompositeStepExecutor();
@@ -97,6 +99,9 @@ function createEngineWithDb(mockDb: any, mockBroadcast: ReturnType<typeof vi.fn>
   composite.register(new AIPromptStepExecutor(mockAgentLoopRunner, mockAgentRuntime));
   composite.register(new AIReviewStepExecutor(mockAgentLoopRunner));
   composite.register(new GitStepExecutor());
+  const activityRegistry = new ActivityRegistry();
+  activityRegistry.register(new GitCommitActivity());
+  composite.register(new ActivityStepExecutorAdapter(activityRegistry, mockAgentLoopRunner));
   composite.registerPlugin(new PluginStepExecutor(mockWorkflowStepRegistry as any));
 
   const workflowEngine = new WorkflowEngine(mockDb, mockBroadcast, composite);

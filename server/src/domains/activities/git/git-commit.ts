@@ -44,6 +44,10 @@ export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutp
         await execFileAsync('git', ['add', '-A'], { cwd });
       }
 
+      // Always compute the stat — matches the original GitStepExecutor.handleGitCommit
+      // git-call sequence; used for the stat-mode message.
+      const { stdout: diffStat } = await execFileAsync('git', ['diff', '--cached', '--stat'], { cwd });
+
       let message: string;
       if (messageMode === 'explicit') {
         const explicit = (input.message ?? '').trim();
@@ -52,7 +56,6 @@ export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutp
         }
         message = explicit;
       } else {
-        const { stdout: diffStat } = await execFileAsync('git', ['diff', '--cached', '--stat'], { cwd });
         message = `auto: ${(diffStat.trim().split('\n').pop() ?? 'changes').trim()}`;
       }
 
