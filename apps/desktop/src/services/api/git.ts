@@ -152,6 +152,20 @@ export async function commitGit(
   });
 }
 
+export async function generateCommitMessage(
+  projectId: string,
+  worktreePath: string,
+): Promise<{ message: string }> {
+  return apiCallForBackend<{ message: string }>(
+    ownerOf(projectId),
+    `/api/projects/${projectId}/git/generate-commit-message`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ worktree: worktreePath }),
+    },
+  );
+}
+
 export async function fetchGit(projectId: string, worktreePath: string): Promise<void> {
   return apiCallVoidForBackend(ownerOf(projectId), `/api/projects/${projectId}/git/fetch`, {
     method: 'POST',

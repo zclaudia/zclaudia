@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Check, ChevronRight, Loader2, Minus, Plus, RefreshCw } from 'lucide-react';
+import { Check, ChevronRight, Loader2, Minus, Plus, RefreshCw, Sparkles } from 'lucide-react';
 import * as api from '../../../services/api';
 import type { GitFileDiffKind } from '../../../services/api/git';
 import { CodeViewer } from '../../../components/renderers/CodeViewer';
@@ -16,6 +16,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
   const setStatus = useGitStore((s) => s.setStatus);
   const [loading, setLoading] = useState(false);
   const [committing, setCommitting] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [message, setMessage] = useState('');
   const [expandedDiff, setExpandedDiff] = useState<{ file: string; kind: GitFileDiffKind } | null>(null);
   const [diffs, setDiffs] = useState<Record<string, { loading: boolean; diff?: string; error?: string }>>({});
@@ -73,6 +74,16 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
       clearDiffs();
       await refresh();
     }
+  };
+
+  const generate = async () => {
+    if (generating || !status || status.staged.length === 0) return;
+    setGenerating(true);
+    const result = await runWithToast('Generate commit message', projectId, () =>
+      api.generateCommitMessage(projectId, worktreePath),
+    );
+    setGenerating(false);
+    if (result) setMessage(result.message);
   };
 
   const toggleDiff = async (file: string, kind: GitFileDiffKind) => {
@@ -157,6 +168,21 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
       </div>
 
       <div className="border-t border-border p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Commit message
+          </span>
+          <button
+            type="button"
+            onClick={generate}
+            disabled={generating || !status || status.staged.length === 0}
+            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-muted/60 disabled:opacity-50 disabled:cursor-not-allowed"
+            title={status && status.staged.length === 0 ? 'Stage files to generate a message' : 'Generate commit message'}
+          >
+            {generating ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+            {generating ? 'Generating…' : 'Generate'}
+          </button>
+        </div>
         <textarea
           value={message}
           onChange={(e) => setMessage(e.target.value)}
