@@ -518,7 +518,10 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
           isEscalateAlways: !!isEscalateAlways,
           sessionType,
           aiInitiatedPlanMode: !!activeRun.aiInitiatedPlanMode,
-          aiReview: effectivePolicy.aiReview,
+          aiReview: {
+            ...effectivePolicy.aiReview,
+            enabled: effectivePolicy.enabled === true && effectivePolicy.aiReview.enabled === true,
+          },
         };
 
         // Store pending permission (user can still manually decide via frontend)

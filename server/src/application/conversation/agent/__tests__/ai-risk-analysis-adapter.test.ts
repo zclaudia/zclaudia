@@ -77,4 +77,37 @@ describe('AIRiskAnalysisAdapter', () => {
 
     expect(result.metadata).toEqual({ redactionCount: 2 });
   });
+
+  it('injects an AI review provider resolved from the requested analysis profile', async () => {
+    mockEvaluateAIReview.mockResolvedValue({
+      decision: 'approve',
+      reasoning: 'safe',
+      confidence: 0.91,
+    });
+    const provider = { runPrompt: vi.fn() };
+    const createProvider = vi.fn(() => provider);
+
+    const adapter = new AIRiskAnalysisAdapter(createDb(), { createProvider });
+    await adapter.evaluate({
+      toolName: 'Bash',
+      toolInput: { command: 'npm test' },
+      detail: 'npm test',
+      cwd: '/repo',
+      config: {
+        confidenceThreshold: 0.8,
+        maxAutoApprovalsPerMinute: 5,
+        analysisLlmProfileId: 'review-profile',
+      },
+    });
+
+    expect(createProvider).toHaveBeenCalledWith('review-profile', expect.objectContaining({
+      cwd: '/repo',
+    }));
+    expect(mockEvaluateAIReview).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        analysisProvider: provider,
+      }),
+    );
+  });
 });

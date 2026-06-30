@@ -46,10 +46,11 @@ export interface ApprovalPort {
 export interface AIRunnerPort {
   runPrompt(opts: {
     projectId?: string;
-    llmProfileId: string;
+    llmProfileId?: string;
     prompt: string;
     workingDirectory?: string;
     sessionName?: string;
+    sessionId?: string;
     timeoutMs?: number;
     onSessionCreated?: (sessionId: string) => void;
   }): Promise<{ sessionId: string; content: string }>;
@@ -131,6 +132,7 @@ export interface AIRiskAnalysisPort {
       maxAutoApprovalsPerMinute: number;
       analysisLlmProfileId?: string;
     };
+    projectId?: string;
   }): Promise<{
     decision: 'approve' | 'deny' | 'uncertain';
     reasoning: string;

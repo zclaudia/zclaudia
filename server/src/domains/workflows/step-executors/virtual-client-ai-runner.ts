@@ -25,29 +25,37 @@ export class VirtualClientAIRunner implements AIRunnerPort {
 
   async runPrompt(opts: {
     projectId?: string;
-    llmProfileId: string;
+    llmProfileId?: string;
     prompt: string;
     workingDirectory?: string;
     sessionName?: string;
+    sessionId?: string;
     timeoutMs?: number;
     onSessionCreated?: (sessionId: string) => void;
   }): Promise<{ sessionId: string; content: string }> {
-    if (!opts.projectId) {
+    if (!opts.sessionId && !opts.projectId) {
       throw new Error('VirtualClientAIRunner.runPrompt: projectId is required');
     }
     // opts.llmProfileId used downstream for AI dispatch; agentProfileId auto-resolved by SessionRepository.
-    const session = this.sessionRepo.create({
-      projectId: opts.projectId,
+    const sessionId = opts.sessionId ?? this.sessionRepo.create({
+      projectId: opts.projectId!,
       name: opts.sessionName ?? 'Workflow AI',
       type: 'background',
       projectRole: 'workflow',
       workingDirectory: opts.workingDirectory,
-    });
+    }).id;
 
-    opts.onSessionCreated?.(session.id);
+    if (!opts.sessionId) {
+      opts.onSessionCreated?.(sessionId);
+    }
+
+    const before = this.db.prepare(
+      'SELECT COALESCE(MAX(rowid), 0) AS rowid FROM messages WHERE session_id = ?'
+    ).get(sessionId) as { rowid: number } | undefined;
+    const beforeRowid = before?.rowid ?? 0;
 
     const timeoutMs = opts.timeoutMs ?? 10 * 60 * 1000;
-    const clientId = `workflow_ai_${session.id}_${Date.now()}`;
+    const clientId = `workflow_ai_${sessionId}_${Date.now()}`;
 
     return new Promise<{ sessionId: string; content: string }>((resolve, reject) => {
       let settled = false;
@@ -59,7 +67,7 @@ export class VirtualClientAIRunner implements AIRunnerPort {
 
       this.aiRunPort.startVirtualRun({
         clientId,
-        sessionId: session.id,
+        sessionId,
         input: opts.prompt,
         workingDirectory: opts.workingDirectory,
         llmProfileId: opts.llmProfileId,
@@ -69,10 +77,10 @@ export class VirtualClientAIRunner implements AIRunnerPort {
             settled = true;
             clearTimeout(timeout);
             const messages = this.db.prepare(
-              "SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' ORDER BY created_at DESC LIMIT 5"
-            ).all(session.id) as { content: string }[];
+              "SELECT content FROM messages WHERE session_id = ? AND role = 'assistant' AND rowid > ? ORDER BY rowid ASC"
+            ).all(sessionId, beforeRowid) as { content: string }[];
             const content = messages.map(m => m.content).join('\n');
-            resolve({ sessionId: session.id, content });
+            resolve({ sessionId, content });
           } else if (msg.type === 'run_failed') {
             settled = true;
             clearTimeout(timeout);

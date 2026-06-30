@@ -15,6 +15,7 @@ const {
   normalizeFromAskUserMock,
   permissionEvaluatorEvaluateMock,
   evaluateMcpToolTrustPolicyMock,
+  getAgentPermissionPolicyMock,
   writePermissionLogMock,
   permissionWorkflowResolverMock,
   mcpInventoryCacheMock,
@@ -23,6 +24,29 @@ const {
   normalizeFromAskUserMock: vi.fn(),
   permissionEvaluatorEvaluateMock: vi.fn(() => 'ask'),
   evaluateMcpToolTrustPolicyMock: vi.fn(() => 'escalate'),
+  getAgentPermissionPolicyMock: vi.fn(() => ({
+    enabled: false,
+    profile: {
+      fileRead: 'ask',
+      fileWrite: 'ask',
+      shellSafe: 'ask',
+      networkOps: 'ask',
+      destructiveOps: 'ask',
+      userQuestions: 'ask',
+    },
+    globalGuards: {
+      blockSensitiveFiles: true,
+      blockOutsideWorkspace: true,
+    },
+    customRules: [],
+    escalateAlways: [],
+    aiReview: {
+      enabled: true,
+      timeoutBeforeReview: 60,
+      confidenceThreshold: 0.8,
+      maxAutoApprovalsPerMinute: 10,
+    },
+  })),
   writePermissionLogMock: vi.fn(),
   permissionWorkflowResolverMock: {
     triggerPermissionEscalation: vi.fn(async () => ({
@@ -52,29 +76,7 @@ vi.mock('../../agent/permission-evaluator.js', () => ({
   buildRememberKey: vi.fn(() => 'remember-key'),
   classify: vi.fn(() => 'destructiveOps'),
   extractBashCommand: vi.fn(() => 'grep -n "foo" /tmp/outside/file'),
-  getAgentPermissionPolicy: vi.fn(() => ({
-    enabled: false,
-    profile: {
-      fileRead: 'ask',
-      fileWrite: 'ask',
-      shellSafe: 'ask',
-      networkOps: 'ask',
-      destructiveOps: 'ask',
-      userQuestions: 'ask',
-    },
-    globalGuards: {
-      blockSensitiveFiles: true,
-      blockOutsideWorkspace: true,
-    },
-    customRules: [],
-    escalateAlways: [],
-    aiReview: {
-      enabled: true,
-      timeoutBeforeReview: 60,
-      confidenceThreshold: 0.8,
-      maxAutoApprovalsPerMinute: 10,
-    },
-  })),
+  getAgentPermissionPolicy: getAgentPermissionPolicyMock,
   getMatchedPermissionRule: vi.fn(() => 'Outside workspace access'),
   getOutsideWorkspacePaths: vi.fn(() => ['/tmp/outside/file']),
   getProjectPermissionOverride: vi.fn(() => undefined),
@@ -152,6 +154,29 @@ function createInput() {
 describe('createPermissionCallback workflow routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getAgentPermissionPolicyMock.mockReturnValue({
+      enabled: false,
+      profile: {
+        fileRead: 'ask',
+        fileWrite: 'ask',
+        shellSafe: 'ask',
+        networkOps: 'ask',
+        destructiveOps: 'ask',
+        userQuestions: 'ask',
+      },
+      globalGuards: {
+        blockSensitiveFiles: true,
+        blockOutsideWorkspace: true,
+      },
+      customRules: [],
+      escalateAlways: [],
+      aiReview: {
+        enabled: true,
+        timeoutBeforeReview: 60,
+        confidenceThreshold: 0.8,
+        maxAutoApprovalsPerMinute: 10,
+      },
+    });
     permissionWorkflowResolverMock.triggerPermissionEscalation.mockResolvedValue({
       resolved: { workflowId: 'wf-system', source: 'system_fallback' },
       run: { id: 'wf-run-1' },
@@ -279,7 +304,7 @@ describe('createPermissionCallback workflow routing', () => {
           requestId: 'req-1',
           toolName: 'Bash',
           aiReview: expect.objectContaining({
-            enabled: true,
+            enabled: false,
             confidenceThreshold: 0.8,
             maxAutoApprovalsPerMinute: 10,
           }),
@@ -305,6 +330,58 @@ describe('createPermissionCallback workflow routing', () => {
     }));
     await Promise.resolve();
     expect(input.permissionBridge.setWorkflowRunId).toHaveBeenCalledWith('req-1', 'wf-run-1');
+  });
+
+  it('passes effective AI review settings to the permission workflow payload', () => {
+    getAgentPermissionPolicyMock.mockReturnValue({
+      enabled: true,
+      profile: {
+        fileRead: 'ask',
+        fileWrite: 'ask',
+        shellSafe: 'ask',
+        networkOps: 'ask',
+        destructiveOps: 'ask',
+        userQuestions: 'ask',
+      },
+      globalGuards: {
+        blockSensitiveFiles: true,
+        blockOutsideWorkspace: true,
+      },
+      customRules: [],
+      escalateAlways: [],
+      aiReview: {
+        enabled: true,
+        timeoutBeforeReview: 25,
+        confidenceThreshold: 0.93,
+        maxAutoApprovalsPerMinute: 2,
+        analysisLlmProfileId: 'review-profile',
+      },
+    });
+    const callback = createPermissionCallback(createInput() as any);
+
+    void callback({
+      requestId: 'req-ai-review',
+      toolName: 'Bash',
+      toolInput: { command: 'npm test' },
+      detail: 'npm test',
+      timeoutSeconds: 0,
+    });
+
+    expect(permissionWorkflowResolverMock.triggerPermissionEscalation).toHaveBeenCalledWith(
+      'project-1',
+      expect.objectContaining({
+        eventPayload: expect.objectContaining({
+          requestId: 'req-ai-review',
+          aiReview: {
+            enabled: true,
+            timeoutBeforeReview: 25,
+            confidenceThreshold: 0.93,
+            maxAutoApprovalsPerMinute: 2,
+            analysisLlmProfileId: 'review-profile',
+          },
+        }),
+      }),
+    );
   });
 
   it('keeps manual approval available if workflow triggering fails', async () => {

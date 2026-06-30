@@ -97,6 +97,10 @@ async function escalateWorkflowPermission(input: {
   const matchedRule = getMatchedPermissionRule(request.toolName, request.toolInput, request.detail, policy, {
     rootPath: context.cwd,
   }) ?? undefined;
+  const aiReview = {
+    ...policy.aiReview,
+    enabled: policy.enabled === true && policy.aiReview.enabled === true,
+  };
 
   return await new Promise<AgentLoopPermissionDecision>((resolve) => {
     let settled = false;
@@ -122,7 +126,7 @@ async function escalateWorkflowPermission(input: {
       matchedRule,
       isEscalateAlways: policy.escalateAlways?.includes(request.toolName) ?? false,
       sessionType: 'background',
-      aiReview: policy.aiReview,
+      aiReview,
     });
 
     timeout = setTimeout(() => {
@@ -147,7 +151,7 @@ async function escalateWorkflowPermission(input: {
         matchedRule,
         isEscalateAlways: policy.escalateAlways?.includes(request.toolName) ?? false,
         sessionType: 'background',
-        aiReview: policy.aiReview,
+        aiReview,
       },
       triggerContext: {
         type: 'event',
