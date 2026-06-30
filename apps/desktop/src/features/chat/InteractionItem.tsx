@@ -414,6 +414,13 @@ function PlanReviewRenderer({ interaction }: { interaction: PlanReviewInteractio
       }
       return;
     }
+    // Server-driven plan review (source: 'tool_call'). The ExitPlanMode tool
+    // clears planStatus server-side on approval, but the client's mode selector
+    // is a separate concept — reset it here too, otherwise the UI stays in plan
+    // mode and the next run_start re-enters it. Mirrors the client_synth branch.
+    if (chatActions && interaction.sessionId) {
+      chatActions.setMode(interaction.sessionId, 'default');
+    }
     sendMessage({
       type: 'interaction_response',
       interactionId: interaction.interactionId,

@@ -117,6 +117,62 @@ describe('translateToolEvent', () => {
     });
   });
 
+  it('emits a mode_transition (enter) alongside the tool_result for a successful EnterPlanMode', () => {
+    const out = translateToolEvent({
+      type: 'tool_execution_end',
+      toolCallId: 'pm1',
+      toolName: 'EnterPlanMode',
+      result: { content: [{ type: 'text', text: 'Entered plan mode.' }], details: { ok: true } },
+      isError: false,
+    } as any, ctx);
+    expect(out).toEqual([
+      {
+        type: 'tool_result',
+        toolUseId: 'pm1',
+        toolName: 'EnterPlanMode',
+        toolResult: { content: [{ type: 'text', text: 'Entered plan mode.' }], details: { ok: true } },
+        isToolError: false,
+      },
+      {
+        type: 'mode_transition',
+        modeTransition: { mode: 'plan', reason: 'enter', sourceToolUseId: 'pm1' },
+      },
+    ]);
+  });
+
+  it('emits a mode_transition (exit) alongside the tool_result for a successful ExitPlanMode', () => {
+    const out = translateToolEvent({
+      type: 'tool_execution_end',
+      toolCallId: 'pm2',
+      toolName: 'ExitPlanMode',
+      result: { content: [{ type: 'text', text: 'Plan approved.' }], details: { ok: true, wasActive: true } },
+      isError: false,
+    } as any, ctx);
+    expect(Array.isArray(out)).toBe(true);
+    expect((out as any[])[1]).toEqual({
+      type: 'mode_transition',
+      modeTransition: { mode: 'default', reason: 'exit', sourceToolUseId: 'pm2' },
+    });
+  });
+
+  it('does NOT emit a mode_transition when the plan-mode toggle failed (details.ok === false)', () => {
+    const out = translateToolEvent({
+      type: 'tool_execution_end',
+      toolCallId: 'pm3',
+      toolName: 'ExitPlanMode',
+      result: { content: [{ type: 'text', text: 'Plan rejected by the user.' }], details: { ok: false } },
+      isError: false,
+    } as any, ctx);
+    // Just the tool_result, no transition (rejection must not flip the UI mode).
+    expect(out).toEqual({
+      type: 'tool_result',
+      toolUseId: 'pm3',
+      toolName: 'ExitPlanMode',
+      toolResult: { content: [{ type: 'text', text: 'Plan rejected by the user.' }], details: { ok: false } },
+      isToolError: false,
+    });
+  });
+
   it('returns undefined for tool_execution_start (covered by tool_use)', () => {
     expect(translateToolEvent({ type: 'tool_execution_start', toolCallId: 't1', toolName: 'read', args: {} } as any, ctx)).toBeUndefined();
   });

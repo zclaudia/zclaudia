@@ -21,6 +21,35 @@ function toolInteractionKind(toolName: string): 'todo_update' | undefined {
     : undefined;
 }
 
+/**
+ * The pi adapter is the only place that knows its plan-mode tool names, so it
+ * tags a successful EnterPlanMode/ExitPlanMode completion with a mode_transition
+ * event. That drives the downstream mode.changed → mode_change pipeline so the
+ * client's mode selector follows AI-initiated plan-mode switches. A failed
+ * toggle (rejected plan, missing context → details.ok === false) emits nothing,
+ * so a rejection never flips the UI mode.
+ */
+function planModeTransitionEvent(
+  toolName: unknown,
+  toolUseId: string | undefined,
+  result: unknown,
+): ProviderRuntimeEvent | undefined {
+  if (typeof toolName !== 'string') return undefined;
+  const normalized = toolName.replace(/[^a-z0-9]/gi, '').toLowerCase();
+  if (normalized !== 'enterplanmode' && normalized !== 'exitplanmode') return undefined;
+  const ok = (result as { details?: { ok?: unknown } } | null | undefined)?.details?.ok;
+  if (ok === false) return undefined;
+  const entering = normalized === 'enterplanmode';
+  return {
+    type: 'mode_transition',
+    modeTransition: {
+      mode: entering ? 'plan' : 'default',
+      reason: entering ? 'enter' : 'exit',
+      sourceToolUseId: toolUseId,
+    },
+  };
+}
+
 function isToolCallBlock(block: unknown): block is PiToolCallBlock {
   return (
     typeof block === 'object' &&
@@ -90,17 +119,22 @@ export function translateToolEvent(
       }
 
       case 'tool_execution_end': {
-        return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const toolUseId = (event as any).toolCallId;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const toolName = (event as any).toolName;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const result = (event as any).result;
+        const toolResultEvent: ProviderRuntimeEvent = {
           type: 'tool_result',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          toolUseId: (event as any).toolCallId,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          toolName: (event as any).toolName,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          toolResult: (event as any).result,
+          toolUseId,
+          toolName,
+          toolResult: result,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           isToolError: Boolean((event as any).isError),
         };
+        const transition = planModeTransitionEvent(toolName, toolUseId, result);
+        return transition ? [toolResultEvent, transition] : toolResultEvent;
       }
 
       // Explicit no-ops

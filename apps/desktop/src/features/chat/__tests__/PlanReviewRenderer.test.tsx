@@ -334,4 +334,19 @@ describe('PlanReviewRenderer — tool_call regression', () => {
     });
     expect(handleSendMessage).not.toHaveBeenCalled();
   });
+
+  it('on Approve: switches the session out of plan mode so the UI exits plan mode', () => {
+    renderWithActions(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }));
+    // The server clears planStatus on approval; the client must mirror it by
+    // resetting its mode selector, otherwise the UI stays in plan mode and the
+    // next run re-enters it.
+    expect(setMode).toHaveBeenCalledWith('session-1', 'default');
+  });
+
+  it('on Deny: keeps the current mode (does not exit plan mode)', () => {
+    renderWithActions(<InteractionItem interaction={interaction} />);
+    fireEvent.click(screen.getByRole('button', { name: /^deny$/i }));
+    expect(setMode).not.toHaveBeenCalled();
+  });
 });
