@@ -17,3 +17,4 @@ export { PermissionClassifyStepExecutor } from './permission-classify-executor.j
 export { AIRiskAnalysisStepExecutor } from './ai-risk-analysis-executor.js';
 export { PermissionDecideStepExecutor } from './permission-decide-executor.js';
 export { TaskWorkflowStepExecutor } from './task-executor.js';
+export { ActivityStepExecutorAdapter } from './activity-adapter.js';
