@@ -14,6 +14,7 @@ import { AutomationRepository } from './repository.js';
 import { newId } from '../../utils/uuid.js';
 import { computeNextCronRun } from '../../utils/cron.js';
 import { pluginEvents } from '../../infra/events/index.js';
+import { SYSTEM_PERMISSION_AUTOMATION_KEY } from './templates.js';
 
 /** Minimal slice of WorkflowEngine the automation service needs. */
 export interface AutomationEnginePort {
@@ -66,6 +67,32 @@ export class AutomationService {
 
   getAutomation(id: string): Automation | null {
     return this.repo.findById(id);
+  }
+
+  /**
+   * Ensure the system permission automation exists, bound to the trigger-free system
+   * permission workflow. The event subscription is inert (escalation is driven
+   * imperatively by PermissionWorkflowResolver); this row exists for model completeness.
+   */
+  ensureSystemAutomations(systemWorkflowId: string): void {
+    const existing = this.repo.findBySystemKey(SYSTEM_PERMISSION_AUTOMATION_KEY);
+    const desiredAction = { kind: 'workflow' as const, ref: systemWorkflowId };
+    const desiredTrigger = { type: 'event' as const, event: 'permission.escalated' };
+    if (!existing) {
+      this.repo.create({
+        name: 'Permission Escalation (System)',
+        description: 'Routes escalated permission requests to the system permission workflow.',
+        enabled: true,
+        trigger: desiredTrigger,
+        action: desiredAction,
+        isSystem: true,
+        systemKey: SYSTEM_PERMISSION_AUTOMATION_KEY,
+      });
+      return;
+    }
+    if (existing.action.ref !== systemWorkflowId || JSON.stringify(existing.trigger) !== JSON.stringify(desiredTrigger)) {
+      this.repo.update(existing.id, { trigger: desiredTrigger, action: desiredAction });
+    }
   }
 
   createAutomation(data: {

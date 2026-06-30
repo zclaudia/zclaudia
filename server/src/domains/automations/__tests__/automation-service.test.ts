@@ -4,6 +4,7 @@ import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { AutomationService } from '../service.js';
 import { pluginEvents } from '../../../infra/events/index.js';
 import type { Workflow, WorkflowDefinition } from '@zclaudia/shared/features/workflows';
+import { SYSTEM_PERMISSION_AUTOMATION_KEY } from '../templates.js';
 
 function fakeEngine() {
   return {
@@ -114,5 +115,20 @@ describe('AutomationService scheduling + events', () => {
     await new Promise((r) => setTimeout(r, 10));
     expect(engine.startRun).toHaveBeenCalledTimes(1);
     expect(engine.startRun.mock.calls[0][0].triggerSource).toBe('event');
+  });
+});
+
+describe('AutomationService.ensureSystemAutomations', () => {
+  it('creates an immutable system permission automation bound to the system workflow', () => {
+    const db3 = new Database(':memory:'); applyMigrations(db3);
+    const svc = new AutomationService(db3, () => {}, fakeEngine() as any, fakeWorkflowLookup() as any);
+    svc.ensureSystemAutomations('system-workflow-id');
+    const a = (svc as any).repo.findBySystemKey(SYSTEM_PERMISSION_AUTOMATION_KEY);
+    expect(a).toBeTruthy();
+    expect(a.isSystem).toBe(true);
+    expect(a.trigger).toEqual({ type: 'event', event: 'permission.escalated' });
+    expect(a.action).toEqual(expect.objectContaining({ kind: 'workflow', ref: 'system-workflow-id' }));
+    svc.ensureSystemAutomations('system-workflow-id');
+    expect((svc as any).repo.findAll().filter((x: any) => x.systemKey === SYSTEM_PERMISSION_AUTOMATION_KEY)).toHaveLength(1);
   });
 });
