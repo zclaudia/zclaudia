@@ -95,7 +95,6 @@ export interface WorkflowDefinition {
   nodes: WorkflowNodeDef[];
   edges: WorkflowEdgeDef[];
   entryNodeId: string;
-  triggers: WorkflowTrigger[];
 }
 
 interface LegacyWorkflowCondition {
@@ -131,7 +130,6 @@ function toNodePosition(index: number): WorkflowNodePosition {
 
 function migrateLegacyWorkflowDefinition(definition: LegacyWorkflowDefinition): WorkflowDefinition {
   const steps = Array.isArray(definition.steps) ? definition.steps : [];
-  const triggers = Array.isArray(definition.triggers) ? definition.triggers : [];
 
   const nodes: WorkflowNodeDef[] = steps.map((step, index) => ({
     id: step.id,
@@ -185,13 +183,12 @@ function migrateLegacyWorkflowDefinition(definition: LegacyWorkflowDefinition): 
     nodes,
     edges,
     entryNodeId: steps[0]?.id ?? '',
-    triggers,
   };
 }
 
 export function normalizeWorkflowDefinition(definition: unknown): WorkflowDefinition {
   if (!isRecord(definition)) {
-    return { nodes: [], edges: [], entryNodeId: '', triggers: [] };
+    return { nodes: [], edges: [], entryNodeId: '' };
   }
 
   if (Array.isArray(definition.nodes) && Array.isArray(definition.edges)) {
@@ -199,7 +196,6 @@ export function normalizeWorkflowDefinition(definition: unknown): WorkflowDefini
       nodes: definition.nodes as WorkflowNodeDef[],
       edges: definition.edges as WorkflowEdgeDef[],
       entryNodeId: typeof definition.entryNodeId === 'string' ? definition.entryNodeId : '',
-      triggers: Array.isArray(definition.triggers) ? definition.triggers as WorkflowTrigger[] : [],
     };
   }
 
@@ -207,16 +203,11 @@ export function normalizeWorkflowDefinition(definition: unknown): WorkflowDefini
     return migrateLegacyWorkflowDefinition(definition as LegacyWorkflowDefinition);
   }
 
-  return {
-    nodes: [],
-    edges: [],
-    entryNodeId: '',
-    triggers: Array.isArray(definition.triggers) ? definition.triggers as WorkflowTrigger[] : [],
-  };
+  return { nodes: [], edges: [], entryNodeId: '' };
 }
 
 export type WorkflowSourceType = 'user' | 'plugin' | 'template';
-export type WorkflowAuthoringMode = 'simple' | 'graph' | 'event-trigger';
+export type WorkflowAuthoringMode = 'graph' | 'event-trigger';
 
 export interface Workflow {
   id: string;
@@ -245,11 +236,18 @@ export type WorkflowRunTriggerSource = 'manual' | 'schedule' | 'event';
 
 export interface WorkflowRun {
   id: string;
-  workflowId: string;
+  /** Present for workflow-action runs; absent for activity-action (ephemeral) runs. */
+  workflowId?: string;
   projectId?: string;
   status: WorkflowRunStatus;
   triggerSource: WorkflowRunTriggerSource;
   triggerDetail?: string;
+  /** Provenance: 'manual' | 'api' | 'event' | `automation:<id>`. */
+  initiator: string;
+  /** What kind of action this run executed. */
+  actionKind?: 'activity' | 'workflow';
+  /** The action ref: a step type (activity) or a Workflow id (workflow). */
+  actionRef?: string;
   currentStepId?: string;
   startedAt: number;
   completedAt?: number;
