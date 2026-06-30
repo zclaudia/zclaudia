@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import Database from 'better-sqlite3';
 import { applyMigrations } from '../../../infra/storage/migrations/index.js';
 import { AutomationService } from '../service.js';
+import { pluginEvents } from '../../../infra/events/index.js';
 import type { Workflow, WorkflowDefinition } from '@zclaudia/shared/features/workflows';
 
 function fakeEngine() {
@@ -73,5 +74,45 @@ describe('AutomationService', () => {
     const svc = new AutomationService(db, () => {}, fakeEngine() as any, fakeWorkflowLookup() as any);
     const a = svc.createAutomation({ name: 'x', trigger: { type: 'manual' }, action: { kind: 'workflow', ref: 'missing' } });
     await expect(svc.runAction(a.id, { initiator: 'manual', triggerSource: 'manual' })).rejects.toThrow(/Workflow not found/);
+  });
+});
+
+describe('AutomationService scheduling + events', () => {
+  let db2: Database.Database;
+  beforeEach(() => { db2 = new Database(':memory:'); applyMigrations(db2); });
+
+  it('fires a due interval automation on tick and computes the next run', async () => {
+    const engine = fakeEngine();
+    const svc = new AutomationService(db2, () => {}, engine as any, fakeWorkflowLookup() as any);
+    svc.createAutomation({
+      name: 'interval',
+      trigger: { type: 'interval', intervalMinutes: 1 },
+      action: { kind: 'activity', ref: 'shell', input: { command: 'echo hi' } },
+    });
+    (svc as any).nextRunByAutomation.forEach((_v: number, k: string) => (svc as any).nextRunByAutomation.set(k, Date.now() - 1000));
+    await svc.tick();
+    expect(engine.startRun).toHaveBeenCalledTimes(1);
+    expect(engine.startRun.mock.calls[0][0].triggerSource).toBe('schedule');
+  });
+
+  it('skips a due automation whose action is already running', async () => {
+    const engine = fakeEngine();
+    engine.isRunningKey = vi.fn(() => true);
+    const svc = new AutomationService(db2, () => {}, engine as any, fakeWorkflowLookup() as any);
+    svc.createAutomation({ name: 'i', trigger: { type: 'interval', intervalMinutes: 1 }, action: { kind: 'activity', ref: 'shell' } });
+    (svc as any).nextRunByAutomation.forEach((_v: number, k: string) => (svc as any).nextRunByAutomation.set(k, Date.now() - 1000));
+    await svc.tick();
+    expect(engine.startRun).not.toHaveBeenCalled();
+  });
+
+  it('fires an event automation when its event is emitted', async () => {
+    const engine = fakeEngine();
+    const svc = new AutomationService(db2, () => {}, engine as any, fakeWorkflowLookup() as any);
+    svc.createAutomation({ name: 'evt', trigger: { type: 'event', event: 'demo.fired' }, action: { kind: 'activity', ref: 'shell' } });
+    svc.initialize();
+    pluginEvents.emit('demo.fired', { hello: 'world' }, 'test');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(engine.startRun).toHaveBeenCalledTimes(1);
+    expect(engine.startRun.mock.calls[0][0].triggerSource).toBe('event');
   });
 });

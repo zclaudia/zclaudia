@@ -12,6 +12,8 @@ import type { Workflow, WorkflowDefinition, WorkflowRun } from '@zclaudia/shared
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { AutomationRepository } from './repository.js';
 import { newId } from '../../utils/uuid.js';
+import { computeNextCronRun } from '../../utils/cron.js';
+import { pluginEvents } from '../../infra/events/index.js';
 
 /** Minimal slice of WorkflowEngine the automation service needs. */
 export interface AutomationEnginePort {
@@ -183,9 +185,120 @@ export class AutomationService {
     });
   }
 
-  // ── Schedule + events (filled in Task 10) ─────────────────────
-  private syncSchedule(_automation: Automation): void { /* Task 10 */ }
-  private rebuildEventSubscriptions(): void { /* Task 10 */ }
+  // ── Schedule + events ─────────────────────────────────────────
+  initialize(): void {
+    for (const a of this.repo.findAllEnabled()) this.syncSchedule(a);
+    this.rebuildEventSubscriptions();
+  }
+
+  async tick(): Promise<void> {
+    try {
+      const now = Date.now();
+      for (const automation of this.repo.findAllEnabled()) {
+        const nextRun = this.nextRunByAutomation.get(automation.id);
+        if (nextRun == null || nextRun > now) continue;
+        const trackingKey = automation.action.kind === 'workflow'
+          ? automation.action.ref
+          : `automation:${automation.id}`;
+        if (this.engine.isRunningKey(trackingKey)) continue;
+
+        const t = automation.trigger;
+        const triggerDetail = t.type === 'cron'
+          ? `cron: ${t.cron}`
+          : t.type === 'once'
+          ? `once: ${new Date(t.onceAt || 0).toISOString()}`
+          : `interval: ${t.intervalMinutes}min`;
+
+        try {
+          await this.runActionFor(automation, {
+            initiator: `automation:${automation.id}`,
+            triggerSource: 'schedule',
+            triggerDetail,
+            triggerContext: { type: t.type, cron: t.cron, intervalMinutes: t.intervalMinutes, onceAt: t.onceAt },
+          });
+        } catch (err) {
+          console.error(`[Automation] Schedule trigger failed for ${automation.id}:`, err);
+        }
+
+        const next = this.computeNextRun(t);
+        if (next == null) this.nextRunByAutomation.delete(automation.id);
+        else this.nextRunByAutomation.set(automation.id, next);
+      }
+    } catch (err) {
+      console.error('[Automation] tick error:', err);
+    }
+  }
+
+  private syncSchedule(automation: Automation): void {
+    if (!automation.enabled) { this.nextRunByAutomation.delete(automation.id); return; }
+    const t = automation.trigger;
+    if (t.type !== 'cron' && t.type !== 'interval' && t.type !== 'once') {
+      this.nextRunByAutomation.delete(automation.id);
+      return;
+    }
+    const next = this.computeNextRun(t);
+    if (next == null) this.nextRunByAutomation.delete(automation.id);
+    else this.nextRunByAutomation.set(automation.id, next);
+  }
+
+  private computeNextRun(t: AutomationTrigger): number | null {
+    if (t.type === 'cron' && t.cron) return computeNextCronRun(t.cron);
+    if (t.type === 'interval' && t.intervalMinutes) return Date.now() + t.intervalMinutes * 60 * 1000;
+    if (t.type === 'once' && t.onceAt) return t.onceAt > Date.now() ? t.onceAt : null;
+    return null;
+  }
+
+  private rebuildEventSubscriptions(): void {
+    for (const unsub of this.eventSubscriptions) unsub();
+    this.eventSubscriptions = [];
+
+    const byEvent = new Map<string, Automation[]>();
+    for (const a of this.repo.findAllEnabled()) {
+      if (a.trigger.type === 'event' && a.trigger.event) {
+        // System permission automation is driven imperatively via the resolver; do not
+        // subscribe it to the bus (nothing emits permission.escalated anyway).
+        if (a.isSystem) continue;
+        const list = byEvent.get(a.trigger.event) ?? [];
+        list.push(a);
+        byEvent.set(a.trigger.event, list);
+      }
+    }
+
+    for (const [event, automations] of byEvent) {
+      const isPattern = event.includes('*');
+      const handler = async (data: unknown) => {
+        for (const a of automations) {
+          const fresh = this.repo.findById(a.id);
+          if (!fresh || !fresh.enabled) continue;
+          if (fresh.trigger.eventFilter && !this.matchesFilter(data, fresh.trigger.eventFilter)) continue;
+          try {
+            await this.runActionFor(fresh, {
+              initiator: `automation:${fresh.id}`,
+              triggerSource: 'event',
+              triggerDetail: `event: ${event}`,
+              eventPayload: data && typeof data === 'object' ? (data as Record<string, unknown>) : { value: data },
+              triggerContext: { type: 'event', event },
+            });
+          } catch (err) {
+            console.error(`[Automation] Event trigger failed for ${fresh.id}:`, err);
+          }
+        }
+      };
+      const unsub = isPattern
+        ? pluginEvents.onPattern(event, handler, 'automation-engine')
+        : pluginEvents.on(event, handler, 'automation-engine');
+      this.eventSubscriptions.push(unsub);
+    }
+  }
+
+  private matchesFilter(data: unknown, filter: Record<string, unknown>): boolean {
+    if (!data || typeof data !== 'object') return false;
+    const record = data as Record<string, unknown>;
+    for (const [key, value] of Object.entries(filter)) {
+      if (record[key] !== value) return false;
+    }
+    return true;
+  }
 
   private broadcast(automation: Automation): void {
     this.broadcastFn(automation.projectId, { type: 'automation_update', projectId: automation.projectId, automation });
