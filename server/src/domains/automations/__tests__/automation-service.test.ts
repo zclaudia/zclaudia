@@ -132,3 +132,29 @@ describe('AutomationService.ensureSystemAutomations', () => {
     expect((svc as any).repo.findAll().filter((x: any) => x.systemKey === SYSTEM_PERMISSION_AUTOMATION_KEY)).toHaveLength(1);
   });
 });
+
+describe('AutomationService eventFilter', () => {
+  it('fires only when the event payload matches the eventFilter', async () => {
+    const db4 = new Database(':memory:');
+    applyMigrations(db4);
+    const engine = fakeEngine();
+    const svc = new AutomationService(db4, () => {}, engine as any, fakeWorkflowLookup() as any);
+    svc.createAutomation({
+      name: 'filtered',
+      trigger: { type: 'event', event: 'thing.changed', eventFilter: { kind: 'important' } },
+      action: { kind: 'activity', ref: 'shell' },
+    });
+    svc.initialize();
+
+    // non-matching payload → no run
+    pluginEvents.emit('thing.changed', { kind: 'trivial' }, 'test');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(engine.startRun).not.toHaveBeenCalled();
+
+    // matching payload → fires
+    pluginEvents.emit('thing.changed', { kind: 'important' }, 'test');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(engine.startRun).toHaveBeenCalledTimes(1);
+    expect(engine.startRun.mock.calls[0][0].triggerSource).toBe('event');
+  });
+});
