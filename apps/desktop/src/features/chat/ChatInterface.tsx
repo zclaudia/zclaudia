@@ -22,6 +22,8 @@ import { useConnection } from '../../contexts/ConnectionContext';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useChatSession } from '../../hooks/chat/useChatSession';
 import { useSendMessage } from '../../hooks/chat/useSendMessage';
+import { useSendQueueConsumer } from '../../hooks/chat/useSendQueueConsumer';
+import { useSendQueueStore, type QueueItem } from '../../stores/sendQueueStore';
 import { useCommandHandler } from '../../hooks/chat/useCommandHandler';
 import { useMessagePagination, restoreToolCalls } from '../../hooks/chat/useMessagePagination';
 import { useSessionActions } from '../../hooks/chat/useSessionActions';
@@ -111,10 +113,19 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
   });
   const {
     handleSendMessage, handleCancelRun, handleResendLastMessage,
-    startRun, clearInterruptedStatus,
+    startRun, sendAsNewRun, steerNow, clearInterruptedStatus,
     restoreMessage, uploadError, resendTargetMessage, resendText, resendChecking,
     resetSendState,
   } = send;
+
+  // Steer a queued item into the live run, then drop it from the queue.
+  const handleSteerQueueItem = useCallback((item: QueueItem) => {
+    steerNow(item.content);
+    useSendQueueStore.getState().removeItem(item.sessionId, item.id);
+  }, [steerNow]);
+
+  // Auto-ship queued messages one at a time as the session's run cycles.
+  useSendQueueConsumer({ sessionId, sendAsNewRun });
 
   const chatActionsValue = useMemo<ChatActionsContextValue>(() => ({
     handleSendMessage,
@@ -413,6 +424,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           onSendMessage={handleSendMessage}
           onCancelRun={handleCancelRun}
           onCommand={handleCommand}
+          onSteerQueueItem={handleSteerQueueItem}
           centered={isEmptySession}
         />
       )}

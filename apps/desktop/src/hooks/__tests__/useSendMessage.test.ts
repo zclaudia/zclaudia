@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { reconcileStaleLoadingRun, useSendMessage } from '../chat/useSendMessage';
 import { useInteractionStore } from '../../stores/interactionStore';
+import { useSendQueueStore } from '../../stores/sendQueueStore';
 
 type HookProps = Parameters<typeof useSendMessage>[0];
 
@@ -124,8 +125,12 @@ describe('useSendMessage', () => {
   });
 });
 
-describe('handleSendMessage — mid-run steer', () => {
-  it('sends run_steer WS message when isLoading + has sessionRunId', async () => {
+describe('handleSendMessage — mid-run queueing', () => {
+  beforeEach(() => {
+    useSendQueueStore.setState({ queues: {} });
+  });
+
+  it('enqueues the message when isLoading (instead of sending run_steer)', async () => {
     const wsSendMessage = vi.fn();
     const { result } = renderHook(() => useSendMessage(makeHookProps({
       isLoading: true,
@@ -138,15 +143,18 @@ describe('handleSendMessage — mid-run steer', () => {
       await result.current.handleSendMessage('  also fix typo  ');
     });
 
-    expect(wsSendMessage).toHaveBeenCalledTimes(1);
-    expect(wsSendMessage).toHaveBeenCalledWith({
-      type: 'run_steer',
-      runId: 'r1',
+    // No WS message is sent — the item is staged in the send queue.
+    expect(wsSendMessage).not.toHaveBeenCalled();
+    const items = useSendQueueStore.getState().queues['session-1'];
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({
+      sessionId: 'session-1',
       content: 'also fix typo',
+      intent: 'queue',
     });
   });
 
-  it('shows upload error and skips send when isLoading + attachments present', async () => {
+  it('enqueues with attachments when isLoading + attachments present (allowed now)', async () => {
     const wsSendMessage = vi.fn();
     const { result } = renderHook(() => useSendMessage(makeHookProps({
       isLoading: true,
@@ -162,12 +170,34 @@ describe('handleSendMessage — mid-run steer', () => {
     });
 
     expect(wsSendMessage).not.toHaveBeenCalled();
-    expect(result.current.uploadError).toMatch(/Cannot send attachments while agent is running/);
+    const items = useSendQueueStore.getState().queues['session-1'];
+    expect(items).toHaveLength(1);
+    expect(items[0].attachments).toHaveLength(1);
   });
 
-  it('warns and skips send when isLoading but no sessionRunId', async () => {
+  it('steerNow sends run_steer immediately for a given content', async () => {
     const wsSendMessage = vi.fn();
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { result } = renderHook(() => useSendMessage(makeHookProps({
+      isLoading: true,
+      sessionRunId: 'r1',
+      isSessionRunning: true,
+      wsSendMessage,
+    })));
+
+    await act(async () => {
+      result.current.steerNow('  inject this  ');
+    });
+
+    expect(wsSendMessage).toHaveBeenCalledTimes(1);
+    expect(wsSendMessage).toHaveBeenCalledWith({
+      type: 'run_steer',
+      runId: 'r1',
+      content: 'inject this',
+    });
+  });
+
+  it('steerNow is a no-op without an active sessionRunId', async () => {
+    const wsSendMessage = vi.fn();
     const { result } = renderHook(() => useSendMessage(makeHookProps({
       isLoading: true,
       sessionRunId: null,
@@ -176,15 +206,13 @@ describe('handleSendMessage — mid-run steer', () => {
     })));
 
     await act(async () => {
-      await result.current.handleSendMessage('x');
+      result.current.steerNow('x');
     });
 
     expect(wsSendMessage).not.toHaveBeenCalled();
-    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('cannot steer'));
-    warnSpy.mockRestore();
   });
 
-  it('skips send when isLoading + sessionRunId but content is whitespace-only', async () => {
+  it('skips enqueue when isLoading but content is whitespace-only and no attachments', async () => {
     const wsSendMessage = vi.fn();
     const { result } = renderHook(() => useSendMessage(makeHookProps({
       isLoading: true,
@@ -198,5 +226,6 @@ describe('handleSendMessage — mid-run steer', () => {
     });
 
     expect(wsSendMessage).not.toHaveBeenCalled();
+    expect(useSendQueueStore.getState().queues['session-1']).toBeUndefined();
   });
 });

@@ -1001,6 +1001,16 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
                 🎯
               </span>
             )}
+            {/* Steered badge: this user message was injected mid-run via steering */}
+            {message.metadata?.steered && (
+              <span
+                className="text-xs mr-2 inline-flex items-center opacity-70"
+                aria-label="steered mid-run"
+                title="Injected mid-run (delivered next turn)"
+              >
+                🧭
+              </span>
+            )}
             {/* Display attachments */}
             {attachments.length > 0 && (
               <div className="space-y-2 mb-2">

@@ -5,6 +5,7 @@ import type { MessageWithToolCalls } from '../../stores/chatMessageStore';
 import { useInteractionStore } from '../../stores/interactionStore';
 import { useProjectStore } from '../../stores/projectStore';
 import { useToastStore } from '../../stores/toastStore';
+import { useSendQueueStore } from '../../stores/sendQueueStore';
 import { uploadFile } from '../../services/fileUpload';
 import * as api from '../../services/api';
 
@@ -127,38 +128,11 @@ export function useSendMessage({
     wsSendMessage(runStartMsg);
   }, [clearInterruptedStatus, wsSendMessage]);
 
-  // ── Send message ──
-  const handleSendMessage = useCallback(async (content: string, attachments?: Attachment[], overrideMode?: string) => {
-    if (!content.trim() && !attachments?.length) return;
-
-    if (!isConnected) {
-      useToastStore.getState().add({
-        type: 'error',
-        title: 'Backend not connected',
-        message: 'Cannot send message: the remote backend is not connected. Please try again later.',
-      });
-      return;
-    }
-
-    if (isLoading) {
-      if (!sessionRunId) {
-        console.warn('[useSendMessage] isLoading but no sessionRunId — cannot steer');
-        return;
-      }
-      if (attachments?.length) {
-        setUploadError('Cannot send attachments while agent is running — cancel first or wait');
-        return;
-      }
-      const trimmed = content.trim();
-      if (!trimmed) return;
-      wsSendMessage({
-        type: 'run_steer',
-        runId: sessionRunId,
-        content: trimmed,
-      });
-      return;
-    }
-
+  // ── Core send: builds a run_start + optimistic user message, uploads
+  //    attachments, and dispatches the WS message. Shared by the normal send
+  //    path and the send-queue consumer (which drains queued items one at a
+  //    time once a run ends). `overrideMode` lets callers reuse it for resend.
+  const sendAsNewRun = useCallback(async (content: string, attachments?: Attachment[], overrideMode?: string) => {
     setLastSentMessage({ content, attachments });
     setRestoreMessage(null);
     setUploadError(null);
@@ -217,7 +191,58 @@ export function useSendMessage({
     useInteractionStore.getState().clearClientSynthPlanReviewsForSession(sessionId);
 
     setTimeout(() => scrollToBottom(), 100);
-  }, [sessionId, isConnected, isLoading, sessionRunId, mode, permissionOverride, currentSession, addMessage, startRun, scrollToBottom, wsSendMessage]);
+  }, [sessionId, mode, permissionOverride, currentSession, addMessage, startRun, scrollToBottom]);
+
+  // ── Send message ──
+  const handleSendMessage = useCallback(async (content: string, attachments?: Attachment[], overrideMode?: string) => {
+    if (!content.trim() && !attachments?.length) return;
+
+    if (!isConnected) {
+      useToastStore.getState().add({
+        type: 'error',
+        title: 'Backend not connected',
+        message: 'Cannot send message: the remote backend is not connected. Please try again later.',
+      });
+      return;
+    }
+
+    if (isLoading) {
+      // A run is active: stage the message in the send queue instead of
+      // silently steering. The user can then "Steer now" from the queue UI,
+      // or leave it queued to ship as a fresh run once this run ends.
+      const trimmed = content.trim();
+      if (!trimmed && !attachments?.length) return;
+      useSendQueueStore.getState().enqueue({
+        sessionId,
+        content: trimmed,
+        attachments: attachments ?? [],
+        intent: 'queue',
+      });
+      return;
+    }
+
+    await sendAsNewRun(content, attachments, overrideMode);
+  }, [isConnected, isLoading, sessionId, sendAsNewRun]);
+
+  // ── Steer now: inject a queued item into the live run mid-flight. ──
+  // Used by the queue UI's "Steer" action. No-op if there's no active run.
+  const steerNow = useCallback((content: string) => {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    if (!sessionRunId) {
+      useToastStore.getState().add({
+        type: 'info',
+        title: 'No active run',
+        message: 'This run has finished — the message will be sent next instead.',
+      });
+      return;
+    }
+    wsSendMessage({
+      type: 'run_steer',
+      runId: sessionRunId,
+      content: trimmed,
+    });
+  }, [sessionRunId, wsSendMessage]);
 
   // ── Resend last message ──
   const handleResendLastMessage = useCallback(async () => {
@@ -236,6 +261,13 @@ export function useSendMessage({
         return;
       }
       const messageInput: MessageInputData = { text: resendText };
+      addMessage(sessionId, {
+        id: crypto.randomUUID(),
+        sessionId,
+        role: 'user',
+        content: resendText,
+        createdAt: Date.now(),
+      });
       await startRun({
         type: 'run_start',
         clientRequestId: crypto.randomUUID(),
@@ -287,6 +319,8 @@ export function useSendMessage({
     handleCancelRun,
     handleResendLastMessage,
     startRun,
+    sendAsNewRun,
+    steerNow,
     clearInterruptedStatus,
     // State
     restoreMessage,

@@ -12,6 +12,8 @@ import { TokenUsageDisplay } from './TokenUsageDisplay';
 import { ContextUsagePopover } from './ContextUsagePopover';
 import { ComposerFooter } from './ComposerFooter';
 import { MessageInput, type Attachment } from './MessageInput';
+import { SendQueueBar } from './SendQueueBar';
+import type { QueueItem } from '../../stores/sendQueueStore';
 import { useServerStore } from '../../stores/serverStore';
 import { useTerminalStore } from '../../stores/terminalStore';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
@@ -64,6 +66,8 @@ interface ChatInputAreaProps {
   onSendMessage: (content: string, attachments?: Attachment[]) => void;
   onCancelRun: () => void;
   onCommand: (command: string, args: string) => Promise<void>;
+  /** Steer a queued item into the active run immediately, then remove it. */
+  onSteerQueueItem: (item: QueueItem) => void;
   /** When true, the composer is vertically centered in the viewport (empty session). */
   centered?: boolean;
 }
@@ -94,6 +98,7 @@ export function ChatInputArea({
   onSendMessage,
   onCancelRun,
   onCommand,
+  onSteerQueueItem,
   centered = false,
 }: ChatInputAreaProps) {
   const setDrawerOpen = useTerminalStore((s) => s.setDrawerOpen);
@@ -348,6 +353,13 @@ export function ChatInputArea({
         onSubmit={handleGoalSubmit}
         onClear={handleGoalClear}
       />
+      {isLoading && (
+        <SendQueueBar
+          sessionId={sessionId}
+          canSteer={!!sessionRunId}
+          onSteer={onSteerQueueItem}
+        />
+      )}
       {/* Mobile-only toolbar: three selectors, JS-gated to mobile only */}
       {isMobile && (
         <div className="mb-1.5 flex items-center gap-1">{selectorTrio}</div>
@@ -508,7 +520,7 @@ export function ChatInputArea({
           !isConnected
             ? 'Connecting...'
             : isLoading
-            ? 'Type to steer mid-run (delivered next turn)...'
+            ? 'Type to queue a message — sends after this run (or Steer)...'
             : (isForcedPlanSession || mode === 'plan')
             ? 'Plan Mode: Analyze and plan (no code changes)...'
             : advancedInput
