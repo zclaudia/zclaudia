@@ -11,6 +11,7 @@ import type { Automation, AutomationAction, AutomationTrigger } from '@zclaudia/
 import type { Workflow, WorkflowDefinition, WorkflowRun } from '@zclaudia/shared/features/workflows';
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { AutomationRepository } from './repository.js';
+import { WorkflowRunRepository } from '../workflows/workflow-run-repository.js';
 import { newId } from '../../utils/uuid.js';
 import { computeNextCronRun } from '../../utils/cron.js';
 import { pluginEvents } from '../../infra/events/index.js';
@@ -47,6 +48,7 @@ export class ImmutableSystemAutomationError extends Error {
 
 export class AutomationService {
   private repo: AutomationRepository;
+  private runRepo: WorkflowRunRepository;
   private eventSubscriptions: Array<() => void> = [];
   /** automationId -> next scheduled run (epoch ms) for cron/interval/once triggers. */
   private nextRunByAutomation = new Map<string, number>();
@@ -58,6 +60,7 @@ export class AutomationService {
     private workflows: AutomationWorkflowLookupPort,
   ) {
     this.repo = new AutomationRepository(db);
+    this.runRepo = new WorkflowRunRepository(db);
   }
 
   // ── CRUD ──────────────────────────────────────────────────────
@@ -67,6 +70,10 @@ export class AutomationService {
 
   getAutomation(id: string): Automation | null {
     return this.repo.findById(id);
+  }
+
+  getRunsForAutomation(automationId: string, limit = 50) {
+    return this.runRepo.findByInitiator(`automation:${automationId}`, limit);
   }
 
   /**
