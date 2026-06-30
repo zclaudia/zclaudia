@@ -29,6 +29,7 @@ import { migration as m_026_session_goals } from './026_session_goals.js';
 import { migration as m_027_agent_multimodal_fallback } from './027_agent_multimodal_fallback.js';
 import { migration as m_028_agent_loop_contexts } from './028_agent_loop_contexts.js';
 import { migration as m_029_automations } from './029_automations.js';
+import { migration as m_030_generalize_workflow_runs } from './030_generalize_workflow_runs.js';
 
 export type { Migration };
 
@@ -62,6 +63,7 @@ export const migrations: Migration[] = [
   m_027_agent_multimodal_fallback,
   m_028_agent_loop_contexts,
   m_029_automations,
+  m_030_generalize_workflow_runs,
 ];
 
 /**
