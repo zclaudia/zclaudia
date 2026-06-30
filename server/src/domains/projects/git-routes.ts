@@ -292,6 +292,40 @@ export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {})
     }
   });
 
+  router.post('/:id/git/generate-commit-message', async (req: Request, res: Response) => {
+    const wt = getWorktreeParam(req);
+    if (!wt) {
+      res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'worktree is required' } });
+      return;
+    }
+    if (!deps.activityRegistry || !deps.agentLoopRunner) {
+      res.status(503).json({ success: false, error: { code: 'NOT_AVAILABLE', message: 'Commit message generation is not available' } });
+      return;
+    }
+    try {
+      const { worktreePath } = service.resolveWorktreeForGitOp(req.params.id, wt);
+      const result = await deps.activityRegistry.invoke(
+        'generate_commit_message',
+        { worktreePath },
+        { agentLoopRunner: deps.agentLoopRunner },
+      );
+      if (result.status !== 'completed') {
+        const noStaged = result.error === 'No staged changes';
+        res.status(noStaged ? 400 : 502).json({
+          success: false,
+          error: {
+            code: noStaged ? 'VALIDATION_ERROR' : 'GENERATION_FAILED',
+            message: result.error ?? 'Failed to generate commit message',
+          },
+        });
+        return;
+      }
+      res.json({ success: true, data: { message: String(result.output.message ?? '') } });
+    } catch (error) {
+      sendError(res, error, 'Failed to generate commit message');
+    }
+  });
+
   // --- Branch mutations ---
 
   router.post('/:id/git/checkout', async (req: Request, res: Response) => {
