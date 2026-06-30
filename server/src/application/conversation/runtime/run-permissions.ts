@@ -36,6 +36,8 @@ import {
 import { unprotectMcpOAuthCredentials } from '../../../infra/services/mcp-oauth-credential-protector.js';
 import { mcpInventoryCache } from '../../../utils/mcp-inventory-cache.js';
 import { isBashLikeTool, isSudoCommand } from '../../../utils/server-utils.js';
+import { isReadOnlyTool, normalizeToolName } from '@zclaudia/shared/core/tools';
+import { isSandboxAvailable } from '../../../infra/providers/pi-runtime/sandbox.js';
 import { providerRegistry } from '../../../infra/providers/registry.js';
 import { recomputePhase, computeBlockers } from './active-run-phase.js';
 
@@ -247,25 +249,14 @@ export function createPermissionCallback(input: CreatePermissionCallbackInput) {
       };
 
       if (forcedPlanBySession && modeValue === 'plan') {
-        const planReadOnlyTools = new Set([
-          'read',
-          'glob',
-          'grep',
-          'find',
-          'ls',
-          'webfetch',
-          'websearch',
-          'toolsearch',
-          'taskoutput',
-          'todowrite',
-          'askuserquestion',
-          'listmcpresources',
-          'readmcpresource',
-          'lsptool',
-        ]);
-        const normalizedTool = request.toolName.toLowerCase();
-        const isAllowedReadTool = planReadOnlyTools.has(normalizedTool);
-        const shouldDeny = isBashLikeTool(request.toolName) || !isAllowedReadTool;
+        // Single source of truth for what's read-only — shared READ_ONLY_TOOL_NAMES,
+        // which already includes EnterPlanMode/ExitPlanMode/Memory/ReadSymbol/AstGrep.
+        const normalizedTool = normalizeToolName(request.toolName);
+        const isAllowedReadTool = !!normalizedTool && isReadOnlyTool(normalizedTool);
+        // Bash runs read-only in plan mode (sandboxReadOnly: true) when a sandbox
+        // is available, mirroring resolvePlanModeTools' catalog admission.
+        const isSandboxedBash = isBashLikeTool(request.toolName) && isSandboxAvailable();
+        const shouldDeny = !isAllowedReadTool && !isSandboxedBash;
         if (shouldDeny) {
           const reason = `Denied by strict Plan Mode: ${request.toolName} is not allowed.`;
           broadcastRunMessage(activeRun, {

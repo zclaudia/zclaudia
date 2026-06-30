@@ -19,7 +19,11 @@ const {
   writePermissionLogMock,
   permissionWorkflowResolverMock,
   mcpInventoryCacheMock,
+  isBashLikeToolMock,
+  isSandboxAvailableMock,
 } = vi.hoisted(() => ({
+  isBashLikeToolMock: vi.fn(() => true),
+  isSandboxAvailableMock: vi.fn(() => false),
   broadcastRunMessageMock: vi.fn(),
   normalizeFromAskUserMock: vi.fn(),
   permissionEvaluatorEvaluateMock: vi.fn(() => 'ask'),
@@ -98,8 +102,12 @@ vi.mock('../../../../utils/mcp-inventory-cache.js', () => ({
 }));
 
 vi.mock('../../../../utils/server-utils.js', () => ({
-  isBashLikeTool: vi.fn(() => true),
+  isBashLikeTool: isBashLikeToolMock,
   isSudoCommand: vi.fn(() => false),
+}));
+
+vi.mock('../../../../infra/providers/pi-runtime/sandbox.js', () => ({
+  isSandboxAvailable: isSandboxAvailableMock,
 }));
 
 function createInput() {
@@ -456,5 +464,87 @@ describe('createPermissionCallback workflow routing', () => {
         title: 'Question',
       },
     }));
+  });
+});
+
+describe('createPermissionCallback strict plan mode', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isBashLikeToolMock.mockReturnValue(false);
+    isSandboxAvailableMock.mockReturnValue(false);
+  });
+
+  function planInput() {
+    const input = createInput();
+    input.forcedPlanBySession = true;
+    input.modeValue = 'plan';
+    return input;
+  }
+
+  function wasStrictDenied() {
+    return broadcastRunMessageMock.mock.calls.some(([, msg]) =>
+      typeof msg?.reason === 'string' && msg.reason.startsWith('Denied by strict Plan Mode'),
+    );
+  }
+
+  it('denies workspace-mutating tools', async () => {
+    const callback = createPermissionCallback(planInput() as never);
+    const decision = await callback({
+      requestId: 'req-write',
+      toolName: 'Write',
+      toolInput: {},
+      detail: 'write file',
+    } as never);
+    expect(decision.behavior).toBe('deny');
+    expect(decision.message).toContain('Denied by strict Plan Mode');
+  });
+
+  it.each(['EnterPlanMode', 'ExitPlanMode', 'ReadSymbol', 'AstGrep', 'Memory'])(
+    'does not strict-deny read-only tool %s',
+    async (toolName) => {
+      const callback = createPermissionCallback(planInput() as never);
+      const result = await shortRace(callback({
+        requestId: `req-${toolName}`,
+        toolName,
+        toolInput: {},
+        detail: toolName,
+      } as never));
+      // Falls through to the normal permission flow rather than being killed by
+      // the strict-plan gate.
+      expect(wasStrictDenied()).toBe(false);
+      if (result !== 'pending') {
+        expect(result.message ?? '').not.toContain('Denied by strict Plan Mode');
+      }
+    },
+  );
+
+  it('allows Bash when the sandbox is available (read-only)', async () => {
+    isBashLikeToolMock.mockReturnValue(true);
+    isSandboxAvailableMock.mockReturnValue(true);
+    const callback = createPermissionCallback(planInput() as never);
+    const result = await shortRace(callback({
+      requestId: 'req-bash-sandbox',
+      toolName: 'Bash',
+      toolInput: { command: 'ls' },
+      detail: 'ls',
+    } as never));
+    expect(wasStrictDenied()).toBe(false);
+    if (result !== 'pending') {
+      expect(result.message ?? '').not.toContain('Denied by strict Plan Mode');
+    }
+  });
+
+  it('denies Bash when the sandbox is unavailable', async () => {
+    isBashLikeToolMock.mockReturnValue(true);
+    isSandboxAvailableMock.mockReturnValue(false);
+    const callback = createPermissionCallback(planInput() as never);
+    const decision = await callback({
+      requestId: 'req-bash-nosandbox',
+      toolName: 'Bash',
+      toolInput: { command: 'ls' },
+      detail: 'ls',
+    } as never);
+    expect(decision.behavior).toBe('deny');
+    expect(decision.message).toContain('Denied by strict Plan Mode');
   });
 });
