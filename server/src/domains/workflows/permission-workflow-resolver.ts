@@ -81,6 +81,7 @@ export class PermissionWorkflowResolver {
       'event',
       'event: permission.escalated',
       triggerData,
+      'event',
     );
     return { resolved, run };
   }

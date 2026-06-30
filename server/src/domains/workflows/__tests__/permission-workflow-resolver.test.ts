@@ -79,7 +79,10 @@ function insertWorkflow(db: Database.Database, values: {
 describe('PermissionWorkflowResolver', () => {
   let db: Database.Database;
   let resolver: PermissionWorkflowResolver;
-  let workflowService: { getSystemPermissionFallback: ReturnType<typeof vi.fn> };
+  let workflowService: {
+    getSystemPermissionFallback: ReturnType<typeof vi.fn>;
+    triggerWorkflow: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     db = createDb();
@@ -90,6 +93,7 @@ describe('PermissionWorkflowResolver', () => {
         isSystem: true,
         systemKey: 'permission_escalation_fallback',
       })),
+      triggerWorkflow: vi.fn(async () => ({ id: 'run-1' })),
     };
     resolver = new PermissionWorkflowResolver(db, workflowService as any);
   });
@@ -158,5 +162,22 @@ describe('PermissionWorkflowResolver', () => {
     const resolved = resolver.resolve('p1');
     expect(resolved.source).toBe('system_fallback');
     expect(resolved.workflowId).toBe('wf-system');
+  });
+
+  it('triggers escalation with an explicit event initiator', async () => {
+    insertWorkflow(db, { id: 'wf-global' });
+    db.prepare(`UPDATE agent_config SET permission_workflow_override_id = 'wf-global' WHERE id = 1`).run();
+
+    await resolver.triggerPermissionEscalation(undefined, {
+      eventPayload: { requestId: 'req-1' },
+    });
+
+    expect(workflowService.triggerWorkflow).toHaveBeenCalledWith(
+      expect.any(String),
+      'event',
+      'event: permission.escalated',
+      expect.objectContaining({ eventPayload: expect.any(Object) }),
+      'event',
+    );
   });
 });
