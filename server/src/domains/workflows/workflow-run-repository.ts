@@ -15,11 +15,14 @@ export class WorkflowRunRepository extends BaseRepository<WorkflowRun, WorkflowR
     const row = raw as Record<string, unknown>;
     return {
       id: row.id as string,
-      workflowId: row.workflow_id as string,
+      workflowId: (row.workflow_id as string) || undefined,
       projectId: (row.project_id as string) ?? undefined,
       status: row.status as WorkflowRunStatus,
       triggerSource: row.trigger_source as WorkflowRunTriggerSource,
       triggerDetail: (row.trigger_detail as string) || undefined,
+      initiator: (row.initiator as string) ?? 'manual',
+      actionKind: (row.action_kind as WorkflowRun['actionKind']) || undefined,
+      actionRef: (row.action_ref as string) || undefined,
       currentStepId: (row.current_step_id as string) || undefined,
       startedAt: row.started_at as number,
       completedAt: (row.completed_at as number) || undefined,
@@ -32,15 +35,18 @@ export class WorkflowRunRepository extends BaseRepository<WorkflowRun, WorkflowR
     return {
       sql: `INSERT INTO workflow_runs (
         id, workflow_id, project_id, status, trigger_source, trigger_detail,
-        current_step_id, started_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        initiator, action_kind, action_ref, current_step_id, started_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       params: [
         id,
-        data.workflowId,
+        data.workflowId ?? null,
         data.projectId ?? null,
         data.status,
         data.triggerSource,
         data.triggerDetail ?? null,
+        data.initiator ?? 'manual',
+        data.actionKind ?? null,
+        data.actionRef ?? null,
         data.currentStepId ?? null,
         data.startedAt,
       ],
@@ -86,6 +92,13 @@ export class WorkflowRunRepository extends BaseRepository<WorkflowRun, WorkflowR
     const rows = this.db.prepare(
       'SELECT * FROM workflow_runs WHERE project_id = ? ORDER BY started_at DESC LIMIT ?'
     ).all(projectId, limit);
+    return rows.map(row => this.mapRow(row));
+  }
+
+  findByInitiator(initiator: string, limit = 50): WorkflowRun[] {
+    const rows = this.db.prepare(
+      'SELECT * FROM workflow_runs WHERE initiator = ? ORDER BY started_at DESC LIMIT ?'
+    ).all(initiator, limit);
     return rows.map(row => this.mapRow(row));
   }
 }
