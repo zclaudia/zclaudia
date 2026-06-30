@@ -28,6 +28,7 @@ import { migration as m_025_message_tree_entry_id } from './025_message_tree_ent
 import { migration as m_026_session_goals } from './026_session_goals.js';
 import { migration as m_027_agent_multimodal_fallback } from './027_agent_multimodal_fallback.js';
 import { migration as m_028_agent_loop_contexts } from './028_agent_loop_contexts.js';
+import { migration as m_029_automations } from './029_automations.js';
 
 export type { Migration };
 
@@ -60,6 +61,7 @@ export const migrations: Migration[] = [
   m_026_session_goals,
   m_027_agent_multimodal_fallback,
   m_028_agent_loop_contexts,
+  m_029_automations,
 ];
 
 /**
