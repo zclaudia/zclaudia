@@ -1,7 +1,17 @@
-import { describe, it, expect } from 'vitest';
-import { BUILTIN_WORKFLOW_TEMPLATES } from '../templates.js';
+import { describe, expect, it } from 'vitest';
+import { BUILTIN_WORKFLOW_TEMPLATES, PERMISSION_WORKFLOW_TEMPLATE_ID } from '../templates.js';
 
-describe('builtin workflow templates', () => {
+describe('workflow templates', () => {
+  it('does not auto-approve ExitPlanMode in the default permission workflow', () => {
+    const template = BUILTIN_WORKFLOW_TEMPLATES.find((item) => item.id === PERMISSION_WORKFLOW_TEMPLATE_ID);
+
+    expect(template).toBeDefined();
+    expect(template?.definition.nodes.some((node) => node.id === 'check_exit_plan_mode')).toBe(false);
+    expect(template?.definition.nodes.some((node) => node.id === 'wait_exit_plan')).toBe(false);
+    expect(template?.definition.nodes.some((node) => node.id === 'decide_approve_exit_plan')).toBe(false);
+    expect(template?.definition.edges.some((edge) => edge.source === 'check_escalate' && edge.type === 'condition_true')).toBe(false);
+  });
+
   it('no template definition carries a triggers field', () => {
     for (const t of BUILTIN_WORKFLOW_TEMPLATES) {
       expect('triggers' in t.definition).toBe(false);
