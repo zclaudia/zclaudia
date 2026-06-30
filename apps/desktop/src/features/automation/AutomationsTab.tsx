@@ -6,6 +6,7 @@ import type { AutomationItem } from './automation-types';
 import { simpleWorkflowToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
+import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
 
 interface AutomationsTabProps {
   api: AutomationApiType;
@@ -16,6 +17,7 @@ interface AutomationsTabProps {
 export function AutomationsTab({ api, projectName, projectId }: AutomationsTabProps) {
   const [simpleWorkflows, setSimpleWorkflows] = useState<Workflow[]>([]);
   const [loading, setLoading] = useState(true);
+  const selectedItemId = useTopLevelViewStore((s) => s.selectedAutomationItemId);
 
   // Create form state
   const [showCreate, setShowCreate] = useState(false);
@@ -226,7 +228,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
           <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Active ({enabledItems.length})</h3>
           <div className="space-y-1.5">
             {enabledItems.map(item => (
-              <AutomationCard key={item.id} item={item} projectName={projectName} onToggle={() => handleToggle(item)} onTrigger={() => handleTriggerNow(item)} onDelete={() => handleDelete(item)} />
+              <AutomationCard key={item.id} item={item} projectName={projectName} onToggle={() => handleToggle(item)} onTrigger={() => handleTriggerNow(item)} onDelete={() => handleDelete(item)} selected={item.id === selectedItemId} />
             ))}
           </div>
         </div>
@@ -238,7 +240,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
           <h3 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">Disabled ({disabledItems.length})</h3>
           <div className="space-y-1.5">
             {disabledItems.map(item => (
-              <AutomationCard key={item.id} item={item} projectName={projectName} onToggle={() => handleToggle(item)} onTrigger={() => handleTriggerNow(item)} onDelete={() => handleDelete(item)} />
+              <AutomationCard key={item.id} item={item} projectName={projectName} onToggle={() => handleToggle(item)} onTrigger={() => handleTriggerNow(item)} onDelete={() => handleDelete(item)} selected={item.id === selectedItemId} />
             ))}
           </div>
         </div>
@@ -251,15 +253,19 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   );
 }
 
-function AutomationCard({ item, projectName, onToggle, onTrigger, onDelete }: {
+function AutomationCard({ item, projectName, onToggle, onTrigger, onDelete, selected }: {
   item: AutomationItem;
   projectName: (id?: string) => string;
   onToggle: () => void;
   onTrigger: () => void;
   onDelete: () => void;
+  selected?: boolean;
 }) {
   return (
-    <div className={`rounded-lg border p-3 flex items-center gap-3 ${item.enabled ? 'border-border bg-card/50' : 'border-border/50 bg-muted/30 opacity-60'}`}>
+    <div
+      data-automation-card
+      className={`rounded-lg border p-3 flex items-center gap-3 ${selected ? 'ring-2 ring-primary ' : ''}${item.enabled ? 'border-border bg-card/50' : 'border-border/50 bg-muted/30 opacity-60'}`}
+    >
       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
         item.status === 'running' ? 'bg-amber-500 animate-pulse' :
         item.status === 'error' ? 'bg-red-500' :
