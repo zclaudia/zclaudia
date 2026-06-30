@@ -37,6 +37,9 @@ vi.mock('../../features/sidebar/ProjectWorkspaceItem', () => ({
 }));
 vi.mock('../../features/sidebar/worktreeGrouping', () => ({ groupSessionsByWorktree: vi.fn().mockReturnValue([]) }));
 vi.mock('../../hooks/useSwipeBack', () => ({ useSwipeBack: vi.fn().mockReturnValue({ current: null }) }));
+vi.mock('../../features/automation/AutomationTree', () => ({
+  AutomationTree: ({ tab }: any) => <div data-testid="automation-tree" data-tab={tab} />,
+}));
 vi.mock('../../hooks/useSelectionCoordinator', () => ({
   useSelectionCoordinator: () => ({
     selectProject: selectionMocks.selectProject,
@@ -1730,6 +1733,31 @@ describe('Sidebar', () => {
       expect(api.searchMessages).toHaveBeenCalled();
     }
     vi.useRealTimers();
+  });
+
+  // ---- Automation mode ----
+
+  it('renders AutomationTree and text nav rows when automationMode is active', () => {
+    const onSelectTab = vi.fn();
+    const onBack = vi.fn();
+    const onSelectScope = vi.fn();
+    const { container } = render(
+      <Sidebar
+        collapsed={false}
+        onToggle={vi.fn()}
+        automationMode={{
+          tab: 'workflows',
+          activeBackendId: LOCAL_BACKEND_ID,
+          projectId: undefined,
+          onSelectTab,
+          onBack,
+          onSelectScope,
+        }}
+      />
+    );
+
+    expect(screen.getByTestId('automation-tree')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Workflows' })).toBeTruthy();
   });
 
   // ---- PluginPermissionDialog ----

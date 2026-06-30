@@ -10,8 +10,7 @@ import { useSearchSidebar } from './useSearchSidebar';
 import { groupSessionsByWorktree as groupSessionsByWorktreeFn } from './worktreeGrouping';
 import { SidebarTopBar } from './SidebarTopBar';
 import { SidebarNav } from './SidebarNav';
-import { AutomationScopeDropdown } from './AutomationScopeDropdown';
-import { AutomationListPanel } from '../automation/AutomationListPanel';
+import { AutomationTree } from '../automation/AutomationTree';
 import { useAutomationApi } from '../automation/useAutomationApi';
 import type { AutomationTab } from '../automation/automation-types';
 import { MobileSidebarHeader } from './MobileSidebarHeader';
@@ -252,10 +251,6 @@ export function Sidebar({
   // --- Automation mode wiring ---
   // Hook must run unconditionally; only consumed when automationMode is present.
   const automationApi = useAutomationApi(automationMode?.activeBackendId ?? null, '', '');
-  const scopeLabel = automationMode?.projectId
-    ? (getProjectsForBackend(automationMode.activeBackendId ?? '').find(p => p.id === automationMode!.projectId)?.name ?? automationMode.projectId)
-    : 'All projects';
-
   const showAgentRequiredDialog = useCallback((reason: AgentReadinessReason | undefined) => {
     setAgentDialogReason(reason);
     setAgentDialogOpen(true);
@@ -605,29 +600,21 @@ export function Sidebar({
               tab: automationMode.tab,
               onSelectTab: automationMode.onSelectTab,
               onBack: automationMode.onBack,
-              scopeSlot: (
-                <AutomationScopeDropdown
-                  label={scopeLabel}
-                  backends={onlineBackends}
-                  getProjectsForBackend={getProjectsForBackend}
-                  expandedBackendIds={expandedBackendIds}
-                  onToggleBackend={toggleBackend}
-                  activeBackendId={automationMode.activeBackendId}
-                  selectedProjectId={automationMode.projectId}
-                  onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
-                  onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
-                />
-              ),
             } : undefined}
           />
 
           <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
             {automationMode ? (
-              <AutomationListPanel
+              <AutomationTree
                 tab={automationMode.tab}
                 api={automationApi}
-                projects={getProjectsForBackend(automationMode.activeBackendId ?? '').map(p => ({ id: p.id, name: p.name }))}
-                projectId={automationMode.projectId}
+                activeBackendId={automationMode.activeBackendId}
+                selectedProjectId={automationMode.projectId}
+                backends={onlineBackends}
+                getProjectsForBackend={getProjectsForBackend}
+                expandedBackendIds={expandedBackendIds}
+                onToggleBackend={toggleBackend}
+                onSelectScope={automationMode.onSelectScope}
               />
             ) : (
               renderProjectList()
@@ -712,29 +699,21 @@ export function Sidebar({
           tab: automationMode.tab,
           onSelectTab: automationMode.onSelectTab,
           onBack: automationMode.onBack,
-          scopeSlot: (
-            <AutomationScopeDropdown
-              label={scopeLabel}
-              backends={onlineBackends}
-              getProjectsForBackend={getProjectsForBackend}
-              expandedBackendIds={expandedBackendIds}
-              onToggleBackend={toggleBackend}
-              activeBackendId={automationMode.activeBackendId}
-              selectedProjectId={automationMode.projectId}
-              onSelectBackend={(backendId) => automationMode.onSelectScope(backendId, undefined)}
-              onSelectProject={(backendId, projectId) => automationMode.onSelectScope(backendId, projectId)}
-            />
-          ),
         } : undefined}
       />
 
       <div className="flex-1 overflow-y-auto scrollbar-hidden p-2">
         {automationMode ? (
-          <AutomationListPanel
+          <AutomationTree
             tab={automationMode.tab}
             api={automationApi}
-            projects={getProjectsForBackend(automationMode.activeBackendId ?? '').map(p => ({ id: p.id, name: p.name }))}
-            projectId={automationMode.projectId}
+            activeBackendId={automationMode.activeBackendId}
+            selectedProjectId={automationMode.projectId}
+            backends={onlineBackends}
+            getProjectsForBackend={getProjectsForBackend}
+            expandedBackendIds={expandedBackendIds}
+            onToggleBackend={toggleBackend}
+            onSelectScope={automationMode.onSelectScope}
           />
         ) : (
           renderProjectList()
