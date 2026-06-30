@@ -1,6 +1,8 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { AutomationTree } from '../AutomationTree';
+import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 
 const api = {
   get: vi.fn(),
@@ -22,6 +24,7 @@ const baseProps = {
 
 beforeEach(() => {
   api.get.mockReset();
+  useTopLevelViewStore.setState({ selectedAutomationItemId: null, automationListRefreshNonce: 0 });
 });
 
 describe('AutomationTree', () => {
