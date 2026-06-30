@@ -25,6 +25,7 @@ import {
   checkoutBranch,
   createBranch,
   deleteBranch,
+  getStagedDiff,
 } from '../git-operations.js';
 
 type ExecFileCallback = (
@@ -386,6 +387,35 @@ describe('git-operations', () => {
       expect(mockExecFile).toHaveBeenCalledWith(
         'git', ['branch', '-D', 'feature'], expect.anything(), expect.any(Function),
       );
+    });
+  });
+
+  describe('getStagedDiff', () => {
+    it('returns diff, stat, files and not-truncated for a small staged diff', async () => {
+      mockGitSequence([
+        'diff --git a/a.ts b/a.ts\n+hello',  // git diff --cached
+        ' a.ts | 1 +\n 1 file changed, 1 insertion(+)', // git diff --cached --stat
+        'a.ts\n', // git diff --cached --name-only
+      ]);
+      const result = await getStagedDiff('/repo');
+      expect(result.files).toEqual(['a.ts']);
+      expect(result.truncated).toBe(false);
+      expect(result.diff).toContain('+hello');
+      expect(result.stat).toContain('1 file changed');
+    });
+
+    it('marks truncated and appends a marker when the diff exceeds maxBytes', async () => {
+      const big = 'x'.repeat(200);
+      mockGitSequence([big, ' a.ts | 1 +', 'a.ts\n']);
+      const result = await getStagedDiff('/repo', 50);
+      expect(result.truncated).toBe(true);
+      expect(result.diff.endsWith('[diff truncated]')).toBe(true);
+    });
+
+    it('returns empty files when nothing is staged', async () => {
+      mockGitSequence(['', '', '']);
+      const result = await getStagedDiff('/repo');
+      expect(result.files).toEqual([]);
     });
   });
 });

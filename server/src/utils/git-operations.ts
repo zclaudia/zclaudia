@@ -166,6 +166,31 @@ export async function getDiff(
   return diff.slice(0, maxBytes) + '\n\n[diff truncated]';
 }
 
+export interface StagedDiffResult {
+  diff: string;
+  stat: string;
+  files: string[];
+  truncated: boolean;
+}
+
+/**
+ * Returns the full staged diff (`git diff --cached`) plus its --stat summary and
+ * the list of staged file paths. The diff is truncated to maxBytes (default 60KB)
+ * so it fits an LLM prompt; `truncated` flags when that happened.
+ */
+export async function getStagedDiff(
+  repoPath: string,
+  maxBytes = 60 * 1024,
+): Promise<StagedDiffResult> {
+  const raw = await git(['diff', '--cached'], repoPath);
+  const stat = await git(['diff', '--cached', '--stat'], repoPath);
+  const nameOnly = await git(['diff', '--cached', '--name-only'], repoPath);
+  const files = nameOnly.split('\n').map((line) => line.trim()).filter(Boolean);
+  const truncated = raw.length > maxBytes;
+  const diff = truncated ? raw.slice(0, maxBytes) + '\n\n[diff truncated]' : raw;
+  return { diff, stat: stat.trim(), files, truncated };
+}
+
 function truncateDiff(diff: string, maxBytes: number): string {
   if (diff.length <= maxBytes) return diff;
   return diff.slice(0, maxBytes) + '\n\n[diff truncated]';
