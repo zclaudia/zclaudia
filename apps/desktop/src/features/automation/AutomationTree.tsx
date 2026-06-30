@@ -25,7 +25,7 @@ export interface AutomationTreeProps {
 const rowBase =
   'w-full text-left px-2 py-1.5 rounded-md text-sm flex items-center gap-2 hover:bg-secondary hover:text-foreground transition-colors';
 
-/** workflows/automations 这两个 tab 的项目节点可展开到条目;其余不展开。 */
+/** Only the workflows/automations tabs let project nodes expand to item leaves; the rest don't. */
 function tabIsExpandable(tab: AutomationTab): boolean {
   return tab === 'workflows' || tab === 'automations';
 }
@@ -45,14 +45,14 @@ export function AutomationTree({
   const selectItem = useTopLevelViewStore((s) => s.selectAutomationItem);
   const refreshNonce = useTopLevelViewStore((s) => s.automationListRefreshNonce);
 
-  // workflows/automations 的条目(仅 active backend),按 projectId 客户端分组。
+  // Item leaves for workflows/automations (active backend only), grouped by projectId client-side.
   const [items, setItems] = useState<Workflow[]>([]);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const expandable = tabIsExpandable(tab);
 
   useEffect(() => {
-    setExpandedProjects(new Set()); // 切 tab 重置展开
+    setExpandedProjects(new Set()); // reset expansion when the tab changes
   }, [tab]);
 
   useEffect(() => {
@@ -100,10 +100,10 @@ export function AutomationTree({
             expanded={expandedBackendIds.includes(backend.backendId)}
             onToggle={() => onToggleBackend(backend.backendId)}
           >
-            {/* system: 全局任务,不展示项目层 */}
+            {/* system: global tasks — no project layer */}
             {tab === 'system' ? null : (
               <div className="space-y-0.5">
-                {/* runs: All projects 作用域行 */}
+                {/* runs: "All projects" scope row */}
                 {tab === 'runs' && (
                   <button
                     type="button"
@@ -119,26 +119,25 @@ export function AutomationTree({
                 {projects.map((project) => {
                   const key = `${backend.backendId}:${project.id}`;
                   const projectSelected = isActive && selectedProjectId === project.id;
-                  // 只有 active backend 的项目能展开条目(api 绑定 active backend)。
-                  const canExpand = expandable && isActive;
-                  const isOpen = canExpand && expandedProjects.has(key);
-                  const leaves = leavesFor(project);
+                  // Expandable tabs show a chevron for every backend's projects. The expanded
+                  // state is tracked regardless of which backend is active; clicking a project
+                  // under a non-active backend activates it (via onSelectScope) and opens it in
+                  // one click. Leaves only render once the backend is active, since the item
+                  // list is fetched for the active backend only.
+                  const isOpen = expandable && expandedProjects.has(key);
+                  const showLeaves = isOpen && isActive;
                   return (
                     <div key={project.id}>
                       <button
                         type="button"
                         aria-label={project.name}
                         onClick={() => {
-                          if (canExpand) {
-                            onSelectScope(backend.backendId, project.id);
-                            toggleProject(key);
-                          } else {
-                            onSelectScope(backend.backendId, project.id);
-                          }
+                          onSelectScope(backend.backendId, project.id);
+                          if (expandable) toggleProject(key);
                         }}
                         className={`${rowBase} ${projectSelected ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
                       >
-                        {canExpand ? (
+                        {expandable ? (
                           <ChevronRight
                             size={14}
                             strokeWidth={2}
@@ -150,7 +149,9 @@ export function AutomationTree({
                         <span className="truncate">{displayProjectName(project.name)}</span>
                       </button>
 
-                      {isOpen && (
+                      {showLeaves && (() => {
+                        const leaves = leavesFor(project);
+                        return (
                         <div className="pl-4 space-y-0.5">
                           {leaves.map((w) => {
                             const leafSelected = selectedItemId === w.id;
@@ -179,7 +180,8 @@ export function AutomationTree({
                             <p className="px-2 py-1 text-xs text-muted-foreground">No items</p>
                           )}
                         </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   );
                 })}

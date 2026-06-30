@@ -33,16 +33,41 @@ describe('AutomationTree', () => {
       { id: 'w1', name: 'Daily backup', status: 'active', projectId: 'p1' },
     ]);
     render(<AutomationTree {...baseProps} tab="workflows" />);
-    // 服务器已展开 -> 看到项目行
+    // backend is already expanded -> the project row is visible
     const projectRow = await screen.findByRole('button', { name: 'gen-token' });
     fireEvent.click(projectRow);
     expect(await screen.findByText('Daily backup')).toBeInTheDocument();
   });
 
+  it('workflows tab: a non-active backend project expands in a single click after activation', async () => {
+    api.get.mockResolvedValue([
+      { id: 'w2', name: 'Nightly sync', status: 'active', projectId: 'p2' },
+    ]);
+    const onSelectScope = vi.fn();
+    const multiProps = {
+      ...baseProps,
+      onSelectScope,
+      backends: [
+        { backendId: 'b1', name: 'Local Server', online: true },
+        { backendId: 'b2', name: 'Remote Server', online: true },
+      ],
+      expandedBackendIds: ['b1', 'b2'],
+      getProjectsForBackend: (id: string) =>
+        id === 'b2' ? [{ id: 'p2', name: 'remote-proj' }] : [{ id: 'p1', name: 'gen-token' }],
+    };
+    const { rerender } = render(<AutomationTree {...multiProps} tab="workflows" activeBackendId="b1" />);
+    // b2 is not active yet — a single click on its project both selects scope and opens it.
+    fireEvent.click(await screen.findByRole('button', { name: 'remote-proj' }));
+    expect(onSelectScope).toHaveBeenCalledWith('b2', 'p2');
+    // Parent reacts by activating b2; the leaf appears without a second click.
+    rerender(<AutomationTree {...multiProps} tab="workflows" activeBackendId="b2" />);
+    expect(await screen.findByText('Nightly sync')).toBeInTheDocument();
+  });
+
   it('runs tab: shows All projects row and no leaves', async () => {
     render(<AutomationTree {...baseProps} tab="runs" />);
     expect(await screen.findByRole('button', { name: 'All projects' })).toBeInTheDocument();
-    expect(api.get).not.toHaveBeenCalled(); // runs 不拉条目
+    expect(api.get).not.toHaveBeenCalled(); // runs does not fetch item leaves
   });
 
   it('runs tab: clicking a project sets scope', async () => {
