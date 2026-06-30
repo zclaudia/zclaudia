@@ -1,2 +1,3 @@
 export { AutomationRepository } from './repository.js';
-// AutomationService (Task 9) and registerAutomationsDomain (Task 12) re-exports added later
+export { AutomationService } from './service.js';
+// registerAutomationsDomain (Task 12) re-export added later

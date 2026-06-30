@@ -1,0 +1,77 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import { applyMigrations } from '../../../infra/storage/migrations/index.js';
+import { AutomationService } from '../service.js';
+import type { Workflow, WorkflowDefinition } from '@zclaudia/shared/features/workflows';
+
+function fakeEngine() {
+  return {
+    startRun: vi.fn(async (opts: any) => ({ id: 'run-1', initiator: opts.initiator, status: 'running', triggerSource: opts.triggerSource, startedAt: 1 })),
+    isRunningKey: vi.fn(() => false),
+  };
+}
+
+function fakeWorkflowLookup(wf?: Workflow) {
+  return { getWorkflow: vi.fn((id: string) => (wf && wf.id === id ? wf : null)) };
+}
+
+describe('AutomationService', () => {
+  let db: Database.Database;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    applyMigrations(db);
+  });
+
+  it('runs an activity action as an ephemeral one-node workflow', async () => {
+    const engine = fakeEngine();
+    const svc = new AutomationService(db, () => {}, engine as any, fakeWorkflowLookup() as any);
+    const a = svc.createAutomation({
+      name: 'commit',
+      trigger: { type: 'manual' },
+      action: { kind: 'activity', ref: 'git_commit', input: { messageMode: 'ai' } },
+    });
+
+    await svc.runAction(a.id, { initiator: 'manual', triggerSource: 'manual' });
+
+    expect(engine.startRun).toHaveBeenCalledTimes(1);
+    const opts = engine.startRun.mock.calls[0][0];
+    expect(opts.workflowId).toBeUndefined();
+    expect(opts.actionKind).toBe('activity');
+    expect(opts.actionRef).toBe('git_commit');
+    expect(opts.trackingKey).toBe(`automation:${a.id}`);
+    const def = opts.definition as WorkflowDefinition;
+    expect(def.nodes).toHaveLength(1);
+    expect(def.nodes[0].type).toBe('git_commit');
+    expect(def.nodes[0].config).toEqual({ messageMode: 'ai' });
+  });
+
+  it('runs a workflow action against the persisted workflow definition', async () => {
+    const wf: Workflow = {
+      id: 'w1', name: 'WF', status: 'active',
+      definition: { nodes: [{ id: 'n', name: 'n', type: 'shell', config: {}, position: { x: 0, y: 0 } }], edges: [], entryNodeId: 'n' },
+      createdAt: 1, updatedAt: 1,
+    };
+    const engine = fakeEngine();
+    const svc = new AutomationService(db, () => {}, engine as any, fakeWorkflowLookup(wf) as any);
+    const a = svc.createAutomation({
+      name: 'run wf',
+      trigger: { type: 'manual' },
+      action: { kind: 'workflow', ref: 'w1' },
+    });
+
+    await svc.runAction(a.id, { initiator: 'manual', triggerSource: 'manual' });
+
+    const opts = engine.startRun.mock.calls[0][0];
+    expect(opts.workflowId).toBe('w1');
+    expect(opts.actionKind).toBe('workflow');
+    expect(opts.trackingKey).toBe('w1');
+    expect(opts.definition).toBe(wf.definition);
+  });
+
+  it('throws when a workflow action references a missing workflow', async () => {
+    const svc = new AutomationService(db, () => {}, fakeEngine() as any, fakeWorkflowLookup() as any);
+    const a = svc.createAutomation({ name: 'x', trigger: { type: 'manual' }, action: { kind: 'workflow', ref: 'missing' } });
+    await expect(svc.runAction(a.id, { initiator: 'manual', triggerSource: 'manual' })).rejects.toThrow(/Workflow not found/);
+  });
+});
