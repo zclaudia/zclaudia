@@ -64,4 +64,15 @@ describe('GenerateCommitMessageActivity', () => {
     expect(res.status).toBe('failed');
     expect(res.error).toBe('too slow');
   });
+
+  it('returns a failed result when git throws (not a throw)', async () => {
+    mockExecFile.mockImplementation((_cmd: string, _args: string[], _opts: unknown, cb: ExecFileCallback) => {
+      cb(new Error('not a git repository'), { stdout: '' });
+    });
+    const run = vi.fn();
+    const res = await new GenerateCommitMessageActivity().invoke({ worktreePath: '/repo' }, servicesWith(run));
+    expect(res.status).toBe('failed');
+    expect(res.error).toContain('not a git repository');
+    expect(run).not.toHaveBeenCalled();
+  });
 });

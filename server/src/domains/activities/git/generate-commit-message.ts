@@ -35,62 +35,70 @@ export class GenerateCommitMessageActivity
       return { status: 'failed', output: { subject: '', message: '' }, error: 'No working directory' };
     }
 
-    const staged = await getStagedDiff(repoPath);
-    if (staged.files.length === 0) {
-      return { status: 'failed', output: { subject: '', message: '' }, error: 'No staged changes' };
-    }
+    try {
+      const staged = await getStagedDiff(repoPath);
+      if (staged.files.length === 0) {
+        return { status: 'failed', output: { subject: '', message: '' }, error: 'No staged changes' };
+      }
 
-    const userInput = [
-      '# Staged files',
-      staged.files.join('\n'),
-      '',
-      '# Stat',
-      staged.stat,
-      '',
-      `# Diff${staged.truncated ? ' (truncated)' : ''}`,
-      staged.diff,
-    ].join('\n');
+      const userInput = [
+        '# Staged files',
+        staged.files.join('\n'),
+        '',
+        '# Stat',
+        staged.stat,
+        '',
+        `# Diff${staged.truncated ? ' (truncated)' : ''}`,
+        staged.diff,
+      ].join('\n');
 
-    const result = await services.agentLoopRunner.run({
-      owner: { type: 'manual', id: `git-commit-message:${repoPath}` },
-      purpose: 'git.commit_message',
-      ...(services.llmProfileId ? { llmProfileId: services.llmProfileId } : {}),
-      cwd: repoPath,
-      systemPrompt: SYSTEM_PROMPT,
-      input: userInput,
-      toolset: { id: 'none' },
-      outputContract: {
-        type: 'json',
-        schema: {
-          type: 'object',
-          required: ['subject'],
-          additionalProperties: false,
-          properties: {
-            subject: { type: 'string' },
-            body: { type: 'string' },
+      const result = await services.agentLoopRunner.run({
+        owner: { type: 'manual', id: `git-commit-message:${repoPath}` },
+        purpose: 'git.commit_message',
+        ...(services.llmProfileId ? { llmProfileId: services.llmProfileId } : {}),
+        cwd: repoPath,
+        systemPrompt: SYSTEM_PROMPT,
+        input: userInput,
+        toolset: { id: 'none' },
+        outputContract: {
+          type: 'json',
+          schema: {
+            type: 'object',
+            required: ['subject'],
+            additionalProperties: false,
+            properties: {
+              subject: { type: 'string' },
+              body: { type: 'string' },
+            },
           },
+          repairAttempts: 1,
         },
-        repairAttempts: 1,
-      },
-      context: { policy: 'none' },
-      limits: { maxTurns: 1, timeoutMs: 30_000 },
-      permissionMode: 'deny-external',
-    });
+        context: { policy: 'none' },
+        limits: { maxTurns: 1, timeoutMs: 30_000 },
+        permissionMode: 'deny-external',
+      });
 
-    if (result.status !== 'completed') {
+      if (result.status !== 'completed') {
+        return {
+          status: 'failed',
+          output: { subject: '', message: '' },
+          error: result.error ?? `Generation failed: ${result.status}`,
+        };
+      }
+
+      const subject = String(result.output.subject ?? '').trim();
+      const body = typeof result.output.body === 'string' ? result.output.body.trim() : '';
+      if (!subject) {
+        return { status: 'failed', output: { subject: '', message: '' }, error: 'Model returned an empty subject' };
+      }
+      const message = body ? `${subject}\n\n${body}` : subject;
+      return { status: 'completed', output: { subject, ...(body ? { body } : {}), message } };
+    } catch (err: unknown) {
       return {
         status: 'failed',
         output: { subject: '', message: '' },
-        error: result.error ?? `Generation failed: ${result.status}`,
+        error: err instanceof Error ? err.message : String(err),
       };
     }
-
-    const subject = String(result.output.subject ?? '').trim();
-    const body = typeof result.output.body === 'string' ? result.output.body.trim() : '';
-    if (!subject) {
-      return { status: 'failed', output: { subject: '', message: '' }, error: 'Model returned an empty subject' };
-    }
-    const message = body ? `${subject}\n\n${body}` : subject;
-    return { status: 'completed', output: { subject, ...(body ? { body } : {}), message } };
   }
 }
