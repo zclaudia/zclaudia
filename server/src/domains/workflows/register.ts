@@ -33,7 +33,9 @@ import {
   AIRiskAnalysisStepExecutor,
   PermissionDecideStepExecutor,
   TaskWorkflowStepExecutor,
+  ActivityStepExecutorAdapter,
 } from './step-executors/index.js';
+import type { ActivityRegistry } from '../activities/index.js';
 import type { PermissionBridgePort } from './ports/step-executor.js';
 import type { PermissionWorkflowResolver } from './permission-workflow-resolver.js';
 import { TaskRepository } from '../tasks/repository.js';
@@ -63,6 +65,7 @@ export interface WorkflowDomainDeps {
   permissionBridge?: PermissionBridgePort;
   getPermissionWorkflowResolver?: () => PermissionWorkflowResolver | undefined;
   taskExecutorRegistry?: TaskExecutorRegistry;
+  activityRegistry?: ActivityRegistry;
 }
 
 export interface WorkflowDomainResult {
@@ -72,7 +75,7 @@ export interface WorkflowDomainResult {
 }
 
 export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomainResult {
-  const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, systemTaskRegistry, aiRunPort, permissionBridge, getPermissionWorkflowResolver } = deps;
+  const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, systemTaskRegistry, aiRunPort, permissionBridge, getPermissionWorkflowResolver, activityRegistry } = deps;
 
   // -- Assemble step executors --
   const agentLoopRunner = new LightweightAgentRunner({ db });
@@ -104,6 +107,10 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
     composite.register(new PermissionDecideStepExecutor(permissionBridge));
   }
   composite.register(new AIRiskAnalysisStepExecutor(agentLoopRunner));
+
+  if (activityRegistry) {
+    composite.register(new ActivityStepExecutorAdapter(activityRegistry, agentLoopRunner));
+  }
 
   // -- Build engine --
   const engine = new WorkflowEngine(db, broadcast, composite);

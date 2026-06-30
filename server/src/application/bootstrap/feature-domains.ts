@@ -59,6 +59,8 @@ import { createIssueRoutes } from '../../domains/issue-orchestration/routes.js';
 import { createEpicRoutes } from '../../domains/epics/routes.js';
 import { EpicService } from '../../domains/epics/service.js';
 import { TaskExecutorRegistry } from '../../domains/tasks/executors/registry.js';
+import { ActivityRegistry, GitCommitActivity, GenerateCommitMessageActivity } from '../../domains/activities/index.js';
+import { LightweightAgentRunner } from '../../infra/providers/pi-runtime/agent-loop/index.js';
 
 
 interface RegisterFeatureDomainsDeps {
@@ -132,7 +134,19 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     taskExecutorRegistry,
   } = deps;
 
-  registerProjectsDomain({ db, app, authMiddleware, onProjectChanged: handleProjectChanged });
+  const activityRegistry = new ActivityRegistry();
+  activityRegistry.register(new GitCommitActivity());
+  activityRegistry.register(new GenerateCommitMessageActivity());
+  const gitActivityRunner = new LightweightAgentRunner({ db });
+
+  registerProjectsDomain({
+    db,
+    app,
+    authMiddleware,
+    onProjectChanged: handleProjectChanged,
+    activityRegistry,
+    agentLoopRunner: gitActivityRunner,
+  });
   registerSessionsDomain({ app, authMiddleware, db, activeRuns, sessionEvents });
   registerLlmProfilesDomain({ app, authMiddleware, db });
 
@@ -288,6 +302,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     permissionBridge,
     getPermissionWorkflowResolver: () => permissionWorkflowResolver,
     taskExecutorRegistry,
+    activityRegistry,
   });
   permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
   app.use('/api/automations', authMiddleware, createAutomationRoutes(workflowService));

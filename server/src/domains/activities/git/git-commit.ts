@@ -12,7 +12,7 @@ export interface GitCommitInput {
   message?: string;
 }
 
-export interface GitCommitOutput {
+export interface GitCommitOutput extends Record<string, unknown> {
   commitSha: string | null;
   message: string;
 }

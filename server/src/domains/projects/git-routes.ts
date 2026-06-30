@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type Database from 'better-sqlite3';
+import type { ActivityRegistry } from '../activities/index.js';
+import type { AgentLoopRunnerPort } from '../agent-loop/index.js';
 import {
   ProjectWorktreeService,
   ProjectNotFoundError,
@@ -70,7 +72,12 @@ function getWorktreeParam(req: Request): string | null {
   return typeof body.worktree === 'string' && body.worktree.trim() ? body.worktree : null;
 }
 
-export function createGitRoutes(db: Database.Database): Router {
+export interface GitRoutesDeps {
+  activityRegistry?: ActivityRegistry;
+  agentLoopRunner?: AgentLoopRunnerPort;
+}
+
+export function createGitRoutes(db: Database.Database, deps: GitRoutesDeps = {}): Router {
   const router = Router({ mergeParams: true });
   const service = new ProjectWorktreeService(db);
 

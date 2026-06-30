@@ -6,7 +6,7 @@ export interface GenerateCommitMessageInput {
   projectRootPath?: string;
 }
 
-export interface GenerateCommitMessageOutput {
+export interface GenerateCommitMessageOutput extends Record<string, unknown> {
   subject: string;
   body?: string;
   message: string;

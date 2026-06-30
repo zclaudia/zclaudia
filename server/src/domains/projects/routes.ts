@@ -6,6 +6,7 @@ import { parseUserHooks } from '@zclaudia/shared/interaction/user-hooks';
 import { ProjectRepository } from './repository.js';
 import { ProjectWorktreeService, ProjectNotFoundError, ProjectRootPathMissingError } from './worktree-service.js';
 import { createGitRoutes } from './git-routes.js';
+import type { GitRoutesDeps } from './git-routes.js';
 import { resolveProjectMemoryDir } from '../../utils/memory-paths.js';
 import { WorkflowRepository } from '../workflows/repository.js';
 import {
@@ -25,6 +26,7 @@ export type ProjectChangeEvent =
 export function createProjectRoutes(
   db: Database.Database,
   onProjectChanged?: (event?: ProjectChangeEvent) => void,
+  gitDeps?: GitRoutesDeps,
 ): Router {
   const router = Router();
   const repo = new ProjectRepository(db);
@@ -296,7 +298,7 @@ export function createProjectRoutes(
   });
 
   // Git + worktree management endpoints (DELETE worktree, status, branches, log, stash, stage/commit, sync)
-  router.use(createGitRoutes(db));
+  router.use(createGitRoutes(db, gitDeps));
 
   router.post('/reorder', (req: Request, res: Response) => {
     try {
