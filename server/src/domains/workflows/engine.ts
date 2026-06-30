@@ -72,9 +72,14 @@ export class WorkflowEngine implements ApprovalPort {
     });
   }
 
-  isRunning(workflowId: string): boolean {
-    const runs = this.activeRuns.get(workflowId);
+  isRunningKey(key: string): boolean {
+    const runs = this.activeRuns.get(key);
     return !!runs && runs.size > 0;
+  }
+
+  /** @deprecated use isRunningKey; kept for callers keyed by workflowId. */
+  isRunning(workflowId: string): boolean {
+    return this.isRunningKey(workflowId);
   }
 
   /**
@@ -226,14 +231,21 @@ export class WorkflowEngine implements ApprovalPort {
 
   // ── Main Execution ────────���─────────────────────────────────────
 
-  async startRun(
-    workflowId: string,
-    projectId: string | undefined,
-    definition: WorkflowDefinition,
-    triggerSource: 'manual' | 'schedule' | 'event',
-    triggerDetail?: string,
-    triggerData?: RunTriggerContext,
-  ): Promise<WorkflowRun> {
+  async startRun(opts: {
+    workflowId?: string;
+    projectId: string | undefined;
+    definition: WorkflowDefinition;
+    triggerSource: 'manual' | 'schedule' | 'event';
+    initiator: string;
+    actionKind?: 'activity' | 'workflow';
+    actionRef?: string;
+    triggerDetail?: string;
+    triggerData?: RunTriggerContext;
+    /** Key for the active-run map (concurrency dedup). Defaults to workflowId ?? run.id. */
+    trackingKey?: string;
+  }): Promise<WorkflowRun> {
+    const { workflowId, projectId, definition, triggerSource, triggerData } = opts;
+
     // Note: concurrent runs are now allowed (needed for permission workflows).
     // The isRunning check is done at the service level for scheduled workflows.
 
@@ -251,17 +263,25 @@ export class WorkflowEngine implements ApprovalPort {
       triggerSource,
       this.runRepo,
       this.stepRunRepo,
-      triggerDetail,
+      {
+        initiator: opts.initiator,
+        actionKind: opts.actionKind,
+        actionRef: opts.actionRef,
+        triggerDetail: opts.triggerDetail,
+      },
     );
     const run = agg.snapshot;
 
     this.flushEvents(agg);
 
-    // Track active run
-    if (!this.activeRuns.has(workflowId)) {
-      this.activeRuns.set(workflowId, new Set());
+    // Track active run (keyed by trackingKey: workflowId for workflows, run.id
+    // for one-off activity runs, or an explicit dedup key from the caller).
+    const trackingKey = opts.trackingKey ?? workflowId ?? run.id;
+
+    if (!this.activeRuns.has(trackingKey)) {
+      this.activeRuns.set(trackingKey, new Set());
     }
-    this.activeRuns.get(workflowId)!.add(run.id);
+    this.activeRuns.get(trackingKey)!.add(run.id);
 
     // Store event payload for progress broadcasting
     if (triggerData?.eventPayload) {
@@ -293,10 +313,10 @@ export class WorkflowEngine implements ApprovalPort {
         }
       })
       .finally(() => {
-        const runs = this.activeRuns.get(workflowId);
+        const runs = this.activeRuns.get(trackingKey);
         if (runs) {
           runs.delete(run.id);
-          if (runs.size === 0) this.activeRuns.delete(workflowId);
+          if (runs.size === 0) this.activeRuns.delete(trackingKey);
         }
         this.runEventPayloads.delete(run.id);
       });
