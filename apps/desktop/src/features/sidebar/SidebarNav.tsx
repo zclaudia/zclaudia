@@ -1,13 +1,10 @@
 import { Home, Workflow, Zap, Clock, History, Server, ArrowLeft } from 'lucide-react';
-import type { ReactNode } from 'react';
 import type { AutomationTab } from '../automation/automation-types';
 
 export interface SidebarAutomationNavMode {
   tab: AutomationTab;
   onSelectTab: (tab: AutomationTab) => void;
   onBack: () => void;
-  /** Optional compact scope control rendered between Back and the tab strip. */
-  scopeSlot?: ReactNode;
 }
 
 interface SidebarNavProps {
@@ -42,7 +39,7 @@ export function SidebarNav({ onHome, isHomeActive, onOpenAutomations, automation
 
   if (automationMode) {
     return (
-      <div className="p-2 space-y-1.5 border-b border-border">
+      <div className="p-2 space-y-0.5 border-b border-border">
         <button
           onClick={automationMode.onBack}
           aria-label="Back to app"
@@ -52,25 +49,21 @@ export function SidebarNav({ onHome, isHomeActive, onOpenAutomations, automation
           Back to app
         </button>
 
-        {automationMode.scopeSlot}
-
-        <div className="flex items-center gap-1">
-          {AUTOMATION_TABS.map(({ key, label, Icon }) => {
-            const active = automationMode.tab === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => automationMode.onSelectTab(key)}
-                aria-label={label}
-                title={label}
-                className={`flex flex-1 items-center justify-center rounded-md py-1.5 transition-colors ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'}`}
-              >
-                <Icon className={iconSize} strokeWidth={1.75} />
-              </button>
-            );
-          })}
-        </div>
+        {AUTOMATION_TABS.map(({ key, label, Icon }) => {
+          const active = automationMode.tab === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => automationMode.onSelectTab(key)}
+              aria-label={label}
+              className={`${rowBase} ${active ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
+            >
+              <Icon className={iconSize} strokeWidth={1.75} />
+              {label}
+            </button>
+          );
+        })}
       </div>
     );
   }
