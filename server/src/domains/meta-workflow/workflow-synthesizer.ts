@@ -87,6 +87,5 @@ export function synthesizeWorkflow(phase: PhaseDef): WorkflowDefinition {
     nodes,
     edges,
     entryNodeId: 'context_load',
-    triggers: [],
   };
 }

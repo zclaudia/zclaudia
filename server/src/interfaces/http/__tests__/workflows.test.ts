@@ -4,11 +4,6 @@ import request from 'supertest';
 import { createWorkflowRoutes } from '../../../domains/workflows/index.js';
 import { ImmutableSystemWorkflowError } from '../../../domains/workflows/service.js';
 
-// Mock cron
-vi.mock('../../../utils/cron.js', () => ({
-  isValidCron: vi.fn().mockReturnValue(true),
-}));
-
 const mockStepRegistry = {
   getAllMeta: vi.fn().mockReturnValue([
     { type: 'plugin_step', name: 'Plugin Step', description: 'From plugin', category: 'Plugin', source: 'plugin' },
@@ -17,8 +12,6 @@ const mockStepRegistry = {
 const mockTriggerRegistry = {
   getAll: vi.fn().mockReturnValue([]),
 };
-
-import { isValidCron } from '../../../utils/cron.js';
 
 const mockWorkflow = {
   id: 'wf-1',
@@ -134,7 +127,11 @@ describe('workflow routes', () => {
         projectId: 'proj-1',
         name: 'New WF',
         description: 'desc',
-        definition: validBody.definition,
+        definition: expect.objectContaining({
+          nodes: [expect.objectContaining({ id: 's1', type: 'shell', config: {} })],
+          edges: [],
+          entryNodeId: 's1',
+        }),
         status: undefined,
       });
     });
@@ -162,15 +159,14 @@ describe('workflow routes', () => {
 
       expect(res.status).toBe(201);
       expect(service.createWorkflow).toHaveBeenCalledWith(expect.objectContaining({
-        definition: {
+        definition: expect.objectContaining({
           nodes: [
-            { id: 's1', name: 'First', type: 'shell', config: {}, position: { x: 300, y: 0 } },
-            { id: 's2', name: 'Second', type: 'shell', config: {}, position: { x: 300, y: 150 } },
+            expect.objectContaining({ id: 's1', name: 'First', type: 'shell', config: {}, position: { x: 300, y: 0 } }),
+            expect.objectContaining({ id: 's2', name: 'Second', type: 'shell', config: {}, position: { x: 300, y: 150 } }),
           ],
           edges: [{ id: 'edge_s1_to_s2', source: 's1', target: 's2', type: 'success' }],
           entryNodeId: 's1',
-          triggers: [{ type: 'manual' }],
-        },
+        }),
       }));
     });
 
@@ -230,21 +226,6 @@ describe('workflow routes', () => {
       expect(res.body.error.message).toContain('entryNodeId');
     });
 
-    it('returns 400 when cron expression is invalid', async () => {
-      (isValidCron as any).mockReturnValue(false);
-      const res = await request(app).post('/api/projects/proj-1/workflows').send({
-        name: 'Cron WF',
-        definition: {
-          nodes: [{ id: 's1', type: 'shell', config: {} }],
-          edges: [],
-          entryNodeId: 's1',
-          triggers: [{ type: 'cron', cron: 'bad-cron' }],
-        },
-      });
-      expect(res.status).toBe(400);
-      expect(res.body.error.message).toContain('Invalid cron');
-    });
-
     it('returns 500 on service error', async () => {
       service.createWorkflow.mockImplementation(() => { throw new Error('create fail'); });
       const res = await request(app).post('/api/projects/proj-1/workflows').send(validBody);
@@ -289,15 +270,6 @@ describe('workflow routes', () => {
       service.getWorkflow.mockReturnValue(null);
       const res = await request(app).patch('/api/workflows/wf-999').send({ name: 'X' });
       expect(res.status).toBe(404);
-    });
-
-    it('validates cron in updated triggers', async () => {
-      (isValidCron as any).mockReturnValue(false);
-      const res = await request(app).patch('/api/workflows/wf-1').send({
-        definition: { triggers: [{ type: 'cron', cron: 'bad' }] },
-      });
-      expect(res.status).toBe(400);
-      expect(res.body.error.message).toContain('Invalid cron');
     });
 
     it('validates merged definition when updating entryNodeId', async () => {

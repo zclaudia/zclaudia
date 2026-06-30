@@ -29,7 +29,7 @@ describe('WorkflowRepository', () => {
       const result = repo.mapRow(row);
       expect(result).toMatchObject({
         id: 'w1', projectId: 'p1', name: 'flow', description: 'desc',
-        status: 'active', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [] }, templateId: 'tpl1',
+        status: 'active', definition: { nodes: [], edges: [], entryNodeId: '' }, templateId: 'tpl1',
         createdAt: 100, updatedAt: 200,
       });
     });
@@ -64,7 +64,7 @@ describe('WorkflowRepository', () => {
       };
 
       const result = repo.mapRow(row);
-      expect(result.definition).toEqual({
+      expect(result.definition).toMatchObject({
         nodes: [
           { id: 's1', name: 'First', type: 'shell', config: { command: 'echo 1' }, position: { x: 300, y: 0 } },
           { id: 's2', name: 'Second', type: 'shell', config: { command: 'echo 2' }, position: { x: 300, y: 150 } },
@@ -73,7 +73,6 @@ describe('WorkflowRepository', () => {
           { id: 'edge_s1_to_s2', source: 's1', target: 's2', type: 'success' },
         ],
         entryNodeId: 's1',
-        triggers: [{ type: 'manual' }],
       });
     });
   });

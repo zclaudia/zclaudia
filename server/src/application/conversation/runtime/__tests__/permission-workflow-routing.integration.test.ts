@@ -232,6 +232,7 @@ describe('permission workflow routing integration', () => {
       expect.objectContaining({
         eventPayload: expect.objectContaining({ requestId: 'req-project' }),
       }),
+      'event',
     );
   });
 
@@ -262,6 +263,7 @@ describe('permission workflow routing integration', () => {
       'event',
       'event: permission.escalated',
       expect.any(Object),
+      'event',
     );
   });
 
@@ -292,6 +294,7 @@ describe('permission workflow routing integration', () => {
       'event',
       'event: permission.escalated',
       expect.any(Object),
+      'event',
     );
     expect(broadcastRunMessageMock).toHaveBeenCalledWith(
       expect.anything(),
@@ -332,6 +335,7 @@ describe('permission workflow routing integration', () => {
       'event',
       'event: permission.escalated',
       expect.any(Object),
+      'event',
     );
     expect(broadcastRunMessageMock.mock.invocationCallOrder[0])
       .toBeLessThan(triggerWorkflowMock.mock.invocationCallOrder[0]);

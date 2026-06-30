@@ -34,12 +34,16 @@ export function createWorkflowRunEntity(opts: CreateWorkflowRunEntityOptions): R
     if (entity.kind !== 'workflow') {
       throw new Error(`workflow run-entity received non-workflow kind: ${entity.kind}`);
     }
-    const run = await opts.engine.startRun(
-      entity.workflowId,
-      opts.projectId,
-      entity.workflow,
-      'manual',
-    );
+    const run = await opts.engine.startRun({
+      workflowId: entity.workflowId,
+      projectId: opts.projectId,
+      definition: entity.workflow,
+      triggerSource: 'manual',
+      initiator: 'manual',
+      actionKind: 'workflow',
+      actionRef: entity.workflowId,
+      trackingKey: entity.workflowId,
+    });
 
     return new Promise<RunEntityOutcome>((resolve) => {
       let settled = false;

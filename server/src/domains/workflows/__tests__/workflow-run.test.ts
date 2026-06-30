@@ -28,7 +28,7 @@ describe('WorkflowRunRepository', () => {
       });
       expect(result).toEqual({
         id: 'r1', workflowId: 'w1', projectId: 'p1', status: 'running',
-        triggerSource: 'manual', triggerDetail: 'user', currentStepId: 's1',
+        triggerSource: 'manual', triggerDetail: 'user', initiator: 'manual', currentStepId: 's1',
         startedAt: 100, completedAt: 200, error: 'err',
       });
     });
@@ -64,7 +64,8 @@ describe('WorkflowRunRepository', () => {
         triggerSource: 'manual' as any, startedAt: 100,
       } as any);
       expect(params[5]).toBeNull(); // triggerDetail
-      expect(params[6]).toBeNull(); // currentStepId
+      expect(params[6]).toBe('manual'); // initiator (defaults to 'manual')
+      expect(params[9]).toBeNull(); // currentStepId
     });
   });
 

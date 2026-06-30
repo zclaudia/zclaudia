@@ -10,7 +10,6 @@ import { ImmutableSystemWorkflowError } from './service.js';
 import type { WorkflowGeneratorService } from './generator.js';
 import { normalizeWorkflowDefinition } from '@zclaudia/shared/features/workflows';
 import type { WorkflowStepTypeMeta, WorkflowDefinition, WorkflowNodeDef } from '@zclaudia/shared/features/workflows';
-import { isValidCron } from '../../utils/cron.js';
 interface StepRegistryPort {
   getAllMeta(): Array<{ type: string; name: string; description: string; category: string; icon?: string; configSchema?: unknown }>;
 }
@@ -25,12 +24,11 @@ function validateWorkflowDefinition(res: Response, definition: unknown): definit
   if (
     !Array.isArray(candidate?.nodes) ||
     !Array.isArray(candidate?.edges) ||
-    typeof candidate?.entryNodeId !== 'string' ||
-    !Array.isArray(candidate?.triggers)
+    typeof candidate?.entryNodeId !== 'string'
   ) {
     res.status(400).json({
       success: false,
-      error: { code: 'VALIDATION_ERROR', message: 'Definition must have nodes, edges, entryNodeId, and triggers' },
+      error: { code: 'VALIDATION_ERROR', message: 'Definition must have nodes, edges, and entryNodeId' },
     });
     return false;
   }
@@ -43,16 +41,6 @@ function validateWorkflowDefinition(res: Response, definition: unknown): definit
       error: { code: 'VALIDATION_ERROR', message: 'entryNodeId must reference an existing node' },
     });
     return false;
-  }
-
-  for (const trigger of workflowDefinition.triggers) {
-    if (trigger.type === 'cron' && trigger.cron && !isValidCron(trigger.cron)) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'VALIDATION_ERROR', message: `Invalid cron expression: ${trigger.cron}` },
-      });
-      return false;
-    }
   }
 
   return true;

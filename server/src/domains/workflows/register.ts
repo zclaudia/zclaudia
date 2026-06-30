@@ -66,6 +66,7 @@ export interface WorkflowDomainDeps {
   getPermissionWorkflowResolver?: () => PermissionWorkflowResolver | undefined;
   taskExecutorRegistry?: TaskExecutorRegistry;
   activityRegistry?: ActivityRegistry;
+  agentLoopRunner?: LightweightAgentRunner;
 }
 
 export interface WorkflowDomainResult {
@@ -78,7 +79,7 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
   const { db, app, authMiddleware, broadcast, notificationService, workflowStepRegistry, workflowTriggerRegistry, aiRunPort, permissionBridge, getPermissionWorkflowResolver, activityRegistry } = deps;
 
   // -- Assemble step executors --
-  const agentLoopRunner = new LightweightAgentRunner({ db });
+  const agentLoopRunner = deps.agentLoopRunner ?? new LightweightAgentRunner({ db });
   const agentRuntime = new DefaultWorkflowAgentRuntimeResolver(db, {
     permissionCallbackFactory: createWorkflowAgentPermissionCallbackFactory({
       db,

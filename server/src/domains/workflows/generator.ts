@@ -14,7 +14,6 @@ import type {
 import type { ServerMessage } from '@zclaudia/shared/wire/messages';
 import { SessionRepository } from '../sessions/repository.js';
 import type { WorkflowAiRunPort } from './ports/runtime.js';
-import { isValidCron } from '../../utils/cron.js';
 import { autoLayoutGraph } from '../../utils/workflow-layout.js';
 interface StepRegistryPort {
   getAllMeta(): Array<{ type: string; name: string; description: string; category: string }>;
@@ -339,7 +338,7 @@ Generate a workflow definition based on the user's natural language description.
     const jsonMatch = response.match(/```json\s*([\s\S]*?)```/);
     const jsonStr = jsonMatch ? jsonMatch[1].trim() : response.trim();
 
-    let parsed: { name?: string; description?: string; definition?: { nodes?: unknown[]; edges?: unknown[]; entryNodeId?: string; triggers?: unknown[] }; warnings?: string[] };
+    let parsed: { name?: string; description?: string; definition?: { nodes?: unknown[]; edges?: unknown[]; entryNodeId?: string }; warnings?: string[] };
     try {
       parsed = JSON.parse(jsonStr);
     } catch {
@@ -354,10 +353,6 @@ Generate a workflow definition based on the user's natural language description.
     const def = parsed.definition;
     if (!Array.isArray(def.nodes) || !Array.isArray(def.edges) || !def.entryNodeId) {
       throw new Error('Invalid definition: must have nodes, edges, entryNodeId');
-    }
-
-    if (!Array.isArray(def.triggers) || def.triggers.length === 0) {
-      def.triggers = [{ type: 'manual' }];
     }
 
     return {
@@ -404,13 +399,6 @@ Generate a workflow definition based on the user's natural language description.
     for (const node of def.nodes) {
       if (!validTypes.has(node.type)) {
         errors.push(`Node "${node.id}" has unknown step type "${node.type}"`);
-      }
-    }
-
-    // Validate cron expressions
-    for (const trigger of def.triggers) {
-      if (trigger.type === 'cron' && trigger.cron && !isValidCron(trigger.cron)) {
-        errors.push(`Invalid cron expression: "${trigger.cron}"`);
       }
     }
 

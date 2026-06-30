@@ -30,7 +30,7 @@ import { registerMetaWorkflow } from '../../domains/meta-workflow/register.js';
 import { createWorktreeAllocatorFromSupervisor } from './meta-workflow-allocator.js';
 import { registerPluginsDomain } from '../plugins/register.js';
 import { toolRegistry, workflowStepRegistry, workflowTriggerRegistry } from '../plugins/index.js';
-import { createAutomationRoutes } from '../../interfaces/http/automations.js';
+import { registerAutomationsDomain } from '../../domains/automations/index.js';
 import type { NotificationSender } from '../../infra/push/notification-sender.js';
 import type { NotificationService } from '../../domains/notification-feed/index.js';
 import { PermissionBridge } from '../conversation/agent/permission-bridge.js';
@@ -137,7 +137,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
   const activityRegistry = new ActivityRegistry();
   activityRegistry.register(new GitCommitActivity());
   activityRegistry.register(new GenerateCommitMessageActivity());
-  const gitActivityRunner = new LightweightAgentRunner({ db });
+  const sharedAgentLoopRunner = new LightweightAgentRunner({ db });
 
   registerProjectsDomain({
     db,
@@ -145,7 +145,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     authMiddleware,
     onProjectChanged: handleProjectChanged,
     activityRegistry,
-    agentLoopRunner: gitActivityRunner,
+    agentLoopRunner: sharedAgentLoopRunner,
   });
   registerSessionsDomain({ app, authMiddleware, db, activeRuns, sessionEvents });
   registerLlmProfilesDomain({ app, authMiddleware, db });
@@ -303,9 +303,22 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
     getPermissionWorkflowResolver: () => permissionWorkflowResolver,
     taskExecutorRegistry,
     activityRegistry,
+    agentLoopRunner: sharedAgentLoopRunner,
   });
   permissionWorkflowResolver = new PermissionWorkflowResolver(db, workflowService);
-  app.use('/api/automations', authMiddleware, createAutomationRoutes(workflowService));
+
+  const { automationService } = registerAutomationsDomain({
+    db,
+    app,
+    authMiddleware,
+    broadcast: (_projectId, msg) => broadcastToAuthenticatedClients(clients, msg),
+    engine: workflowEngine,
+    workflows: { getWorkflow: (id) => workflowService.getWorkflow(id) },
+    systemTaskRegistry: workflowScheduling,
+  });
+
+  // Reconcile the system permission automation against the system workflow.
+  automationService.ensureSystemAutomations(workflowService.getSystemPermissionFallback().id);
 
   // ── Permission workflow progress broadcasting ──
   // Subscribe to workflow engine events and translate to permission-specific messages.
