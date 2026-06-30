@@ -1,4 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import Database from 'better-sqlite3';
 import type {
   WorkflowRun,
   WorkflowRunStatus,
@@ -6,8 +7,9 @@ import type {
   WorkflowStepRunStatus,
   WorkflowDefinition,
 } from '@zclaudia/shared/features/workflows';
-import type { WorkflowRunRepository } from '../workflow-run-repository.js';
-import type { WorkflowStepRunRepository } from '../workflow-step-run-repository.js';
+import { applyMigrations } from '../../../infra/storage/migrations/index.js';
+import { WorkflowRunRepository } from '../workflow-run-repository.js';
+import { WorkflowStepRunRepository } from '../workflow-step-run-repository.js';
 import { WorkflowRunAggregate } from '../run-aggregate.js';
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -130,6 +132,7 @@ describe('WorkflowRunAggregate', () => {
       const agg = WorkflowRunAggregate.start(
         def, 'wf-1', 'proj-1', 'manual',
         runRepo, stepRunRepo,
+        { initiator: 'workflow:wf-1' },
       );
 
       expect(runRepo.create).toHaveBeenCalledOnce();
@@ -410,5 +413,38 @@ describe('WorkflowRunAggregate', () => {
       agg.completeRun();
       expect(agg.snapshot.status).toBe('completed');
     });
+  });
+});
+
+describe('WorkflowRunAggregate.start with action metadata', () => {
+  let db: Database.Database;
+  let runRepo: WorkflowRunRepository;
+  let stepRepo: WorkflowStepRunRepository;
+
+  beforeEach(() => {
+    db = new Database(':memory:');
+    applyMigrations(db);
+    runRepo = new WorkflowRunRepository(db);
+    stepRepo = new WorkflowStepRunRepository(db);
+  });
+
+  it('records initiator/action on the run row', () => {
+    const def: WorkflowDefinition = {
+      nodes: [{ id: 'n1', name: 'Commit', type: 'git_commit', config: {}, position: { x: 0, y: 0 } }],
+      edges: [],
+      entryNodeId: 'n1',
+    };
+    const agg = WorkflowRunAggregate.start(def, undefined, undefined, 'schedule', runRepo, stepRepo, {
+      initiator: 'automation:a1',
+      actionKind: 'activity',
+      actionRef: 'git_commit',
+      triggerDetail: 'interval: 30min',
+    });
+    const run = runRepo.findById(agg.id)!;
+    expect(run.initiator).toBe('automation:a1');
+    expect(run.actionKind).toBe('activity');
+    expect(run.actionRef).toBe('git_commit');
+    expect(run.workflowId).toBeUndefined();
+    expect(stepRepo.findByRun(agg.id)).toHaveLength(1);
   });
 });

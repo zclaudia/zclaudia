@@ -59,19 +59,27 @@ export class WorkflowRunAggregate {
 
   static start(
     definition: WorkflowDefinition,
-    workflowId: string,
+    workflowId: string | undefined,
     projectId: string | undefined,
     triggerSource: WorkflowRunTriggerSource,
     runRepo: WorkflowRunRepository,
     stepRunRepo: WorkflowStepRunRepository,
-    triggerDetail?: string,
+    meta: {
+      initiator: string;
+      actionKind?: 'activity' | 'workflow';
+      actionRef?: string;
+      triggerDetail?: string;
+    },
   ): WorkflowRunAggregate {
     const run = runRepo.create({
       workflowId,
       projectId,
       status: 'running',
       triggerSource,
-      triggerDetail,
+      triggerDetail: meta.triggerDetail,
+      initiator: meta.initiator,
+      actionKind: meta.actionKind,
+      actionRef: meta.actionRef,
       startedAt: Date.now(),
     });
 
@@ -91,7 +99,7 @@ export class WorkflowRunAggregate {
       runId: run.id,
       projectId,
       timestamp: Date.now(),
-      workflowId,
+      workflowId: workflowId ?? '',
       triggerSource,
     });
     return agg;
