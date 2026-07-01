@@ -27,6 +27,14 @@ export class ActivityRegistry {
     if (!activity) {
       return { status: 'failed', output: {}, error: `Unknown activity: ${type}` };
     }
+    const schema = activity.configSchema as { required?: string[] } | undefined;
+    if (schema?.required?.length) {
+      const config = (input ?? {}) as Record<string, unknown>;
+      const missing = schema.required.filter((k) => config[k] === undefined);
+      if (missing.length) {
+        return { status: 'failed', output: {}, error: `Missing required config: ${missing.join(', ')}` };
+      }
+    }
     return activity.invoke(input, services);
   }
 }
