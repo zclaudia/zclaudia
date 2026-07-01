@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
 import type { Automation, Workflow } from '@zclaudia/shared';
+import type { WorkflowStepTypeMeta } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { AutomationItem } from './automation-types';
 import { automationToItem } from './automation-types';
 import { Select } from '../../components/ui/Select';
 import { LoadingState, EmptyState } from './AutomationSharedComponents';
 import { useTopLevelViewStore } from '../../stores/topLevelViewStore';
+import { SchemaForm, missingRequiredKeys } from './SchemaForm';
 
 interface AutomationsTabProps {
   api: AutomationApiType;
@@ -28,11 +30,11 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   const [newOnceAt, setNewOnceAt] = useState('');
   const [newEvent, setNewEvent] = useState('');
   const [newActionType, setNewActionType] = useState('ai_prompt');
-  const [newPrompt, setNewPrompt] = useState('');
-  const [newShellCmd, setNewShellCmd] = useState('');
   const [workflowRef, setWorkflowRef] = useState('');
   const [availableWorkflows, setAvailableWorkflows] = useState<Workflow[]>([]);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [stepTypes, setStepTypes] = useState<WorkflowStepTypeMeta[]>([]);
+  const [actionConfig, setActionConfig] = useState<Record<string, unknown>>({});
 
   const effectiveProjectId = projectId ?? '';
   const projectQuery = effectiveProjectId ? `?projectId=${encodeURIComponent(effectiveProjectId)}` : '';
@@ -54,9 +56,30 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
     api.get('/api/workflows').then(setAvailableWorkflows).catch(() => setAvailableWorkflows([]));
   }, [api]);
 
+  useEffect(() => {
+    api.get('/api/workflow-step-types')
+      .then((res: { success?: boolean; data?: WorkflowStepTypeMeta[] } | WorkflowStepTypeMeta[]) => {
+        const data = Array.isArray(res) ? res : (res.data ?? []);
+        setStepTypes(data);
+      })
+      .catch(() => setStepTypes([]));
+  }, [api]);
+
   const workflowNameMap = useMemo(
     () => new Map(availableWorkflows.map((w) => [w.id, w.name])),
     [availableWorkflows],
+  );
+
+  const inlineActionOptions = useMemo(
+    () =>
+      stepTypes
+        .filter((m) => m.category !== 'Flow Control' && m.category !== 'Permission')
+        .map((m) => ({ value: m.type, label: m.name })),
+    [stepTypes],
+  );
+  const selectedStepType = useMemo(
+    () => stepTypes.find((m) => m.type === newActionType),
+    [stepTypes, newActionType],
   );
 
   // Build unified list
@@ -69,14 +92,18 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   const handleCreate = async () => {
     if (!newName.trim()) return;
     if (newActionType === 'workflow' && !workflowRef) return;
-    const actionConfig: Record<string, unknown> =
-      newActionType === 'ai_prompt' ? { prompt: newPrompt }
-      : newActionType === 'shell' ? { command: newShellCmd }
-      : {};
 
-    const action = newActionType === 'workflow'
-      ? { kind: 'workflow' as const, ref: workflowRef }
-      : { kind: 'activity' as const, ref: newActionType, input: actionConfig };
+    let action: { kind: 'workflow'; ref: string } | { kind: 'activity'; ref: string; input: Record<string, unknown> };
+    if (newActionType === 'workflow') {
+      action = { kind: 'workflow', ref: workflowRef };
+    } else {
+      const missing = missingRequiredKeys(selectedStepType?.configSchema, actionConfig);
+      if (missing.length) {
+        setCreateError(`Missing required: ${missing.join(', ')}`);
+        return;
+      }
+      action = { kind: 'activity', ref: newActionType, input: actionConfig };
+    }
 
     const trigger: Record<string, unknown> = { type: newTriggerType };
     if (newTriggerType === 'interval') trigger.intervalMinutes = parseInt(newIntervalMinutes) || 60;
@@ -102,8 +129,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
 
       setShowCreate(false);
       setNewName('');
-      setNewPrompt('');
-      setNewShellCmd('');
+      setActionConfig({});
       setWorkflowRef('');
       setNewCron('');
       setNewEvent('');
@@ -207,16 +233,10 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
             <span className="text-[10px] text-muted-foreground">Action:</span>
             <Select
               value={newActionType}
-              onChange={setNewActionType}
+              onChange={(v) => { setNewActionType(v); setActionConfig({}); }}
               size="md"
               triggerClassName="min-w-[140px]"
-              options={[
-                { value: 'ai_prompt', label: 'AI Prompt' },
-                { value: 'shell', label: 'Shell Command' },
-                { value: 'git_commit', label: 'Git Commit' },
-                { value: 'webhook', label: 'Webhook' },
-                { value: 'workflow', label: 'Workflow' },
-              ]}
+              options={[...inlineActionOptions, { value: 'workflow', label: 'Workflow' }]}
             />
           </div>
           {newActionType === 'workflow' ? (
@@ -229,14 +249,11 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
               options={availableWorkflows.map((w) => ({ value: w.id, label: w.name }))}
             />
           ) : (
-            <>
-              {newActionType === 'ai_prompt' && (
-                <textarea value={newPrompt} onChange={(e) => setNewPrompt(e.target.value)} placeholder="Enter prompt... (supports {{event.key}} templates)" rows={3} className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground resize-y" />
-              )}
-              {newActionType === 'shell' && (
-                <input value={newShellCmd} onChange={(e) => setNewShellCmd(e.target.value)} placeholder="command to run" className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground font-mono" />
-              )}
-            </>
+            <SchemaForm
+              schema={selectedStepType?.configSchema}
+              value={actionConfig}
+              onChange={setActionConfig}
+            />
           )}
           {createError && (
             <div className="text-[11px] text-destructive">{createError}</div>
