@@ -39,12 +39,31 @@ vi.mock('../engine.js', () => ({}));
 vi.mock('../templates.js', () => ({
   PERMISSION_WORKFLOW_TEMPLATE_ID: 'permission-escalation-default',
   SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY: 'permission_escalation_fallback',
+  AI_AUTO_COMMIT_TEMPLATE_ID: 'ai-auto-commit',
+  SYSTEM_AI_AUTO_COMMIT_KEY: 'ai_auto_commit',
   BUILTIN_WORKFLOW_TEMPLATES: [
     { id: 'permission-escalation-default', name: 'Template 1', description: 'desc', definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } },
     { id: 'tpl1', name: 'Template 1', description: 'desc', definition: { triggers: [], nodes: [], edges: [], entryNodeId: '' } },
+    {
+      id: 'ai-auto-commit',
+      name: 'AI Auto Commit',
+      description: 'auto-commit desc',
+      definition: {
+        triggers: [],
+        entryNodeId: 'stage',
+        edges: [],
+        nodes: [
+          { id: 'stage', name: 'Stage Changes', type: 'git_stage', config: {} },
+          { id: 'check', name: 'Has Staged Changes?', type: 'condition', config: {} },
+          { id: 'generate', name: 'Generate Commit Message', type: 'generate_commit_message', config: {} },
+          { id: 'commit', name: 'Commit', type: 'git_commit', config: {} },
+        ],
+      },
+    },
   ],
 }));
 
+import { SYSTEM_AI_AUTO_COMMIT_KEY, AI_AUTO_COMMIT_TEMPLATE_ID, BUILTIN_WORKFLOW_TEMPLATES } from '../templates.js';
 import { ImmutableSystemWorkflowError, WorkflowService } from '../service.js';
 
 describe('WorkflowService', () => {
@@ -151,7 +170,7 @@ describe('WorkflowService', () => {
   describe('getTemplates', () => {
     it('returns builtin templates', () => {
       const templates = service.getTemplates();
-      expect(templates.map((t) => t.id)).toEqual(['permission-escalation-default', 'tpl1']);
+      expect(templates.map((t) => t.id)).toEqual(['permission-escalation-default', 'tpl1', 'ai-auto-commit']);
     });
   });
 
@@ -288,6 +307,70 @@ describe('WorkflowService', () => {
       mockEngine.rejectStep.mockReturnValue(true);
       expect(service.rejectStep('sr1')).toBe(true);
       expect(mockEngine.rejectStep).toHaveBeenCalledWith('sr1');
+    });
+  });
+
+  describe('auto-commit workflow seeding', () => {
+    it('creates the system auto-commit workflow on initialize', () => {
+      mockWorkflowRepo.findBySystemKey.mockImplementation((key: string) =>
+        key === SYSTEM_AI_AUTO_COMMIT_KEY ? null : null,
+      );
+
+      service.initialize();
+
+      expect(mockWorkflowRepo.create).toHaveBeenCalledWith(expect.objectContaining({
+        templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
+        isSystem: true,
+        systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
+        status: 'active',
+        sourceType: 'template',
+        definition: expect.objectContaining({
+          nodes: expect.arrayContaining([
+            expect.objectContaining({ type: 'git_stage' }),
+            expect.objectContaining({ type: 'condition' }),
+            expect.objectContaining({ type: 'generate_commit_message' }),
+            expect.objectContaining({ type: 'git_commit' }),
+          ]),
+        }),
+      }));
+    });
+
+    it('is idempotent — does not recreate when a healthy system workflow exists', () => {
+      const autoTemplate = BUILTIN_WORKFLOW_TEMPLATES.find((t) => t.id === AI_AUTO_COMMIT_TEMPLATE_ID)!;
+      mockWorkflowRepo.findBySystemKey.mockImplementation((key: string) =>
+        key === SYSTEM_AI_AUTO_COMMIT_KEY
+          ? { id: 'auto-1', status: 'active', templateId: AI_AUTO_COMMIT_TEMPLATE_ID, isSystem: true, definition: autoTemplate.definition }
+          : null,
+      );
+
+      service.initialize();
+
+      const autoCommitCreates = mockWorkflowRepo.create.mock.calls.filter(
+        (c) => c[0]?.systemKey === SYSTEM_AI_AUTO_COMMIT_KEY,
+      );
+      const autoCommitUpdates = mockWorkflowRepo.update.mock.calls.filter(
+        (c) => c[1]?.systemKey === SYSTEM_AI_AUTO_COMMIT_KEY,
+      );
+      expect(autoCommitCreates).toHaveLength(0);
+      expect(autoCommitUpdates).toHaveLength(0);
+    });
+
+    it('repairs an unhealthy system auto-commit workflow', () => {
+      mockWorkflowRepo.findBySystemKey.mockImplementation((key: string) =>
+        key === SYSTEM_AI_AUTO_COMMIT_KEY
+          ? { id: 'auto-1', status: 'disabled', templateId: AI_AUTO_COMMIT_TEMPLATE_ID, isSystem: true, definition: { broken: true } }
+          : null,
+      );
+
+      service.initialize();
+
+      expect(mockWorkflowRepo.update).toHaveBeenCalledWith('auto-1', expect.objectContaining({
+        status: 'active',
+        isSystem: true,
+        systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
+        templateId: AI_AUTO_COMMIT_TEMPLATE_ID,
+        sourceType: 'template',
+      }));
     });
   });
 

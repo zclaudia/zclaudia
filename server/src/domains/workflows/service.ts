@@ -22,6 +22,8 @@ import {
   BUILTIN_WORKFLOW_TEMPLATES,
   PERMISSION_WORKFLOW_TEMPLATE_ID,
   SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY,
+  AI_AUTO_COMMIT_TEMPLATE_ID,
+  SYSTEM_AI_AUTO_COMMIT_KEY,
 } from './templates.js';
 
 export class ImmutableSystemWorkflowError extends Error {
@@ -50,6 +52,7 @@ export class WorkflowService {
 
   initialize(): void {
     this.ensureBuiltinWorkflows();
+    this.ensureBuiltinAutoCommitWorkflow();
   }
 
   private ensureBuiltinWorkflows(): void {
@@ -103,6 +106,47 @@ export class WorkflowService {
         sourceType: 'template',
       });
       console.log(`[Workflow] Repaired system fallback workflow: ${template.name}`);
+    }
+  }
+
+  private ensureBuiltinAutoCommitWorkflow(): void {
+    const template = BUILTIN_WORKFLOW_TEMPLATES.find(t => t.id === AI_AUTO_COMMIT_TEMPLATE_ID);
+    if (!template) return;
+
+    const existing = this.workflowRepo.findBySystemKey(SYSTEM_AI_AUTO_COMMIT_KEY);
+    if (!existing) {
+      this.workflowRepo.create({
+        projectId: undefined,
+        name: template.name,
+        description: template.description,
+        status: 'active',
+        definition: template.definition,
+        templateId: template.id,
+        isSystem: true,
+        systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
+        sourceType: 'template',
+      });
+      console.log(`[Workflow] Auto-created system workflow: ${template.name}`);
+      return;
+    }
+
+    const needsRepair = existing.status !== 'active'
+      || existing.templateId !== AI_AUTO_COMMIT_TEMPLATE_ID
+      || !existing.isSystem
+      || JSON.stringify(existing.definition) !== JSON.stringify(template.definition);
+
+    if (needsRepair) {
+      this.workflowRepo.update(existing.id, {
+        name: template.name,
+        description: template.description,
+        status: 'active',
+        definition: template.definition,
+        templateId: template.id,
+        isSystem: true,
+        systemKey: SYSTEM_AI_AUTO_COMMIT_KEY,
+        sourceType: 'template',
+      });
+      console.log(`[Workflow] Repaired system workflow: ${template.name}`);
     }
   }
 
