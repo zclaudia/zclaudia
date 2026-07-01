@@ -12,6 +12,15 @@ const mockStepRegistry = {
 const mockTriggerRegistry = {
   getAll: vi.fn().mockReturnValue([]),
 };
+// Mirrors the activities registered in bootstrap (feature-domains.ts):
+// GitCommitActivity, GitStageActivity, GenerateCommitMessageActivity.
+const mockActivityRegistry = {
+  listMeta: vi.fn().mockReturnValue([
+    { type: 'git_commit', name: 'Git Commit', description: 'Stage (by default) and commit changes', category: 'Git', source: 'activity', supportsLoop: true },
+    { type: 'git_stage', name: 'Git Stage', description: 'Stage changes', category: 'Git', source: 'activity' },
+    { type: 'generate_commit_message', name: 'Generate Commit Message', description: 'Generate a commit message', category: 'Git', source: 'activity' },
+  ]),
+};
 
 const mockWorkflow = {
   id: 'wf-1',
@@ -73,6 +82,7 @@ describe('workflow routes', () => {
     app.use('/api', createWorkflowRoutes(service as any, undefined, {
       stepRegistry: mockStepRegistry as any,
       triggerRegistry: mockTriggerRegistry as any,
+      activityRegistry: mockActivityRegistry as any,
     }));
   });
 
@@ -508,8 +518,8 @@ describe('workflow routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       const types = res.body.data;
-      // 14 builtin + 1 plugin
-      expect(types).toHaveLength(15);
+      // 13 builtin + 3 activity + 1 plugin
+      expect(types).toHaveLength(17);
       // Check a few builtins
       expect(types.find((t: any) => t.type === 'git_commit')).toBeDefined();
       expect(types.find((t: any) => t.type === 'ai_prompt')).toBeDefined();
