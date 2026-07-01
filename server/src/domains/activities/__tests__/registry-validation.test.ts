@@ -10,6 +10,9 @@ describe('ActivityRegistry.invoke configSchema validation', () => {
     const invokeSpy = vi.fn(async () => ({ status: 'completed' as const, output: { ok: true } }));
     const activity: Activity = {
       type: 'demo',
+      name: 'Demo',
+      description: 'Demo activity',
+      category: 'Test',
       configSchema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
       invoke: invokeSpy,
     };
@@ -26,6 +29,9 @@ describe('ActivityRegistry.invoke configSchema validation', () => {
     const invokeSpy = vi.fn(async () => ({ status: 'completed' as const, output: { ok: true } }));
     const activity: Activity = {
       type: 'demo',
+      name: 'Demo',
+      description: 'Demo activity',
+      category: 'Test',
       configSchema: { type: 'object', required: ['name'], properties: { name: { type: 'string' } } },
       invoke: invokeSpy,
     };

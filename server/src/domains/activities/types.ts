@@ -19,7 +19,15 @@ export interface ActivityResult<O = Record<string, unknown>> {
  */
 export interface Activity<I = Record<string, unknown>, O = Record<string, unknown>> {
   readonly type: string;
-  /** Optional JSON-schema metadata (future automation-form rendering). Not validated yet. */
+  /** Human-readable label for catalog/UI. */
+  readonly name: string;
+  /** One-line description for catalog/UI. */
+  readonly description: string;
+  /** Grouping category for catalog/UI (e.g. 'Git', 'AI'). */
+  readonly category: string;
+  /** Optional lucide icon name for catalog/UI. */
+  readonly icon?: string;
+  /** Optional JSON-schema metadata; drives config-form rendering and required-key validation. */
   readonly configSchema?: Record<string, unknown>;
   invoke(input: I, services: ActivityServices): Promise<ActivityResult<O>>;
 }

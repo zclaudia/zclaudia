@@ -22,6 +22,11 @@ export interface GitStageOutput extends Record<string, unknown> {
  */
 export class GitStageActivity implements Activity<GitStageInput, GitStageOutput> {
   readonly type = 'git_stage';
+  readonly name = 'Git Stage';
+  readonly description = 'Stage all changes (git add -A)';
+  readonly category = 'Git';
+  readonly icon = 'GitBranch';
+  readonly configSchema = { type: 'object', properties: {}, required: [] as string[] };
 
   async invoke(input: GitStageInput): Promise<ActivityResult<GitStageOutput>> {
     const cwd = input.worktreePath ?? input.projectRootPath;

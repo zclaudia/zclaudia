@@ -25,6 +25,11 @@ export class GenerateCommitMessageActivity
   implements Activity<GenerateCommitMessageInput, GenerateCommitMessageOutput>
 {
   readonly type = 'generate_commit_message';
+  readonly name = 'Generate Commit Message';
+  readonly description = 'Generate a Conventional Commits message from the staged diff via AI';
+  readonly category = 'AI';
+  readonly icon = 'Sparkles';
+  readonly configSchema = { type: 'object', properties: {}, required: [] as string[] };
 
   async invoke(
     input: GenerateCommitMessageInput,

@@ -24,6 +24,19 @@ export interface GitCommitOutput extends Record<string, unknown> {
  */
 export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutput> {
   readonly type = 'git_commit';
+  readonly name = 'Git Commit';
+  readonly description = 'Stage (by default) and commit changes';
+  readonly category = 'Git';
+  readonly icon = 'GitCommit';
+  readonly configSchema = {
+    type: 'object',
+    properties: {
+      stageAll: { type: 'boolean', description: 'Run git add -A before committing (default true)' },
+      messageMode: { type: 'string', enum: ['stat', 'explicit'], description: 'stat = auto summary; explicit = use message field' },
+      message: { type: 'string', description: 'Commit message (used when messageMode is explicit)' },
+    },
+    required: [] as string[],
+  };
 
   async invoke(input: GitCommitInput): Promise<ActivityResult<GitCommitOutput>> {
     const cwd = input.worktreePath ?? input.projectRootPath;
