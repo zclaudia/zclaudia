@@ -14,7 +14,7 @@ function makeApiWith(workflows: any[]) {
   };
 }
 
-const userWorkflow = { id: 'wf-user', name: 'My Flow', isSystem: false, status: 'inactive', projectId: 'p1', authoringMode: 'advanced', definition: { nodes: [], edges: [], entryNodeId: '', triggers: [{ type: 'manual' }] } };
+const userWorkflow = { id: 'wf-user', name: 'My Flow', isSystem: false, status: 'inactive', projectId: 'p1', authoringMode: 'graph', definition: { nodes: [], edges: [], entryNodeId: '' } };
 
 const baseProps = {
   projects: [{ id: 'p1', name: 'proj-one' }],

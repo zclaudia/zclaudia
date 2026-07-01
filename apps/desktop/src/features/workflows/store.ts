@@ -27,6 +27,8 @@ import {
 } from './api';
 
 const ALL_KEY = '__all__';
+/** Runs bucket for activity-action runs that have no owning workflow. */
+const NO_WORKFLOW_KEY = '__no_workflow__';
 
 interface WorkflowState {
   /** projectId → workflows */
@@ -134,12 +136,13 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   loadRun: async (runId) => {
     const { run, stepRuns } = await getWorkflowRun(runId);
+    const runKey = run.workflowId ?? NO_WORKFLOW_KEY;
     set((state) => ({
       runs: {
         ...state.runs,
-        [run.workflowId]: [
+        [runKey]: [
           run,
-          ...(state.runs[run.workflowId] ?? []).filter((r) => r.id !== run.id),
+          ...(state.runs[runKey] ?? []).filter((r) => r.id !== run.id),
         ],
       },
       stepRuns: { ...state.stepRuns, [runId]: stepRuns },
@@ -179,14 +182,15 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   upsertRun: (_projectId, run, stepRuns) =>
     set((state) => {
       // Update runs
-      const existingRuns = state.runs[run.workflowId] ?? [];
+      const runKey = run.workflowId ?? NO_WORKFLOW_KEY;
+      const existingRuns = state.runs[runKey] ?? [];
       const runIdx = existingRuns.findIndex((r) => r.id === run.id);
       const updatedRuns = runIdx >= 0
         ? existingRuns.map((r, i) => (i === runIdx ? run : r))
         : [run, ...existingRuns];
 
       const newState: Partial<WorkflowState> = {
-        runs: { ...state.runs, [run.workflowId]: updatedRuns },
+        runs: { ...state.runs, [runKey]: updatedRuns },
       };
 
       // Update step runs if provided

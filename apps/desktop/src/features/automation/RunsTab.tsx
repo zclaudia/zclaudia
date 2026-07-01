@@ -46,7 +46,10 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
         runId={selectedRunId}
         workflowName={(() => {
           const run = runs.find(r => r.id === selectedRunId);
-          return run ? (workflowNameMap.get(run.workflowId) || run.workflowId.slice(0, 12)) : '';
+          if (!run) return '';
+          return run.workflowId
+            ? (workflowNameMap.get(run.workflowId) ?? run.workflowId.slice(0, 12))
+            : (run.actionRef ?? 'Activity');
         })()}
         onBack={() => setSelectedRunId(null)}
       />
@@ -89,7 +92,9 @@ export function RunsTab({ api, projectId }: RunsTabProps) {
                 <div className="flex items-center gap-2 min-w-0">
                   <RunStatusBadge status={run.status} />
                   <span className="text-sm font-medium truncate">
-                    {workflowNameMap.get(run.workflowId) || run.workflowId.slice(0, 12)}
+                    {run.workflowId
+                      ? (workflowNameMap.get(run.workflowId) ?? run.workflowId.slice(0, 12))
+                      : (run.actionRef ?? 'Activity')}
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground shrink-0">

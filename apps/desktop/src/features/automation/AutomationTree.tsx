@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Folder, Globe, ChevronRight, Shield } from 'lucide-react';
-import type { Workflow } from '@zclaudia/shared';
+import type { Workflow, Automation } from '@zclaudia/shared';
 import { BackendRow } from '../sidebar/BackendRow';
 import { isInternalProject, displayProjectName } from './automation-types';
 import type { AutomationApiType } from './useAutomationApi';
@@ -46,7 +46,7 @@ export function AutomationTree({
   const refreshNonce = useTopLevelViewStore((s) => s.automationListRefreshNonce);
 
   // Item leaves for workflows/automations (active backend only), grouped by projectId client-side.
-  const [items, setItems] = useState<Workflow[]>([]);
+  const [items, setItems] = useState<Array<Workflow | Automation>>([]);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
 
   const expandable = tabIsExpandable(tab);
@@ -58,23 +58,26 @@ export function AutomationTree({
   useEffect(() => {
     if (!expandable) { setItems([]); return; }
     let cancelled = false;
-    const path = tab === 'workflows' ? '/api/workflows' : '/api/automations';
-    api.get(path)
-      .then((list: Workflow[]) => {
-        if (cancelled) return;
-        const filtered = tab === 'workflows'
-          ? list.filter((w) => w.authoringMode !== 'simple')
-          : list;
-        setItems(filtered);
-      })
-      .catch(() => { if (!cancelled) setItems([]); });
+    if (tab === 'workflows') {
+      api.get('/api/workflows')
+        .then((list: Workflow[]) => { if (!cancelled) setItems(list); })
+        .catch(() => { if (!cancelled) setItems([]); });
+    } else {
+      api.get('/api/automations')
+        .then((list: Automation[]) => { if (!cancelled) setItems(list); })
+        .catch(() => { if (!cancelled) setItems([]); });
+    }
     return () => { cancelled = true; };
   }, [api, tab, expandable, refreshNonce]);
 
-  const leavesFor = (project: ScopeProject): Workflow[] =>
+  const leavesFor = (project: ScopeProject): Array<Workflow | Automation> =>
     isInternalProject(project.name)
       ? items.filter((w) => !w.projectId)
       : items.filter((w) => w.projectId === project.id);
+
+  /** Automations expose `enabled`; workflows expose `status`. Normalize the "active" dot. */
+  const isItemActive = (item: Workflow | Automation): boolean =>
+    'status' in item ? item.status === 'active' : item.enabled;
 
   const toggleProject = (key: string) =>
     setExpandedProjects((prev) => {
@@ -166,7 +169,7 @@ export function AutomationTree({
                                 className={`${rowBase} ${leafSelected ? 'bg-secondary text-foreground' : 'text-muted-foreground'}`}
                               >
                                 <span
-                                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${w.status === 'active' ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
+                                  className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isItemActive(w) ? 'bg-green-500' : 'bg-muted-foreground/40'}`}
                                   aria-hidden
                                 />
                                 <span className="flex-1 min-w-0 flex items-center gap-1.5">

@@ -6,8 +6,9 @@ import { useTopLevelViewStore } from '../../../stores/topLevelViewStore';
 
 const api = {
   get: vi.fn().mockResolvedValue([
-    { id: 'w1', name: 'Alpha', status: 'active', projectId: undefined,
-      definition: { triggers: [{ type: 'manual' }], nodes: [] } },
+    { id: 'w1', name: 'Alpha', enabled: true, projectId: undefined,
+      trigger: { type: 'manual' }, action: { kind: 'activity', ref: 'git_commit' },
+      createdAt: 0, updatedAt: 0 },
   ]),
   post: vi.fn(), patch: vi.fn(), del: vi.fn(),
 } as any;

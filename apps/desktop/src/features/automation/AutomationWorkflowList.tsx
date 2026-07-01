@@ -35,7 +35,7 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
       const scoped = selectedIsGlobal
         ? wfs.filter((w: Workflow) => !w.projectId)
         : wfs;
-      setWorkflows(scoped.filter((w: Workflow) => w.authoringMode !== 'simple'));
+      setWorkflows(scoped);
     } catch { /* ignore */ }
     setLoading(false);
   }, [api, effectiveProjectId, selectedIsGlobal]);
@@ -47,7 +47,7 @@ export function AutomationWorkflowList({ api, projects, projectId }: AutomationW
     const name = `New Workflow ${new Date().toLocaleTimeString()}`;
     const result = await api.post(`/api/projects/${effectiveProjectId}/workflows`, {
       name,
-      definition: { nodes: [], edges: [], entryNodeId: '', triggers: [{ type: 'manual' }] },
+      definition: { nodes: [], edges: [], entryNodeId: '' },
     }).catch(() => null);
     await refresh();
     if (result && result.id) {

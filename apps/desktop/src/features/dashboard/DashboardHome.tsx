@@ -1,11 +1,14 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Bot, ClipboardList, GitBranch, GitPullRequest, CircleDot, Workflow, ChevronRight, Zap, ExternalLink, FileText } from 'lucide-react';
+import type { Automation } from '@zclaudia/shared';
 import { useProjectStore } from '../../stores/projectStore';
 import { useSupervisionStore } from '../../features/supervision/store';
 import { useLocalPRStore } from '../../features/local-pr/store';
 import { useLocalIssueStore } from '../../features/local-issues/store';
 import { useWorkflowStore } from '../../features/workflows/store';
 import { useGitStore } from '../../features/git/store';
+import { useOwnershipStore } from '../../stores/ownershipStore';
+import { apiCallForBackend } from '../../services/api/unwrap';
 import type { DashboardView } from './ProjectDashboard';
 
 interface DashboardHomeProps {
@@ -123,14 +126,16 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
     return status && !status.clean;
   });
 
-  // Workflows (DAG only) + Automations (simple)
+  // Workflows (from /api/workflows — all real workflows now)
   const allWorkflows = useWorkflowStore((s) => s.workflows[projectId] ?? []);
   const loadWorkflows = useWorkflowStore((s) => s.loadWorkflows);
-  const workflows = allWorkflows.filter(w => w.authoringMode !== 'simple');
-  const simpleAutomations = allWorkflows.filter(w => w.authoringMode === 'simple');
+  const workflows = allWorkflows;
   const activeWorkflows = workflows.filter((w) => w.status === 'active');
-  const activeAutomations = simpleAutomations.filter((w) => w.status === 'active');
   const runs = useWorkflowStore((s) => s.runs);
+
+  // Automations (from /api/automations)
+  const [automations, setAutomations] = useState<Automation[]>([]);
+  const activeAutomations = automations.filter((a) => a.enabled);
 
   // Load data on mount
   useEffect(() => {
@@ -138,6 +143,14 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
     loadIssues(projectId).catch(() => {});
     loadWorkflows(projectId).catch(() => {});
   }, [loadIssues, loadPRs, loadWorkflows, projectId]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    const backendId = useOwnershipStore.getState().getProjectBackendId(projectId);
+    apiCallForBackend<Automation[]>(backendId, `/api/automations?projectId=${encodeURIComponent(projectId)}`)
+      .then(setAutomations)
+      .catch(() => {});
+  }, [projectId]);
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-5">
@@ -332,8 +345,8 @@ export function DashboardHome({ projectId, onNavigate, onOpenAutomations, onOpen
               <div className="space-y-1">
                 <div className="text-2xl font-bold">{activeAutomations.length}</div>
                 <div className="text-xs text-muted-foreground">active</div>
-                {simpleAutomations.length > activeAutomations.length && (
-                  <div className="text-xs text-muted-foreground">{simpleAutomations.length - activeAutomations.length} disabled</div>
+                {automations.length > activeAutomations.length && (
+                  <div className="text-xs text-muted-foreground">{automations.length - activeAutomations.length} disabled</div>
                 )}
               </div>
             </button>
