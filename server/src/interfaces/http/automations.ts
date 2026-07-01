@@ -66,7 +66,14 @@ export function createAutomationRoutes(automationService: AutomationService): Ro
 
   router.patch('/:id', (req: Request, res: Response) => {
     try {
-      const automation = automationService.updateAutomation(req.params.id, req.body);
+      const body = req.body as AutomationBody;
+      const patch: Record<string, unknown> = {};
+      if (body.name !== undefined) patch.name = body.name;
+      if (body.description !== undefined) patch.description = body.description;
+      if (body.enabled !== undefined) patch.enabled = body.enabled;
+      if (body.trigger !== undefined) patch.trigger = body.trigger;
+      if (body.action !== undefined) patch.action = body.action;
+      const automation = automationService.updateAutomation(req.params.id, patch);
       res.json({ success: true, data: automation });
     } catch (error) {
       fail(res, 500, error instanceof Error ? error.message : String(error), 'INTERNAL_ERROR');
@@ -84,7 +91,7 @@ export function createAutomationRoutes(automationService: AutomationService): Ro
 
   router.post('/:id/trigger', async (req: Request, res: Response) => {
     try {
-      const run = await automationService.runAction(req.params.id, { initiator: 'manual', triggerSource: 'manual' });
+      const run = await automationService.runAction(req.params.id, { initiator: `automation:${req.params.id}`, triggerSource: 'manual' });
       res.json({ success: true, data: run });
     } catch (error) {
       fail(res, 500, error instanceof Error ? error.message : String(error), 'INTERNAL_ERROR');

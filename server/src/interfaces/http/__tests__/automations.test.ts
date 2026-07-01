@@ -54,6 +54,17 @@ describe('POST /api/automations/:id/trigger', () => {
     svc.createAutomation({ name: 'x', trigger: { type: 'manual' }, action: { kind: 'activity', ref: 'shell' } });
     const res = await request(appWith(svc)).post('/api/automations/a1/trigger');
     expect(res.status).toBe(200);
-    expect(svc.runAction).toHaveBeenCalledWith('a1', expect.objectContaining({ initiator: 'manual', triggerSource: 'manual' }));
+    expect(svc.runAction).toHaveBeenCalledWith('a1', expect.objectContaining({ initiator: 'automation:a1', triggerSource: 'manual' }));
+  });
+});
+
+describe('PATCH /api/automations/:id', () => {
+  it('whitelists patch fields, dropping isSystem/systemKey', async () => {
+    const svc = svcStub();
+    const res = await request(appWith(svc)).patch('/api/automations/a1').send({ isSystem: true, systemKey: 'x', name: 'renamed' });
+    expect(res.status).toBe(200);
+    expect(svc.updateAutomation).toHaveBeenCalledWith('a1', expect.objectContaining({ name: 'renamed' }));
+    expect(svc.updateAutomation).toHaveBeenCalledWith('a1', expect.not.objectContaining({ isSystem: expect.anything() }));
+    expect(svc.updateAutomation).toHaveBeenCalledWith('a1', expect.not.objectContaining({ systemKey: expect.anything() }));
   });
 });
