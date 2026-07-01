@@ -191,8 +191,7 @@ You MUST output a single JSON block wrapped in \`\`\`json ... \`\`\` with exactl
   "definition": {
     "nodes": [...],
     "edges": [...],
-    "entryNodeId": "first_node_id",
-    "triggers": [...]
+    "entryNodeId": "first_node_id"
   }
 }
 
@@ -265,7 +264,6 @@ Common output fields:
 5. Set position to {x:0, y:0} for ALL nodes
 6. Use descriptive snake_case node IDs
 7. Edge IDs should be sequential: e1, e2, e3...
-8. Choose appropriate triggers based on the user's description
 
 ## Examples
 
