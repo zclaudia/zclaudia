@@ -5,7 +5,13 @@ import type { Activity, ActivityServices } from '../types.js';
 const services: ActivityServices = { agentLoopRunner: {} as never };
 
 function fakeActivity(type: string): Activity {
-  return { type, invoke: vi.fn(async () => ({ status: 'completed', output: { ok: true } })) };
+  return {
+    type,
+    name: type,
+    description: `${type} activity`,
+    category: 'Test',
+    invoke: vi.fn(async () => ({ status: 'completed', output: { ok: true } })),
+  };
 }
 
 describe('ActivityRegistry', () => {
@@ -31,5 +37,29 @@ describe('ActivityRegistry', () => {
     const r = new ActivityRegistry();
     r.register(fakeActivity('dup'));
     expect(() => r.register(fakeActivity('dup'))).toThrow(/dup/);
+  });
+
+  it('listMeta returns catalog metadata for each registered activity', () => {
+    const r = new ActivityRegistry();
+    r.register({
+      type: 'demo',
+      name: 'Demo',
+      description: 'A demo',
+      category: 'Test',
+      icon: 'Beaker',
+      configSchema: { type: 'object', properties: {}, required: [] },
+      invoke: vi.fn(async () => ({ status: 'completed', output: {} })),
+    });
+    expect(r.listMeta()).toEqual([
+      {
+        type: 'demo',
+        name: 'Demo',
+        description: 'A demo',
+        category: 'Test',
+        icon: 'Beaker',
+        configSchema: { type: 'object', properties: {}, required: [] },
+        source: 'activity',
+      },
+    ]);
   });
 });

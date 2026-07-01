@@ -1,4 +1,5 @@
 import type { Activity, ActivityResult, ActivityServices } from './types.js';
+import type { WorkflowStepTypeMeta } from '@zclaudia/shared/features/workflows';
 
 export class ActivityRegistry {
   private activities = new Map<string, Activity>();
@@ -16,6 +17,18 @@ export class ActivityRegistry {
 
   types(): string[] {
     return [...this.activities.keys()];
+  }
+
+  listMeta(): WorkflowStepTypeMeta[] {
+    return [...this.activities.values()].map((a) => ({
+      type: a.type,
+      name: a.name,
+      description: a.description,
+      category: a.category,
+      icon: a.icon,
+      configSchema: a.configSchema,
+      source: 'activity',
+    }));
   }
 
   async invoke(
