@@ -5,11 +5,9 @@ import type {
   WorkflowNodeDef,
   WorkflowEdgeDef,
   WorkflowDefinition,
-  WorkflowTrigger,
 } from '@zclaudia/shared';
 import { normalizeWorkflowDefinition } from '@zclaudia/shared';
 import { StepConfigForm } from './StepConfigForm';
-import { TriggerConfigForm } from './TriggerConfigForm';
 import { NodePalette } from './NodePalette';
 import { NLWorkflowGenerator } from './NLWorkflowGenerator';
 import { WorkflowGraphEditor, fromFlowNodes, fromFlowEdges } from './WorkflowGraphEditor';
@@ -43,7 +41,6 @@ function getInitialDefinition(workflow?: Workflow): WorkflowDefinition {
       nodes: [],
       edges: [],
       entryNodeId: '',
-      triggers: [{ type: 'manual' }],
     };
   }
   return normalizeWorkflowDefinition(workflow.definition);
@@ -71,7 +68,6 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
 
   const [name, setName] = useState(workflow?.name ?? '');
   const [description, setDescription] = useState(workflow?.description ?? '');
-  const [triggers, setTriggers] = useState<WorkflowTrigger[]>(initial.triggers);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -151,11 +147,9 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
     definition: WorkflowDefinition;
     name: string;
     description: string;
-    triggers: WorkflowTrigger[];
   }) => {
     setName(result.name);
     setDescription(result.description);
-    setTriggers(result.triggers);
     // Replace the graph via the exposed imperative method
     const editorEl = document.querySelector('[data-graph-editor]');
     if (editorEl && (editorEl as any).__replaceGraph) {
@@ -180,7 +174,6 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
         nodes,
         edges,
         entryNodeId,
-        triggers,
       };
 
       if (standalone && serverUrl) {
@@ -385,11 +378,7 @@ export function WorkflowEditor({ workflow, projectId, onBack, onSaved, standalon
               </button>
             </div>
             {leftPanelMode === 'toolbox' ? (
-              <>
-                <NodePalette />
-                <hr className="border-border" />
-                <TriggerConfigForm triggers={triggers} onChange={setTriggers} />
-              </>
+              <NodePalette />
             ) : (
               <NLWorkflowGenerator
                 projectId={projectId}

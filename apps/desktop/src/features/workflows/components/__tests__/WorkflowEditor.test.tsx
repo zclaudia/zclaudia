@@ -32,12 +32,6 @@ vi.mock('../StepConfigForm', () => ({
   ),
 }));
 
-vi.mock('../TriggerConfigForm', () => ({
-  TriggerConfigForm: ({ triggers }: any) => (
-    <div data-testid="trigger-config-form">Triggers: {triggers?.length}</div>
-  ),
-}));
-
 vi.mock('../NodePalette', () => ({
   NodePalette: () => <div data-testid="node-palette">NodePalette</div>,
 }));
@@ -294,7 +288,6 @@ describe('WorkflowEditor', () => {
     );
     expect(screen.getByText('Toolbox')).toBeTruthy();
     expect(screen.getByTestId('node-palette')).toBeTruthy();
-    expect(screen.getByTestId('trigger-config-form')).toBeTruthy();
   });
 
   it('collapses left panel', () => {

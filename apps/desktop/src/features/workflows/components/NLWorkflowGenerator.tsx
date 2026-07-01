@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { Sparkles, Loader2, AlertTriangle, RotateCcw } from 'lucide-react';
-import type { WorkflowDefinition, WorkflowTrigger } from '@zclaudia/shared';
+import type { WorkflowDefinition } from '@zclaudia/shared';
 import { generateWorkflowFromNL, refineGeneratedWorkflow } from '../api';
 
 interface NLWorkflowGeneratorProps {
@@ -10,7 +10,6 @@ interface NLWorkflowGeneratorProps {
     definition: WorkflowDefinition;
     name: string;
     description: string;
-    triggers: WorkflowTrigger[];
   }) => void;
 }
 
@@ -46,7 +45,6 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
         definition: result.definition,
         name: result.name,
         description: result.description,
-        triggers: result.definition.triggers,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -75,7 +73,6 @@ export function NLWorkflowGenerator({ projectId, llmProfileId, onGenerated }: NL
         definition: result.definition,
         name: result.name,
         description: result.description,
-        triggers: result.definition.triggers,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
