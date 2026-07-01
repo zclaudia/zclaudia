@@ -20,6 +20,18 @@ describe('TokenUsageDisplay', () => {
     expect(screen.getByText('5%')).toBeInTheDocument();
   });
 
+  it('prefers the real context occupancy over latest input tokens', () => {
+    render(
+      <TokenUsageDisplay
+        inputTokens={100_000}
+        latestInputTokens={0}
+        contextUsedTokens={32_900}
+        contextWindow={1_000_000}
+      />,
+    );
+    expect(screen.getByText('3%')).toBeInTheDocument();
+  });
+
   it('shows an em dash when the context window is unknown', () => {
     render(<TokenUsageDisplay inputTokens={14_000} />);
     expect(screen.getByText('—')).toBeInTheDocument();

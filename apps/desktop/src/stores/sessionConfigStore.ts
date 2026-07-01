@@ -31,6 +31,7 @@ export interface SessionUsage {
   latestOutputTokens?: number;
   latestCacheReadTokens?: number;
   latestCacheWriteTokens?: number;
+  contextUsedTokens?: number;
 }
 
 interface SessionConfigState {
@@ -138,6 +139,7 @@ export const useSessionConfigStore = create<SessionConfigState>((set, get) => ({
             latestOutputTokens: usage.output,
             latestCacheReadTokens: usage.cacheRead ?? 0,
             latestCacheWriteTokens: usage.cacheWrite ?? 0,
+            contextUsedTokens: usage.contextUsedTokens ?? existing.contextUsedTokens,
           },
         },
       };

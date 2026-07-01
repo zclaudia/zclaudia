@@ -5,6 +5,8 @@ interface TokenUsageDisplayProps {
   latestInputTokens?: number;
   /** Cumulative session input tokens; the fallback when no snapshot exists. */
   inputTokens: number;
+  /** Real context-window occupancy for the final LLM call, if available. */
+  contextUsedTokens?: number;
   /** Context window for the active model, if known. */
   contextWindow?: number;
 }
@@ -18,9 +20,10 @@ interface TokenUsageDisplayProps {
 export function TokenUsageDisplay({
   latestInputTokens,
   inputTokens,
+  contextUsedTokens,
   contextWindow,
 }: TokenUsageDisplayProps) {
-  const currentInput = latestInputTokens ?? inputTokens;
+  const currentInput = contextUsedTokens ?? latestInputTokens ?? inputTokens;
   if (currentInput === 0) return null;
 
   const hasContextWindow = typeof contextWindow === 'number' && contextWindow > 0;

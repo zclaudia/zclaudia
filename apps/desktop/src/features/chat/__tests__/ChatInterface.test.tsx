@@ -148,7 +148,12 @@ vi.mock('../WorktreeSelector', () => ({
 }));
 vi.mock('../TokenUsageDisplay', () => ({
   TokenUsageDisplay: (props: any) => (
-    <div data-testid="token-usage" data-input={props.inputTokens} data-context-window={props.contextWindow} />
+    <div
+      data-testid="token-usage"
+      data-input={props.inputTokens}
+      data-context-used={props.contextUsedTokens}
+      data-context-window={props.contextWindow}
+    />
   ),
 }));
 vi.mock('../../../components/BottomPanel', () => ({
@@ -1553,6 +1558,27 @@ describe('ChatInterface', () => {
     const tokenDisplay = container.querySelector('[data-testid="token-usage"]');
     expect(tokenDisplay?.getAttribute('data-input')).toBe('100');
     expect(tokenDisplay?.getAttribute('data-context-window')).toBe('128000');
+  });
+
+  it('uses real context occupancy for the header and compact usage display', () => {
+    setDefaultStores({
+      sessionConfigStore: {
+        sessionUsage: {
+          'sess-1': {
+            inputTokens: 100,
+            outputTokens: 200,
+            latestInputTokens: 0,
+            latestOutputTokens: 75,
+            contextUsedTokens: 32_900,
+            contextWindow: 1_000_000,
+          },
+        },
+      },
+    });
+    const { container } = render(<ChatInterface sessionId="sess-1" />);
+    const tokenDisplay = container.querySelector('[data-testid="token-usage"]');
+    expect(tokenDisplay?.getAttribute('data-context-used')).toBe('32900');
+    expect(container.textContent).toContain('· 3%');
   });
 
   it('passes zero usage when no usage data exists', () => {

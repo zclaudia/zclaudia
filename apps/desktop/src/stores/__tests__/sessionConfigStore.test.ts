@@ -30,6 +30,18 @@ describe('sessionConfigStore', () => {
     expect(u.latestInputTokens).toBe(3);
   });
 
+  it('stores the real context occupancy when provided by the runtime', () => {
+    useSessionConfigStore.getState().addSessionUsage('s1', {
+      input: 100,
+      output: 5,
+      cacheRead: 900,
+      cacheWrite: 0,
+      contextUsedTokens: 32_900,
+    } as never);
+    const u = useSessionConfigStore.getState().sessionUsage.s1;
+    expect(u.contextUsedTokens).toBe(32_900);
+  });
+
   it('setSystemInfo syncs contextWindow into usage (intra-store)', () => {
     useSessionConfigStore.getState().setSystemInfo('s1', { contextWindow: 200000 } as never);
     expect(useSessionConfigStore.getState().sessionUsage.s1.contextWindow).toBe(200000);

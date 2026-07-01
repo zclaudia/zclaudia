@@ -316,7 +316,7 @@ export function ChatInterface({ sessionId, onReturnToDashboard, onOpenSidebar, b
           systemInfo={currentSystemInfo}
           contextPercent={
             currentUsage.contextWindow && currentUsage.contextWindow > 0
-              ? Math.min(100, Math.round(((currentUsage.latestInputTokens ?? 0) / currentUsage.contextWindow) * 100))
+              ? Math.min(100, Math.round(((currentUsage.contextUsedTokens ?? currentUsage.latestInputTokens ?? 0) / currentUsage.contextWindow) * 100))
               : null
           }
         />

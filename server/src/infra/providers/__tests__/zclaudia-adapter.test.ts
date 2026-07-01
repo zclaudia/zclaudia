@@ -7,6 +7,7 @@ import type { LlmProfileConfig } from '@zclaudia/shared/core/llm-profile';
 import type { AgentProfileConfig, ThinkingLevel } from '@zclaudia/shared/core/agent-profile';
 import { ALL_TOOL_NAMES, type ToolName } from '@zclaudia/shared/core/tools';
 import { EDIT_TOOL_SELECTION_GUIDANCE } from '../pi-runtime/run-prompt.js';
+import { withContextUsedTokens } from '../pi-runtime/usage-extractor.js';
 
 // Mock sandbox so resolvePlanModeTools tests can control isSandboxAvailable()
 // without touching real system dependencies (sysbox/bwrap presence checks).
@@ -140,7 +141,7 @@ vi.mock('@earendil-works/pi-agent-core', () => {
     }
   }
 
-  return { Agent: MockAgent, Session: MockSession };
+  return { Agent: MockAgent, Session: MockSession, convertToLlm: vi.fn() };
 });
 
 // Helper to enqueue the script that the next `new Agent()` will play back.
@@ -305,6 +306,24 @@ describe('extractLastCallUsage', () => {
 
   it('returns undefined for an empty message list', () => {
     expect(extractLastCallUsage([])).toBeUndefined();
+  });
+});
+
+describe('withContextUsedTokens', () => {
+  it('adds context occupancy from the last LLM call without changing cumulative usage', () => {
+    const usage = {
+      input: 10_000,
+      output: 500,
+      cacheRead: 90_000,
+      cacheWrite: 0,
+      totalTokens: 100_500,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+    };
+
+    expect(withContextUsedTokens(usage, { input: 30_000, cacheRead: 2_900 })).toEqual({
+      ...usage,
+      contextUsedTokens: 32_900,
+    });
   });
 });
 
@@ -524,7 +543,14 @@ describe('PiAgentProviderAdapter.run', () => {
 
     const last = out[out.length - 1];
     expect(last.type).toBe('result');
-    expect(last.usage).toMatchObject({ input: 130, output: 70, cacheRead: 5, cacheWrite: 2, totalTokens: 207 });
+    expect(last.usage).toMatchObject({
+      input: 130,
+      output: 70,
+      cacheRead: 5,
+      cacheWrite: 2,
+      totalTokens: 207,
+      contextUsedTokens: 30,
+    });
   });
 
   it('loads history from session tree (buildContext) and passes it to Agent initialState', async () => {

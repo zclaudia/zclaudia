@@ -15,7 +15,9 @@ describe('fileViewerStore', () => {
       targetEndLine: null,
       targetNonce: 0,
       searchOpen: false,
+      showTree: true,
       fullscreen: false,
+      treeWidthPx: 256,
       contentCache: new Map(),
     });
   });
@@ -257,6 +259,19 @@ describe('fileViewerStore', () => {
 
       useFileViewerStore.getState().setFullscreen(false);
       expect(useFileViewerStore.getState().fullscreen).toBe(false);
+    });
+  });
+
+  describe('setTreeWidthPx', () => {
+    it('clamps the file tree width to the supported desktop range', () => {
+      useFileViewerStore.getState().setTreeWidthPx(120);
+      expect(useFileViewerStore.getState().treeWidthPx).toBe(160);
+
+      useFileViewerStore.getState().setTreeWidthPx(360);
+      expect(useFileViewerStore.getState().treeWidthPx).toBe(360);
+
+      useFileViewerStore.getState().setTreeWidthPx(640);
+      expect(useFileViewerStore.getState().treeWidthPx).toBe(520);
     });
   });
 

@@ -2,6 +2,9 @@ import { create } from 'zustand';
 import { usePluginStore } from './pluginStore';
 
 const CACHE_MAX = 30;
+const TREE_WIDTH_MIN = 160;
+const TREE_WIDTH_MAX = 520;
+const TREE_WIDTH_DEFAULT = 256;
 
 interface FileViewerState {
   // Panel open state
@@ -24,6 +27,8 @@ interface FileViewerState {
   searchOpen: boolean;
   // File tree visibility (desktop)
   showTree: boolean;
+  // File tree width (desktop)
+  treeWidthPx: number;
   // Full-screen overlay (mobile)
   fullscreen: boolean;
   // LRU content cache  (key = "projectRoot\0relativePath")
@@ -37,12 +42,16 @@ interface FileViewerState {
   togglePanel: () => void;
   setShowTree: (show: boolean) => void;
   toggleTree: () => void;
+  setTreeWidthPx: (widthPx: number) => void;
   setSearchOpen: (open: boolean) => void;
   setFullscreen: (open: boolean) => void;
   getCached: (projectRoot: string, relativePath: string) => string | undefined;
 }
 
 function cacheKey(root: string, path: string) { return `${root}\0${path}`; }
+function clampTreeWidth(widthPx: number) {
+  return Math.max(TREE_WIDTH_MIN, Math.min(TREE_WIDTH_MAX, Math.round(widthPx)));
+}
 
 export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   isOpen: false,
@@ -56,6 +65,7 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
   targetNonce: 0,
   searchOpen: false,
   showTree: true,
+  treeWidthPx: TREE_WIDTH_DEFAULT,
   fullscreen: false,
   contentCache: new Map(),
 
@@ -115,6 +125,9 @@ export const useFileViewerStore = create<FileViewerState>((set, get) => ({
 
   toggleTree: () =>
     set((state) => ({ showTree: !state.showTree })),
+
+  setTreeWidthPx: (widthPx) =>
+    set({ treeWidthPx: clampTreeWidth(widthPx) }),
 
   setSearchOpen: (open: boolean) =>
     set({ searchOpen: open, isOpen: open ? true : undefined }),

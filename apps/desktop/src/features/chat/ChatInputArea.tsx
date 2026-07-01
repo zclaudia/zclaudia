@@ -55,6 +55,7 @@ interface ChatInputAreaProps {
     cacheWriteTokens?: number;
     latestCacheReadTokens?: number;
     latestCacheWriteTokens?: number;
+    contextUsedTokens?: number;
   };
   advancedInput: boolean;
   restoreMessage: { content: string; attachments?: Attachment[] } | null;
@@ -539,6 +540,7 @@ export function ChatInputArea({
               <TokenUsageDisplay
                 latestInputTokens={currentUsage.latestInputTokens}
                 inputTokens={currentUsage.inputTokens}
+                contextUsedTokens={currentUsage.contextUsedTokens}
                 contextWindow={currentUsage.contextWindow}
               />
             </ContextUsagePopover>

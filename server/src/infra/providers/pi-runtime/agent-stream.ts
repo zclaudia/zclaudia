@@ -9,7 +9,7 @@ import type { TranslateContext } from './message-event-translator.js';
 import { translateEvent } from './message-event-translator.js';
 import { translateToolEvent } from './tool-event-translator.js';
 import { withStreamRetry } from './retry-stream.js';
-import { extractErrorStop, extractLastCallUsage, extractUsage } from './usage-extractor.js';
+import { extractErrorStop, extractLastCallUsage, extractUsage, withContextUsedTokens } from './usage-extractor.js';
 import { recordPiContextUsage } from './context-observer.js';
 
 export async function* runPiAgentStream(input: {
@@ -124,11 +124,12 @@ export async function* runPiAgentStream(input: {
     if (event.type === 'agent_end') {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const messages = (event as any).messages as AgentMessage[];
-      const usage = extractUsage(messages);
+      const lastCallUsage = extractLastCallUsage(messages);
+      const usage = withContextUsedTokens(extractUsage(messages), lastCallUsage);
 
       recordPiContextUsage({
         sessionId: options.claudiaSessionId,
-        lastCallUsage: extractLastCallUsage(messages),
+        lastCallUsage,
       });
 
       // Surface LLM-level errors that pi-agent-core's loop quietly absorbs

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { FileViewerPanel, FileViewerActions } from '../FileViewerPanel';
 
 vi.mock('../../../contexts/ThemeContext', () => ({
@@ -80,6 +80,8 @@ const mockFileViewerState = {
   setFullscreen: vi.fn(),
   toggleTree: vi.fn(),
   setShowTree: vi.fn(),
+  treeWidthPx: 256,
+  setTreeWidthPx: vi.fn(),
   isOpen: false,
   targetLine: null as number | null,
   targetEndLine: null as number | null,
@@ -102,6 +104,7 @@ beforeEach(() => {
   mockFileViewerState.error = null;
   mockFileViewerState.searchOpen = false;
   mockFileViewerState.showTree = true;
+  mockFileViewerState.treeWidthPx = 256;
   mockFileViewerState.projectRoot = null;
 });
 
@@ -186,6 +189,22 @@ describe('FileViewerPanel', () => {
 
     tree.click();
     expect(mockFileViewerState.openFile).toHaveBeenCalledWith('/project', 'src/from-tree.ts');
+  });
+
+  it('lets desktop users resize the file tree with the separator', () => {
+    mockFileViewerState.filePath = 'src/current.ts';
+    mockFileViewerState.content = 'const x = 1;';
+    render(<FileViewerPanel projectRoot="/project" />);
+
+    const pane = screen.getByTestId('file-tree-pane');
+    expect(pane).toHaveStyle({ width: '256px' });
+
+    const handle = screen.getByRole('separator', { name: 'Resize file tree' });
+    fireEvent.mouseDown(handle, { clientX: 256 });
+    fireEvent.mouseMove(window, { clientX: 336 });
+    fireEvent.mouseUp(window);
+
+    expect(mockFileViewerState.setTreeWidthPx).toHaveBeenCalledWith(336);
   });
 
   it('hides the file tree when showTree is false on desktop', () => {

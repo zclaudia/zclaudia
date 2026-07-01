@@ -1,4 +1,13 @@
-import { useState, useEffect, useMemo, type CSSProperties } from 'react';
+import {
+  useCallback,
+  useRef,
+  useState,
+  useEffect,
+  useMemo,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type TouchEvent as ReactTouchEvent,
+} from 'react';
 import { useFileViewerStore } from '../../stores/fileViewerStore';
 import { Highlight, themes as prismThemes, type PrismTheme, type Token } from 'prism-react-renderer';
 import { List, useListRef, type RowComponentProps, type ListImperativeAPI } from 'react-window';
@@ -60,6 +69,8 @@ interface FileViewerPanelProps {
 
 /** Row height (px) — must match lineHeight below so virtualization aligns rows. */
 const ROW_HEIGHT_PX = 20;
+const TREE_WIDTH_MIN = 160;
+const TREE_WIDTH_MAX = 520;
 
 type CodeRowExtraProps = {
   tokens: Token[][];
@@ -299,8 +310,9 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const {
     loading, searchOpen,
     targetLine, targetEndLine, targetNonce,
-    openFile, setContent, setError, setSearchOpen, showTree,
+    openFile, setContent, setError, setSearchOpen, showTree, treeWidthPx, setTreeWidthPx,
   } = store;
+  const treeResizeCleanupRef = useRef<(() => void) | null>(null);
   // Guard: when the store still holds state pointing at a different project
   // (e.g. user just switched session/project), treat the viewer as if no file
   // is selected. SessionChatLayout's effect will close()/reset the store
@@ -357,6 +369,39 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const contentLayoutClass = isMobile
     ? (showFileTree ? 'flex flex-col' : 'block')
     : 'flex';
+
+  useEffect(() => () => treeResizeCleanupRef.current?.(), []);
+
+  const beginTreeResize = useCallback((event: ReactMouseEvent | ReactTouchEvent) => {
+    if (isMobile) return;
+    const startX = 'touches' in event ? event.touches[0]?.clientX : event.clientX;
+    if (typeof startX !== 'number') return;
+    event.preventDefault();
+    treeResizeCleanupRef.current?.();
+
+    const startWidth = treeWidthPx;
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
+      const clientX = 'touches' in moveEvent ? moveEvent.touches[0]?.clientX : moveEvent.clientX;
+      if (typeof clientX !== 'number') return;
+      moveEvent.preventDefault();
+      setTreeWidthPx(startWidth + clientX - startX);
+    };
+    const cleanup = () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', cleanup);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', cleanup);
+      window.removeEventListener('touchcancel', cleanup);
+      treeResizeCleanupRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', cleanup);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', cleanup);
+    window.addEventListener('touchcancel', cleanup);
+    treeResizeCleanupRef.current = cleanup;
+  }, [isMobile, setTreeWidthPx, treeWidthPx]);
 
   // Scroll the virtualized list to the target line when one is set / changed.
   useEffect(() => {
@@ -435,14 +480,33 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
 
           <div className={`flex-1 min-h-0 overflow-hidden ${contentLayoutClass}`}>
             {showFileTree && (
-              <div className={isMobile ? 'h-2/5 min-h-[180px] flex-shrink-0 border-b border-border' : 'w-64 flex-shrink-0 border-r border-border'}>
-                <FileTree
-                  projectRoot={projectRoot}
-                  backendId={fileBackendId}
-                  selectedPath={filePath}
-                  onOpenFile={handleSearchSelect}
-                />
-              </div>
+              <>
+                <div
+                  data-testid="file-tree-pane"
+                  className={isMobile ? 'h-2/5 min-h-[180px] flex-shrink-0 border-b border-border' : 'flex-shrink-0 border-r border-border'}
+                  style={isMobile ? undefined : { width: `${treeWidthPx}px` }}
+                >
+                  <FileTree
+                    projectRoot={projectRoot}
+                    backendId={fileBackendId}
+                    selectedPath={filePath}
+                    onOpenFile={handleSearchSelect}
+                  />
+                </div>
+                {!isMobile && (
+                  <div
+                    role="separator"
+                    aria-label="Resize file tree"
+                    aria-orientation="vertical"
+                    aria-valuemin={TREE_WIDTH_MIN}
+                    aria-valuemax={TREE_WIDTH_MAX}
+                    aria-valuenow={treeWidthPx}
+                    className="-ml-px h-full w-2 flex-shrink-0 cursor-col-resize touch-none border-l border-transparent transition-colors hover:border-border hover:bg-muted/60"
+                    onMouseDown={beginTreeResize}
+                    onTouchStart={beginTreeResize}
+                  />
+                )}
+              </>
             )}
             <div className="flex-1 min-h-0 min-w-0 h-full overflow-hidden">
               {loading && (

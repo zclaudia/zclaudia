@@ -109,6 +109,7 @@ export function useChatSession({ sessionId, isConnected }: UseChatSessionParams)
     cacheWriteTokens: 0,
     latestCacheReadTokens: undefined,
     latestCacheWriteTokens: undefined,
+    contextUsedTokens: undefined,
   };
   const fileReferenceRoot = currentSession?.workingDirectory || currentProject?.rootPath;
   const fileReferenceBackendId = useOwnershipStore(

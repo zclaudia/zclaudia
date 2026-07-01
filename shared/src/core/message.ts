@@ -181,6 +181,8 @@ export interface UsageInfo {
   cacheWrite: number;
   totalTokens: number;
   cost: UsageCost;
+  /** Real context-window occupancy for the final LLM call: input + cacheRead. */
+  contextUsedTokens?: number;
 }
 
 // Note: ToolDefinition and AIToolCall are defined in plugin-types.ts

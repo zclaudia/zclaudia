@@ -68,3 +68,14 @@ export function extractUsage(messages: AgentMessage[]): Usage {
   }
   return acc;
 }
+
+export function withContextUsedTokens<T extends Partial<Usage>>(
+  usage: T,
+  lastCallUsage?: Partial<Usage>,
+): T & { contextUsedTokens?: number } {
+  if (!lastCallUsage) return usage;
+  return {
+    ...usage,
+    contextUsedTokens: (lastCallUsage.input ?? 0) + (lastCallUsage.cacheRead ?? 0),
+  };
+}
