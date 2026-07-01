@@ -28,6 +28,9 @@ export class CompositeStepExecutor implements StepExecutorPort {
   private findExecutor(type: string): StepExecutorPort | null {
     const indexed = this.typeIndex.get(type);
     if (indexed) return indexed;
+    for (const executor of this.executors) {
+      if (executor.supportedTypes.includes(type)) return executor;
+    }
     if (this.pluginExecutor?.supports(type)) return this.pluginExecutor;
     return null;
   }

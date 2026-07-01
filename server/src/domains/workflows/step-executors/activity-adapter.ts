@@ -8,14 +8,14 @@ import type { ActivityRegistry, ActivityServices } from '../../activities/index.
  * Composition stays in the workflow layer — this adapter never chains activities.
  */
 export class ActivityStepExecutorAdapter implements StepExecutorPort {
-  readonly supportedTypes: readonly string[];
+  get supportedTypes(): readonly string[] {
+    return this.registry.types();
+  }
 
   constructor(
     private readonly registry: ActivityRegistry,
     private readonly agentLoopRunner: AgentLoopRunnerPort,
-  ) {
-    this.supportedTypes = registry.types();
-  }
+  ) {}
 
   async execute(
     node: WorkflowNodeDef,
