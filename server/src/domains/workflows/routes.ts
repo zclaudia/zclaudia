@@ -49,10 +49,15 @@ function validateWorkflowDefinition(res: Response, definition: unknown): definit
 export function createWorkflowRoutes(
   service: WorkflowService,
   generatorService?: WorkflowGeneratorService,
-  registries?: { stepRegistry?: StepRegistryPort; triggerRegistry?: TriggerRegistryPort },
+  registries?: {
+    stepRegistry?: StepRegistryPort;
+    triggerRegistry?: TriggerRegistryPort;
+    activityRegistry?: { listMeta(): WorkflowStepTypeMeta[] };
+  },
 ): Router {
   const workflowStepRegistry = registries?.stepRegistry;
   const workflowTriggerRegistry = registries?.triggerRegistry;
+  const activityRegistry = registries?.activityRegistry;
   const router = Router();
 
   // GET /api/projects/:projectId/workflows
@@ -459,23 +464,32 @@ export function createWorkflowRoutes(
   // GET /api/workflow-step-types
   router.get('/workflow-step-types', (_req: Request, res: Response) => {
     const builtinMeta: WorkflowStepTypeMeta[] = [
-      { type: 'git_commit', name: 'Git Commit', description: 'Commit changes', category: 'Git', source: 'builtin', supportsLoop: true },
       { type: 'git_merge', name: 'Git Merge', description: 'Merge branches', category: 'Git', source: 'builtin', supportsLoop: true },
       { type: 'create_worktree', name: 'Create Worktree', description: 'Create a git worktree', category: 'Git', source: 'builtin' },
       { type: 'create_pr', name: 'Create PR', description: 'Create a pull request', category: 'Git', source: 'builtin', supportsLoop: true },
       { type: 'ai_review', name: 'AI Review', description: 'AI code review', category: 'AI', source: 'builtin', supportsLoop: true },
-      { type: 'ai_prompt', name: 'AI Prompt', description: 'Send prompt to AI', category: 'AI', source: 'builtin', supportsLoop: true },
-      { type: 'shell', name: 'Shell Command', description: 'Execute shell command', category: 'Automation', source: 'builtin', supportsLoop: true },
-      { type: 'webhook', name: 'Webhook', description: 'HTTP webhook call', category: 'Automation', source: 'builtin', supportsLoop: true },
-      { type: 'notify', name: 'Notify', description: 'Send notification', category: 'Automation', source: 'builtin' },
+      { type: 'ai_prompt', name: 'AI Prompt', description: 'Send prompt to AI', category: 'AI', source: 'builtin', supportsLoop: true,
+        configSchema: { type: 'object', properties: { prompt: { type: 'string', format: 'multiline', description: 'Prompt (supports {{event.key}} templates)' } }, required: ['prompt'] } },
+      { type: 'shell', name: 'Shell Command', description: 'Execute shell command', category: 'Automation', source: 'builtin', supportsLoop: true,
+        configSchema: { type: 'object', properties: { command: { type: 'string', description: 'Command to run' } }, required: ['command'] } },
+      { type: 'webhook', name: 'Webhook', description: 'HTTP webhook call', category: 'Automation', source: 'builtin', supportsLoop: true,
+        configSchema: { type: 'object', properties: { url: { type: 'string', description: 'Webhook URL' }, method: { type: 'string', enum: ['GET', 'POST', 'PUT', 'DELETE'] } }, required: ['url'] } },
+      { type: 'notify', name: 'Notify', description: 'Send notification', category: 'Automation', source: 'builtin',
+        configSchema: { type: 'object', properties: { message: { type: 'string', format: 'multiline', description: 'Notification message' } }, required: ['message'] } },
       { type: 'condition', name: 'Condition', description: 'Conditional branching', category: 'Flow Control', source: 'builtin' },
       { type: 'wait', name: 'Wait / Approval', description: 'Wait or require approval', category: 'Flow Control', source: 'builtin' },
       { type: 'permission_classify', name: 'Permission Classify', description: 'Classify permission request', category: 'Permission', source: 'builtin' },
       { type: 'ai_risk_analysis', name: 'AI Risk Analysis', description: 'Analyze permission risk', category: 'Permission', source: 'builtin' },
       { type: 'permission_decide', name: 'Permission Decide', description: 'Decide on permission request', category: 'Permission', source: 'builtin' },
     ];
-    const pluginMeta = workflowStepRegistry?.getAllMeta() ?? [];
-    res.json({ success: true, data: [...builtinMeta, ...pluginMeta] });
+    const pluginMeta = (workflowStepRegistry?.getAllMeta() ?? []) as WorkflowStepTypeMeta[];
+    const activityMeta = activityRegistry?.listMeta() ?? [];
+    // Dedupe by type; later inserts win, so activity meta overrides any builtin of the same type.
+    const byType = new Map<string, WorkflowStepTypeMeta>();
+    for (const m of builtinMeta) byType.set(m.type, m);
+    for (const m of pluginMeta) byType.set(m.type, m);
+    for (const m of activityMeta) byType.set(m.type, m);
+    res.json({ success: true, data: [...byType.values()] });
   });
 
   return router;

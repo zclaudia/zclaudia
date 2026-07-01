@@ -129,6 +129,7 @@ export function registerWorkflowDomain(deps: WorkflowDomainDeps): WorkflowDomain
   app.use('/api', authMiddleware, createWorkflowRoutes(workflowService, workflowGeneratorService, {
     stepRegistry: workflowStepRegistry,
     triggerRegistry: workflowTriggerRegistry,
+    activityRegistry,
   }));
 
   // Scheduling + event subscriptions are owned by AutomationService.
