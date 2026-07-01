@@ -59,7 +59,7 @@ import { createIssueRoutes } from '../../domains/issue-orchestration/routes.js';
 import { createEpicRoutes } from '../../domains/epics/routes.js';
 import { EpicService } from '../../domains/epics/service.js';
 import { TaskExecutorRegistry } from '../../domains/tasks/executors/registry.js';
-import { ActivityRegistry, GitCommitActivity, GenerateCommitMessageActivity } from '../../domains/activities/index.js';
+import { ActivityRegistry, GitCommitActivity, GitStageActivity, GenerateCommitMessageActivity } from '../../domains/activities/index.js';
 import { LightweightAgentRunner } from '../../infra/providers/pi-runtime/agent-loop/index.js';
 
 
@@ -136,6 +136,7 @@ export function registerFeatureDomains(deps: RegisterFeatureDomainsDeps): Featur
 
   const activityRegistry = new ActivityRegistry();
   activityRegistry.register(new GitCommitActivity());
+  activityRegistry.register(new GitStageActivity());
   activityRegistry.register(new GenerateCommitMessageActivity());
   const sharedAgentLoopRunner = new LightweightAgentRunner({ db });
 
