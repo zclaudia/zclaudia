@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
-import type { Automation } from '@zclaudia/shared';
+import type { Automation, Workflow } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { AutomationItem } from './automation-types';
 import { automationToItem } from './automation-types';
@@ -30,35 +30,51 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   const [newActionType, setNewActionType] = useState('ai_prompt');
   const [newPrompt, setNewPrompt] = useState('');
   const [newShellCmd, setNewShellCmd] = useState('');
+  const [workflowRef, setWorkflowRef] = useState('');
+  const [availableWorkflows, setAvailableWorkflows] = useState<Workflow[]>([]);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const effectiveProjectId = projectId ?? '';
+  const projectQuery = effectiveProjectId ? `?projectId=${encodeURIComponent(effectiveProjectId)}` : '';
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const query = effectiveProjectId ? `?projectId=${encodeURIComponent(effectiveProjectId)}` : '';
-      const allAutomations: Automation[] = await api.get(`/api/automations${query}`).catch(() => []);
+      const allAutomations: Automation[] = await api.get(`/api/automations${projectQuery}`).catch(() => []);
       setAutomations(allAutomations);
     } catch { /* ignore */ }
     setLoading(false);
-  }, [api, effectiveProjectId]);
+  }, [api, projectQuery]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  useEffect(() => {
+    api.get(`/api/workflows${projectQuery}`).then(setAvailableWorkflows).catch(() => setAvailableWorkflows([]));
+  }, [api, projectQuery]);
+
+  const workflowNameMap = useMemo(
+    () => new Map(availableWorkflows.map((w) => [w.id, w.name])),
+    [availableWorkflows],
+  );
+
   // Build unified list
   const items: AutomationItem[] = useMemo(() => {
-    return automations.map(automationToItem).sort((a, b) =>
+    return automations.map((a) => automationToItem(a, workflowNameMap)).sort((a, b) =>
       (b.enabled ? 1 : 0) - (a.enabled ? 1 : 0)
     );
-  }, [automations]);
+  }, [automations, workflowNameMap]);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
+    if (newActionType === 'workflow' && !workflowRef) return;
     const actionConfig: Record<string, unknown> =
       newActionType === 'ai_prompt' ? { prompt: newPrompt }
       : newActionType === 'shell' ? { command: newShellCmd }
       : {};
+
+    const action = newActionType === 'workflow'
+      ? { kind: 'workflow' as const, ref: workflowRef }
+      : { kind: 'activity' as const, ref: newActionType, input: actionConfig };
 
     const trigger: Record<string, unknown> = { type: newTriggerType };
     if (newTriggerType === 'interval') trigger.intervalMinutes = parseInt(newIntervalMinutes) || 60;
@@ -79,13 +95,14 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
         name: newName.trim(),
         projectId: effectiveProjectId || undefined,
         trigger,
-        action: { kind: 'activity', ref: newActionType, input: actionConfig },
+        action,
       });
 
       setShowCreate(false);
       setNewName('');
       setNewPrompt('');
       setNewShellCmd('');
+      setWorkflowRef('');
       setNewCron('');
       setNewEvent('');
       setNewOnceAt('');
@@ -196,14 +213,28 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
                 { value: 'shell', label: 'Shell Command' },
                 { value: 'git_commit', label: 'Git Commit' },
                 { value: 'webhook', label: 'Webhook' },
+                { value: 'workflow', label: 'Workflow' },
               ]}
             />
           </div>
-          {newActionType === 'ai_prompt' && (
-            <textarea value={newPrompt} onChange={(e) => setNewPrompt(e.target.value)} placeholder="Enter prompt... (supports {{event.key}} templates)" rows={3} className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground resize-y" />
-          )}
-          {newActionType === 'shell' && (
-            <input value={newShellCmd} onChange={(e) => setNewShellCmd(e.target.value)} placeholder="command to run" className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground font-mono" />
+          {newActionType === 'workflow' ? (
+            <Select
+              value={workflowRef}
+              onChange={setWorkflowRef}
+              size="md"
+              block
+              placeholder="Select workflow…"
+              options={availableWorkflows.map((w) => ({ value: w.id, label: w.name }))}
+            />
+          ) : (
+            <>
+              {newActionType === 'ai_prompt' && (
+                <textarea value={newPrompt} onChange={(e) => setNewPrompt(e.target.value)} placeholder="Enter prompt... (supports {{event.key}} templates)" rows={3} className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground resize-y" />
+              )}
+              {newActionType === 'shell' && (
+                <input value={newShellCmd} onChange={(e) => setNewShellCmd(e.target.value)} placeholder="command to run" className="w-full px-2 py-1 text-xs rounded-md border border-border bg-background text-foreground font-mono" />
+              )}
+            </>
           )}
           {createError && (
             <div className="text-[11px] text-destructive">{createError}</div>
@@ -218,7 +249,7 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
             >
               Cancel
             </button>
-            <button onClick={handleCreate} disabled={!newName.trim()} className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50">Create</button>
+            <button onClick={handleCreate} disabled={!newName.trim() || (newActionType === 'workflow' && !workflowRef)} className="px-2 py-1 text-xs rounded-md bg-muted/60 text-foreground hover:bg-muted disabled:opacity-50">Create</button>
           </div>
         </div>
       )}
