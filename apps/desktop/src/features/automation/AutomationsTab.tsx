@@ -49,8 +49,10 @@ export function AutomationsTab({ api, projectName, projectId }: AutomationsTabPr
   useEffect(() => { refresh(); }, [refresh]);
 
   useEffect(() => {
-    api.get(`/api/workflows${projectQuery}`).then(setAvailableWorkflows).catch(() => setAvailableWorkflows([]));
-  }, [api, projectQuery]);
+    // Fetch all workflows (unfiltered) for the picker: bindable workflows are global/system
+    // workflows (e.g. the seeded Auto-Commit), which /api/workflows?projectId=X would exclude.
+    api.get('/api/workflows').then(setAvailableWorkflows).catch(() => setAvailableWorkflows([]));
+  }, [api]);
 
   const workflowNameMap = useMemo(
     () => new Map(availableWorkflows.map((w) => [w.id, w.name])),
