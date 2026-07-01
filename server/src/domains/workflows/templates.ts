@@ -3,6 +3,9 @@ import type { WorkflowTemplate } from '@zclaudia/shared/features/workflows';
 export const PERMISSION_WORKFLOW_TEMPLATE_ID = 'permission-escalation-default';
 export const SYSTEM_PERMISSION_ESCALATION_FALLBACK_KEY = 'permission_escalation_fallback';
 
+export const AI_AUTO_COMMIT_TEMPLATE_ID = 'ai-auto-commit';
+export const SYSTEM_AI_AUTO_COMMIT_KEY = 'ai_auto_commit';
+
 export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
   {
     id: PERMISSION_WORKFLOW_TEMPLATE_ID,
@@ -414,6 +417,55 @@ export const BUILTIN_WORKFLOW_TEMPLATES: WorkflowTemplate[] = [
         { id: 'e11', source: 'notify_ready', target: 'await_merge', type: 'success' },
         { id: 'e12', source: 'await_merge', target: 'merge', type: 'success' },
         { id: 'e13', source: 'merge', target: 'resolve_conflict', type: 'error' },
+      ],
+    },
+  },
+  {
+    id: AI_AUTO_COMMIT_TEMPLATE_ID,
+    name: 'AI Auto Commit',
+    description: 'Stages all changes, generates a Conventional-Commits message with AI, and commits. Bind a trigger via an Automation to enable.',
+    category: 'git',
+    definition: {
+      entryNodeId: 'stage',
+      nodes: [
+        {
+          id: 'stage',
+          name: 'Stage Changes',
+          type: 'git_stage',
+          config: {},
+          position: { x: 300, y: 0 },
+          onError: 'abort',
+        },
+        {
+          id: 'check',
+          name: 'Has Staged Changes?',
+          type: 'condition',
+          config: {},
+          position: { x: 300, y: 150 },
+          condition: { expression: '${stage.output.hasChanges} == true' },
+        },
+        {
+          id: 'generate',
+          name: 'Generate Commit Message',
+          type: 'generate_commit_message',
+          config: {},
+          position: { x: 300, y: 300 },
+          timeoutMs: 30000,
+          onError: 'abort',
+        },
+        {
+          id: 'commit',
+          name: 'Commit',
+          type: 'git_commit',
+          config: { stageAll: false, messageMode: 'explicit', message: '${generate.output.message}' },
+          position: { x: 300, y: 450 },
+          onError: 'abort',
+        },
+      ],
+      edges: [
+        { id: 'e1', source: 'stage', target: 'check', type: 'success' },
+        { id: 'e2', source: 'check', target: 'generate', type: 'condition_true' },
+        { id: 'e3', source: 'generate', target: 'commit', type: 'success' },
       ],
     },
   },
