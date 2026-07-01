@@ -1,6 +1,6 @@
 import type { Project, Automation } from '@zclaudia/shared';
 
-export type AutomationTab = 'automations' | 'workflows' | 'runs' | 'system';
+export type AutomationTab = 'automations' | 'activity' | 'workflows' | 'runs' | 'system';
 
 export interface OpenAutomationsOptions {
   tab?: AutomationTab;

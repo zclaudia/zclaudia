@@ -219,7 +219,9 @@ describe('ChatMessagePane', () => {
       ] as any,
     });
 
-    const scrollContainer = container.firstElementChild as HTMLElement;
+    // The scroll container is the inner overflow-y-auto div (wrapped by a relative
+    // parent that hosts the fade mask + lifted scroll-to-bottom button).
+    const scrollContainer = container.querySelector('.overflow-y-auto') as HTMLElement;
     defineScrollableMetrics(scrollContainer, {
       scrollTop: 500,
       scrollHeight: 1000,
@@ -276,5 +278,33 @@ describe('ChatMessagePane', () => {
     );
 
     expect(scrollToBottom).not.toHaveBeenCalled();
+  });
+
+  it('fades only the message edges that have off-screen content', () => {
+    const { container } = renderPane({
+      sessionMessages: [
+        { id: 'm1', sessionId: 's1', role: 'assistant', content: 'hello', createdAt: 1, updatedAt: 1 },
+        { id: 'm2', sessionId: 's1', role: 'assistant', content: 'world', createdAt: 2, updatedAt: 2 },
+      ] as any,
+    });
+    const scrollContainer = container.querySelector('.overflow-y-auto') as HTMLElement;
+    // The mask uses a calc() gradient jsdom can't parse into computed style, so the
+    // component mirrors which edges are faded onto data-edge-fade for assertions.
+    const fade = () => scrollContainer.getAttribute('data-edge-fade');
+
+    // Scrolled to the middle: content above and below → both edges fade.
+    defineScrollableMetrics(scrollContainer, { scrollTop: 300, scrollHeight: 1000, clientHeight: 500 });
+    fireEvent.scroll(scrollContainer);
+    expect(fade()).toBe('both');
+
+    // Scrolled to the very top: nothing above → top edge stays crisp, bottom fades.
+    defineScrollableMetrics(scrollContainer, { scrollTop: 0, scrollHeight: 1000, clientHeight: 500 });
+    fireEvent.scroll(scrollContainer);
+    expect(fade()).toBe('bottom');
+
+    // Scrolled to the very bottom: nothing below → newest message stays crisp.
+    defineScrollableMetrics(scrollContainer, { scrollTop: 500, scrollHeight: 1000, clientHeight: 500 });
+    fireEvent.scroll(scrollContainer);
+    expect(fade()).toBe('top');
   });
 });

@@ -86,11 +86,18 @@ describe('SidebarNav', () => {
 const base = { onHome: () => {}, isHomeActive: false };
 
 describe('SidebarNav automation mode', () => {
-  it('renders four text tab rows with visible labels', () => {
+  it('renders the automation tab rows with visible labels', () => {
     render(<SidebarNav {...base} automationMode={{ tab: 'workflows', onSelectTab: () => {}, onBack: () => {} }} />);
-    for (const name of ['Automations', 'Workflows', 'Runs', 'System']) {
+    for (const name of ['Automations', 'Activity', 'Workflows', 'Runs', 'System']) {
       expect(screen.getByRole('button', { name })).toHaveTextContent(name);
     }
+  });
+
+  it('fires onSelectTab with "activity" when the Activity row is clicked', () => {
+    const onSelectTab = vi.fn();
+    render(<SidebarNav {...base} automationMode={{ tab: 'automations', onSelectTab, onBack: () => {} }} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Activity' }));
+    expect(onSelectTab).toHaveBeenCalledWith('activity');
   });
 
   it('calls onSelectTab when a row is clicked', () => {

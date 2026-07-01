@@ -1,17 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import { RefreshCw } from 'lucide-react';
-import type { ContextGraph, GraphNode } from '@zclaudia/shared';
-import { fetchContextGraph } from '../../services/api/context-graph';
+import type { GraphNode } from '@zclaudia/shared';
 import { useSelectionStore } from '../../stores/selectionStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
 import { useOwnershipStore } from '../../stores/ownershipStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { useToastStore } from '../../stores/toastStore';
 import { computeLayout } from './layout';
 import { laneColor } from './nodeGlyphs';
 import { LineageGraph } from './LineageGraph';
 import { LineageEmptyState } from './LineageEmptyState';
+import { useLineageStore } from './lineageStore';
 
 export function LineagePanel() {
   const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
@@ -19,30 +18,10 @@ export function LineagePanel() {
   const sessions = useProjectStore((s) => s.sessions);
   const requestMessageJump = useUIStore((s) => s.requestMessageJump);
   const { selectSession } = useSelectionCoordinator();
+  const graph = useLineageStore((s) => s.graph);
+  const reload = useLineageStore((s) => s.reload);
 
-  const [graph, setGraph] = useState<ContextGraph | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const reqIdRef = useRef(0);
-
-  const reload = useCallback(async () => {
-    if (!selectedSessionId) { setGraph(null); return; }
-    const myReq = ++reqIdRef.current;
-    setLoading(true);
-    try {
-      const next = await fetchContextGraph(selectedSessionId);
-      if (reqIdRef.current === myReq) setGraph(next);
-    } catch {
-      if (reqIdRef.current === myReq) {
-        useToastStore.getState().add({ type: 'error', title: 'Lineage for this session is unavailable' });
-        setGraph(null);
-      }
-    } finally {
-      if (reqIdRef.current === myReq) setLoading(false);
-    }
-  }, [selectedSessionId]);
-
-  useEffect(() => { void reload(); }, [reload, sessions]);
+  useEffect(() => { void reload(selectedSessionId); }, [reload, selectedSessionId, sessions]);
 
   const onNodeClick = useCallback((node: GraphNode) => {
     const messageId = node.jump.messageId;
@@ -54,31 +33,19 @@ export function LineagePanel() {
 
   const layout = graph ? computeLayout(graph) : null;
   const isLinear = !!graph && graph.sessions.length <= 1 && graph.forkEdges.length === 0;
+  const laneColorOf = useCallback(
+    (sid: string) => laneColor(graph?.sessions.find((s) => s.id === sid)?.laneOrder ?? 0),
+    [graph],
+  );
 
   return (
     <div className="flex h-full flex-col bg-card">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-border">
-        <span className="text-sm font-semibold text-foreground">Lineage</span>
-        {graph && (
-          <span className="ml-auto text-[11px] text-muted-foreground">
-            {graph.sessions.length} session{graph.sessions.length > 1 ? 's' : ''}
-          </span>
-        )}
-        <button
-          aria-label="Refresh lineage"
-          className={graph ? '' : 'ml-auto'}
-          onClick={() => void reload()}
-          disabled={loading}
-        >
-          <RefreshCw size={14} className={loading ? 'animate-spin text-muted-foreground' : 'text-muted-foreground'} />
-        </button>
-      </div>
       <div className="flex-1 overflow-auto">
         {layout && layout.nodes.length > 0 && (
           <LineageGraph
             model={layout}
             onNodeClick={onNodeClick}
-            laneColorOf={(sid) => laneColor(graph!.sessions.find((s) => s.id === sid)?.laneOrder ?? 0)}
+            laneColorOf={laneColorOf}
           />
         )}
         {graph && isLinear && <LineageEmptyState />}
@@ -88,6 +55,32 @@ export function LineagePanel() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+export function LineageActions() {
+  const selectedSessionId = useSelectionStore((s) => s.selectedSessionId);
+  const graph = useLineageStore((s) => s.graph);
+  const loading = useLineageStore((s) => s.loading);
+  const reload = useLineageStore((s) => s.reload);
+
+  return (
+    <div className="flex items-center gap-2">
+      {graph && (
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {graph.sessions.length} session{graph.sessions.length > 1 ? 's' : ''}
+        </span>
+      )}
+      <button
+        aria-label="Refresh lineage"
+        title="Refresh lineage"
+        onClick={() => void reload(selectedSessionId)}
+        disabled={loading}
+        className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-60"
+      >
+        <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+      </button>
     </div>
   );
 }

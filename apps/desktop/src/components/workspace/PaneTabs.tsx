@@ -1,5 +1,5 @@
-import { Fragment, useState, useRef } from 'react';
-import { X, Plus } from 'lucide-react';
+import { Fragment, useState, useRef, useEffect, useCallback } from 'react';
+import { X, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useRightWorkspaceStore, type PaneNode, type ToolRef } from '../../stores/rightWorkspaceStore';
 import { usePluginStore } from '../../stores/pluginStore';
 import { iconForPanel } from '../rightSidebarToolIcons';
@@ -23,6 +23,42 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
   const [launcherOpen, setLauncherOpen] = useState(false);
   const launcherRef = useRef<HTMLDivElement>(null);
 
+  // Soft fade at the tab-list edges when tabs overflow (e.g. a narrow pane), so the
+  // scrolled-off tabs melt into the trailing action area instead of hard-cutting.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [canScroll, setCanScroll] = useState({ left: false, right: false });
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanScroll({
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft < el.scrollWidth - el.clientWidth - 1,
+    });
+  }, []);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    updateScrollState();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(updateScrollState);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [pane.tools.length, updateScrollState]);
+  // No-wheel affordance: chevron buttons on the overflow edges scroll the tab list
+  // by roughly a page so tabs stay reachable without a scroll wheel / trackpad.
+  const scrollByStep = (dir: 1 | -1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * Math.max(120, el.clientWidth * 0.7), behavior: 'smooth' });
+  };
+  const maskStyle =
+    canScroll.left || canScroll.right
+      ? {
+          maskImage: `linear-gradient(to right, ${canScroll.left ? 'transparent, black 16px' : 'black'}, ${canScroll.right ? 'black calc(100% - 16px), transparent' : 'black'})`,
+          WebkitMaskImage: `linear-gradient(to right, ${canScroll.left ? 'transparent, black 16px' : 'black'}, ${canScroll.right ? 'black calc(100% - 16px), transparent' : 'black'})`,
+        }
+      : undefined;
+
   const activePanel = panels.find((p) => p.id === pane.activeToolId);
 
   const onActivate = (ref: ToolRef) =>
@@ -40,8 +76,15 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
       className={`flex items-stretch px-1 h-8 border-b border-border/50 flex-shrink-0 select-none ${focused ? '' : 'opacity-90'}`}
     >
       {/* Only the tab list scrolls; the launcher + drag spacer stay outside so the
-          launcher dropdown isn't clipped by overflow (overflow-x:auto → overflow-y:auto). */}
-      <div className="flex items-stretch gap-0.5 min-w-0 overflow-x-auto">
+          launcher dropdown isn't clipped by overflow (overflow-x:auto → overflow-y:auto).
+          The relative wrapper hosts the edge chevrons that overlay the faded edges. */}
+      <div className="relative flex min-w-0">
+      <div
+        ref={scrollRef}
+        onScroll={updateScrollState}
+        style={maskStyle}
+        className="flex items-stretch gap-0.5 min-w-0 flex-1 overflow-x-auto scrollbar-hidden"
+      >
       {pane.tools.map((ref, index) => {
         const panel = panels.find((p) => p.id === ref.toolId);
         const Icon = iconForPanel(ref.toolId);
@@ -91,6 +134,27 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
         <div className="w-0.5 my-1.5 rounded bg-foreground/60 flex-shrink-0" />
       )}
       </div>
+      {canScroll.left && (
+        <button
+          aria-label="Scroll tabs left"
+          title="Scroll tabs left"
+          onClick={() => scrollByStep(-1)}
+          className="absolute inset-y-0 left-0 z-10 flex items-center pl-0.5 pr-2 bg-gradient-to-r from-card via-card/90 to-transparent text-muted-foreground hover:text-foreground"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+      )}
+      {canScroll.right && (
+        <button
+          aria-label="Scroll tabs right"
+          title="Scroll tabs right"
+          onClick={() => scrollByStep(1)}
+          className="absolute inset-y-0 right-0 z-10 flex items-center pr-0.5 pl-2 bg-gradient-to-l from-card via-card/90 to-transparent text-muted-foreground hover:text-foreground"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      )}
+      </div>
 
       <div className="relative flex items-center" ref={launcherRef}>
         <button
@@ -115,7 +179,7 @@ export function PaneTabs({ sessionId, pane, focused, projectId }: PaneTabsProps)
       {/* Active tool's action buttons (search, reload, …) — re-homed here from the
           old per-pane header that the tab strip replaced. */}
       {activePanel?.actions ? (
-        <div className="flex items-center flex-shrink-0 pr-0.5">
+        <div data-pane-actions className="ml-auto flex items-center flex-shrink-0 pr-0.5">
           <PanelActions panel={activePanel} projectId={projectId} />
         </div>
       ) : null}

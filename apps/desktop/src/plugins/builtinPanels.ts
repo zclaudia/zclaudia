@@ -15,7 +15,7 @@ import { DraftActions } from '../components/draft/DraftActions';
 import { NotificationsPanel } from '../components/notifications/NotificationsPanel';
 import { ChangesPanel } from '../features/changes/ChangesPanel';
 import { MemoryPanel } from '../features/memory/MemoryPanel';
-import { LineagePanel } from '../features/lineage/LineagePanel';
+import { LineageActions, LineagePanel } from '../features/lineage/LineagePanel';
 import { GitSidebarPanel } from '../features/git/components/GitSidebarPanel';
 import { useTerminalStore } from '../stores/terminalStore';
 import { useFileViewerStore } from '../stores/fileViewerStore';
@@ -31,6 +31,7 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'terminal',
     pluginId: 'com.claudia.terminal',
+    builtin: true,
     type: 'panel',
     label: 'Terminal',
     icon: 'Terminal',
@@ -65,6 +66,7 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'file-viewer',
     pluginId: 'com.claudia.file-viewer',
+    builtin: true,
     type: 'panel',
     label: 'File',
     icon: 'File',
@@ -85,6 +87,7 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'draft',
     pluginId: 'com.claudia.draft',
+    builtin: true,
     type: 'panel',
     label: 'Draft',
     icon: 'FileEdit',
@@ -105,6 +108,7 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'session-changes',
     pluginId: 'com.claudia.changes',
+    builtin: true,
     type: 'panel',
     label: 'Changes',
     icon: 'FileDiff',
@@ -124,6 +128,7 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'memory',
     pluginId: 'com.claudia.memory',
+    builtin: true,
     type: 'panel',
     label: 'Memory',
     icon: 'Brain',
@@ -142,6 +147,7 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'notifications',
     pluginId: 'com.claudia.notifications',
+    builtin: true,
     type: 'panel',
     label: 'Notifications',
     icon: 'Activity',
@@ -162,10 +168,12 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'lineage',
     pluginId: 'com.claudia.lineage',
+    builtin: true,
     type: 'panel',
     label: 'Lineage',
     icon: 'GitFork',
     component: LineagePanel,
+    actions: LineageActions,
     order: 6,
     platforms: ['desktop'],
     defaultPlacement: 'right',
@@ -180,6 +188,7 @@ export function initBuiltinPanels() {
   registerPanel({
     id: 'git',
     pluginId: 'com.zclaudia.git',
+    builtin: true,
     type: 'panel',
     label: 'Git',
     icon: 'GitBranch',

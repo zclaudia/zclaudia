@@ -7,11 +7,12 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { Zap, Clock, History, Server } from 'lucide-react';
+import { Zap, Blocks, Workflow, History, Server } from 'lucide-react';
 import { useAutomationApi } from './useAutomationApi';
 import type { ProjectInfo, AutomationTab } from './automation-types';
 import { isInternalProject } from './automation-types';
 import { AutomationsTab } from './AutomationsTab';
+import { ActivityTab } from './ActivityTab';
 import { AutomationWorkflowDetail } from './AutomationWorkflowDetail';
 import { RunsTab } from './RunsTab';
 import { SystemTasksTab } from './SystemTasksTab';
@@ -24,7 +25,8 @@ interface AutomationContentProps {
 
 const TAB_META: Record<AutomationTab, { label: string; Icon: typeof Zap }> = {
   automations: { label: 'Automations', Icon: Zap },
-  workflows: { label: 'Workflows', Icon: Clock },
+  activity: { label: 'Activity', Icon: Blocks },
+  workflows: { label: 'Workflows', Icon: Workflow },
   runs: { label: 'Runs', Icon: History },
   system: { label: 'System', Icon: Server },
 };
@@ -71,6 +73,7 @@ export function AutomationContent({ tab, projectId, backendId }: AutomationConte
             projectId={projectId}
           />
         )}
+        {tab === 'activity' && <ActivityTab key={`activity-${scopeKey}`} api={api} />}
         {tab === 'workflows' && (
           <AutomationWorkflowDetail
             key={`workflows-${scopeKey}`}

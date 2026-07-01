@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, fireEvent, screen } from '@testing-library/react';
 import { usePluginStore } from '../../../stores/pluginStore';
 import { useRightWorkspaceStore } from '../../../stores/rightWorkspaceStore';
@@ -73,7 +73,7 @@ describe('PaneTabs', () => {
     expect(scroller).toBeTruthy();
     // The launcher menu drops below the strip; if it lives under the overflow-scroll
     // element, that element clips it (overflow-x:auto forces overflow-y:auto).
-    expect(scroller!.contains(addBtn)).toBe(false);
+    expect(scroller?.contains(addBtn)).toBe(false);
   });
 
   it('exposes a trailing window-drag region (strip is the topmost row)', () => {
@@ -96,6 +96,25 @@ describe('PaneTabs', () => {
     expect(getByLabelText('Tool action')).toBeTruthy();
   });
 
+  it("pins the active tool's action area to the right edge of the strip", () => {
+    const Actions = () => <button aria-label="Tool action">A</button>;
+    usePluginStore.setState({
+      panels: [
+        { id: 'memory', pluginId: 'x', type: 'panel', label: 'Memory' },
+        { id: 'file-viewer', pluginId: 'x', type: 'panel', label: 'Files', actions: Actions },
+      ] as any,
+      disabledBuiltinPanels: [],
+    });
+    const pane = seedPane(); // active = file-viewer
+    const { container } = render(<PaneTabs sessionId="A" pane={pane} focused />);
+    const strip = container.querySelector('[data-tab-strip]') as HTMLElement;
+    const actions = container.querySelector('[data-pane-actions]') as HTMLElement;
+
+    expect(actions).toBeTruthy();
+    expect(strip.lastElementChild).toBe(actions);
+    expect(actions.className).toContain('ml-auto');
+  });
+
   it('shows only the active tool\'s actions, not an inactive tab\'s', () => {
     const Actions = () => <button aria-label="Tool action">A</button>;
     usePluginStore.setState({
@@ -111,5 +130,32 @@ describe('PaneTabs', () => {
     const pane = useRightWorkspaceStore.getState().bySession.A.root as any;
     const { queryByLabelText } = render(<PaneTabs sessionId="A" pane={pane} focused />);
     expect(queryByLabelText('Tool action')).toBeNull();
+  });
+
+  it('shows edge scroll chevrons only for the overflowing side, and clicking scrolls', () => {
+    const pane = seedPane();
+    const { container, getByLabelText, queryByLabelText } = render(
+      <PaneTabs sessionId="A" pane={pane} focused />,
+    );
+    const scroller = container.querySelector('.overflow-x-auto') as HTMLElement;
+    const scrollBy = vi.fn();
+    scroller.scrollBy = scrollBy as any;
+    // jsdom has no layout: fake an overflowing, scrolled-to-start tab list.
+    Object.defineProperty(scroller, 'scrollWidth', { configurable: true, value: 500 });
+    Object.defineProperty(scroller, 'clientWidth', { configurable: true, value: 100 });
+    scroller.scrollLeft = 0;
+    fireEvent.scroll(scroller);
+
+    // At the start edge: only the right chevron is offered.
+    expect(queryByLabelText('Scroll tabs left')).toBeNull();
+    fireEvent.click(getByLabelText('Scroll tabs right'));
+    expect(scrollBy).toHaveBeenCalledWith(expect.objectContaining({ left: expect.any(Number) }));
+    expect(scrollBy.mock.calls[0][0].left).toBeGreaterThan(0);
+
+    // Scrolled into the middle: both edges are reachable.
+    scroller.scrollLeft = 200;
+    fireEvent.scroll(scroller);
+    expect(queryByLabelText('Scroll tabs left')).not.toBeNull();
+    expect(queryByLabelText('Scroll tabs right')).not.toBeNull();
   });
 });

@@ -87,6 +87,12 @@ export interface UIExtension {
    *  have their own dedicated entry point elsewhere (e.g. Notifications opens via
    *  the sidebar bell modal). Still registered so it can render when opened. */
   hideFromLauncher?: boolean;
+  /** Marks a first-party built-in panel (registered by initBuiltinPanels), as
+   *  opposed to a server/third-party plugin panel. This is the single source of
+   *  truth for the Settings → Plugins "Built-in" management list, which derives
+   *  from `panels.filter(p => p.builtin)`. Set it right where you register a
+   *  built-in panel so a new tool can never drift out of management. */
+  builtin?: boolean;
 }
 
 export interface PluginNotchTab {

@@ -38,7 +38,8 @@ vi.mock('../../../stores/toastStore', () => ({
   useToastStore: { getState: () => ({ add }) },
 }));
 
-import { LineagePanel } from '../LineagePanel';
+import { LineageActions, LineagePanel } from '../LineagePanel';
+import { useLineageStore } from '../lineageStore';
 
 const linearGraph = {
   rootSessionId: 'S0', focusSessionId: 'S0', truncated: false, forkEdges: [],
@@ -57,6 +58,7 @@ describe('LineagePanel', () => {
     selectSession.mockReset();
     add.mockReset();
     selectedSessionId = 'S0';
+    useLineageStore.getState().reset();
   });
 
   it('fetches and renders the graph for the selected session', async () => {
@@ -64,6 +66,15 @@ describe('LineagePanel', () => {
     const { getByTestId } = render(<LineagePanel />);
     await waitFor(() => expect(fetchContextGraph).toHaveBeenCalledWith('S0'));
     await waitFor(() => expect(getByTestId('lineage-node-S0:r')).toBeTruthy());
+  });
+
+  it('does not render an internal toolbar inside the graph panel', async () => {
+    fetchContextGraph.mockResolvedValue(linearGraph);
+    const { queryByLabelText, queryByText, getByTestId } = render(<LineagePanel />);
+    await waitFor(() => expect(getByTestId('lineage-node-S0:r')).toBeTruthy());
+
+    expect(queryByText('Lineage')).toBeNull();
+    expect(queryByLabelText('Refresh lineage')).toBeNull();
   });
 
   it('jumps via requestMessageJump + selectSession on node click', async () => {
@@ -77,10 +88,27 @@ describe('LineagePanel', () => {
 
   it('manual refresh re-fetches', async () => {
     fetchContextGraph.mockResolvedValue(linearGraph);
-    const { getByLabelText } = render(<LineagePanel />);
+    const { getByLabelText } = render(
+      <>
+        <LineagePanel />
+        <LineageActions />
+      </>,
+    );
     await waitFor(() => expect(fetchContextGraph).toHaveBeenCalledTimes(1));
     fireEvent.click(getByLabelText('Refresh lineage'));
     await waitFor(() => expect(fetchContextGraph).toHaveBeenCalledTimes(2));
+  });
+
+  it('renders the session count in the top actions', async () => {
+    fetchContextGraph.mockResolvedValue(linearGraph);
+    const { getByText, getByTestId } = render(
+      <>
+        <LineagePanel />
+        <LineageActions />
+      </>,
+    );
+    await waitFor(() => expect(getByTestId('lineage-node-S0:r')).toBeTruthy());
+    expect(getByText('1 session')).toBeTruthy();
   });
 
   it('toasts when a fetch fails', async () => {

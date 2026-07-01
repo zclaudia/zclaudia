@@ -903,10 +903,9 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
   const metadataThinkingBlocks = !isUser && !isSystem ? message.metadata?.thinkingBlocks : undefined;
   const hasMetadataThinking = Boolean(metadataThinkingBlocks && metadataThinkingBlocks.length > 0);
 
-  // Hover state for the message actions menu
-  const [hovered, setHovered] = useState(false);
-
-  // Show the actions menu when the message has a treeEntryId and callbacks are provided
+  // Show the actions menu when the message has a treeEntryId and callbacks are provided.
+  // Rendered unconditionally (not hover-gated) so it doesn't reflow the timestamp row
+  // on hover — the trigger is a low-contrast icon that only fills in on hover.
   const showActionsMenu = Boolean(message.treeEntryId && onFork && onBranch);
 
   if (useSegmented) {
@@ -922,8 +921,6 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
       <div
         data-role={message.role}
         className="relative flex flex-col items-start min-w-0 max-w-full group/msgitem"
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
       >
         {hasMetadataThinking && (
           <div className="w-full max-w-full md:max-w-3xl lg:max-w-4xl xl:max-w-5xl min-w-0">
@@ -942,7 +939,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         />
         <div className="mt-1 flex items-center gap-2 px-3">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
-          {showActionsMenu && hovered && (
+          {showActionsMenu && (
             <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor="left" canBranch={!isLeaf} />
           )}
         </div>
@@ -956,8 +953,6 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
       className={`relative flex flex-col min-w-0 ${isUser ? 'items-end' : 'items-start'} ${
         isSystem ? 'opacity-60' : ''
       }`}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
     >
       {/* Structured thinking blocks from metadata (pi-runtime) */}
       {hasMetadataThinking && (
@@ -1029,7 +1024,7 @@ const MessageItem = memo(function MessageItem({ message, streamingContentBlocks,
         )}
         <div className="mt-1 flex items-center gap-2">
           <span className="text-xs opacity-50">{formatMessageTimestamp(message.createdAt)}</span>
-          {showActionsMenu && hovered && (
+          {showActionsMenu && (
             <MessageActionsMenu treeEntryId={message.treeEntryId!} onFork={onFork!} onBranch={onBranch!} anchor={isUser ? 'right' : 'left'} canBranch={!isLeaf} />
           )}
         </div>

@@ -114,13 +114,13 @@ describe('RightSidebarEmptyState', () => {
   it('shows the changes count when there are changes', () => {
     changesMock.mockReturnValue([{}, {}, {}]);
     renderEmpty();
-    expect(screen.getByText('3 files to review')).toBeInTheDocument();
+    expect(screen.getByText('Changes').closest('button')).toHaveAttribute('title', '3 files to review');
   });
 
   it('hides the changes count and uses the static subtitle at zero', () => {
     renderEmpty();
     expect(screen.queryByText(/to review/)).toBeNull();
-    expect(screen.getByText('View session changes')).toBeInTheDocument();
+    expect(screen.getByText('Changes').closest('button')).toHaveAttribute('title', 'View session changes');
   });
 
   it('moves the changes tile to the front when there are changes', () => {

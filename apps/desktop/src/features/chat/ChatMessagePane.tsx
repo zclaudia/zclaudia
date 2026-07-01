@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback, useMemo, memo, type RefObject } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo, memo, type RefObject } from 'react';
 import { Loader2, AlertTriangle, ArrowDown } from 'lucide-react';
 import { MessageList } from './MessageList';
 import { ToolCallList } from './tool-call/ToolCallList';
@@ -171,6 +171,19 @@ export const ChatMessagePane = memo(function ChatMessagePane({
     scrollToBottom(instant);
   }, [scrollToBottom]);
 
+  // Soft fade where the message list meets the header (top) and the composer
+  // (bottom): content dissolves into that chrome instead of hard-cutting. Only
+  // fade an edge when there's content beyond it, so the newest message stays
+  // crisp when scrolled to the bottom and the first when scrolled to the top.
+  const [edgeFade, setEdgeFade] = useState({ top: false, bottom: false });
+  const updateEdgeFade = useCallback(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const top = el.scrollTop > 4;
+    const bottom = el.scrollTop < el.scrollHeight - el.clientHeight - 4;
+    setEdgeFade((prev) => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }));
+  }, [messagesContainerRef]);
+
   const handleMessagesScroll = useCallback(() => {
     const container = messagesContainerRef.current;
     if (container) {
@@ -188,8 +201,28 @@ export const ChatMessagePane = memo(function ChatMessagePane({
 
       lastObservedScrollTopRef.current = currentScrollTop;
     }
+    updateEdgeFade();
     handleScroll();
-  }, [handleScroll, messagesContainerRef, updateStickToBottom]);
+  }, [handleScroll, messagesContainerRef, updateStickToBottom, updateEdgeFade]);
+
+  useEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    updateEdgeFade();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(updateEdgeFade);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [messagesContainerRef, updateEdgeFade, sessionMessages.length, initialLoadDone]);
+  const FADE_PX = 32;
+  const edgeMaskStyle = edgeFade.top || edgeFade.bottom
+    ? (() => {
+        const mask = `linear-gradient(to bottom, ${
+          edgeFade.top ? `transparent, black ${FADE_PX}px` : 'black'
+        }, ${edgeFade.bottom ? `black calc(100% - ${FADE_PX}px), transparent` : 'black'})`;
+        return { maskImage: mask, WebkitMaskImage: mask };
+      })()
+    : undefined;
 
   const handleJumpToBottom = useCallback(() => {
     shouldStickToBottomRef.current = true;
@@ -262,13 +295,22 @@ export const ChatMessagePane = memo(function ChatMessagePane({
   }, [promptInteractions.length, planReviewInteractions.length, initialLoadDone, scrollToBottom]);
 
   return (
+    <div className={collapsed ? 'hidden' : 'relative flex-1 flex flex-col min-h-0'}>
     <div
       ref={messagesContainerRef}
-      className={
-        collapsed
-          ? 'hidden'
-          : 'flex-1 overflow-y-auto overflow-x-hidden pl-2 pr-3 py-2 md:p-4 relative min-h-0'
+      // Which edges are currently faded (see edgeMaskStyle). Exposed for tests since
+      // jsdom can't parse the calc() mask gradient to assert on the computed style.
+      data-edge-fade={
+        edgeFade.top && edgeFade.bottom
+          ? 'both'
+          : edgeFade.top
+            ? 'top'
+            : edgeFade.bottom
+              ? 'bottom'
+              : undefined
       }
+      className="flex-1 overflow-y-auto overflow-x-hidden pl-2 pr-3 py-2 md:p-4 relative min-h-0"
+      style={edgeMaskStyle}
       onScroll={handleMessagesScroll}
       onWheel={(e) => handleMessageWheel(e.deltaY)}
     >
@@ -386,11 +428,12 @@ export const ChatMessagePane = memo(function ChatMessagePane({
 
       <div ref={messagesEndRef} />
       </div>
+      </div>
 
       {showScrollToBottom && (
         <button
           onClick={handleJumpToBottom}
-          className="sticky bottom-4 float-right mr-2 z-10 w-9 h-9 rounded-full bg-muted/90 border border-border shadow-md flex items-center justify-center hover:bg-muted transition-colors"
+          className="absolute bottom-4 right-2 z-10 w-9 h-9 rounded-full bg-muted/90 border border-border shadow-md flex items-center justify-center hover:bg-muted transition-colors"
           aria-label="Scroll to bottom"
         >
           <ArrowDown size={16} strokeWidth={1.5} className="text-foreground" />

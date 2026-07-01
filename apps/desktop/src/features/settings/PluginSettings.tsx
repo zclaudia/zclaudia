@@ -10,15 +10,6 @@ import { usePluginStore, selectPluginPanels } from '../../stores/pluginStore';
 import type { InstalledPlugin, PluginStatus, UIExtension } from '../../stores/pluginStore';
 import { getBaseUrl, fetchAndSyncPlugins } from '../../services/api';
 
-/** Plugin IDs hardcoded in builtinPanels.ts — only these count as built-in */
-const BUILTIN_PLUGIN_IDS = new Set([
-  'com.claudia.terminal',
-  'com.claudia.file-viewer',
-  'com.claudia.draft',
-  'com.claudia.changes',
-  'com.claudia.notifications',
-]);
-
 // Status badge colors — using semantic theme tokens
 const statusColors: Record<PluginStatus, string> = {
   idle: 'bg-muted-foreground/20 text-muted-foreground',
@@ -51,7 +42,9 @@ export function PluginSettings({ onOpenPluginSettings }: PluginSettingsProps) {
     toggleBuiltinPanel,
   } = usePluginStore();
   const allPanels = usePluginStore(selectPluginPanels);
-  const builtinPanels = allPanels.filter((p) => BUILTIN_PLUGIN_IDS.has(p.pluginId));
+  // Built-in panels self-identify via the `builtin` flag set at registration in
+  // builtinPanels.ts, so newly-added tools appear here automatically (no separate list).
+  const builtinPanels = allPanels.filter((p) => p.builtin);
 
   const [searchQuery, setSearchQuery] = useState('');
 

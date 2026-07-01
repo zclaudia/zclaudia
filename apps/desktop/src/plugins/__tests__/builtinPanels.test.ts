@@ -28,6 +28,7 @@ vi.mock('../../features/memory/MemoryPanel', () => ({
 }));
 vi.mock('../../features/lineage/LineagePanel', () => ({
   LineagePanel: () => null,
+  LineageActions: () => null,
 }));
 vi.mock('../../features/git/components/GitSidebarPanel', () => ({
   GitSidebarPanel: () => null,
@@ -81,6 +82,24 @@ describe('initBuiltinPanels', () => {
     );
   });
 
+  it('flags every registered panel as builtin so it appears in the management list', async () => {
+    // The Settings "Built-in" list derives from panels.filter(p => p.builtin). Every
+    // panel registered here is first-party, so all must carry the flag — this catches a
+    // new tool being added without `builtin: true` (which would silently drop it from
+    // management), the drift that hid Memory/Lineage/Git before.
+    const registerSpy = vi.fn();
+    usePluginStore.setState({ registerPanel: registerSpy } as any);
+
+    const { initBuiltinPanels } = await import('../builtinPanels');
+    initBuiltinPanels();
+
+    const unflagged = registerSpy.mock.calls
+      .map(([panel]) => panel)
+      .filter((panel) => panel.builtin !== true)
+      .map((panel) => panel.pluginId);
+    expect(unflagged).toEqual([]);
+  });
+
   it('places terminal, file-viewer, draft, and session-changes in the right sidebar by default', async () => {
     const registerSpy = vi.fn();
     usePluginStore.setState({ registerPanel: registerSpy } as any);
@@ -108,6 +127,7 @@ describe('initBuiltinPanels', () => {
         pluginId: 'com.claudia.lineage',
         platforms: ['desktop'],
         component: expect.any(Function),
+        actions: expect.any(Function),
       }),
     );
   });

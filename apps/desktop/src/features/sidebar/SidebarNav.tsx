@@ -1,4 +1,4 @@
-import { Home, Workflow, Zap, Clock, History, Server, ArrowLeft } from 'lucide-react';
+import { Home, Workflow, Zap, Blocks, History, Server, ArrowLeft } from 'lucide-react';
 import type { AutomationTab } from '../automation/automation-types';
 
 export interface SidebarAutomationNavMode {
@@ -21,7 +21,8 @@ interface SidebarNavProps {
 
 const AUTOMATION_TABS: { key: AutomationTab; label: string; Icon: typeof Zap }[] = [
   { key: 'automations', label: 'Automations', Icon: Zap },
-  { key: 'workflows', label: 'Workflows', Icon: Clock },
+  { key: 'activity', label: 'Activity', Icon: Blocks },
+  { key: 'workflows', label: 'Workflows', Icon: Workflow },
   { key: 'runs', label: 'Runs', Icon: History },
   { key: 'system', label: 'System', Icon: Server },
 ];
@@ -85,7 +86,7 @@ export function SidebarNav({ onHome, isHomeActive, onOpenAutomations, automation
           aria-label="Automations"
           className={`${rowBase} text-muted-foreground`}
         >
-          <Workflow className={iconSize} strokeWidth={1.75} />
+          <Zap className={iconSize} strokeWidth={1.75} />
           Automations
         </button>
       )}
