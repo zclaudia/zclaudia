@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, RefreshCw, Play, Pause, Trash2, FolderOpen, Globe } from 'lucide-react';
-import type { Automation, Workflow } from '@zclaudia/shared';
-import type { WorkflowStepTypeMeta } from '@zclaudia/shared';
+import type { Automation, Workflow, WorkflowStepTypeMeta } from '@zclaudia/shared';
 import type { AutomationApiType } from './useAutomationApi';
 import type { AutomationItem } from './automation-types';
 import { automationToItem } from './automation-types';

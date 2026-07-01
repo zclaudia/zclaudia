@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ActivityRegistry } from '../registry.js';
+import { GitCommitActivity } from '../git/git-commit.js';
+import { GitStageActivity } from '../git/git-stage.js';
 import type { Activity, ActivityServices } from '../types.js';
 
 const services: ActivityServices = { agentLoopRunner: {} as never };
@@ -61,5 +63,18 @@ describe('ActivityRegistry', () => {
         source: 'activity',
       },
     ]);
+  });
+
+  it('GitCommitActivity has supportsLoop:true in listMeta; GitStageActivity does not', () => {
+    const r = new ActivityRegistry();
+    r.register(new GitCommitActivity());
+    r.register(new GitStageActivity());
+    const meta = r.listMeta();
+    const commitMeta = meta.find((m) => m.type === 'git_commit');
+    const stageMeta = meta.find((m) => m.type === 'git_stage');
+    expect(commitMeta).toBeDefined();
+    expect(commitMeta?.supportsLoop).toBe(true);
+    expect(stageMeta).toBeDefined();
+    expect(stageMeta?.supportsLoop).toBeUndefined();
   });
 });

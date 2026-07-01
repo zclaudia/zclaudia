@@ -50,7 +50,8 @@ export function NodePalette() {
 
   const categories = useMemo(() => {
     const cats = BUILTIN_STEP_CATEGORIES.map(c => ({ ...c, steps: [...c.steps] }));
-    const pluginSteps = stepTypes.filter(s => s.source !== 'builtin');
+    const builtinTypes = new Set(BUILTIN_STEP_CATEGORIES.flatMap(c => c.steps.map(s => s.type)));
+    const pluginSteps = stepTypes.filter(s => s.source !== 'builtin' && !builtinTypes.has(s.type));
 
     for (const step of pluginSteps) {
       const catLabel = step.category || 'Plugins';

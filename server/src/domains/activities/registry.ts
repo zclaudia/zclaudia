@@ -28,6 +28,7 @@ export class ActivityRegistry {
       icon: a.icon,
       configSchema: a.configSchema,
       source: 'activity',
+      supportsLoop: a.supportsLoop,
     }));
   }
 

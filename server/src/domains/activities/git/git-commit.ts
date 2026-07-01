@@ -28,6 +28,7 @@ export class GitCommitActivity implements Activity<GitCommitInput, GitCommitOutp
   readonly description = 'Stage (by default) and commit changes';
   readonly category = 'Git';
   readonly icon = 'GitCommit';
+  readonly supportsLoop = true;
   readonly configSchema = {
     type: 'object',
     properties: {

@@ -29,5 +29,7 @@ export interface Activity<I = Record<string, unknown>, O = Record<string, unknow
   readonly icon?: string;
   /** Optional JSON-schema metadata; drives config-form rendering and required-key validation. */
   readonly configSchema?: Record<string, unknown>;
+  /** When true, the workflow editor renders loop handles for this step type. */
+  readonly supportsLoop?: boolean;
   invoke(input: I, services: ActivityServices): Promise<ActivityResult<O>>;
 }

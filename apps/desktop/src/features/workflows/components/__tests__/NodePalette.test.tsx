@@ -76,4 +76,18 @@ describe('NodePalette', () => {
     const { container } = render(<NodePalette />);
     expect(container.textContent).toContain('Custom Git Op');
   });
+
+  it('does not duplicate git_commit tile when catalog returns it as source:activity, but still shows new git_stage activity', () => {
+    (useWorkflowStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      stepTypes: [
+        { type: 'git_commit', name: 'Git Commit', source: 'activity', category: 'Git' },
+        { type: 'git_stage', name: 'Git Stage', source: 'activity', category: 'Git' },
+      ],
+    });
+    const { getAllByText, getByText } = render(<NodePalette />);
+    // git_commit must appear exactly once (not duplicated)
+    expect(getAllByText('Git Commit')).toHaveLength(1);
+    // git_stage is genuinely new — it should appear
+    expect(getByText('Git Stage')).toBeTruthy();
+  });
 });
