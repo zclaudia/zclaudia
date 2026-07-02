@@ -50,6 +50,44 @@
     --shadow-xl: 0 8px 32px -4px rgb(0 0 0 / 0.12), 0 4px 8px -2px rgb(0 0 0 / 0.06);
   }
 
+  /* Light theme — cool (counterpart of dark-cool) */
+  .light-cool {
+    /* @generated:tokens light-cool — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */
+    --background: 225 14% 97%;
+    --foreground: 225 12% 10%;
+    --card: 225 16% 99%;
+    --sidebar: 225 12% 93%;
+    --card-foreground: 225 12% 10%;
+    --popover: 225 16% 99%;
+    --popover-foreground: 225 12% 10%;
+    --secondary: 225 10% 90%;
+    --secondary-foreground: 225 10% 20%;
+    --muted: 225 10% 91%;
+    --muted-foreground: 225 6% 43%;
+    --accent: 225 10% 87%;
+    --accent-foreground: 225 10% 20%;
+    --border: 225 9% 86%;
+    --input: 225 9% 86%;
+    --scrollbar-thumb: 225 7% 75%;
+    --scrollbar-thumb-hover: 225 7% 62%;
+    --terminal-bg: 225 10% 95%;
+    --terminal-fg: 225 12% 10%;
+    --primary: 214 70% 45%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 214 70% 45%;
+    --destructive: 4 66% 45%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 150 48% 33%;
+    --success-foreground: 150 40% 97%;
+    --warning: 38 80% 44%;
+    --warning-foreground: 35 80% 12%;
+    --thinking: 265 45% 50%;
+    --thinking-foreground: 265 60% 97%;
+    --terminal-cursor: 214 70% 45%;
+    --terminal-selection: 214 70% 88%;
+    /* @generated:tokens end */
+  }
+
   /* Dark theme — Neutral (default fallback), warm charcoal */
   .dark {
     /* @generated:tokens dark — edit apps/desktop/scripts/tokens/config.mjs, run pnpm gen:tokens */

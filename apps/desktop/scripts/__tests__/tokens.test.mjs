@@ -7,11 +7,12 @@ test('black on white has ~21:1 contrast', () => {
   assert.ok(Math.abs(contrastRatio([0, 0, 0], [0, 0, 100]) - 21) < 0.1);
 });
 
-test('there are exactly four themes with the expected axes', () => {
+test('there are exactly five themes with the expected axes', () => {
   assert.deepEqual(
     themes.map(t => [t.name, t.hue]),
     [
       ['light', 45],
+      ['light-cool', 225],
       ['dark', 35],
       ['dark-warm', 30],
       ['dark-cool', 225],
