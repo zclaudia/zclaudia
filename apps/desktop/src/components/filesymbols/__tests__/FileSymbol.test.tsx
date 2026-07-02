@@ -8,6 +8,7 @@ describe('FileSymbol', () => {
     const svg = container.querySelector('svg');
     expect(svg).not.toBeNull();
     expect(container.innerHTML).toContain('hsl(var(--glyph-');
+    // Attribute-level hex exists only inside <mask> shapes; visible paint is style-attr by construction (enforced by the generator tests).
     expect(container.innerHTML).not.toMatch(/style="[^"]*#[0-9a-fA-F]{6}/);
   });
 

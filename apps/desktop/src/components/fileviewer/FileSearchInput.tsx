@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Search } from 'lucide-react';
 import * as api from '../../services/api';
 import type { FileEntry } from '@zclaudia/shared';
-import { FileTypeIcon } from './fileIcons';
+import { FileSymbol } from '../filesymbols';
 
 interface FileSearchInputProps {
   projectRoot: string;
@@ -137,7 +137,7 @@ export function FileSearchInput({
                     : 'text-foreground hover:bg-secondary/80'
                 }`}
               >
-                <FileTypeIcon
+                <FileSymbol
                   name={name}
                   className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
                 />

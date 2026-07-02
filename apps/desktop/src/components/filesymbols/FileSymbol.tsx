@@ -5,7 +5,8 @@ import { symbolMarkupForFile } from './mapping';
  * --glyph-* theme tokens baked into the generated markup — the sanctioned
  * colored-icon exception in docs/ui-conventions.md §3. The markup is
  * build-time-generated trusted content (gen:symbols), never user input,
- * so dangerouslySetInnerHTML is safe here.
+ * so dangerouslySetInnerHTML is safe here. Callers must size the wrapper
+ * via className or the size prop — the svg has no intrinsic size.
  */
 export function FileSymbol({
   name,

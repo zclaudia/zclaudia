@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Folder, FolderOpen, Loader2 } from 'lucide-react';
 import type { FileEntry } from '@zclaudia/shared';
 import * as api from '../../services/api';
-import { FileTypeIcon } from './fileIcons';
+import { FileSymbol } from '../filesymbols';
 
 interface FileTreeProps {
   projectRoot: string;
@@ -133,7 +133,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
                     <FolderIcon className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                 ) : (
-                  <FileTypeIcon
+                  <FileSymbol
                     name={entry.name}
                     className="flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
                   />

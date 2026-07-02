@@ -32,7 +32,7 @@ import * as api from '../../services/api';
 import { FileSearchInput } from './FileSearchInput';
 import { FileTree } from './FileTree';
 import { MarkdownFileContent } from './MarkdownFileContent';
-import { FileTypeIcon } from './fileIcons';
+import { FileSymbol } from '../filesymbols';
 import { isDesktopTauri } from '../../utils/platform';
 import { openPopoutWindow, buildWindowTitle, getConnectionParams } from '../../utils/popoutWindow';
 import { useProjectStore } from '../../stores/projectStore';
@@ -422,7 +422,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
   const codeTheme = isDarkTheme(resolvedTheme) ? prismThemes.oneDark : prismThemes.oneLight;
   const isMarkdown = lang === 'markdown';
   const headerIcon = filePath ? (
-    <FileTypeIcon
+    <FileSymbol
       name={filePath.split('/').pop() ?? filePath}
       className="flex w-3.5 h-3.5 flex-shrink-0 items-center justify-center [&>svg]:h-3.5 [&>svg]:w-3.5"
     />
