@@ -83,13 +83,13 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
     return (
       <>
         {error && (
-          <div className="px-2 py-1 text-xs text-destructive" style={entryIndent(depth)}>
+          <div className="px-2 py-1 text-sm text-destructive" style={entryIndent(depth)}>
             {error}
           </div>
         )}
         {loading && !entries.length && (
           <div
-            className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground"
+            className="flex items-center gap-2 h-7 px-2 text-sm text-muted-foreground"
             style={entryIndent(depth)}
           >
             <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
@@ -109,7 +109,7 @@ export function FileTree({ projectRoot, backendId, selectedPath, onOpenFile }: F
               <button
                 type="button"
                 onClick={() => (isDirectory ? toggleDirectory(entry.path) : onOpenFile(entry.path))}
-                className={`group w-full flex items-center gap-1.5 px-2 py-1.5 text-left text-xs font-mono min-w-0 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
+                className={`group w-full flex items-center gap-1.5 h-7 px-2 text-left text-sm min-w-0 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
                   isSelected
                     ? 'bg-muted text-foreground shadow-[inset_2px_0_0_hsl(var(--muted-foreground))]'
                     : 'text-muted-foreground hover:bg-secondary/80 hover:text-foreground'

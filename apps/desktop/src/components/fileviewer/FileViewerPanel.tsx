@@ -522,7 +522,7 @@ export function FileViewerPanel({ projectRoot }: FileViewerPanelProps) {
                 const { dirs, file } = breadcrumbSegments(filePath);
                 return (
                   <span
-                    className="flex min-w-0 items-center gap-1 text-xs font-mono truncate"
+                    className="flex min-w-0 items-center gap-1 text-xs truncate"
                     title={filePath}
                   >
                     {dirs.map((dir, i) => (

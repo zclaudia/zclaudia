@@ -131,7 +131,7 @@ export function FileSearchInput({
               <button
                 key={entry.path}
                 onClick={() => handleSelect(entry)}
-                className={`w-full text-left px-3 py-1.5 text-sm font-mono flex items-center gap-2 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
+                className={`w-full text-left h-7 px-3 text-sm flex items-center gap-2 outline-none transition-colors focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
                   idx === selectedIndex
                     ? 'bg-primary/10 text-primary'
                     : 'text-foreground hover:bg-secondary/80'
