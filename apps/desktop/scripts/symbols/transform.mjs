@@ -46,5 +46,5 @@ export function transformSvg(name, svg, colorMap) {
     .join('')
     .replace(/<svg[^>]*>/, root => root.replace(/\s(?:width|height|xmlns)="[^"]*"/g, ''))
     // upstream SVGs are one element per line; collapsing newlines cannot fuse attributes
-    .replace(/\n\s*/g, '');
+    .replace(/\r?\n\s*/g, '');
 }

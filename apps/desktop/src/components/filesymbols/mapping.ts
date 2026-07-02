@@ -1,0 +1,125 @@
+import { SYMBOLS, type SymbolName } from './generated/symbols';
+
+// Exact lowercased basenames, checked first.
+const BASENAMES: Record<string, SymbolName> = {
+  'package.json': 'node',
+  'package-lock.json': 'npm',
+  'pnpm-lock.yaml': 'pnpm',
+  'pnpm-workspace.yaml': 'pnpm',
+  'yarn.lock': 'yarn',
+  'cargo.toml': 'rust',
+  'cargo.lock': 'rust',
+  'go.mod': 'go',
+  'go.sum': 'go',
+  'tauri.conf.json': 'tauri',
+  'claude.md': 'claude',
+  '.nvmrc': 'node',
+  '.npmrc': 'npm',
+  changelog: 'text',
+  contributing: 'text',
+  authors: 'text',
+  notice: 'text',
+};
+
+// Ordered prefix rules on the lowercased basename; first match wins.
+// Tool configs must precede the generic dotfile/.config. fallback.
+const PREFIXES: Array<[string, SymbolName]> = [
+  ['tsconfig', 'tsconfig'],
+  ['.prettierrc', 'prettier'],
+  ['prettier.config.', 'prettier'],
+  ['.eslintrc', 'eslint'],
+  ['eslint.config.', 'eslint'],
+  ['vite.config.', 'vite'],
+  ['vitest.', 'vitest'],
+  ['jest.config.', 'jest'],
+  ['tailwind.config.', 'tailwind'],
+  ['dockerfile', 'docker'],
+  ['docker-compose', 'docker'],
+  ['.git', 'git'],
+  ['.env', 'gear'],
+  ['license', 'license'],
+  ['readme', 'markdown'],
+  ['makefile', 'code-gray'],
+  ['justfile', 'code-gray'],
+  ['rakefile', 'code-gray'],
+];
+
+const EXTENSIONS: Record<string, SymbolName> = {
+  ts: 'ts', mts: 'ts', cts: 'ts',
+  tsx: 'react-ts',
+  js: 'js', mjs: 'js', cjs: 'js',
+  jsx: 'react',
+  py: 'python', pyw: 'python', pyi: 'python',
+  go: 'go',
+  rs: 'rust',
+  rb: 'ruby',
+  php: 'php',
+  java: 'java',
+  kt: 'kotlin', kts: 'kotlin',
+  swift: 'swift',
+  c: 'c',
+  h: 'h',
+  cpp: 'cplus', cc: 'cplus', cxx: 'cplus', hpp: 'cplus',
+  cs: 'csharp',
+  sql: 'database', sqlite: 'database', db: 'database',
+  sh: 'shell', bash: 'shell', zsh: 'shell', fish: 'shell',
+  ps1: 'shell', bat: 'shell', cmd: 'shell',
+  lua: 'lua',
+  dart: 'dart',
+  scala: 'scala', sbt: 'scala',
+  ex: 'elixir', exs: 'elixir',
+  erl: 'erlang',
+  hs: 'haskell',
+  zig: 'zig',
+  html: 'code-orange', htm: 'code-orange',
+  css: 'brackets-purple', less: 'brackets-purple',
+  scss: 'sass', sass: 'sass',
+  vue: 'vue',
+  svelte: 'svelte',
+  astro: 'astro',
+  json: 'brackets-yellow', jsonc: 'brackets-yellow',
+  yaml: 'yaml', yml: 'yaml',
+  toml: 'gear', ini: 'gear', plist: 'gear', conf: 'gear',
+  xml: 'xml',
+  csv: 'csv', tsv: 'csv',
+  lock: 'lock', lockb: 'lock',
+  tf: 'terraform', tfvars: 'terraform',
+  graphql: 'graphql', gql: 'graphql',
+  proto: 'proto',
+  ipynb: 'notebook',
+  md: 'markdown', markdown: 'markdown',
+  mdx: 'mdx',
+  txt: 'text', rtf: 'text', log: 'text', rst: 'text',
+  pdf: 'pdf',
+  png: 'image', jpg: 'image', jpeg: 'image', ico: 'image',
+  webp: 'image', bmp: 'image', avif: 'image', tiff: 'image',
+  gif: 'gif',
+  svg: 'svg',
+  woff: 'font', woff2: 'font', ttf: 'font', otf: 'font', eot: 'font',
+  mp3: 'audio', wav: 'audio', ogg: 'audio', flac: 'audio', m4a: 'audio',
+  mp4: 'video', mov: 'video', avi: 'video', mkv: 'video', webm: 'video',
+  zip: 'compressed', tar: 'compressed', gz: 'compressed', tgz: 'compressed',
+  bz2: 'compressed', '7z': 'compressed', rar: 'compressed', zst: 'compressed',
+};
+
+export function symbolNameForFile(name: string): SymbolName {
+  const lower = name.toLowerCase();
+
+  const exact = BASENAMES[lower];
+  if (exact) return exact;
+
+  for (const [prefix, symbol] of PREFIXES) {
+    if (lower.startsWith(prefix)) return symbol;
+  }
+
+  // Remaining dotfiles and *.config.* are configuration regardless of extension.
+  if (lower.startsWith('.') || lower.includes('.config.')) return 'gear';
+
+  const dot = lower.lastIndexOf('.');
+  const ext = dot > 0 ? lower.slice(dot + 1) : '';
+  return EXTENSIONS[ext] ?? 'document';
+}
+
+export function symbolMarkupForFile(name: string): string {
+  return SYMBOLS[symbolNameForFile(name)];
+}

@@ -12,6 +12,7 @@ node_modules/
 # 生成的文件
 src-tauri/target/
 src-tauri/gen/
+apps/desktop/src/components/filesymbols/generated/
 
 # 测试报告
 playwright-report/
@@ -28,5 +29,3 @@ docs/quality-audit/
 
 # 锁文件
 pnpm-lock.yaml
-
-apps/desktop/src/components/filesymbols/generated/
