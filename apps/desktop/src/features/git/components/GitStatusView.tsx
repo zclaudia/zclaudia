@@ -113,9 +113,7 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Working Tree
-        </span>
+        <span className="text-[11px] font-medium text-muted-foreground">Working tree</span>
         <button
           type="button"
           onClick={() => refresh()}
@@ -173,14 +171,12 @@ export function GitStatusView({ projectId, worktreePath }: GitStatusViewProps) {
 
       <div className="border-t border-border p-3 space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Commit message
-          </span>
+          <span className="text-[11px] font-medium text-muted-foreground">Commit message</span>
           <button
             type="button"
             onClick={generate}
             disabled={generating || !status || status.staged.length === 0}
-            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-muted/60 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors hover:bg-muted/60 disabled:opacity-50 disabled:cursor-not-allowed"
             title={
               status && status.staged.length === 0
                 ? 'Stage files to generate a message'
@@ -249,14 +245,14 @@ function FileSection({
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground">
+        <span className="text-[11px] font-medium text-muted-foreground">
           {title} <span className="text-muted-foreground">({files.length})</span>
         </span>
         {onAll && (
           <button
             type="button"
             onClick={onAll}
-            className="rounded-md px-2 py-0.5 text-[10px] font-medium text-primary transition-colors hover:bg-muted/60"
+            className="rounded-md px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors hover:bg-muted/60"
           >
             {action} all
           </button>
@@ -279,7 +275,7 @@ function FileSection({
                   <ChevronRight
                     className={`h-3 w-3 flex-shrink-0 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                   />
-                  <span className="text-xs font-mono truncate" title={file}>
+                  <span className="text-xs truncate" title={file}>
                     {file}
                   </span>
                 </button>

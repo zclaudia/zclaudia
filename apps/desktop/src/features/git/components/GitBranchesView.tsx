@@ -124,9 +124,7 @@ export function GitBranchesView({
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Branches
-        </span>
+        <span className="text-[11px] font-medium text-muted-foreground">Branches</span>
         <button
           type="button"
           onClick={() => refresh()}
@@ -194,7 +192,7 @@ function BranchSection({
   if (branches.length === 0) return null;
   return (
     <div>
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-foreground mb-1">
+      <div className="text-[11px] font-medium text-muted-foreground mb-1">
         {title} <span className="text-muted-foreground">({branches.length})</span>
       </div>
       <div className="bg-secondary/30 border border-border rounded-lg divide-y divide-border overflow-hidden">

@@ -44,12 +44,12 @@ export function WorktreeDetail({ projectId, worktree, onRefreshList }: WorktreeD
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold truncate">{worktree.branch}</span>
               {worktree.isMain && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-500">
+                <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground">
                   main
                 </span>
               )}
               {worktree.managedBy === 'supervisor' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-500">
+                <span className="text-[10px] px-1.5 py-0.5 rounded border border-border text-muted-foreground">
                   supervisor
                 </span>
               )}

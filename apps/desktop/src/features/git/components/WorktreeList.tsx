@@ -65,7 +65,7 @@ export function WorktreeList({
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <span className="text-[11px] font-medium text-muted-foreground">
           Worktrees ({worktrees.length})
         </span>
         <div className="flex items-center gap-1">
@@ -183,13 +183,13 @@ function WorktreeRow({
         <div className="flex items-center gap-1.5">
           <span className="text-xs font-medium truncate">{worktree.branch}</span>
           {worktree.isMain && (
-            <span className="text-[9px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-500 flex-shrink-0">
+            <span className="text-[9px] px-1 py-0.5 rounded border border-border text-muted-foreground flex-shrink-0">
               main
             </span>
           )}
           {isManaged && (
             <span
-              className="text-[9px] px-1 py-0.5 rounded bg-purple-500/10 text-purple-500 flex-shrink-0 flex items-center gap-0.5"
+              className="text-[9px] px-1 py-0.5 rounded border border-border text-muted-foreground flex-shrink-0 flex items-center gap-0.5"
               title="Managed by Supervisor v2 worktree pool — cannot be deleted manually"
             >
               <Shield className="w-2.5 h-2.5" />

@@ -41,9 +41,7 @@ export function GitLogView({ projectId, worktreePath }: GitLogViewProps) {
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-          Recent Commits
-        </span>
+        <span className="text-[11px] font-medium text-muted-foreground">Recent commits</span>
         <button
           type="button"
           onClick={() => refresh()}
