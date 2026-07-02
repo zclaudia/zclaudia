@@ -88,16 +88,16 @@ export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanel
   }
 
   if (loading) {
-    return <div className="p-4 text-sm opacity-60">Loading…</div>;
+    return <div className="p-4 text-sm text-muted-foreground">Loading…</div>;
   }
 
   if (detail) {
     return (
       <div className="flex flex-col h-full">
-        <div className="flex items-center gap-2 px-2 pt-2 pb-1 border-b border-black/10 dark:border-white/10">
+        <div className="flex items-center gap-2 px-2 pt-2 pb-1 border-b border-border">
           <button
             type="button"
-            className="text-xs px-2 py-0.5 rounded hover:bg-black/5 dark:hover:bg-white/5 opacity-70 hover:opacity-100"
+            className="text-xs px-2 py-0.5 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
             onClick={() => setDetail(null)}
           >
             ← Back
@@ -105,7 +105,7 @@ export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanel
           <span className="text-xs font-medium truncate">{detail.name}</span>
         </div>
         <div className="flex-1 overflow-auto p-2">
-          {detail.loading && <div className="text-sm opacity-60">Loading…</div>}
+          {detail.loading && <div className="text-sm text-muted-foreground">Loading…</div>}
           {detail.error && <div className="text-sm text-red-500">{detail.error}</div>}
           {!detail.loading && !detail.error && detail.content !== null && (
             <pre className="text-xs whitespace-pre-wrap break-words">{detail.content}</pre>
@@ -117,7 +117,7 @@ export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanel
 
   if (!projectId || !memoryDir || entries.length === 0) {
     return (
-      <div className="p-4 text-sm opacity-60">
+      <div className="p-4 text-sm text-muted-foreground">
         No memories yet — the agent saves project memory here as it works.
       </div>
     );
@@ -130,7 +130,7 @@ export function MemoryPanel({ projectId, backendId: propBackendId }: MemoryPanel
           <li key={entry.path}>
             <button
               type="button"
-              className="w-full text-left px-2 py-1 rounded hover:bg-black/5 dark:hover:bg-white/5 text-sm"
+              className="w-full text-left px-2 py-1 rounded hover:bg-secondary text-sm"
               onClick={() => openDetail(entry)}
             >
               {entry.name}

@@ -1,4 +1,5 @@
 import type { NotificationItem as NotificationItemData } from '@zclaudia/shared';
+import { Bot, Clock, Dot, User, X, Zap, type LucideIcon } from 'lucide-react';
 import { useNotificationFeedStore } from '../../stores/notificationFeedStore';
 import { useConnection } from '../../contexts/ConnectionContext';
 import { useSelectionCoordinator } from '../../hooks/useSelectionCoordinator';
@@ -11,11 +12,11 @@ const STATUS_STYLES: Record<string, { dot: string }> = {
   failed: { dot: 'bg-red-500' },
 };
 
-const SOURCE_ICONS: Record<string, string> = {
-  trigger: '\u26A1', // ⚡
-  scheduled: '\u23F0', // ⏰
-  manual: '\u{1F464}', // 👤
-  delegation: '\u{1F916}', // 🤖
+const SOURCE_ICONS: Record<string, LucideIcon> = {
+  trigger: Zap,
+  scheduled: Clock,
+  manual: User,
+  delegation: Bot,
 };
 
 interface NotificationItemProps {
@@ -29,6 +30,7 @@ export function NotificationItem({ item, onDismiss, onAfterSelect }: Notificatio
   const { selectSession } = useSelectionCoordinator();
   const { sendMessage } = useConnection();
   const statusStyle = STATUS_STYLES[item.status] || STATUS_STYLES.running;
+  const SourceIcon = SOURCE_ICONS[item.source] ?? Dot;
   const isUnread = !item.readAt;
 
   const handleClick = () => {
@@ -61,14 +63,7 @@ export function NotificationItem({ item, onDismiss, onAfterSelect }: Notificatio
           onClick={handleDismiss}
           className="absolute top-2 right-2 w-5 h-5 flex items-center justify-center rounded-md text-muted-foreground/40 hover:text-foreground hover:bg-secondary opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
         >
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M6 18L18 6M6 6l12 12"
-            />
-          </svg>
+          <X className="w-3 h-3" strokeWidth={1.75} aria-hidden="true" />
         </span>
       )}
 
@@ -79,8 +74,12 @@ export function NotificationItem({ item, onDismiss, onAfterSelect }: Notificatio
         <div className="flex-1 min-w-0 pr-4">
           {/* Title + source icon + time */}
           <div className="flex items-center gap-1.5">
-            <span className="text-[10px]" title={item.source}>
-              {SOURCE_ICONS[item.source] || '\u2022'}
+            <span title={item.source} className="flex shrink-0">
+              <SourceIcon
+                className="h-3 w-3 text-muted-foreground"
+                strokeWidth={1.75}
+                aria-hidden="true"
+              />
             </span>
             <span
               className={`text-xs truncate flex-1 ${isUnread ? 'font-medium text-foreground' : 'text-muted-foreground'}`}

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Pencil } from 'lucide-react';
 import { ConnectionProvider, useConnection } from '../../contexts/ConnectionContext';
 import { WindowContextBar } from '../window/WindowContextBar';
 import * as api from '../../services/api';
@@ -210,19 +210,11 @@ function DraftWindowContent({ sessionId }: { sessionId: string }) {
         className="flex items-center gap-2 px-3 py-1.5 border-b border-border flex-shrink-0 bg-card"
         data-tauri-drag-region
       >
-        <svg
+        <Pencil
           className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-          />
-        </svg>
+          strokeWidth={1.75}
+          aria-hidden="true"
+        />
         <span className="text-xs font-medium text-muted-foreground truncate" data-tauri-drag-region>
           Draft
         </span>
