@@ -7,18 +7,13 @@
 
 import WebSocket from 'ws';
 import type { SocksProxyAgent } from 'socks-proxy-agent';
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import * as crypto from 'crypto';
-import { newId } from '../../utils/uuid.js';
 import type {
   PeerHelloMessage,
   PeerReadyMessage,
   RegistrySyncPayload,
   BackendPresence,
   RegistrySnapshotMessage,
-  BackendHeartbeatMessage,
   HeartbeatAckMessage,
   StreamDemandMessage,
   BackendResourceSnapshotMessage,
@@ -41,43 +36,10 @@ import type { ProjectItem, SessionItem, SessionMessage } from '@zclaudia/protoco
 import type { GatewayBackendInfo } from '@zclaudia/shared/core/server';
 import type { ClientMessage, ServerMessage } from '@zclaudia/shared/wire/messages';
 import { GatewayBackendDataPublisher } from './gateway-backend-data-publisher.js';
+import { getOrCreateDeviceId } from './gateway-device-id.js';
+import { GatewayHeartbeat } from './gateway-heartbeat.js';
 import { handleHttpProxyRequest } from './gateway-http-proxy.js';
 import { createSocksProxyAgent } from './gateway-proxy-agent.js';
-
-// ============================================================================
-// Config & Device ID
-// ============================================================================
-
-const CONFIG_DIR = process.env.ZCLAUDIA_DATA_DIR
-  ? path.resolve(process.env.ZCLAUDIA_DATA_DIR)
-  : path.join(os.homedir(), '.zclaudia');
-const DEVICE_CONFIG_PATH = path.join(CONFIG_DIR, 'device.json');
-
-interface DeviceConfig {
-  deviceId: string;
-  createdAt: number;
-}
-
-function getOrCreateDeviceId(): string {
-  if (!fs.existsSync(CONFIG_DIR)) {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true });
-  }
-  if (fs.existsSync(DEVICE_CONFIG_PATH)) {
-    try {
-      const config: DeviceConfig = JSON.parse(fs.readFileSync(DEVICE_CONFIG_PATH, 'utf-8'));
-      return config.deviceId;
-    } catch {
-      /* fall through */
-    }
-  }
-  const deviceId = newId();
-  fs.writeFileSync(
-    DEVICE_CONFIG_PATH,
-    JSON.stringify({ deviceId, createdAt: Date.now() }, null, 2)
-  );
-  console.log(`[Gateway] Generated new device ID: ${deviceId}`);
-  return deviceId;
-}
 
 // ============================================================================
 // Types
@@ -277,8 +239,12 @@ export class GatewayClient {
   private connectTimeout: NodeJS.Timeout | null = null;
   private connectTimeoutMs = 15000;
 
-  private heartbeatInterval: NodeJS.Timeout | null = null;
-  private heartbeatIntervalMs = 10_000;
+  private readonly heartbeat = new GatewayHeartbeat({
+    intervalMs: 10_000,
+    canSend: () => !!this.ws && this.isConnected,
+    currentEpoch: () => this.epoch,
+    send: msg => this.sendWs(msg),
+  });
 
   private streamDemandActive = false;
 
@@ -837,35 +803,11 @@ export class GatewayClient {
       console.log(`[Gateway] Connected: peerSessionId=${this.peerSessionId} (no backend)`);
     }
     this.applyRegistrySync(msg.registrySync);
-    this.startHeartbeat();
+    this.heartbeat.start();
     this.publishBackendDataSnapshot();
     this.startBackendDataPush();
     this.flushPendingMessages();
     this.outgoingEvents.onConnectionStateChanged?.(true);
-  }
-
-  // ==========================================================================
-  // Internal — Heartbeat
-  // ==========================================================================
-
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    this.heartbeatInterval = setInterval(() => {
-      if (!this.ws || !this.isConnected || !this.epoch) return;
-      const msg: BackendHeartbeatMessage = {
-        type: 'backend_heartbeat',
-        epoch: this.epoch,
-        observedAt: Date.now(),
-      };
-      this.sendWs(msg);
-    }, this.heartbeatIntervalMs);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval);
-      this.heartbeatInterval = null;
-    }
   }
 
   private handleHeartbeatAck(msg: HeartbeatAckMessage): void {
@@ -1083,7 +1025,7 @@ export class GatewayClient {
       this.outgoingEvents.onOutgoingBackendUnsubscribed?.(backendId, 'peer_disconnected');
     }
     this.subscribedBackends.clear();
-    this.stopHeartbeat();
+    this.heartbeat.stop();
     this.stopBackendDataPush();
     if (wasConnected) this.outgoingEvents.onConnectionStateChanged?.(false);
   }
