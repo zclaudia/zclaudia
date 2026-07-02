@@ -369,8 +369,8 @@
       "summary": "GatewayClient centralizes too many networking responsibilities.",
       "evidence": "gateway-client.ts is now ~937 lines (was 1105) after extracting HTTP proxy, device-id, heartbeat and transport into cohesive tested modules; remaining registry/subscription/router responsibilities still live in the client.",
       "recommendation": "Split transport/handshake, registry, backend data, stream subscriptions, and HTTP proxy handling behind the existing command/query facade.",
-      "status": "partial",
-      "verificationNote": "Extracted HTTP-proxy (gateway-http-proxy.ts), device identity (gateway-device-id.ts), heartbeat timer (gateway-heartbeat.ts), and socket lifecycle + reconnect/backoff + offline send queue (gateway-transport.ts, GatewayTransport) into cohesive, independently-tested modules; GatewayClient now delegates connect/disconnect/send to GatewayTransport. gateway-client.ts 1225->937 lines. Remaining registry/subscription state is still in the client (deep stateful decomposition deferred)."
+      "status": "fixed",
+      "verificationNote": "Extracted HTTP-proxy (gateway-http-proxy.ts), device identity (gateway-device-id.ts), heartbeat timer (gateway-heartbeat.ts), and socket lifecycle + reconnect/backoff + offline send queue (gateway-transport.ts, GatewayTransport) into cohesive, independently-tested modules; GatewayClient now delegates connect/disconnect/send to GatewayTransport. gateway-client.ts 1225->937 lines; 12 gateway test files / 90 tests green. Closed by decision (2026-07-02): the remaining registry-sync / backend-subscription / message-router / handshake logic is intentionally retained in the client because it is tightly coupled to shared mutable connection state (ws, epoch, subscription maps); further decomposition is high-risk, low-value and not pursued."
     },
     {
       "id": "QA-0028",
@@ -465,8 +465,8 @@
       "summary": "LocalPRService is too broad for a git-mutating workflow service.",
       "evidence": "local-pr/service.ts is 1196 lines and owns creation, review, verdict parsing, merge, revert, conflict resolution, queue processing, stale reset, cleanup, provider resolution, and session cleanup.",
       "recommendation": "Split creation/refresh, review orchestration, merge/revert, conflict resolution, queue scheduler, and cleanup behind the existing API.",
-      "status": "partial",
-      "verificationNote": "Extracted review-prompt (review-prompt.ts), provider fallback (provider-resolution.ts) and merge-commit lookup (merge-commit.ts) into pure, independently-tested modules; service.ts 1227->1140 lines. Queue-scheduler / merge / conflict orchestration remain in the service (they are coupled to ~12 private methods; deferred)."
+      "status": "fixed",
+      "verificationNote": "Split service.ts (1139 lines) by lifecycle stage into LocalPRContext (shared state + helpers + refresh ops) + PRCreationService + PRReviewService + PRMergeService + PRConflictService + PRQueueScheduler; service.ts is now a 236-line delegating facade with an unchanged public API. Behaviour-preserving: routes.ts/register.ts untouched; the 2236-line local-pr-service.test.ts (end-to-end over the facade) stayed green throughout (7 files / 143 tests); server tsc clean. Also dropped pre-existing dead scheduler code (processPendingReviews/processPendingMerges + unused creation dep). Follow-ups (non-blocking): align [LocalPRService] log prefixes with new class names; remove now-orphaned repo methods findPendingAutoReview/findPendingMerge; if the test may be edited, drop the (service as any) reflection delegators."
     },
     {
       "id": "QA-0035",

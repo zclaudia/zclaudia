@@ -1,6 +1,6 @@
 # Quality Audit — Remediation Progress
 
-Working branch: `quality-audit/remaining-open` (not yet merged/pushed as of 2026-07-02).
+Working branch: `quality-audit/remaining-open` (merged to `main` on 2026-07-02).
 Source of truth for per-finding status: [findings.json](findings.json).
 
 ## Overall status (55 findings)
@@ -28,35 +28,37 @@ Gates at end of branch: `format:check` pass · `check:architecture` pass · `lin
 warnings · server `tsc` clean · touched server suites 227 passed. (Full `pnpm test` still has the
 QA-0014 env-only failures: 4 pi-runtime files need `rg`/`git` binaries absent in the sandbox.)
 
-## The three partials — current state for separate discussion
+## The maintainability partials — current state for separate discussion
 
-These were advanced by extracting cohesive, tested leaf modules but remain `partial`. Each needs
-its own decision on how far to push the deeper, higher-risk decomposition.
+These were advanced by extracting cohesive, tested leaf modules. QA-0027 (closed by decision) and
+QA-0034 (fully split by lifecycle stage) are now `fixed`; QA-0054 remains `partial` and needs its
+own decision on how far to push the deeper, higher-risk decomposition.
 
-### QA-0027 — `gateway-client.ts`
-- **Now:** ~1055 lines. Extracted: HTTP proxy, device identity, heartbeat timer (all tested).
-- **Remaining bulk:** connection lifecycle + reconnect/backoff, handshake (peer hello/ready),
-  registry sync + snapshot, backend subscription state, outgoing backend-data/stream message
-  handlers, offline send queue.
-- **Why deferred:** these share the client's mutable connection state (`ws`, `epoch`,
-  `isConnected`, subscription maps). Splitting needs a deps interface (CQE facade already exists)
-  and carries live-networking regression risk.
-- **Open questions for discussion:** which seam first — reconnect/transport, or the
-  outgoing-message handler cluster? Extract as classes with injected deps, or move handlers behind
-  the existing command/query/event facade?
+### QA-0027 — `gateway-client.ts` — ✅ CLOSED (fixed, 2026-07-02)
+- **Now:** 937 lines. Extracted: HTTP proxy, device identity, heartbeat timer, and socket
+  lifecycle + reconnect/backoff + offline send queue (`gateway-transport.ts`, `GatewayTransport`) —
+  all independently tested (12 gateway test files / 90 tests green).
+- **Retained by decision:** registry sync + snapshot, backend subscription state, message router,
+  handshake (peer hello/ready), and the backend-data/stream outgoing handlers stay in the client.
+- **Rationale:** these are tightly coupled to the client's shared mutable connection state (`ws`,
+  `epoch`, subscription maps); further decomposition is high-risk (live-networking regression) and
+  low-value. Closed rather than pursued further.
 
-### QA-0034 — `local-pr/service.ts`
-- **Now:** ~1140 lines. Extracted: review prompt, conflict prompt (pre-existing), review-verdict
-  (pre-existing), provider resolution, merge-commit lookup (all tested).
-- **Remaining bulk:** creation/refresh, review orchestration, merge/revert, conflict resolution,
-  and the queue scheduler (`tick` + `processQueue/Failed/Stale/PendingReviews/PendingMerges` +
-  `cleanupFinishedPRs`).
-- **Why deferred:** the queue scheduler alone touches ~12 private methods/fields
-  (`prRepo`, `startReview`, `mergePR`, `startConflictResolution`, `refreshAfterBusyState`,
-  `hasAvailableSlot`, `activeReviewIds`, `broadcastPRUpdate`, `deleteRelatedSessions`, …).
-- **Open questions for discussion:** extract a `LocalPRQueueScheduler` behind a deps port, or split
-  by lifecycle stage (creation / review / merge-revert / conflict)? How to test the scheduler
-  without a live git worktree?
+### QA-0034 — `local-pr/service.ts` — ✅ CLOSED (fixed, 2026-07-02)
+- **Now:** 236-line delegating facade (was 1139). Split by lifecycle stage into `LocalPRContext`
+  (shared state + helpers + refresh ops, 226) + `PRCreationService` (192) + `PRReviewService` (167)
+  + `PRMergeService` (226) + `PRConflictService` (157) + `PRQueueScheduler` (153). Each stage is a
+  `constructor(ctx, …)` collaborator; the facade constructs them and delegates its unchanged public
+  API.
+- **How:** behaviour-preserving verbatim move, one stage per commit (branch
+  `quality-audit/qa-0034-service-split`, 7 commits). The 2236-line `local-pr-service.test.ts` was
+  the regression net — unchanged and green throughout (7 files / 143 tests); server `tsc` clean.
+- **Extra:** dropped pre-existing dead scheduler code (`processPendingReviews`/`processPendingMerges`
+  + unused `creation` dep). Spec/plan: `specs/2026-07-02-qa-0034-local-pr-service-split-design.md`,
+  `plans/2026-07-02-qa-0034-local-pr-service-split.md`.
+- **Follow-ups (non-blocking):** align `[LocalPRService]` log prefixes with new class names; remove
+  now-orphaned repo methods `findPendingAutoReview`/`findPendingMerge`; if the test may be edited,
+  drop the `(service as any)` reflection delegators on the facade.
 
 ### QA-0054 — `scripts/build/*.sh`
 - **Now:** android.sh ~556, macos.sh ~540 lines. All three scripts share the version/updates
