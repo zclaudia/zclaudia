@@ -49,3 +49,18 @@ test('renderTokens emits css custom properties in config order', () => {
   assert.match(css, /--primary: 214 70% 45%;/);
   assert.ok(css.startsWith('    --background:'));
 });
+
+test('a missing token produces a validation error, not a crash', () => {
+  const theme = structuredClone(themes[0]);
+  delete theme.neutrals.sidebar;
+  const errors = validateTheme(theme);
+  assert.ok(errors.some(e => e.includes('missing token --sidebar')));
+});
+
+test('popover diverging from card is rejected on its own', () => {
+  const theme = structuredClone(themes[0]);
+  theme.neutrals.popover = [theme.hue, 5, theme.neutrals.popover[2]];
+  const errors = validateTheme(theme);
+  assert.ok(errors.some(e => e.includes('--popover must equal --card')));
+  assert.ok(!errors.some(e => e.includes('ladder')));
+});

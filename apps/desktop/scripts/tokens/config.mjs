@@ -30,6 +30,7 @@ function darkNeutrals(hue, sat, satText) {
     secondary: [hue, Math.max(sat - 1, 4), 14],
     'secondary-foreground': [hue, satText - 2, 86],
     muted: [hue, Math.max(sat - 1, 4), 14],
+    // saturation floors at 6 — a future theme with satText < 10 clamps here
     'muted-foreground': [hue, Math.max(satText - 4, 6), 60],
     accent: [hue, sat, 17],
     'accent-foreground': [hue, satText - 2, 86],

@@ -11,7 +11,7 @@ export function hslToRgb([h, s, l]) {
 }
 
 export function relativeLuminance(rgb) {
-  const [r, g, b] = rgb.map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  const [r, g, b] = rgb.map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); // WCAG 2.0 threshold; delta vs 2.1's 0.04045 is negligible at these gate floors.
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
@@ -37,6 +37,17 @@ const CONTRAST_GATES = [
 export function validateTheme(theme) {
   const errors = [];
   const all = { ...theme.neutrals, ...theme.accents };
+
+  const required = new Set(['sidebar', 'background', 'card', 'popover']);
+  for (const [fg, bg] of CONTRAST_GATES) {
+    required.add(fg);
+    required.add(bg);
+  }
+  const missing = [...required].filter(token => !Array.isArray(all[token]));
+  for (const token of missing) {
+    errors.push(`${theme.name}: missing token --${token}`);
+  }
+  if (missing.length > 0) return errors;
 
   for (const [token, [h]] of Object.entries(theme.neutrals)) {
     if (h !== theme.hue) {
